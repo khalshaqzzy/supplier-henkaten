@@ -26,25 +26,24 @@ Roadmap tidak memberikan estimasi waktu. Urutan didasarkan pada dependency dan r
 
 ## 2. Current Repository Status
 
-Kondisi repository pada saat roadmap ini dibuat:
+Kondisi repository setelah Phase 0-1:
 
 - branch aktif: `staging`;
 - `.agent/PRD.md` tersedia dan menjadi product contract;
-- `.agent/implementationPhases.md` sebelumnya kosong;
-- `.agent/sessionHandoff.md` masih kosong;
-- belum ada application source code;
-- belum ada `package.json`, `pnpm-lock.yaml`, atau workspace manifest;
+- delapan ADR dan empat architecture/security baseline tersedia;
+- Node.js 22.23.1 + pnpm 11.16.0 ESM workspace tersedia;
+- active workspace: API compile-only shell, shared contracts, dan deterministic test fixtures;
+- strict TypeScript, ESLint, Prettier, Vitest, root validation, dan lockfile tersedia;
+- local PostgreSQL 18 + pgvector 0.8.5 Compose lifecycle tersedia;
+- baseline GitHub CI memiliki quality, database-smoke, dan secret-scan jobs;
+- belum ada NestJS runtime atau application HTTP behavior;
 - belum ada Prisma schema atau migration;
-- belum ada unit, integration, atau E2E tests;
-- belum ada Docker Compose runtime;
-- belum ada GitHub Actions workflow;
-- belum ada deployment files;
+- belum ada frontend, Playwright E2E, atau remote deployment files;
 - materi slide tersedia sebagai reference-only input.
 
-Current phase: **Phase 0 - Product Contract dan Architecture Baseline**
-Current phase status: **in_progress**
-Completed subphase: **0.1 PRD dan roadmap alignment**
-Next recommended subphase: **0.2 Architecture decisions**
+Completed phases: **Phase 0 dan Phase 1**
+Next phase: **Phase 2 - API Platform dan Persistence Foundation**
+Next phase status: **planned**
 
 Tidak ada application behavior yang boleh ditandai implemented sampai source code dan acceptance checks terkait benar-benar tersedia di repository.
 
@@ -231,7 +230,7 @@ Sebuah phase hanya `done` bila seluruh required subphase `done`, phase exit crit
 
 ## 8. Phase 0 - Product Contract dan Architecture Baseline
 
-Status: **in_progress**
+Status: **done**
 
 Goal: menghilangkan keputusan arsitektur fundamental sebelum scaffolding dan memastikan roadmap konsisten dengan PRD.
 
@@ -272,7 +271,7 @@ Exit criteria:
 
 ### 0.2 Architecture Decisions
 
-Status: **planned - next**
+Status: **done**
 
 Dependency: 0.1.
 
@@ -302,7 +301,7 @@ Exit criteria:
 
 ### 0.3 Domain dan State Model Baseline
 
-Status: **planned**
+Status: **done**
 
 Dependency: 0.2.
 
@@ -343,7 +342,7 @@ Exit criteria:
 
 ### 0.4 Security, Privacy, dan Accepted Risk Baseline
 
-Status: **planned**
+Status: **done**
 
 Dependency: 0.2.
 
@@ -379,7 +378,7 @@ Phase 0 exit criteria:
 
 ## 9. Phase 1 - Repository Scaffold dan Local Tooling
 
-Status: **planned**
+Status: **done**
 
 Goal: membuat foundation pnpm workspace, local database, contracts, test fixtures, dan quality commands yang dipakai seluruh application.
 
@@ -393,7 +392,7 @@ Unlocks:
 
 ### 1.1 pnpm Workspace Scaffold
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 0.
 
@@ -426,7 +425,7 @@ Exit criteria:
 
 ### 1.2 TypeScript dan Code Quality Baseline
 
-Status: **planned**
+Status: **done**
 
 Dependency: 1.1.
 
@@ -455,7 +454,7 @@ Exit criteria:
 
 ### 1.3 Shared Contracts
 
-Status: **planned**
+Status: **done**
 
 Dependency: 1.1-1.2 dan Phase 0.3.
 
@@ -488,7 +487,7 @@ Exit criteria:
 
 ### 1.4 Deterministic Test Fixtures
 
-Status: **planned**
+Status: **done**
 
 Dependency: 1.3.
 
@@ -521,7 +520,7 @@ Exit criteria:
 
 ### 1.5 Local PostgreSQL Compose
 
-Status: **planned**
+Status: **done**
 
 Dependency: 1.1.
 
@@ -554,7 +553,7 @@ Exit criteria:
 
 ### 1.6 Baseline GitHub CI Validation
 
-Status: **planned**
+Status: **done**
 
 Dependency: 1.1-1.5.
 
@@ -5081,23 +5080,23 @@ No acceptance criterion may remain without an owning phase.
 
 Current recommended batch:
 
-1. Complete Phase 0.2 Architecture Decisions.
-2. Complete Phase 0.3 Domain dan State Model Baseline.
-3. Complete Phase 0.4 Security, Privacy, dan Accepted Risk Baseline.
-4. Update roadmap/session handoff/ADRs.
-5. Begin Phase 1.1 pnpm Workspace Scaffold only after Phase 0 exit criteria pass.
+1. Begin Phase 2.1 NestJS Runtime Foundation.
+2. Continue Phase 2.2 structured logging and correlation ID.
+3. Add Prisma foundation and initial non-domain persistence migration in Phase 2.3.
+4. Implement tenant context and scoped repository conventions before domain repositories.
+5. Add append-only audit, transactional outbox, health/readiness, and PostgreSQL integration harness.
 
-Initial implementation order inside the first coding batch:
+Initial implementation order inside the next coding batch:
 
-1. add ADR directory and architecture records;
-2. initialize root pnpm workspace;
-3. add strict TypeScript/ESLint/Prettier;
-4. add contracts/test-fixtures packages;
-5. add local PostgreSQL pgvector Compose;
-6. add repeatable database lifecycle scripts;
-7. add baseline CI validation.
+1. extend the compile-only API workspace into a NestJS Express runtime;
+2. add environment schema validation and global Problem Details mapping;
+3. add structured logging and correlation middleware;
+4. add Prisma 7 and its first migration;
+5. add tenant-context and transaction-client abstractions;
+6. add audit/outbox tables and repository contracts;
+7. add liveness/readiness endpoints and a real PostgreSQL integration-test lifecycle.
 
-Do not start React frontend, Prisma product schema, or deployment scripts in the first batch before their dependencies.
+Do not start React frontend, supplier product domains, or deployment scripts before their owning dependencies.
 
 ## 32. Deferred dan Explicitly Out-of-scope
 

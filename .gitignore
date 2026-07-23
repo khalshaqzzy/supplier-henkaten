@@ -1,1 +1,34 @@
 materials/
+
+# Generated documentation
+.agent/*.pdf
+
+# Operating system and editors
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# JavaScript and TypeScript
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.eslintcache
+.cache/
+.pnpm-store/
+
+# Runtime configuration
+.env
+.env.*
+!.env.example
+
+# Test and browser artifacts
+test-results/
+playwright-report/
+blob-report/
+
+# Local runtime data
+uploads/
+.local/
+tmp/

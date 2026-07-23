@@ -1,0 +1,25 @@
+{
+  "name": "@tmmin-henkaten/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "clean": "tsc --build tsconfig.build.json --clean",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tmmin-henkaten/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@tmmin-henkaten/test-fixtures": "workspace:*"
+  }
+}

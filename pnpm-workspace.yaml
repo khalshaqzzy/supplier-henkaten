@@ -1,0 +1,6 @@
+packages:
+  - apps/api
+  - packages/contracts
+  - packages/test-fixtures
+
+sharedWorkspaceLockfile: true

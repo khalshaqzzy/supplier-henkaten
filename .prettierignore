@@ -1,0 +1,10 @@
+.agent/**
+docs/**
+materials/**
+node_modules/**
+dist/**
+coverage/**
+pnpm-lock.yaml
+playwright-report/**
+test-results/**
+uploads/**

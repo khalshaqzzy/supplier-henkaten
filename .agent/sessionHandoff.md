@@ -1,190 +1,257 @@
-# Session Handoff — Product Contract dan Implementation Roadmap
+# Session Handoff — Architecture dan Repository Foundation
 
 Last updated: 2026-07-23
 
 Branch: `staging`
 
-Repository state at handoff: product planning complete; application implementation has not started
+Repository state: Phase 0 dan Phase 1 complete; Phase 2 belum dimulai
 
-## 1. Current Objective
+## 1. Completed Objective
 
-Menyelesaikan product dan implementation baseline untuk Enterprise Digital Henkaten Management sebelum repository scaffolding dimulai.
+Architecture baseline dan local repository foundation untuk Enterprise Digital Henkaten Management
+telah diselesaikan. Repository sekarang memiliki decision-complete architecture documents, pnpm ESM
+workspace, shared Zod contracts, deterministic fixtures, PostgreSQL local lifecycle, dan baseline
+CI.
 
-Product contract telah dituangkan dalam `.agent/PRD.md`, dan coding roadmap backend-first telah dituangkan dalam `.agent/implementationPhases.md`. Kedua dokumen menjadi input utama bagi session berikutnya; tidak ada application behavior yang sudah diimplementasikan.
+Tidak ada product API, NestJS runtime, Prisma schema, frontend, atau remote deployment yang sudah
+diimplementasikan.
 
-## 2. Current Phase dan Progress
+## 2. Current Progress
 
-- Current phase: **Phase 0 — Product Contract dan Architecture Baseline**
-- Phase status: **in_progress**
-- Completed subphase: **0.1 PRD dan Roadmap Alignment**
-- Next subphase: **0.2 Architecture Decisions**
-- Application code status: **not started**
-- Database/migration status: **not started**
-- Automated test status: **not started**
-- Deployment status: **not started**
+- Completed: **Phase 0 — Product Contract dan Architecture Baseline**
+- Completed: **Phase 1 — Repository Scaffold dan Local Tooling**
+- Next: **Phase 2 — API Platform dan Persistence Foundation**
+- Next subphase: **2.1 NestJS Runtime Foundation**
+- Phase 2 status: **planned**
 
-Hanya satu phase yang berstatus `in_progress`. Phase 1 tidak boleh dimulai sebelum Phase 0.2–0.4 dan exit criteria Phase 0 selesai.
+Tidak ada phase atau subphase yang saat ini ditandai `in_progress`.
 
-## 3. Work Completed
+## 3. Architecture Baseline
 
-### 3.1 Product Requirements Document
+Delapan ADR berstatus Accepted tersedia di `docs/adr/`:
 
-`.agent/PRD.md` telah diisi sebagai product contract v1 yang mencakup:
+1. pnpm ESM monorepo dan package boundaries;
+2. NestJS/Prisma/PostgreSQL modular monolith;
+3. tenant isolation dan authorization boundaries;
+4. database-backed session dan same-origin browser API;
+5. transaction concurrency dan lock ordering;
+6. transactional outbox dan SSE;
+7. Hosted member-photo storage;
+8. single-VM environment dan release constraints.
 
-- scope Hosted dan External untuk 20–42 supplier;
-- role dan permission TMMIN Admin, TMMIN Quality, Supplier Admin, Supervisor/GL, Line Leader/TL, MP, dan QC Team;
-- tenant isolation, authentication, account lifecycle, dan PII boundary;
-- supplier master data, default assignment, Shift Run, Henkaten 4M, approval, Man reservation/cascade, warning, notification, board, dashboard, dan audit;
-- External REST API, idempotency, source version ordering, projection, credential isolation, dan data minimization;
-- conceptual data model, technical architecture, security, observability, performance, CI/CD, deployment, testing, acceptance criteria, risks, blockers, dan out-of-scope;
-- permanent Hosted data retention serta accepted critical risks terkait tidak adanya backup/recovery/HA dan automatic production deployment.
+Normative implementation documents tersedia di `docs/architecture/`:
 
-### 3.2 Implementation Roadmap
+- aggregate ownership dan cross-aggregate transactions;
+- state machines;
+- domain-event dan public-error registry;
+- security, privacy, dan accepted-risk baseline.
 
-`.agent/implementationPhases.md` telah diisi sebagai roadmap coding utama dengan:
+Keputusan penting:
 
-- 17 phase, dari Phase 0 sampai Phase 16;
-- 147 subphase;
-- dependency, execution list, verification, data/migration impact, dan exit criteria pada setiap subphase;
-- backend-first sequencing dan backend contract freeze sebelum frontend feature development;
-- phase dependency matrix, milestone map, critical path, parallelization guidance, ADR backlog, PRD acceptance ownership, global Definition of Done, serta explicit deferred/out-of-scope list;
-- staging deployment ditempatkan setelah local full-stack E2E dan menjelang UAT;
-- recommended first execution batch yang dimulai dari Phase 0.2.
+- Node.js 22.23.1 dan pnpm 11.16.0;
+- ESM menyeluruh dengan TypeScript NodeNext;
+- package namespace `@tmmin-henkaten/*`;
+- PostgreSQL 18;
+- Zod-first dengan generated OpenAPI sebagai public wire artifact;
+- tenant-scoped repositories tanpa PostgreSQL RLS;
+- opaque database-backed session dengan same-origin browser API;
+- PostgreSQL transactional outbox + SSE tanpa Redis;
+- Sharp/private local volume untuk Hosted photo pada owning implementation;
+- no backup/recovery/HA dan automatic production deployment tetap accepted risk.
 
-### 3.3 Repository Inspection
+## 4. Repository Foundation
 
-Repository dikonfirmasi masih greenfield:
+Active workspaces:
 
-- belum ada root `package.json`, `pnpm-workspace.yaml`, atau lockfile;
-- belum ada `apps/`, `packages/`, Prisma schema, migration, test harness, Docker Compose, GitHub Actions, atau deployment scripts;
-- branch aktif adalah `staging`;
-- remote `origin/staging` tersedia;
-- materi referensi tetap berada di repository dan tidak diubah dalam session ini.
+- `apps/api`
+  - compile-only ESM shell;
+  - mengimpor shared contracts melalui package export;
+  - tidak membuka HTTP port dan belum memakai NestJS/Prisma.
+- `packages/contracts`
+  - Zod runtime schemas;
+  - shared domain/status/error/event enums;
+  - common, auth/session, health/readiness, event-envelope contracts.
+- `packages/test-fixtures`
+  - deterministic fixture builders;
+  - fixed UUID/time;
+  - External fixture PII-policy checks;
+  - tidak menjadi database seed atau production dependency.
 
-## 4. Files Changed
+Root tooling:
 
-- `.agent/PRD.md`
-  - product contract v1 lengkap;
-  - 2,184 lines.
-- `.agent/implementationPhases.md`
-  - backend-first implementation roadmap lengkap;
-  - 5,199 lines.
-- `.agent/sessionHandoff.md`
-  - handoff session ini.
+- exact pnpm lockfile;
+- strict TypeScript 6/NodeNext;
+- typed ESLint flat config dan import boundaries;
+- Prettier;
+- Vitest;
+- root `validate` command;
+- Node and pnpm version pins;
+- local developer README.
 
-Tidak ada source code, migration, test, deployment file, secret, atau runtime configuration yang dibuat atau diubah.
+Generated `.agent/*.pdf`, termasuk local `implementationPhases.pdf`, di-ignore dan tidak dihapus.
 
-## 5. Locked Decisions
+## 5. Shared Contracts
 
-Keputusan berikut tidak boleh ditentukan ulang tanpa product/architecture change yang eksplisit:
+Current shared enums include:
 
-- Node.js 22, TypeScript, dan pnpm workspaces tanpa Turborepo.
-- NestJS dengan Express adapter, Prisma, dan PostgreSQL.
-- Local/test PostgreSQL menggunakan Docker-managed pgvector-enabled image; tidak ada fitur vector/AI pada v1.
-- Dua React Vite frontend: supplier-facing dan TMMIN-facing.
-- Shared runtime contracts menggunakan Zod.
-- Hosted session menggunakan opaque database-backed session ID dan secure HttpOnly cookie.
-- Tenant isolation menggunakan scoped repositories, authorization guards, database constraints, dan negative tests; PostgreSQL RLS bukan requirement v1.
-- Realtime board/notification menggunakan SSE dengan PostgreSQL transactional outbox; Redis tidak ditambahkan.
-- Foto member hanya berlaku pada Hosted mode, diproses server-side, dan disimpan pada persistent local volume.
-- External supplier mengirim minimized monitoring data; nomor registrasi, foto, username, password, dan account master tidak diterima melalui External API.
-- Backend contracts dibekukan sebelum frontend feature implementation.
-- Staging deployment dikerjakan setelah local E2E lengkap, menjelang UAT.
-- Push `staging` men-deploy staging; push `main` men-deploy production secara otomatis setelah required checks.
-- v1 tetap tidak memiliki backup/recovery, RPO/RTO, atau HA sesuai accepted risk dalam PRD.
+- Hosted/External source modes;
+- identity realm dan application roles;
+- Shift Run states;
+- Henkaten categories/statuses;
+- approval routes/route states/decisions;
+- cancellation and Assignment Issue states;
+- External event/ingestion states;
+- internal event registry;
+- canonical public error codes.
 
-## 6. Validation Performed
+Current common contracts include:
 
-Checks yang telah dijalankan:
+- opaque UUID;
+- offset-required UTC timestamp normalization;
+- safe correlation ID;
+- positive optimistic version;
+- cursor pagination with default 25/max 100;
+- field-addressable Problem Details;
+- Supplier/TMMIN login shapes;
+- scoped session principal/response;
+- password-change baseline;
+- health/readiness;
+- durable event envelope primitives.
 
-- structural validation terhadap `.agent/implementationPhases.md`;
-- terverifikasi 17 phase dan 147 subphase;
-- terverifikasi setiap subphase memiliki enam field wajib:
-  - `Status`;
-  - `Dependency`;
-  - `Execution`;
-  - `Verification`;
-  - `Data/migration impact`;
-  - `Exit criteria`;
-- pengecekan locked decision markers pada roadmap;
-- Markdown code-fence balance check;
-- `git diff --check -- .agent/implementationPhases.md`;
-- repository status, branch, remote, dan diff inspection.
+No OpenAPI file exists yet. Endpoint implementation must generate OpenAPI from the shared Zod
+schemas rather than create parallel manual schemas.
 
-Tidak ada application tests yang dijalankan karena belum ada application code atau test harness.
+## 6. Local PostgreSQL
 
-## 7. Architecture Records
+Configuration:
 
-Belum ada ADR yang dibuat.
+- PostgreSQL: 18.4;
+- pgvector: 0.8.5;
+- image:
+  `pgvector/pgvector:0.8.5-pg18-bookworm@sha256:12a379b47ad65289572ea0756efc11b7c241a6662833e8af7038cd3b73d647e0`;
+- Compose project: `supplier-henkaten-local`;
+- local port: `55432`;
+- main DB: `supplier_henkaten`;
+- disposable test DB: `supplier_henkaten_test`.
 
-Hal ini tidak berarti architecture decisions boleh diabaikan. Phase 0.2 secara eksplisit menjadi next task untuk membuat ADR terpisah bagi:
+Root commands:
 
-- pnpm workspace dan package boundaries;
-- NestJS modular monolith dan Prisma/PostgreSQL;
-- tenant isolation;
-- opaque database-backed sessions;
-- transaction/concurrency strategy;
-- transactional outbox dan SSE;
-- local member-photo storage;
-- single-VM deployment topology.
+- `pnpm db:up`
+- `pnpm db:wait`
+- `pnpm db:verify`
+- `pnpm db:migrate`
+- `pnpm db:test:reset`
+- `pnpm db:down`
+- `pnpm db:destroy`
 
-ADR harus selesai sebelum scaffolding yang bergantung padanya. Hindari membuat satu ADR gabungan atau placeholder yang menduplikasi delapan decision boundary tersebut.
+`db:migrate` currently reports zero registered migrations. Phase 2.3 must replace the dispatcher with
+Prisma while preserving the root command.
 
-## 8. Known Risks dan External Dependencies
+Safety verified:
 
-### Accepted critical risks
+- test database name must end with `_test`;
+- test reset does not alter a sentinel in the main DB;
+- `db:down` preserves the main named volume;
+- `db:destroy` explicitly removes only the project volume;
+- no product tables remain or were introduced.
 
-- Tidak ada database atau member-photo backup.
-- Tidak ada recovery mechanism, RPO/RTO, HA, atau multi-node failover.
-- Production deployment otomatis tanpa manual approval gate.
-- Destructive migration berisiko tinggi dan wajib dicegah melalui expand/contract discipline.
-- In-app-only notification tidak menjangkau user yang offline.
-- Hosted PII disimpan dengan logical permanent retention.
+## 7. Baseline CI
 
-### External dependencies yang belum memblokir local development
+`.github/workflows/ci.yml` runs on push/PR for `staging` and `main`, plus manual dispatch.
 
-- production domains;
-- production VM;
-- SSH/deployment credentials;
-- production DNS;
-- GitHub environment secrets;
-- representative Hosted dan External UAT users;
-- privacy/governance approval;
-- written accepted-risk sign-off.
+Jobs:
 
-Dependency tersebut menjadi blocker pada deployment validation, UAT, atau production release—bukan pada Phase 0–14.
+- `quality`: frozen install, format, lint, typecheck, tests, build;
+- `database-smoke`: Compose validation, PostgreSQL lifecycle, version/extension checks, test reset,
+  and always-on cleanup;
+- `secret-scan`: Gitleaks with read-only repository permission.
 
-## 9. Open Questions
+There is no deployment job. CodeQL, dependency review, Trivy, Playwright, images, and deployment
+remain owned by later phases.
 
-Tidak ada product question yang menghalangi Phase 0.2 atau local scaffolding.
+The workflow has been parsed by Prettier and its local-equivalent commands passed. The remote
+workflow is triggered by the final push to `staging`; its GitHub result remains the authoritative
+clean-checkout confirmation.
 
-Hal berikut sengaja tetap external/unresolved sampai owning phase:
+## 8. Validation Evidence
 
-- final production domains;
-- concrete VM sizing dan credentials;
-- final image-processing library;
-- production secret values;
-- designated UAT participants;
-- organizational approval atas privacy dan accepted critical risks.
+Runtime:
 
-Jika salah satu jawaban mengubah product behavior, PRD dan roadmap harus diperbarui sebelum implementation dilanjutkan.
+- official temporary Node.js 22.23.1 distribution, SHA-256 verified;
+- pnpm 11.16.0.
 
-## 10. Next Recommended Action
+Commands/checks passed:
 
-Jalankan Phase 0.2 terlebih dahulu:
+- `pnpm install --frozen-lockfile`;
+- `pnpm clean` and clean rebuild;
+- `pnpm format:check`;
+- `pnpm lint`;
+- `pnpm typecheck`;
+- `pnpm test`;
+- `pnpm build`;
+- `pnpm validate`;
+- negative cross-workspace import lint probe;
+- negative strict TypeScript probe;
+- `docker compose config --quiet`;
+- database start/wait/verify;
+- PostgreSQL 18.4 and vector 0.8.5 verification;
+- disposable test database reset;
+- main-database isolation sentinel;
+- volume persistence across `db:down`;
+- explicit project volume destroy;
+- ADR/architecture structure checks;
+- final review confirmed that the eight existing ADR boundaries cover every durable decision in this
+  batch, so no duplicate ninth ADR was required;
+- high-confidence repository secret-pattern scan;
+- ignored-artifact inspection confirmed that `.agent/implementationPhases.pdf`, build output,
+  dependencies, and materials are not staged;
+- `git diff --check`.
 
-1. buat `docs/adr/` dan ADR terpisah sesuai decision boundary;
-2. catat context, decision, alternatives, tradeoffs, consequences, validation, risks, dan follow-up;
-3. lanjutkan Phase 0.3 untuk aggregate boundaries, state machines, concurrency ownership, dan event vocabulary;
-4. lanjutkan Phase 0.4 untuk security/privacy/risk baseline;
-5. tandai Phase 0 selesai hanya setelah seluruh exit criteria lulus;
-6. baru mulai Phase 1.1 pnpm Workspace Scaffold.
+Test result:
 
-Jangan memulai React frontend, Prisma product schema, atau staging deployment pada next batch.
+- contracts: 11 tests passed;
+- deterministic fixtures: 6 tests passed;
+- API workspace shell: 1 test passed;
+- total: 18 tests passed.
 
-## 11. End-of-session Runtime State
+Final audit note:
 
-- Tidak ada dev server yang dijalankan.
-- Tidak ada watcher atau background worker yang dijalankan.
-- Tidak ada Docker container yang dimulai oleh agent.
-- Tidak ada cleanup runtime yang diperlukan.
+- the complete workspace validation was rerun immediately before delivery using the pinned Node.js
+  and pnpm versions;
+- the first OrbStack start command reported a client-side startup timeout, but the VM reached
+  `Running`; Docker then responded normally and the complete database smoke sequence passed;
+- the temporary database container, network, and volume created by the final smoke test were removed
+  after validation.
+
+## 9. Runtime Cleanup
+
+- PostgreSQL container stopped and removed.
+- Compose network removed.
+- project PostgreSQL volume removed after persistence validation.
+- no application server, watcher, or worker remains.
+- OrbStack was started only for database validation and was stopped before final handoff.
+
+## 10. Known Constraints dan Risks
+
+- Host default Node.js is v26; project commands must use Node.js 22.23.1.
+- Permanent Hosted data retention remains a governance dependency.
+- There is no database/photo backup, restore, RPO/RTO, or HA.
+- Single VM remains a critical accepted failure domain.
+- Production deployment remains automatic without manual approval.
+- Baseline CI is not a substitute for later full security and E2E gates.
+
+## 11. Next Recommended Action
+
+Begin Phase 2.1 only:
+
+1. turn the compile-only API shell into a NestJS 11 Express runtime;
+2. preserve ESM/NodeNext and package boundaries;
+3. add environment validation and global Problem Details mapping;
+4. add structured logging and correlation in 2.2;
+5. introduce Prisma 7 and the first non-domain persistence migration in 2.3;
+6. replace the zero-migration dispatcher without renaming root `db:migrate`;
+7. implement tenant context, audit/outbox, liveness/readiness, and PostgreSQL integration harness
+   before supplier domain features.
+
+Do not start frontend, Hosted domain workflows, External ingestion, or remote deployment during the
+next batch.
