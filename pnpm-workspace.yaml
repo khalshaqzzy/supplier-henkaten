@@ -1,0 +1,12 @@
+packages:
+  - apps/api
+  - packages/contracts
+  - packages/test-fixtures
+
+allowBuilds:
+  '@prisma/engines': true
+  '@swc/core': true
+  argon2: true
+  prisma: true
+
+sharedWorkspaceLockfile: true

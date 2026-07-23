@@ -1,0 +1,11 @@
+.agent/**
+docs/**
+materials/**
+node_modules/**
+dist/**
+coverage/**
+apps/api/openapi/openapi.json
+pnpm-lock.yaml
+playwright-report/**
+test-results/**
+uploads/**
