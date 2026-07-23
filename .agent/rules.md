@@ -58,6 +58,75 @@ Future agents must treat runtime cleanup as part of finishing a task:
 - Before final response, confirm there are no agent-started long-running processes or containers still needed for the completed task.
 - If a process or container must remain running for the user to inspect the app, state that explicitly and include the URL or reason.
 
+## 4.2 Mandatory Local GitHub Actions Parity Checks
+
+Before creating any commit, future agents must inspect every workflow under `.github/workflows/`
+that is triggered by the target branch and run its relevant checks locally. A previous successful
+local command is not evidence when generated files or build output from an earlier run may still
+exist.
+
+Required behavior:
+
+- use the repository-pinned Node.js and pnpm versions;
+- run `pnpm install --frozen-lockfile`;
+- begin from a clean-artifact state or a temporary clean Git worktree so ignored generated output
+  cannot hide a missing generation/build dependency;
+- execute the workflow commands in the same order and with the same required environment variables
+  as GitHub Actions;
+- run database checks against the Docker-managed disposable test database and always stop the
+  Compose stack afterward;
+- run the same secret scanner used by CI. When the GitHub Action supplies Gitleaks, run the matching
+  Gitleaks version locally, preferably through a pinned Docker image;
+- never silence a scanner broadly. A false-positive exception must identify the exact finding,
+  explain why it is safe, and preserve scanning for the rest of the file/repository;
+- record the exact commands and results in `.agent/sessionHandoff.md`;
+- do not commit while any local CI-equivalent check is failing.
+
+The current baseline is:
+
+```text
+pnpm install --frozen-lockfile
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test:unit
+pnpm openapi:check
+pnpm build
+docker compose config --quiet
+pnpm db:up
+pnpm db:wait
+pnpm db:verify
+pnpm db:test:reset
+pnpm db:test:migrate
+NODE_ENV=test DATABASE_URL=<disposable-test-url> RELEASE_SHA=ci \
+  SESSION_CSRF_SECRET=<safe-test-value> AUTH_THROTTLE_SECRET=<safe-test-value> \
+  OUTBOX_ENABLED=false pnpm test:integration
+pnpm db:down
+docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.24.3 \
+  dir /repo --config=/repo/.gitleaks.toml --redact --verbose
+git diff --check
+```
+
+The directory-mode Gitleaks command is the mandatory pre-commit scan because it includes
+uncommitted files. After committing and before pushing, also mirror the current GitHub Action
+commit scan:
+
+```text
+docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.24.3 \
+  detect --source=/repo --config=/repo/.gitleaks.toml --redact --verbose --log-opts=-1
+```
+
+If `.github/workflows/` changes, this list must be reconciled in the same change rather than assumed
+to remain complete.
+
+After pushing:
+
+1. inspect the new run with `gh run list --branch <branch>`;
+2. use `gh run view <run-id> --json jobs` and `gh run view <run-id> --log-failed`;
+3. do not report the delivery as successful until all required jobs are green;
+4. if a job fails, reproduce it locally, fix the root cause, rerun all affected local checks, then
+   commit and push the correction.
+
 ## 5. When To Update `.agent`
 
 Update `.agent` when implementation changes:

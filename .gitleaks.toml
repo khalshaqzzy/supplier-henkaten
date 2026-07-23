@@ -1,0 +1,10 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Exact non-production credentials used only by the disposable CI test database"
+regexTarget = "secret"
+regexes = [
+  '''integration-test-csrf-secret-at-least-32''',
+  '''integration-test-throttle-secret-32''',
+]

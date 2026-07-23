@@ -36,6 +36,8 @@ Kondisi repository setelah Phase 0-4:
 - strict TypeScript, ESLint, Prettier, Vitest, root validation, dan lockfile tersedia;
 - local PostgreSQL 18 + pgvector 0.8.5 Compose lifecycle tersedia;
 - baseline GitHub CI memiliki quality, database-integration, dan secret-scan jobs;
+- root quality/integration commands bersifat hermetic pada clean checkout, Gitleaks version dipin,
+  dan local CI-parity verification wajib dilakukan sebelum commit;
 - NestJS/Express runtime, Prisma 7 adapter, initial PostgreSQL migration, OpenAPI 3.1, audit,
   outbox, health/readiness, authentication, RBAC, TMMIN administration, supplier provisioning, dan
   source-governance core tersedia;

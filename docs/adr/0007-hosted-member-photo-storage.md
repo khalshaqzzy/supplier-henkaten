@@ -73,9 +73,9 @@ posture.
 
 ## Validation Evidence
 
-Sharp processing, private authenticated delivery, signature/MIME checks, bounded decode,
-transactional metadata replacement, and idempotent outbox cleanup are implemented and exercised by
-integration tests.
+Sharp processing, private authenticated delivery, file-format verification, bounded decode,
+transactional metadata replacement, and idempotent outbox cleanup are implemented and exercised
+by integration tests.
 
 ## Follow-up
 

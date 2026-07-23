@@ -53,6 +53,9 @@ dependency analysis. Delaying inactive package manifests keeps root commands hon
 - `.node-version` and `.nvmrc` pin Node.js 22.23.1.
 - Root `package.json` pins pnpm through `packageManager` and constrains Node.js through `engines`.
 - Root scripts call recursive pnpm commands in topological order.
+- Every root command that consumes generated Prisma types or compiled workspace exports first
+  generates/builds those prerequisites itself. Commands must pass independently on a clean
+  checkout and may not rely on ignored artifacts left by an earlier command.
 - TypeScript shared defaults target ES2022 and use `module` and `moduleResolution` set to `NodeNext`.
 - Package exports reference compiled JavaScript and declaration files under `dist`.
 - ESLint blocks forbidden cross-boundary imports and production imports of test fixtures.
@@ -81,8 +84,13 @@ validation.
 ## Validation Evidence
 
 Validated on 2026-07-23 with Node.js 22.23.1 and pnpm 11.16.0. Frozen installation, formatting,
-typed lint, strict typecheck, 18 Vitest tests, and all three workspace builds passed. Negative probes
+typed lint, strict typecheck, Vitest tests, and all three workspace builds passed. Negative probes
 confirmed that a cross-workspace relative import and an intentional strict type mismatch fail.
+
+After generated Prisma output and every workspace `dist` directory were explicitly removed, the
+quality workflow sequence passed because lint regenerates Prisma and builds shared packages. The
+database integration command also passed from that clean-artifact state because it now generates
+Prisma and builds shared contracts before Vitest starts.
 
 ## Follow-up
 

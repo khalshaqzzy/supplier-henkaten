@@ -3,7 +3,8 @@
 Tanggal: 2026-07-23
 Branch: `staging`
 Status repository: Phase 0–4 selesai; Phase 5 `planned`
-Target commit: `feat: add hosted supplier master data management`
+Phase 4 commit: `4137545 feat: add hosted supplier master data management`
+CI remediation target: `fix: make CI validation hermetic`
 
 ## 1. Outcome
 
@@ -229,3 +230,37 @@ Mulai Phase 5.1:
 
 Jangan memulai Henkaten, frontend, External ingestion, atau deployment sebelum dependency phase
 masing-masing terpenuhi.
+
+## 11. CI Failure Remediation
+
+GitHub Actions run `29991802871` untuk commit Phase 4 diinspeksi menggunakan `gh` CLI. Ketiga job
+gagal dengan akar masalah berikut:
+
+- `quality`: `pnpm lint` bergantung pada generated Prisma client yang hanya tersedia dari local
+  run sebelumnya. Clean GitHub checkout menghasilkan type-resolution failures.
+- `database-integration`: `pnpm test:integration` membuat Prisma client tetapi tidak membuild
+  `@tmmin-henkaten/contracts`, sehingga Vitest tidak dapat me-resolve package export pada clean
+  checkout.
+- `secret-scan`: Gitleaks `8.24.3` mendeteksi false positive pada frasa dokumentasi
+  `signature/MIME checks` di ADR 0007.
+
+Remediation:
+
+- root `lint`, `openapi:check`, dan `test:integration` sekarang menghasilkan/build prerequisite
+  sendiri;
+- Gitleaks dipin ke `8.24.3`, safe CI-only test values di-allowlist secara exact, historical
+  false-positive fingerprint diabaikan secara exact, dan kalimat ADR diperjelas;
+- `.agent/rules.md` sekarang mewajibkan local GitHub Actions parity checks dari clean-artifact
+  state sebelum commit, pre-commit working-tree Gitleaks scan, dan `gh` verification setelah push;
+- ADR 0001 mencatat hermetic workspace-command requirement.
+
+Actual local parity evidence:
+
+- generated Prisma client dan semua workspace `dist` directories dihapus;
+- frozen install, format, lint, typecheck, unit, OpenAPI drift, dan build lulus;
+- generated Prisma client dan shared `dist` dihapus lagi sebelum database job;
+- Compose validation, PostgreSQL 18/pgvector verification, fresh migrations, dan 11 integration
+  tests lulus;
+- Gitleaks `8.24.3` directory scan lulus tanpa finding;
+- Gitleaks commit scan terhadap commit Phase 4 lulus dengan exact historical false-positive
+  fingerprint handling.
