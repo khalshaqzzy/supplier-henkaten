@@ -26,11 +26,11 @@ Roadmap tidak memberikan estimasi waktu. Urutan didasarkan pada dependency dan r
 
 ## 2. Current Repository Status
 
-Kondisi repository setelah Phase 0-8:
+Kondisi repository setelah Phase 0-9:
 
 - branch aktif: `staging`;
 - `.agent/PRD.md` tersedia dan menjadi product contract;
-- tujuh belas ADR dan lima architecture/security baseline tersedia;
+- delapan belas ADR dan enam architecture/security baseline tersedia;
 - Node.js 22.23.1 + pnpm 11.16.0 ESM workspace tersedia;
 - active workspace: NestJS API, shared contracts, dan deterministic test fixtures;
 - strict TypeScript, ESLint, Prettier, Vitest, root validation, dan lockfile tersedia;
@@ -45,8 +45,8 @@ Kondisi repository setelah Phase 0-8:
 - Hosted supplier master data telah tersedia: member/account, private photo, line/job, part, Shift
   Template, versioned 4M checklist, typed Default Assignment, logical deactivation, dan audited
   TMMIN read-only access;
-- minimum Hosted configuration contributor Phase 4 telah aktif dan tetap fail-closed terhadap
-  contributor External Phase 9;
+- minimum Hosted configuration contributor dan External next-epoch credential contributor telah
+  aktif;
 - durable Shift Run plan, atomic normal/emergency Start Shift, Working Assignment snapshot,
   Assignment Issue foundation, scoped query, reference protection, dan operational cutover
   contributor telah tersedia;
@@ -57,12 +57,15 @@ Kondisi repository setelah Phase 0-8:
   transactional End Shift telah tersedia;
 - durable per-user notification, scoped Assignment Board, supplier/TMMIN dashboard, audit read API,
   dan resumable SSE invalidation stream telah tersedia;
+- epoch-bound external client/secret lifecycle, opaque 15-minute token, strict public event
+  contracts, immutable ordered ingestion, per-item batch processing, External projection/warning,
+  TMMIN notification, dan unified dashboard/freshness telah tersedia;
 - belum ada frontend, Playwright E2E, atau remote deployment files;
 - materi slide tersedia sebagai reference-only input.
 
-Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, dan Phase 8**
+Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8, dan Phase 9**
 Current phase: **tidak ada**
-Next phase: **Phase 9 - External REST API Backend (`planned`)**
+Next phase: **Phase 10 - Backend Contract Freeze dan Hardening (`planned`)**
 
 Tidak ada application behavior yang boleh ditandai implemented sampai source code dan acceptance checks terkait benar-benar tersedia di repository.
 
@@ -2521,7 +2524,7 @@ Phase 8 exit criteria:
 
 ## 17. Phase 9 - External REST API Backend
 
-Status: **planned**
+Status: **done**
 
 Goal: menyediakan external client lifecycle dan idempotent monitoring ingestion tanpa memberi supplier External akses ke Hosted workflow.
 
@@ -2537,7 +2540,7 @@ Unlocks:
 
 ### 9.1 External API Client Lifecycle
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 3.7.
 
@@ -2568,7 +2571,7 @@ Exit criteria:
 
 ### 9.2 Client-credentials Token Endpoint
 
-Status: **planned**
+Status: **done**
 
 Dependency: 9.1.
 
@@ -2597,7 +2600,7 @@ Exit criteria:
 
 ### 9.3 OpenAPI dan Zod Event Contracts
 
-Status: **planned**
+Status: **done**
 
 Dependency: shared contracts Phase 1 and PRD API v1.
 
@@ -2627,7 +2630,7 @@ Exit criteria:
 
 ### 9.4 Single-event Ingestion
 
-Status: **planned**
+Status: **done**
 
 Dependency: 9.2-9.3.
 
@@ -2657,7 +2660,7 @@ Exit criteria:
 
 ### 9.5 Idempotency dan Source-version Ordering
 
-Status: **planned**
+Status: **done**
 
 Dependency: 9.4.
 
@@ -2687,7 +2690,7 @@ Exit criteria:
 
 ### 9.6 Batch Ingestion
 
-Status: **planned**
+Status: **done**
 
 Dependency: 9.5.
 
@@ -2716,7 +2719,7 @@ Exit criteria:
 
 ### 9.7 Projection dan TMMIN Warning Integration
 
-Status: **planned**
+Status: **done**
 
 Dependency: 9.4-9.6 dan Phase 8.6.
 
@@ -2745,7 +2748,7 @@ Exit criteria:
 
 ### 9.8 PII, Rate Limit, dan IP Allowlist Enforcement
 
-Status: **planned**
+Status: **done**
 
 Dependency: 9.2-9.7.
 
@@ -2774,7 +2777,7 @@ Exit criteria:
 
 ### 9.9 External Contract dan Security Suite
 
-Status: **planned**
+Status: **done**
 
 Dependency: 9.1-9.8.
 
@@ -2802,6 +2805,19 @@ Exit criteria:
 Phase 9 exit criteria:
 
 - External suppliers can securely push monitoring events; TMMIN receives unified warning/dashboard data without Hosted control or excess PII.
+
+Implementation note:
+
+- Migration 007 menambahkan credential, token digest, immutable raw ingestion, current projection,
+  unified warning source, index, dan append-only trigger.
+- Strict shared Zod schemas dan OpenAPI mencakup lima lifecycle event untuk keempat kategori 4M,
+  single/batch/status endpoint, dan TMMIN client/projection reads.
+- Serializable per-event transaction, canonical hash reconciliation, source-version ordering,
+  terminal freeze, dan per-item batch isolation telah dibuktikan dengan real PostgreSQL.
+- External Open/terminal state memperbarui warning dan mengirim durable notification ke active
+  TMMIN Admin; Assignment Board tetap Hosted-only.
+- Local single-instance rate limiter menerapkan token attempt limit serta ingestion token bucket;
+  horizontal scaling memerlukan coordinated counter sesuai ADR 0018.
 
 ---
 

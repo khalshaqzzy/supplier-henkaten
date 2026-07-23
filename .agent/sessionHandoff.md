@@ -1,100 +1,118 @@
-# Session Handoff — Durable Read Models and Realtime Invalidation
+# Session Handoff — External Ingestion and Unified Monitoring
 
 Tanggal: 2026-07-23
 Branch: `staging`
-Status repository: Phase 0–8 selesai; Phase 9 `planned`
+Status repository: Phase 0–9 selesai; Phase 10 `planned`
 
 ## 1. Outcome
 
-Hosted backend sekarang menyediakan seluruh read experience yang diperlukan sebelum External
-ingestion dan frontend:
+Backend sekarang menerima External Henkaten monitoring dengan authorization, privacy, ordering, dan
+traceability yang terikat ke supplier/source epoch:
 
-- idempotent outbox-driven notification persistence per user;
-- paginated notification center, unread count, dan optimistic read/unread mutation;
-- role-scoped Assignment Board untuk active Shift Run dengan ordered job/MP, initials/photo,
-  vacancy/reservation/conflict, dan explicit Open/Approved 4M indicators;
-- supplier dashboard aggregation dan bounded recent activity;
-- TMMIN global dashboard untuk Hosted state, affected warning, source-mode count, override, dan
-  freshness;
-- supplier/TMMIN audit read API dengan cursor pagination dan sensitive-key redaction;
-- authenticated tenant/line-scoped SSE invalidation dengan heartbeat dan `Last-Event-ID` resume;
-- shared Zod/OpenAPI contracts, migration, ADR, architecture note, dan integration evidence.
-
-External credential, token, ingestion, projection, dan unified Hosted/External freshness tetap
-dimiliki Phase 9.
+- TMMIN-managed external client lifecycle dengan one-time Argon2id-hashed secret, rotation maksimal
+  dua active secret, revoke, optional IP allowlist, dan optimistic version;
+- opaque 15-minute bearer token dengan stored SHA-256 digest, fixed scope, epoch validation, immediate
+  revocation, generic auth failure, dan `Cache-Control: no-store`;
+- strict Zod/OpenAPI `1.0` event contract untuk MAN/MACHINE/MATERIAL/METHOD dan seluruh lifecycle;
+- immutable raw event, canonical SHA-256 idempotency, contiguous source version, terminal freeze,
+  current projection, freshness, warning, audit, dan outbox dalam satu serializable transaction;
+- single, per-item batch, dan ingestion-status API dengan bounded 5 MiB/500-item input;
+- TMMIN projection history, unified Hosted/External dashboard, external warning notification, dan
+  source-mode badge tanpa External Assignment Board;
+- token-attempt dan ingestion rate limit yang sesuai single-instance topology;
+- PostgreSQL concurrency, partial-batch, contract, privacy, and revocation evidence.
 
 ## 2. Locked Decisions
 
-- PostgreSQL domain tables tetap source of truth read model.
-- Notification unik per `(sourceEventId, recipientUserId)` dan aman terhadap outbox retry.
-- Outbox mendukung zero-or-more handler per event; domain event tanpa side-effect handler tetap valid.
-- SSE hanya mengirim invalidation metadata, bukan full domain payload atau PII.
-- REST board/dashboard/audit adalah recovery path dan authority setelah reconnect.
-- Direct bounded queries digunakan; projection/materialized view hanya dapat ditambah berdasarkan
-  query-plan dan latency evidence.
-- Notification read state tidak mengubah warning, Henkaten, approval, atau assignment.
-- Supplier audit list hanya Supplier Admin; TMMIN audit memerlukan explicit cross-tenant capability.
+- Authorization identity adalah tuple client + supplier + source epoch + scope + optional IP.
+- Secret plaintext hanya dikembalikan sekali; bearer plaintext tidak pernah disimpan.
+- Source cutover memerlukan active next-epoch credential untuk target External dan merevoke external
+  client/token ketika kembali ke Hosted.
+- Accepted raw event immutable; projection hanya current monitoring view dan dapat direkonstruksi
+  dari history.
+- Idempotency key dibatasi oleh supplier + epoch + opaque event ID. Canonical hash membedakan exact
+  retry dari conflict.
+- Batch memproses satu transaction per item dan mengembalikan result pada original input position.
+- Unified warning menggunakan exactly-one Hosted Henkaten atau External projection relation.
+- External projection/warning hanya read-only untuk TMMIN; supplier External tidak mendapat Hosted
+  session, workflow, board, atau personnel model.
+- In-process rate counter hanya valid untuk satu API instance; multiple replicas memerlukan
+  coordinated counter lebih dahulu.
 
 ## 3. Persistence dan Migration
 
 Migration baru:
 
-- `apps/api/prisma/migrations/20260723000600_notification_read_models/migration.sql`
+- `apps/api/prisma/migrations/20260723000700_external_ingestion/migration.sql`
 
 Entity baru:
 
-- `Notification`.
+- `ExternalApiClient`;
+- `ExternalApiSecret`;
+- `ExternalAccessToken`;
+- `ExternalIngestionEvent`;
+- `ExternalHenkatenProjection`.
 
-Constraint/index:
+`WarningInstance` sekarang menyimpan `sourceMode` dan exactly one of `henkatenId` atau
+`externalProjectionId`. Database menegakkan credential/projection uniqueness, positive versions,
+event/source-version uniqueness, dan raw-event update/delete prevention trigger.
 
-- unique source outbox event + recipient;
-- recipient unread/reverse-time index;
-- supplier reverse-time index;
-- positive optimistic version.
-
-Fresh disposable PostgreSQL migration 001→006 lulus.
+Fresh disposable PostgreSQL migration 001→007 lulus.
 
 ## 4. API dan Contract Changes
 
-Endpoint baru:
+TMMIN credential/projection:
 
-- `GET /api/v1/supplier/notifications`;
-- `GET /api/v1/supplier/notifications/unread-count`;
-- `PATCH /api/v1/supplier/notifications/{id}/read-state`;
-- `GET /api/v1/supplier/assignment-board`;
-- `GET /api/v1/supplier/dashboard`;
-- `GET /api/v1/supplier/audit`;
-- `GET /api/v1/supplier/realtime` (`text/event-stream`);
-- `GET /api/v1/tmmin/dashboard`;
-- `GET /api/v1/tmmin/audit`.
+- `GET|POST /api/v1/tmmin/suppliers/{supplierId}/external-clients`;
+- `POST /api/v1/tmmin/suppliers/{supplierId}/external-clients/{id}/rotate-secret`;
+- `POST /api/v1/tmmin/suppliers/{supplierId}/external-clients/{id}/revoke`;
+- `GET /api/v1/tmmin/suppliers/{supplierId}/external-projections`;
+- `GET /api/v1/tmmin/suppliers/{supplierId}/external-projections/{id}`.
 
-Capability baru memisahkan notification, board, dashboard, audit, dan future external credential
-management.
+External public boundary:
 
-## 5. Recipient dan Scope Behavior
+- `POST /api/v1/external/auth/token`;
+- `POST /api/v1/external/henkaten/events`;
+- `POST /api/v1/external/henkaten/events/batch`;
+- `GET /api/v1/external/ingestions/{eventId}`.
 
-- Henkaten Open: current persisted Supervisor responsibility dan seluruh active QC.
-- Henkaten terminal: creator dan active Supplier Admin.
-- vacancy/assignment issue/override: Supplier Admin dan affected line ownership bila tersedia.
-- Notification endpoint selalu terkunci ke current user ID.
-- Board/dashboard scope:
-  - Supplier Admin/QC: seluruh tenant;
-  - Supervisor: owned supervised Shift Run;
-  - Line Leader: owned led Shift Run.
-- TMMIN dashboard/audit memerlukan TMMIN realm capability dan tidak memiliki mutation.
+TMMIN notifications:
 
-## 6. Realtime dan Recovery
+- `GET /api/v1/tmmin/notifications`;
+- `GET /api/v1/tmmin/notifications/unread-count`;
+- `PATCH /api/v1/tmmin/notifications/{id}/read-state`.
 
-SSE memakai retained outbox event ID sebagai cursor. Message berisi event/aggregate identity,
-aggregate version, occurrence time, dan refresh topics. Heartbeat dikirim ketika tidak ada perubahan.
-`Last-Event-ID` digunakan untuk mencari event berikutnya; REST refresh tetap wajib setelah reconnect.
+## 5. Ingestion Behavior
+
+- First event harus `HENKATEN_OPENED`, status `OPEN`, source version 1.
+- Subsequent event harus exactly current + 1; gap/stale/terminal update ditolak.
+- Approved memerlukan Supervisor dan QC Approved; Rejected memerlukan reject evidence; Cancelled
+  memerlukan reason.
+- Semua checklist item harus `YES`, category payload harus match discriminator, dan unknown field
+  ditolak.
+- Exact retry mengembalikan `DUPLICATE`; same event ID/different canonical hash mengembalikan 409.
+- Concurrent identical first delivery menghasilkan exactly one raw event/projection side effect,
+  dengan outcome `ACCEPTED` + `DUPLICATE`.
+- Batch mixed result tidak me-rollback unrelated valid event.
+
+## 6. Monitoring, Notification, dan Privacy
+
+Global dashboard menggabungkan Hosted dan External category/outcome/open-warning counts serta
+accepted/rejected ingestion dan last-successful freshness. Open External projection membuka warning;
+terminal projection menutup warning. Outbox-derived notification dikirim idempotently ke active
+TMMIN Admin dan menggunakan TMMIN user-scoped notification endpoint.
+
+External event contract tidak memiliki Hosted member/registration/photo/account/contact/attendance/
+health/skill fields. Audit/log hanya menyimpan safe identity, result code, correlation, epoch, dan
+source IP; tidak ada secret, bearer, atau Authorization value.
 
 ## 7. Documentation
 
-- ADR 0017 mendefinisikan durable notification dan authoritative read-model boundary.
-- `docs/architecture/read-models-and-realtime.md` mendokumentasikan write-to-read flow, scoping,
-  redaction, SSE, dan query-evolution rules.
-- PRD implementation status dan roadmap diperbarui menjadi Phase 0–8.
+- ADR 0018 mendefinisikan epoch-bound client/token, immutable ordered ingestion, projection, batch,
+  dan single-instance rate-limit decisions.
+- `docs/architecture/external-ingestion.md` mendokumentasikan authorization, event contract,
+  transaction/idempotency flow, batch, monitoring, abuse, dan privacy boundary.
+- Read-model architecture, PRD implementation status, dan roadmap diperbarui menjadi Phase 0–9.
 
 ## 8. Validation Selesai
 
@@ -104,62 +122,56 @@ Development validation:
 - formatter — passed;
 - lint — passed;
 - typecheck — passed;
-- unit — contracts 21, fixtures 6, API 7; 34 passed;
+- unit — contracts 23, fixtures 6, API 7; 36 passed;
 - OpenAPI generation — passed;
-- Docker PostgreSQL 18.4 + pgvector 0.8.5 verification — passed;
-- disposable database reset + fresh migration 001→006 — passed;
-- full PostgreSQL integration — 4 files, 24 tests passed.
+- disposable database reset + fresh migration 001→007 — passed;
+- full PostgreSQL integration — 5 files, 30 tests passed.
 
-Integration evidence mencakup durable recipients, notification read state, board content,
-supplier/TMMIN dashboard, audit redaction, dan seluruh prior auth/master/shift/Henkaten/approval/
-movement races.
+Integration evidence mencakup seluruh prior auth/master/shift/Henkaten/approval/read-model behavior
+serta External secret storage, token, exact/conflicting retry, version gap, terminal projection,
+immutable evidence, partial batch, unified dashboard/warning, notification, concurrent identical
+delivery, dan immediate revocation.
 
 ## 9. Final Local CI Parity
 
 Clean-artifact parity dijalankan dengan official Darwin arm64 Node.js `22.23.1` dan pnpm `11.16.0`.
-Existing build output, generated Prisma client, dan test-photo output dipindahkan ke isolated temporary
-artifact hold sebelum checks:
+Existing build output, generated Prisma client, dan test-photo output dipindahkan ke isolated
+temporary artifact hold sebelum checks:
 
 - `pnpm install --frozen-lockfile`;
 - `pnpm format:check`;
 - `pnpm lint`;
 - `pnpm typecheck`;
-- `pnpm test:unit` — contracts 21, fixtures 6, API 7; 34 passed;
+- `pnpm test:unit` — contracts 23, fixtures 6, API 7; 36 passed;
 - `pnpm openapi:check`;
 - `pnpm build`;
 - `docker compose config --quiet`;
-- `pnpm db:up`;
-- `pnpm db:wait`;
-- `pnpm db:verify` — PostgreSQL 18.4, pgvector 0.8.5;
-- `pnpm db:test:reset`;
-- `pnpm db:test:migrate` — fresh migration 001→006 passed;
-- CI environment `pnpm test:integration` — 24 passed;
+- `pnpm db:up`, `pnpm db:wait`, dan `pnpm db:verify` — PostgreSQL 18.4, pgvector 0.8.5;
+- `pnpm db:test:reset` dan `pnpm db:test:migrate` — fresh migration 001→007 passed;
+- CI environment `pnpm test:integration` — 5 files, 30 tests passed;
 - `pnpm db:down`;
 - Gitleaks 8.24.3 directory scan — no leaks;
 - `git diff --check` — passed.
 
-Compose is down dan tidak ada dev server, watcher, test process, atau agent-started container.
+Satu initial parity attempt mengalami transport-only `socket hang up` pada existing Hosted test tanpa
+application/database error. Fresh full-database rerun lulus 30/30. Compose down dan tidak ada dev
+server, watcher, test process, atau agent-started container.
 
 ## 10. Delivery
 
-Setelah commit:
-
-- Gitleaks commit scan;
-- push `staging`;
-- inspect GitHub Actions `quality`, `database-integration`, dan `secret-scan`;
-- delivery belum dianggap selesai sampai seluruh required jobs green.
-
 Target commit:
 
-- `feat: add durable operational read models`
+- `feat: add secure external henkaten ingestion`
+
+Setelah commit: Gitleaks commit scan, push `staging`, dan inspect GitHub Actions `quality`,
+`database-integration`, serta `secret-scan` sampai green.
 
 ## 11. Next Recommended Batch
 
-Mulai External REST API:
+Mulai backend contract freeze dan hardening:
 
-1. external client/secret lifecycle dan source-governance contributor;
-2. opaque 15-minute bearer token dengan epoch/scope/IP binding;
-3. strict v1 Zod/OpenAPI event contract dan PII boundary;
-4. immutable single/batch ingestion dengan canonical hash dan sequential source version;
-5. current external projection, warning, freshness, dan TMMIN dashboard integration;
-6. rate-limit, abuse, concurrency, contract, dan security-negative suite.
+1. audit critical policy unit coverage dan consolidate race/failure evidence;
+2. reconcile implemented route inventory, Zod schemas, generated OpenAPI, enum/error names;
+3. review Compact-scale list/board/dashboard/warning/audit/notification/external query plans;
+4. capture repeatable p50/p95/p99 baseline and error rate;
+5. run security-negative matrix, resolve Critical/High gaps, and publish freeze boundary.

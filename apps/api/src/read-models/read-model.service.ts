@@ -233,40 +233,79 @@ export class ReadModelService {
   }
 
   async tmminDashboard() {
-    const [suppliers, open, affected, overrides, categories, outcomes, freshness] =
-      await Promise.all([
-        this.prisma.supplier.groupBy({
-          by: ['sourceMode'],
-          where: { active: true },
-          _count: { _all: true },
-        }),
-        this.prisma.henkaten.count({ where: { status: 'OPEN' } }),
-        this.prisma.warningInstance.groupBy({
-          by: ['supplierId', 'normalizedPartNumberSnapshot'],
-          where: { status: 'OPEN' },
-        }),
-        this.prisma.shiftRun.count({ where: { startedWithOverride: true } }),
-        this.prisma.henkaten.groupBy({
-          by: ['category'],
-          _count: { _all: true },
-        }),
-        this.prisma.henkaten.groupBy({
-          by: ['status'],
-          where: { status: { not: 'OPEN' } },
-          _count: { _all: true },
-        }),
-        this.prisma.supplier.findMany({
-          where: { active: true },
-          select: {
-            id: true,
-            name: true,
-            sourceMode: true,
-            henkatens: { orderBy: { updatedAt: 'desc' }, take: 1, select: { updatedAt: true } },
-            warningInstances: { where: { status: 'OPEN' }, select: { id: true } },
+    const [
+      suppliers,
+      hostedOpen,
+      externalOpen,
+      affected,
+      overrides,
+      hostedCategories,
+      externalCategories,
+      hostedOutcomes,
+      externalOutcomes,
+      accepted,
+      recentRejected,
+      freshness,
+    ] = await Promise.all([
+      this.prisma.supplier.groupBy({
+        by: ['sourceMode'],
+        where: { active: true },
+        _count: { _all: true },
+      }),
+      this.prisma.henkaten.count({ where: { status: 'OPEN' } }),
+      this.prisma.externalHenkatenProjection.count({ where: { status: 'OPEN' } }),
+      this.prisma.warningInstance.groupBy({
+        by: ['supplierId', 'normalizedPartNumberSnapshot'],
+        where: { status: 'OPEN' },
+      }),
+      this.prisma.shiftRun.count({ where: { startedWithOverride: true } }),
+      this.prisma.henkaten.groupBy({
+        by: ['category'],
+        _count: { _all: true },
+      }),
+      this.prisma.externalHenkatenProjection.groupBy({
+        by: ['category'],
+        _count: { _all: true },
+      }),
+      this.prisma.henkaten.groupBy({
+        by: ['status'],
+        where: { status: { not: 'OPEN' } },
+        _count: { _all: true },
+      }),
+      this.prisma.externalHenkatenProjection.groupBy({
+        by: ['status'],
+        where: { status: { not: 'OPEN' } },
+        _count: { _all: true },
+      }),
+      this.prisma.externalIngestionEvent.count(),
+      this.prisma.auditEvent.count({
+        where: {
+          action: 'EXTERNAL_INGEST_REJECTED',
+          occurredAt: { gte: new Date(Date.now() - 24 * 60 * 60_000) },
+        },
+      }),
+      this.prisma.supplier.findMany({
+        where: { active: true },
+        select: {
+          id: true,
+          name: true,
+          sourceMode: true,
+          henkatens: { orderBy: { updatedAt: 'desc' }, take: 1, select: { updatedAt: true } },
+          externalProjections: {
+            orderBy: { updatedAt: 'desc' },
+            take: 1,
+            select: { updatedAt: true },
           },
-          orderBy: { name: 'asc' },
-        }),
-      ]);
+          externalApiClients: {
+            orderBy: { lastSuccessfulIngestionAt: 'desc' },
+            take: 1,
+            select: { lastSuccessfulIngestionAt: true },
+          },
+          warningInstances: { where: { status: 'OPEN' }, select: { id: true } },
+        },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
     const source = new Map(suppliers.map((item) => [item.sourceMode, item._count._all]));
     return {
       generatedAt: new Date().toISOString(),
@@ -277,24 +316,28 @@ export class ReadModelService {
         withWarnings: freshness.filter(({ warningInstances }) => warningInstances.length > 0)
           .length,
       },
-      openHenkatens: open,
+      openHenkatens: hostedOpen + externalOpen,
       affectedParts: affected.length,
       emergencyOverrides: overrides,
+      externalIngestion: { accepted, recentRejected },
       bySourceMode: suppliers.map((item) => ({
         label: item.sourceMode,
         count: item._count._all,
       })),
-      byCategory: categories.map((item) => ({
-        label: item.category,
-        count: item._count._all,
-      })),
-      outcomes: outcomes.map((item) => ({ label: item.status, count: item._count._all })),
+      byCategory: mergeCounts(hostedCategories, externalCategories, 'category'),
+      outcomes: mergeCounts(hostedOutcomes, externalOutcomes, 'status'),
       freshness: freshness.map((supplier) => ({
         supplierId: supplier.id,
         supplierName: supplier.name,
         sourceMode: supplier.sourceMode,
-        lastDataAt: supplier.henkatens[0]?.updatedAt.toISOString() ?? null,
+        lastDataAt:
+          (supplier.sourceMode === 'EXTERNAL'
+            ? supplier.externalProjections[0]?.updatedAt
+            : supplier.henkatens[0]?.updatedAt
+          )?.toISOString() ?? null,
         activeWarnings: supplier.warningInstances.length,
+        lastIngestionAt:
+          supplier.externalApiClients[0]?.lastSuccessfulIngestionAt?.toISOString() ?? null,
       })),
     };
   }
@@ -341,6 +384,19 @@ export class ReadModelService {
       },
     };
   }
+}
+
+function mergeCounts<T extends Record<K, string>, K extends keyof T>(
+  left: Array<T & { _count: { _all: number } }>,
+  right: Array<T & { _count: { _all: number } }>,
+  key: K,
+) {
+  const counts = new Map<string, number>();
+  for (const item of [...left, ...right]) {
+    const label = item[key];
+    counts.set(label, (counts.get(label) ?? 0) + item._count._all);
+  }
+  return [...counts].map(([label, count]) => ({ label, count }));
 }
 
 function shiftScope(principal: RequestPrincipal): Prisma.ShiftRunWhereInput {

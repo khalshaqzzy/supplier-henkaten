@@ -62,7 +62,7 @@ export class ProblemExceptionFilter implements ExceptionFilter {
                 status: 413,
                 code: 'PAYLOAD_TOO_LARGE' as const,
                 title: 'Payload too large',
-                detail: 'The JSON request body exceeds the 1 MiB limit.',
+                detail: 'The JSON request body exceeds the 5 MiB limit.',
               }
             : exception instanceof HttpException
               ? {

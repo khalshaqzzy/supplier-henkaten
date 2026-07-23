@@ -92,6 +92,20 @@ import {
   notificationUnreadCountSchema,
   supplierDashboardSchema,
   tmminDashboardSchema,
+  createExternalClientRequestSchema,
+  externalBatchRequestSchema,
+  externalBatchResponseSchema,
+  externalClientActionRequestSchema,
+  externalClientCredentialSchema,
+  externalClientPageSchema,
+  externalClientSchema,
+  externalHenkatenEventSchema,
+  externalProjectionDetailSchema,
+  externalProjectionPageSchema,
+  externalTokenRequestSchema,
+  externalTokenResponseSchema,
+  ingestionResultSchema,
+  ingestionStatusSchema,
 } from '@tmmin-henkaten/contracts';
 
 const noContent = { description: 'No content' };
@@ -254,8 +268,112 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       ...masterDataPaths(),
       ...operationalPaths(),
       ...readModelPaths(),
+      ...externalPaths(),
     },
   }) as unknown as Record<string, unknown>;
+}
+
+function externalPaths() {
+  const supplier = { path: z.object({ supplierId: z.string().uuid() }) };
+  const supplierAndId = {
+    path: z.object({ supplierId: z.string().uuid(), id: z.string().uuid() }),
+  };
+  const bearer = { header: z.object({ Authorization: z.string().startsWith('Bearer ') }) };
+  return {
+    '/api/v1/tmmin/suppliers/{supplierId}/external-clients': {
+      get: {
+        requestParams: supplier,
+        responses: { '200': json('External API clients', externalClientPageSchema) },
+      },
+      post: {
+        requestParams: supplier,
+        requestBody: body(createExternalClientRequestSchema),
+        responses: {
+          '201': json('Issued external client credential', externalClientCredentialSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/external-clients/{id}/rotate-secret': {
+      post: {
+        requestParams: supplierAndId,
+        requestBody: body(externalClientActionRequestSchema),
+        responses: {
+          '201': json('Rotated external client secret', externalClientCredentialSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/external-clients/{id}/revoke': {
+      post: {
+        requestParams: supplierAndId,
+        requestBody: body(externalClientActionRequestSchema),
+        responses: { '200': json('Revoked external client', externalClientSchema), '409': problem },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/external-projections': {
+      get: {
+        requestParams: supplier,
+        responses: { '200': json('External Henkaten projections', externalProjectionPageSchema) },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/external-projections/{id}': {
+      get: {
+        requestParams: supplierAndId,
+        responses: {
+          '200': json('External Henkaten projection detail', externalProjectionDetailSchema),
+          '404': problem,
+        },
+      },
+    },
+    '/api/v1/external/auth/token': {
+      post: {
+        requestBody: body(externalTokenRequestSchema),
+        responses: {
+          '200': json('Short-lived external bearer token', externalTokenResponseSchema),
+          '401': problem,
+          '429': problem,
+        },
+      },
+    },
+    '/api/v1/external/henkaten/events': {
+      post: {
+        requestParams: bearer,
+        requestBody: body(externalHenkatenEventSchema),
+        responses: {
+          '202': json('Accepted external event', ingestionResultSchema),
+          '200': json('Duplicate external event', ingestionResultSchema),
+          '409': problem,
+          '422': problem,
+          '429': problem,
+        },
+      },
+    },
+    '/api/v1/external/henkaten/events/batch': {
+      post: {
+        requestParams: bearer,
+        requestBody: body(externalBatchRequestSchema),
+        responses: {
+          '200': json('Per-item external ingestion results', externalBatchResponseSchema),
+          '400': problem,
+          '413': problem,
+          '429': problem,
+        },
+      },
+    },
+    '/api/v1/external/ingestions/{eventId}': {
+      get: {
+        requestParams: {
+          ...bearer,
+          path: z.object({ eventId: z.string().min(1).max(200) }),
+        },
+        responses: {
+          '200': json('External ingestion status', ingestionStatusSchema),
+          '404': problem,
+        },
+      },
+    },
+  };
 }
 
 function readModelPaths() {
@@ -310,6 +428,26 @@ function readModelPaths() {
     },
     '/api/v1/tmmin/dashboard': {
       get: { responses: { '200': json('TMMIN global dashboard', tmminDashboardSchema) } },
+    },
+    '/api/v1/tmmin/notifications': {
+      get: {
+        requestParams: { query: notificationListQuerySchema },
+        responses: { '200': json('Current TMMIN user notifications', notificationPageSchema) },
+      },
+    },
+    '/api/v1/tmmin/notifications/unread-count': {
+      get: {
+        responses: {
+          '200': json('Unread TMMIN notification count', notificationUnreadCountSchema),
+        },
+      },
+    },
+    '/api/v1/tmmin/notifications/{id}/read-state': {
+      patch: {
+        requestParams: idPath,
+        requestBody: body(notificationReadRequestSchema),
+        responses: { '200': json('Updated notification', notificationSchema), '409': problem },
+      },
     },
     '/api/v1/tmmin/audit': {
       get: {

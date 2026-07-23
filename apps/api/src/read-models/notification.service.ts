@@ -20,6 +20,7 @@ const NOTIFICATION_EVENTS = [
   'ASSIGNMENT_ISSUE_OPENED',
   'NOTIFICATION_REQUESTED',
   'SHIFT_STARTED_WITH_OVERRIDE',
+  'EXTERNAL_PROJECTION_UPDATED',
 ] as const;
 
 @Injectable()
@@ -96,7 +97,7 @@ export class NotificationService implements OnModuleInit {
     return { ...presentNotification(updated), version: updated.version };
   }
 
-  private async consume(event: ClaimedOutboxEvent): Promise<void> {
+  async consume(event: ClaimedOutboxEvent): Promise<void> {
     if (!event.supplierId) return;
     const template = this.template(event);
     if (!template) return;
@@ -137,6 +138,13 @@ export class NotificationService implements OnModuleInit {
 
   private async recipients(event: ClaimedOutboxEvent): Promise<string[]> {
     const supplierId = event.supplierId!;
+    if (event.eventType === 'EXTERNAL_PROJECTION_UPDATED') {
+      const users = await this.prisma.user.findMany({
+        where: { realm: 'TMMIN', role: 'TMMIN_ADMIN', status: 'ACTIVE' },
+        select: { id: true },
+      });
+      return users.map(({ id }) => id);
+    }
     const common = { supplierId, status: 'ACTIVE' as const };
     if (event.aggregateType === 'Henkaten') {
       const henkaten = await this.prisma.henkaten.findFirst({
@@ -248,6 +256,19 @@ export class NotificationService implements OnModuleInit {
           body: 'A job is vacant or conflicted and requires assignment action.',
           ...link('/assignment-board'),
         };
+      case 'EXTERNAL_PROJECTION_UPDATED': {
+        const payload = asRecord(event.payload);
+        const status = typeof payload.status === 'string' ? payload.status : 'UNKNOWN';
+        const opened = status === 'OPEN';
+        return {
+          kind: 'EXTERNAL_WARNING',
+          title: opened ? 'External Henkaten warning opened' : 'External Henkaten warning updated',
+          body: opened
+            ? 'An External supplier reported an open Henkaten warning.'
+            : `An External Henkaten warning moved to ${status.toLowerCase()}.`,
+          ...link(`/external-projections/${event.aggregateId}`),
+        };
+      }
       default:
         return null;
     }

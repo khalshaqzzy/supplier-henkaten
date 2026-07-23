@@ -26,10 +26,12 @@ flowchart LR
 ## Notification Rules
 
 - `(sourceEventId, recipientUserId)` is the delivery idempotency boundary.
-- Only active users in the event supplier can become recipients.
+- Hosted events resolve active users in the event supplier. External projection events resolve
+  active TMMIN Admin users.
 - Approval notifications resolve the current persisted route responsibility.
 - Terminal notifications include the creator and Supplier Admin.
 - Vacancy and override notifications include the affected line ownership and Supplier Admin.
+- External warning notifications deep-link to the read-only TMMIN projection.
 - Read/unread changes only `Notification.readAt` and `Notification.version`.
 - Deep links are relative resource paths and are still protected by destination authorization.
 

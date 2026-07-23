@@ -202,6 +202,12 @@ export const tmminDashboardSchema = z
     openHenkatens: z.number().int().nonnegative(),
     affectedParts: z.number().int().nonnegative(),
     emergencyOverrides: z.number().int().nonnegative(),
+    externalIngestion: z
+      .object({
+        accepted: z.number().int().nonnegative(),
+        recentRejected: z.number().int().nonnegative(),
+      })
+      .strict(),
     bySourceMode: countByLabelSchema,
     byCategory: countByLabelSchema,
     outcomes: countByLabelSchema,
@@ -213,6 +219,7 @@ export const tmminDashboardSchema = z
           sourceMode: sourceModeSchema,
           lastDataAt: utcTimestampSchema.nullable(),
           activeWarnings: z.number().int().nonnegative(),
+          lastIngestionAt: utcTimestampSchema.nullable(),
         })
         .strict(),
     ),

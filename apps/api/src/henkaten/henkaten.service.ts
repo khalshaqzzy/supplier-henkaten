@@ -549,7 +549,8 @@ export class HenkatenService {
     return {
       items: rows.map((row) => ({
         id: row.id,
-        henkatenId: row.henkatenId,
+        henkatenId: row.henkatenId ?? row.externalProjectionId!,
+        sourceMode: row.sourceMode,
         status: row.status,
         partNumber: row.partNumberSnapshot,
         partName: row.partNameSnapshot,
@@ -763,7 +764,9 @@ function roleWhere(principal?: RequestPrincipal): Prisma.HenkatenWhereInput {
 
 function presentWarning(row: {
   id: string;
-  henkatenId: string;
+  henkatenId: string | null;
+  externalProjectionId?: string | null;
+  sourceMode?: 'HOSTED' | 'EXTERNAL';
   status: 'OPEN' | 'CLOSED';
   partNumberSnapshot: string;
   partNameSnapshot: string;
@@ -772,7 +775,8 @@ function presentWarning(row: {
 }) {
   return {
     id: row.id,
-    henkatenId: row.henkatenId,
+    henkatenId: row.henkatenId ?? row.externalProjectionId!,
+    sourceMode: row.sourceMode ?? 'HOSTED',
     status: row.status,
     partNumber: row.partNumberSnapshot,
     partName: row.partNameSnapshot,

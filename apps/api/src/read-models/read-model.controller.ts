@@ -109,7 +109,41 @@ export class SupplierReadModelController {
 
 @Controller('/api/v1/tmmin')
 export class TmminReadModelController {
-  constructor(private readonly reads: ReadModelService) {}
+  constructor(
+    private readonly access: OperationalAccessService,
+    private readonly notifications: NotificationService,
+    private readonly reads: ReadModelService,
+  ) {}
+
+  @RequireCapabilities('TMMIN_DASHBOARD_READ')
+  @Get('/notifications')
+  listNotifications(
+    @ValidatedQuery(notificationListQuerySchema) query: NotificationListQuery,
+    @Req() request: ContextRequest,
+  ) {
+    return this.notifications.list(this.access.principal(request), query);
+  }
+
+  @RequireCapabilities('TMMIN_DASHBOARD_READ')
+  @Get('/notifications/unread-count')
+  unreadCount(@Req() request: ContextRequest) {
+    return this.notifications.unreadCount(this.access.principal(request));
+  }
+
+  @RequireCapabilities('TMMIN_DASHBOARD_READ')
+  @Patch('/notifications/:id/read-state')
+  setRead(
+    @Param('id') id: string,
+    @ValidatedBody(notificationReadRequestSchema) body: NotificationReadRequest,
+    @Req() request: ContextRequest,
+  ) {
+    return this.notifications.setRead(
+      this.access.principal(request),
+      parseWithSchema(opaqueIdSchema, id),
+      body,
+      request.correlationId!,
+    );
+  }
 
   @RequireCapabilities('TMMIN_DASHBOARD_READ')
   @Get('/dashboard')

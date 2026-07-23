@@ -147,6 +147,11 @@ enum WarningStatus {
   CLOSED
 }
 
+enum ExternalClientStatus {
+  ACTIVE
+  REVOKED
+}
+
 model Supplier {
   id                     String                  @id @default(uuid()) @db.Uuid
   code                   String                  @db.VarChar(50)
@@ -192,6 +197,10 @@ model Supplier {
   approvalDecisions      ApprovalDecision[]
   approvalRouteRoutings  ApprovalRouteRouting[]
   assignmentMovements    AssignmentMovement[]
+  externalApiClients     ExternalApiClient[]
+  externalAccessTokens   ExternalAccessToken[]
+  externalIngestionEvents ExternalIngestionEvent[]
+  externalProjections    ExternalHenkatenProjection[]
 
   @@unique([normalizedCode], map: "Supplier_normalizedCode_key")
   @@index([sourceMode, active])
@@ -363,6 +372,115 @@ model Notification {
   @@unique([sourceEventId, recipientUserId])
   @@index([recipientUserId, readAt, createdAt(sort: Desc), id(sort: Desc)])
   @@index([supplierId, createdAt(sort: Desc)])
+}
+
+model ExternalApiClient {
+  id                        String               @id @default(uuid()) @db.Uuid
+  supplierId                String               @db.Uuid
+  clientId                  String               @unique @db.VarChar(100)
+  name                      String               @db.VarChar(150)
+  sourceEpoch               Int
+  scopes                    String[]
+  ipAllowlist               String[]
+  status                    ExternalClientStatus @default(ACTIVE)
+  lastSuccessfulIngestionAt DateTime?            @db.Timestamptz(3)
+  version                   Int                  @default(1)
+  createdAt                 DateTime             @default(now()) @db.Timestamptz(3)
+  createdById               String               @db.Uuid
+  updatedAt                 DateTime             @updatedAt @db.Timestamptz(3)
+  updatedById               String?              @db.Uuid
+  supplier                  Supplier             @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  secrets                   ExternalApiSecret[]
+  tokens                    ExternalAccessToken[]
+  ingestionEvents           ExternalIngestionEvent[]
+
+  @@unique([id, supplierId])
+  @@index([supplierId, status, sourceEpoch])
+}
+
+model ExternalApiSecret {
+  id          String            @id @default(uuid()) @db.Uuid
+  clientId    String            @db.Uuid
+  secretHash  String            @db.VarChar(512)
+  lastFour    String            @db.Char(4)
+  issuedAt    DateTime          @default(now()) @db.Timestamptz(3)
+  expiresAt   DateTime?         @db.Timestamptz(3)
+  revokedAt   DateTime?         @db.Timestamptz(3)
+  createdById String            @db.Uuid
+  client      ExternalApiClient @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  @@index([clientId, revokedAt, expiresAt])
+}
+
+model ExternalAccessToken {
+  id          String            @id @default(uuid()) @db.Uuid
+  clientId    String            @db.Uuid
+  supplierId  String            @db.Uuid
+  sourceEpoch Int
+  tokenHash   Bytes             @unique
+  scopes      String[]
+  sourceIp    String?           @db.VarChar(45)
+  issuedAt    DateTime          @default(now()) @db.Timestamptz(3)
+  expiresAt   DateTime          @db.Timestamptz(3)
+  revokedAt   DateTime?         @db.Timestamptz(3)
+  client      ExternalApiClient @relation(fields: [clientId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  supplier    Supplier          @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  @@index([clientId, expiresAt, revokedAt])
+  @@index([supplierId, sourceEpoch, expiresAt])
+}
+
+model ExternalIngestionEvent {
+  id                String                     @id @default(uuid()) @db.Uuid
+  supplierId        String                     @db.Uuid
+  clientId          String                     @db.Uuid
+  sourceEpoch       Int
+  eventId           String                     @db.VarChar(200)
+  sourceHenkatenId  String                     @db.VarChar(200)
+  sourceVersion     Int
+  eventType         String                     @db.VarChar(50)
+  payloadHash       String                     @db.Char(64)
+  canonicalPayload  Json
+  correlationId     String                     @db.VarChar(128)
+  receivedAt        DateTime                   @default(now()) @db.Timestamptz(3)
+  projectionId      String?                    @db.Uuid
+  supplier          Supplier                   @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  client            ExternalApiClient          @relation(fields: [clientId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  projection        ExternalHenkatenProjection? @relation(fields: [projectionId, supplierId], references: [id, supplierId], onDelete: Restrict)
+
+  @@unique([supplierId, sourceEpoch, eventId])
+  @@unique([supplierId, sourceEpoch, sourceHenkatenId, sourceVersion])
+  @@index([clientId, receivedAt(sort: Desc)])
+  @@index([supplierId, receivedAt(sort: Desc)])
+}
+
+model ExternalHenkatenProjection {
+  id                         String                   @id @default(uuid()) @db.Uuid
+  supplierId                 String                   @db.Uuid
+  sourceEpoch                Int
+  sourceHenkatenId           String                   @db.VarChar(200)
+  sourceVersion              Int
+  status                     HenkatenStatus
+  category                   HenkatenCategory
+  occurredAt                 DateTime                 @db.Timestamptz(3)
+  lineSnapshot               Json
+  shiftSnapshot              Json
+  jobSnapshot                Json
+  partSnapshot               Json
+  changeSnapshot             Json
+  checklistSnapshot          Json
+  decisionsSnapshot          Json
+  lastEventId                String                   @db.VarChar(200)
+  createdAt                  DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt                  DateTime                 @updatedAt @db.Timestamptz(3)
+  supplier                   Supplier                 @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  ingestionEvents            ExternalIngestionEvent[]
+  warning                    WarningInstance?
+
+  @@unique([id, supplierId])
+  @@unique([supplierId, sourceEpoch, sourceHenkatenId])
+  @@index([supplierId, status, updatedAt(sort: Desc)])
+  @@index([status, updatedAt(sort: Desc)])
 }
 
 model Member {
@@ -1082,7 +1200,9 @@ model MPReservation {
 model WarningInstance {
   id                           String        @id @default(uuid()) @db.Uuid
   supplierId                   String        @db.Uuid
-  henkatenId                   String        @unique @db.Uuid
+  henkatenId                   String?       @unique @db.Uuid
+  externalProjectionId         String?       @unique @db.Uuid
+  sourceMode                   SourceMode    @default(HOSTED)
   status                       WarningStatus @default(OPEN)
   partNumberSnapshot           String        @db.VarChar(100)
   normalizedPartNumberSnapshot String        @db.VarChar(100)
@@ -1092,10 +1212,12 @@ model WarningInstance {
   closeReason                  String?       @db.VarChar(50)
   version                      Int           @default(1)
   supplier                     Supplier      @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  henkaten                     Henkaten      @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  henkaten                     Henkaten?     @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  externalProjection           ExternalHenkatenProjection? @relation(fields: [externalProjectionId, supplierId], references: [id, supplierId], onDelete: Restrict)
 
   @@unique([id, supplierId])
   @@unique([henkatenId, supplierId])
+  @@unique([externalProjectionId, supplierId])
   @@index([supplierId, status, normalizedPartNumberSnapshot, openedAt])
   @@index([status, openedAt])
 }

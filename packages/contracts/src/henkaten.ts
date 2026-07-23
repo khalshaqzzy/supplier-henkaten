@@ -274,6 +274,7 @@ export const warningInstanceSchema = z
   .object({
     id: opaqueIdSchema,
     henkatenId: opaqueIdSchema,
+    sourceMode: z.enum(['HOSTED', 'EXTERNAL']),
     status: warningStatusSchema,
     partNumber: z.string(),
     partName: z.string(),
