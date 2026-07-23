@@ -34,6 +34,7 @@ const environmentSchema = z
     ARGON2_PARALLELISM: z.coerce.number().int().min(1).default(1),
     AUTH_IP_LOGIN_LIMIT: z.coerce.number().int().min(5).default(50),
     AUTH_GLOBAL_LIMIT_PER_MINUTE: z.coerce.number().int().min(30).default(300),
+    PHOTO_STORAGE_ROOT: z.string().min(1).default('.local/uploads/member-photos'),
   })
   .passthrough();
 
@@ -64,6 +65,7 @@ export type AppConfig = {
   argon2Parallelism: number;
   authIpLoginLimit: number;
   authGlobalLimitPerMinute: number;
+  photoStorageRoot: string;
 };
 
 export function loadAppConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -99,6 +101,7 @@ export function loadAppConfig(environment: NodeJS.ProcessEnv = process.env): App
     argon2Parallelism: parsed.ARGON2_PARALLELISM,
     authIpLoginLimit: parsed.AUTH_IP_LOGIN_LIMIT,
     authGlobalLimitPerMinute: parsed.AUTH_GLOBAL_LIMIT_PER_MINUTE,
+    photoStorageRoot: parsed.PHOTO_STORAGE_ROOT,
   };
 }
 

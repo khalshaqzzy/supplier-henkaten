@@ -12,6 +12,7 @@ import { RuntimeConfigModule } from './config/runtime-config.module.js';
 import { HealthController } from './health/health.controller.js';
 import { OpenApiController } from './openapi/openapi.controller.js';
 import { PersistenceModule } from './persistence/persistence.module.js';
+import { MasterDataModule } from './master-data/master-data.module.js';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { PersistenceModule } from './persistence/persistence.module.js';
     PersistenceModule,
     AuthModule,
     AdministrationModule,
+    MasterDataModule,
   ],
   controllers: [HealthController, OpenApiController],
   providers: [

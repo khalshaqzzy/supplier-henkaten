@@ -53,7 +53,7 @@ windows are separate attributes rather than durable role states.
 | ACTIVE | deactivate | INACTIVE and all sessions revoked |
 | INACTIVE | reactivate | ACTIVE, no prior session restored |
 | ACTIVE | reset/change password | ACTIVE, sessions revoked, password epoch increased |
-| ACTIVE | role change | ACTIVE, sessions revoked, authorization epoch increased |
+| ACTIVE | role change | rejected; operational member role is immutable |
 
 Session:
 

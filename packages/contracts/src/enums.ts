@@ -32,6 +32,8 @@ export const capabilitySchema = z.enum([
   'TMMIN_SOURCE_MANAGE',
   'SUPPLIER_SELF_SERVICE',
   'SUPPLIER_MASTER_DATA_MANAGE',
+  'SUPPLIER_MASTER_DATA_READ',
+  'TMMIN_MASTER_DATA_READ',
   'SUPPLIER_HOSTED_PREPARATION',
 ]);
 export type Capability = z.infer<typeof capabilitySchema>;
@@ -82,6 +84,17 @@ export type IngestionResultStatus = z.infer<typeof ingestionResultStatusSchema>;
 
 export const domainEventTypeSchema = z.enum([
   'SUPPLIER_SOURCE_MODE_CHANGED',
+  'MEMBER_CREATED',
+  'MEMBER_UPDATED',
+  'MEMBER_STATUS_CHANGED',
+  'MEMBER_ACCOUNT_STATUS_CHANGED',
+  'MEMBER_PHOTO_REPLACED',
+  'MEMBER_PHOTO_REMOVED',
+  'MEMBER_PHOTO_CLEANUP_REQUESTED',
+  'MASTER_DATA_CHANGED',
+  'MASTER_DATA_REORDERED',
+  'CHECKLIST_VERSION_PUBLISHED',
+  'DEFAULT_ASSIGNMENT_CHANGED',
   'SESSION_REVOKED',
   'SHIFT_STARTED',
   'SHIFT_STARTED_WITH_OVERRIDE',
@@ -122,5 +135,10 @@ export const publicErrorCodeSchema = z.enum([
   'RATE_LIMITED',
   'NOT_READY',
   'INTERNAL_ERROR',
+  'CAPACITY_EXCEEDED',
+  'RESOURCE_IN_USE',
+  'IMMUTABLE_FIELD',
+  'INVALID_IMAGE',
+  'CHECKLIST_NOT_PUBLISHED',
 ]);
 export type PublicErrorCode = z.infer<typeof publicErrorCodeSchema>;

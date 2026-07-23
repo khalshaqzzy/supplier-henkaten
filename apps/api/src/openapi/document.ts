@@ -26,6 +26,37 @@ import {
   userCredentialResponseSchema,
   userPageSchema,
   userSummarySchema,
+  assignmentMoveRequestSchema,
+  assignmentMutationRequestSchema,
+  assignmentRemoveRequestSchema,
+  checklistDraftSchema,
+  checklistVersionSchema,
+  createJobRequestSchema,
+  createLineRequestSchema,
+  createMemberRequestSchema,
+  createPartRequestSchema,
+  createShiftTemplateRequestSchema,
+  defaultAssignmentsSchema,
+  jobPageSchema,
+  jobSchema,
+  linePageSchema,
+  lineSchema,
+  masterListQuerySchema,
+  memberCredentialResponseSchema,
+  memberPageSchema,
+  memberSchema,
+  partPageSchema,
+  partSchema,
+  reorderRequestSchema,
+  shiftTemplatePageSchema,
+  shiftTemplateSchema,
+  updateChecklistDraftRequestSchema,
+  updateJobRequestSchema,
+  updateLineRequestSchema,
+  updateMemberAccountRequestSchema,
+  updateMemberRequestSchema,
+  updatePartRequestSchema,
+  updateShiftTemplateRequestSchema,
 } from '@tmmin-henkaten/contracts';
 
 const noContent = { description: 'No content' };
@@ -185,8 +216,310 @@ export function buildOpenApiDocument(): Record<string, unknown> {
           },
         },
       },
+      ...masterDataPaths(),
     },
   }) as unknown as Record<string, unknown>;
+}
+
+function masterDataPaths() {
+  const memberPath = { path: z.object({ id: z.string().uuid() }) };
+  const linePath = { path: z.object({ lineId: z.string().uuid() }) };
+  const jobPath = {
+    path: z.object({ lineId: z.string().uuid(), id: z.string().uuid() }),
+  };
+  const resourcePath = { path: z.object({ resourceId: z.string().uuid() }) };
+  const categoryPath = {
+    path: z.object({ category: z.enum(['MAN', 'MACHINE', 'MATERIAL', 'METHOD']) }),
+  };
+  const listParams = { query: masterListQuerySchema };
+  const action = (response: z.ZodType) => ({
+    post: {
+      requestParams: memberPath,
+      requestBody: body(expectedVersionSchema),
+      responses: { '200': json('Action completed', response), '409': problem },
+    },
+  });
+  return {
+    '/api/v1/supplier/master-data/members': {
+      get: {
+        requestParams: listParams,
+        responses: { '200': json('Members', memberPageSchema) },
+      },
+      post: {
+        requestBody: body(createMemberRequestSchema),
+        responses: {
+          '201': json('Member and optional credential', memberCredentialResponseSchema),
+        },
+      },
+    },
+    '/api/v1/supplier/master-data/members/{id}': {
+      get: {
+        requestParams: memberPath,
+        responses: { '200': json('Member', memberSchema), '404': problem },
+      },
+      patch: {
+        requestParams: memberPath,
+        requestBody: body(updateMemberRequestSchema),
+        responses: { '200': json('Updated member', memberSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/members/{id}/activate': action(memberSchema),
+    '/api/v1/supplier/master-data/members/{id}/deactivate': action(memberSchema),
+    '/api/v1/supplier/master-data/members/{id}/account': {
+      patch: {
+        requestParams: memberPath,
+        requestBody: body(updateMemberAccountRequestSchema),
+        responses: { '200': json('Updated member', memberSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/members/{id}/account/activate': action(
+      memberCredentialResponseSchema,
+    ),
+    '/api/v1/supplier/master-data/members/{id}/account/deactivate': action(
+      memberCredentialResponseSchema,
+    ),
+    '/api/v1/supplier/master-data/members/{id}/account/reset-password': action(
+      memberCredentialResponseSchema,
+    ),
+    '/api/v1/supplier/master-data/members/{id}/photo': {
+      post: {
+        requestParams: memberPath,
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: z.object({ photo: z.file().max(2 * 1024 * 1024) }),
+            },
+          },
+        },
+        responses: { '201': json('Member with photo', memberSchema), '400': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/members/{id}/photo/remove': {
+      post: {
+        requestParams: memberPath,
+        requestBody: body(expectedVersionSchema),
+        responses: { '204': noContent, '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/members/{id}/photo/{variant}': {
+      get: {
+        requestParams: {
+          path: z.object({ id: z.string().uuid(), variant: z.enum(['full', 'thumbnail']) }),
+        },
+        responses: { '200': { description: 'Private normalized WebP image' }, '404': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/lines': collectionPath(
+      listParams,
+      linePageSchema,
+      createLineRequestSchema,
+      lineSchema,
+    ),
+    '/api/v1/supplier/master-data/lines/{id}': mutablePath(updateLineRequestSchema, lineSchema),
+    '/api/v1/supplier/master-data/lines/{id}/activate': action(lineSchema),
+    '/api/v1/supplier/master-data/lines/{id}/deactivate': action(lineSchema),
+    '/api/v1/supplier/master-data/lines/{lineId}/jobs': {
+      get: {
+        requestParams: { ...linePath, query: masterListQuerySchema },
+        responses: { '200': json('Jobs', jobPageSchema) },
+      },
+      post: {
+        requestParams: linePath,
+        requestBody: body(createJobRequestSchema),
+        responses: { '201': json('Created job', jobSchema) },
+      },
+    },
+    '/api/v1/supplier/master-data/lines/{lineId}/jobs/{id}': {
+      patch: {
+        requestParams: jobPath,
+        requestBody: body(updateJobRequestSchema),
+        responses: { '200': json('Updated job', jobSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/parts': collectionPath(
+      listParams,
+      partPageSchema,
+      createPartRequestSchema,
+      partSchema,
+    ),
+    '/api/v1/supplier/master-data/parts/{id}': mutablePath(updatePartRequestSchema, partSchema),
+    '/api/v1/supplier/master-data/parts/{id}/activate': action(partSchema),
+    '/api/v1/supplier/master-data/parts/{id}/deactivate': action(partSchema),
+    '/api/v1/supplier/master-data/shift-templates': collectionPath(
+      listParams,
+      shiftTemplatePageSchema,
+      createShiftTemplateRequestSchema,
+      shiftTemplateSchema,
+    ),
+    '/api/v1/supplier/master-data/shift-templates/{id}': mutablePath(
+      updateShiftTemplateRequestSchema,
+      shiftTemplateSchema,
+    ),
+    '/api/v1/supplier/master-data/shift-templates/{id}/activate': action(shiftTemplateSchema),
+    '/api/v1/supplier/master-data/shift-templates/{id}/deactivate': action(shiftTemplateSchema),
+    '/api/v1/supplier/master-data/{collection}/reorder': {
+      post: {
+        requestBody: body(reorderRequestSchema),
+        responses: { '201': { description: 'Collection reordered' }, '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/checklists/{category}/draft': {
+      get: {
+        requestParams: categoryPath,
+        responses: { '200': json('Checklist draft', checklistDraftSchema) },
+      },
+      patch: {
+        requestParams: categoryPath,
+        requestBody: body(updateChecklistDraftRequestSchema),
+        responses: { '200': json('Updated checklist draft', checklistDraftSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/checklists/{category}/publish': {
+      post: {
+        requestParams: categoryPath,
+        requestBody: body(expectedVersionSchema),
+        responses: { '201': json('Published checklist', checklistVersionSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/checklists/{category}/versions': {
+      get: {
+        requestParams: categoryPath,
+        responses: {
+          '200': json('Checklist versions', z.object({ items: z.array(checklistVersionSchema) })),
+        },
+      },
+    },
+    '/api/v1/supplier/master-data/checklists/{category}/activate': checklistStatusPath(),
+    '/api/v1/supplier/master-data/checklists/{category}/deactivate': checklistStatusPath(),
+    '/api/v1/supplier/master-data/default-assignments': {
+      get: { responses: { '200': json('Default assignments', defaultAssignmentsSchema) } },
+    },
+    '/api/v1/supplier/master-data/lines/{resourceId}/default-supervisor': assignmentPath(
+      assignmentMutationRequestSchema,
+    ),
+    '/api/v1/supplier/master-data/lines/{resourceId}/default-line-leader': assignmentPath(
+      assignmentMutationRequestSchema,
+    ),
+    '/api/v1/supplier/master-data/jobs/{resourceId}/default-mp': assignmentPath(
+      assignmentMutationRequestSchema,
+    ),
+    '/api/v1/supplier/master-data/lines/{resourceId}/default-line-leader/move': assignmentPath(
+      assignmentMoveRequestSchema,
+    ),
+    '/api/v1/supplier/master-data/jobs/{resourceId}/default-mp/move': assignmentPath(
+      assignmentMoveRequestSchema,
+    ),
+    '/api/v1/supplier/master-data/{kind}/{resourceId}/remove': {
+      post: {
+        requestParams: resourcePath,
+        requestBody: body(assignmentRemoveRequestSchema),
+        responses: { '201': json('Default assignments', defaultAssignmentsSchema), '409': problem },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/master-data/members': {
+      get: {
+        requestParams: {
+          path: z.object({ supplierId: z.string().uuid() }),
+          query: masterListQuerySchema,
+        },
+        responses: { '200': json('Hosted members', memberPageSchema), '404': problem },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/master-data/members/{id}': {
+      get: {
+        requestParams: {
+          path: z.object({ supplierId: z.string().uuid(), id: z.string().uuid() }),
+        },
+        responses: { '200': json('Hosted member', memberSchema), '404': problem },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/master-data/members/{id}/photo/{variant}': {
+      get: {
+        requestParams: {
+          path: z.object({
+            supplierId: z.string().uuid(),
+            id: z.string().uuid(),
+            variant: z.enum(['full', 'thumbnail']),
+          }),
+        },
+        responses: { '200': { description: 'Private normalized WebP image' }, '404': problem },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/master-data/lines': tmminListPath(linePageSchema),
+    '/api/v1/tmmin/suppliers/{supplierId}/master-data/parts': tmminListPath(partPageSchema),
+    '/api/v1/tmmin/suppliers/{supplierId}/master-data/shift-templates':
+      tmminListPath(shiftTemplatePageSchema),
+    '/api/v1/tmmin/suppliers/{supplierId}/master-data/default-assignments': {
+      get: {
+        requestParams: { path: z.object({ supplierId: z.string().uuid() }) },
+        responses: { '200': json('Default assignments', defaultAssignmentsSchema), '404': problem },
+      },
+    },
+  };
+}
+
+function collectionPath(
+  requestParams: Record<string, unknown>,
+  pageSchema: z.ZodType,
+  createSchema: z.ZodType,
+  responseSchema: z.ZodType,
+) {
+  return {
+    get: { requestParams, responses: { '200': json('Collection', pageSchema) } },
+    post: {
+      requestBody: body(createSchema),
+      responses: { '201': json('Created resource', responseSchema), '409': problem },
+    },
+  };
+}
+
+function mutablePath(updateSchema: z.ZodType, responseSchema: z.ZodType) {
+  return {
+    get: {
+      requestParams: { path: z.object({ id: z.string().uuid() }) },
+      responses: { '200': json('Resource', responseSchema), '404': problem },
+    },
+    patch: {
+      requestParams: { path: z.object({ id: z.string().uuid() }) },
+      requestBody: body(updateSchema),
+      responses: { '200': json('Updated resource', responseSchema), '409': problem },
+    },
+  };
+}
+
+function checklistStatusPath() {
+  return {
+    post: {
+      requestParams: {
+        path: z.object({ category: z.enum(['MAN', 'MACHINE', 'MATERIAL', 'METHOD']) }),
+      },
+      requestBody: body(expectedVersionSchema),
+      responses: { '201': json('Checklist template', checklistDraftSchema), '409': problem },
+    },
+  };
+}
+
+function assignmentPath(requestSchema: z.ZodType) {
+  return {
+    post: {
+      requestParams: { path: z.object({ resourceId: z.string().uuid() }) },
+      requestBody: body(requestSchema),
+      responses: { '201': json('Default assignments', defaultAssignmentsSchema), '409': problem },
+    },
+  };
+}
+
+function tmminListPath(schema: z.ZodType) {
+  return {
+    get: {
+      requestParams: {
+        path: z.object({ supplierId: z.string().uuid() }),
+        query: masterListQuerySchema,
+      },
+      responses: { '200': json('Hosted master data', schema), '404': problem },
+    },
+  };
 }
 
 function sessionPath() {

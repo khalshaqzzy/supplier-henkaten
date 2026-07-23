@@ -82,15 +82,16 @@ Approval and audit history retain actor snapshots when a user or member changes 
 |---|---|
 | Aggregate roots | `Member`, `Line`, `Job`, `Part`, `ShiftTemplate`, `ChecklistTemplate` |
 | Owned state | member/account linkage, photo metadata, line/jobs, part identity, shift definition, checklist versions/items |
-| Invariants | tenant uniqueness from PRD; one active role per member; immutable published checklist versions |
+| Invariants | tenant uniqueness; immutable member role; permanent logical retention; immutable published checklist versions |
 | Mutation owner | capability-specific Master Data services |
 | Tenant boundary | exactly one supplier |
 | Version owner | each mutable master root |
 | Emits | master-data created/changed/deactivated, checklist published |
 | References | User ID, photo object ID, default assignments |
 
-`Job` belongs to one `Line`. A checklist version owns ordered item snapshots and becomes immutable
-once published. Referenced master data is deactivated rather than hard-deleted.
+`Job` belongs to one immutable `Line`. A checklist template owns one mutable persisted draft;
+publishing appends an immutable ordered version. All master data is corrected, deactivated, and
+reactivated without a public hard-delete path.
 
 ## 7. Shift and Assignment
 
@@ -98,7 +99,7 @@ once published. Referenced master data is deactivated rather than hard-deleted.
 |---|---|
 | Aggregate root | `ShiftRun` |
 | Owned state | status, line/template/business-date snapshot, working assignments, start/end/override summary |
-| Supporting roots | `DefaultAssignment`, `AssignmentIssue` |
+| Supporting roots | typed `DefaultAssignmentSet` relations, `AssignmentIssue` |
 | Ledger | `AssignmentMovement` |
 | Invariants | one active shift per line; one MP per working job; one job per working MP; hard gates before normal start |
 | Mutation owner | `ShiftApplicationService` |

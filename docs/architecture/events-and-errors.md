@@ -32,6 +32,13 @@ photo bytes/paths, or unsanitized freeform data.
 | Event type | Producer | Primary consumers |
 |---|---|---|
 | `SUPPLIER_SOURCE_MODE_CHANGED` | Supplier service | identity revocation, monitoring, audit |
+| `MEMBER_CREATED` / `MEMBER_UPDATED` / `MEMBER_STATUS_CHANGED` | Member service | future board/read models |
+| `MEMBER_ACCOUNT_STATUS_CHANGED` | Member service | identity monitoring |
+| `MEMBER_PHOTO_REPLACED` / `MEMBER_PHOTO_REMOVED` | Photo service | future board/read models |
+| `MEMBER_PHOTO_CLEANUP_REQUESTED` | Photo service | private-volume cleanup handler |
+| `MASTER_DATA_CHANGED` / `MASTER_DATA_REORDERED` | Master Data service | future board/read models |
+| `CHECKLIST_VERSION_PUBLISHED` | Checklist service | shift preflight and Henkaten configuration |
+| `DEFAULT_ASSIGNMENT_CHANGED` | Assignment service | shift preflight and future board read model |
 | `SESSION_REVOKED` | Identity service | session monitoring/audit |
 | `SHIFT_STARTED` | Shift service | board, notification, metrics |
 | `SHIFT_STARTED_WITH_OVERRIDE` | Shift service | board, notification, TMMIN visibility |
@@ -111,6 +118,11 @@ values, and cross-tenant existence are never returned.
 | `RATE_LIMITED` | 429 | request limit exceeded; include `Retry-After` |
 | `NOT_READY` | 503 | process alive but critical dependency/init is unavailable |
 | `INTERNAL_ERROR` | 500 | unexpected safe server error |
+| `CAPACITY_EXCEEDED` | 409 | active tenant resource limit has been reached |
+| `RESOURCE_IN_USE` | 409 | deactivation is blocked by an active reference |
+| `IMMUTABLE_FIELD` | 409 | request attempts to change immutable domain identity |
+| `INVALID_IMAGE` | 400 | uploaded member photo fails size/signature/decode policy |
+| `CHECKLIST_NOT_PUBLISHED` | 409 | checklist category lacks a usable published version |
 
 External schema/business validation may use `422` with `VALIDATION_FAILED`; malformed JSON remains
 `400`.

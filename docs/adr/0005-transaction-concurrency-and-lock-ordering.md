@@ -90,3 +90,9 @@ validation remains owned by the persistence and domain implementation.
 
 Reusable transaction, lock, and retry helpers will be implemented with the persistence foundation
 and exercised by each owning domain workflow.
+
+Master-data capacity mutations lock Supplier before counting active members, lines, or jobs.
+Checklist publish locks ChecklistTemplate before reading draft and allocating a version number.
+Default assignment mutation locks DefaultAssignmentSet before assignment target and member rows.
+Collection reorder locks resources in canonical UUID order and validates every expected version
+before writing any display order.

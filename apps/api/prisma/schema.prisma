@@ -64,6 +64,26 @@ enum AuditResult {
   FAILURE
 }
 
+enum MemberRole {
+  SUPERVISOR
+  LINE_LEADER
+  MP
+  QC
+}
+
+enum HenkatenCategory {
+  MAN
+  MACHINE
+  MATERIAL
+  METHOD
+}
+
+enum MemberPhotoState {
+  CURRENT
+  PENDING_DELETE
+  DELETED
+}
+
 model Supplier {
   id                      String              @id @default(uuid()) @db.Uuid
   code                    String              @db.VarChar(50)
@@ -85,6 +105,18 @@ model Supplier {
   hostedPreparations      HostedPreparation[]
   auditEvents             AuditEvent[]
   outboxEvents            OutboxEvent[]
+  members                 Member[]
+  memberPhotos            MemberPhoto[]
+  lines                   Line[]
+  jobs                    Job[]
+  parts                   Part[]
+  shiftTemplates          ShiftTemplate[]
+  checklistTemplates      ChecklistTemplate[]
+  checklistVersions       ChecklistVersion[]
+  defaultAssignmentSet    DefaultAssignmentSet?
+  defaultLineSupervisors  DefaultLineSupervisor[]
+  defaultLineLeaders      DefaultLineLeader[]
+  defaultJobMps           DefaultJobMp[]
 
   @@unique([normalizedCode], map: "Supplier_normalizedCode_key")
   @@index([sourceMode, active])
@@ -112,13 +144,16 @@ model User {
   createdById                 String?         @db.Uuid
   updatedAt                   DateTime        @updatedAt @db.Timestamptz(3)
   updatedById                 String?         @db.Uuid
+  memberId                    String?         @db.Uuid
   supplier                    Supplier?       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  member                      Member?         @relation(fields: [memberId, supplierId], references: [id, supplierId], onDelete: Restrict)
   sessions                    UserSession[]
   passwordHistory             PasswordHistory[]
   hostedPreparations          HostedPreparation[]
 
   @@index([supplierId, role, status])
   @@index([realm, role, status])
+  @@unique([memberId])
 }
 
 model UserSession {
@@ -230,4 +265,268 @@ model OutboxEvent {
 
   @@index([processedAt, failedAt, availableAt])
   @@index([supplierId, occurredAt])
+}
+
+model Member {
+  id                           String                  @id @default(uuid()) @db.Uuid
+  supplierId                   String                  @db.Uuid
+  fullName                     String                  @db.VarChar(150)
+  registrationNumber           String                  @db.VarChar(100)
+  normalizedRegistrationNumber String                  @db.VarChar(100)
+  role                         MemberRole
+  active                       Boolean                 @default(true)
+  version                      Int                     @default(1)
+  createdAt                    DateTime                @default(now()) @db.Timestamptz(3)
+  createdById                  String?                 @db.Uuid
+  updatedAt                    DateTime                @updatedAt @db.Timestamptz(3)
+  updatedById                  String?                 @db.Uuid
+  supplier                     Supplier                @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  users                        User[]
+  photos                       MemberPhoto[]
+  supervisedLines              DefaultLineSupervisor[]
+  ledLines                     DefaultLineLeader[]
+  assignedJobs                 DefaultJobMp[]
+
+  @@unique([supplierId, normalizedRegistrationNumber])
+  @@unique([id, supplierId])
+  @@index([supplierId, active, role])
+  @@index([supplierId, fullName])
+}
+
+model MemberPhoto {
+  id              String           @id @default(uuid()) @db.Uuid
+  supplierId      String           @db.Uuid
+  memberId        String           @db.Uuid
+  state           MemberPhotoState @default(CURRENT)
+  fullPath        String           @db.VarChar(500)
+  thumbnailPath   String           @db.VarChar(500)
+  fullChecksum    String           @db.VarChar(64)
+  thumbnailChecksum String         @db.VarChar(64)
+  fullWidth       Int
+  fullHeight      Int
+  thumbnailWidth  Int
+  thumbnailHeight Int
+  createdAt       DateTime         @default(now()) @db.Timestamptz(3)
+  createdById     String?          @db.Uuid
+  supersededAt    DateTime?        @db.Timestamptz(3)
+  deletedAt       DateTime?        @db.Timestamptz(3)
+  version         Int              @default(1)
+  supplier        Supplier         @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  member          Member           @relation(fields: [memberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+
+  @@unique([id, supplierId])
+  @@index([supplierId, memberId, state])
+}
+
+model Line {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  supplierId         String                  @db.Uuid
+  code               String                  @db.VarChar(100)
+  normalizedCode     String                  @db.VarChar(100)
+  name               String                  @db.VarChar(150)
+  displayOrder       Int
+  active             Boolean                 @default(true)
+  version            Int                     @default(1)
+  createdAt          DateTime                @default(now()) @db.Timestamptz(3)
+  createdById        String?                 @db.Uuid
+  updatedAt          DateTime                @updatedAt @db.Timestamptz(3)
+  updatedById        String?                 @db.Uuid
+  supplier           Supplier                @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  jobs               Job[]
+  defaultSupervisor  DefaultLineSupervisor?
+  defaultLineLeader  DefaultLineLeader?
+
+  @@unique([supplierId, normalizedCode])
+  @@unique([id, supplierId])
+  @@index([supplierId, active, displayOrder])
+}
+
+model Job {
+  id              String       @id @default(uuid()) @db.Uuid
+  supplierId      String       @db.Uuid
+  lineId          String       @db.Uuid
+  name            String       @db.VarChar(150)
+  normalizedName  String       @db.VarChar(150)
+  displayOrder    Int
+  active          Boolean      @default(true)
+  version         Int          @default(1)
+  createdAt       DateTime     @default(now()) @db.Timestamptz(3)
+  createdById     String?      @db.Uuid
+  updatedAt       DateTime     @updatedAt @db.Timestamptz(3)
+  updatedById     String?      @db.Uuid
+  supplier        Supplier     @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  line            Line         @relation(fields: [lineId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  defaultMp       DefaultJobMp?
+
+  @@unique([lineId, normalizedName])
+  @@unique([id, supplierId])
+  @@index([supplierId, lineId, active, displayOrder])
+}
+
+model Part {
+  id                   String   @id @default(uuid()) @db.Uuid
+  supplierId           String   @db.Uuid
+  partNumber           String   @db.VarChar(100)
+  normalizedPartNumber String   @db.VarChar(100)
+  partName             String   @db.VarChar(200)
+  normalizedPartName   String   @db.VarChar(200)
+  active               Boolean  @default(true)
+  version              Int      @default(1)
+  createdAt            DateTime @default(now()) @db.Timestamptz(3)
+  createdById          String?  @db.Uuid
+  updatedAt            DateTime @updatedAt @db.Timestamptz(3)
+  updatedById          String?  @db.Uuid
+  supplier             Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  @@unique([supplierId, normalizedPartNumber])
+  @@unique([id, supplierId])
+  @@index([supplierId, active, normalizedPartName])
+}
+
+model ShiftTemplate {
+  id           String   @id @default(uuid()) @db.Uuid
+  supplierId   String   @db.Uuid
+  name         String   @db.VarChar(150)
+  displayOrder Int
+  startMinute  Int
+  endMinute    Int
+  timezone     String   @db.VarChar(100)
+  active       Boolean  @default(true)
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  createdById  String?  @db.Uuid
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+  updatedById  String?  @db.Uuid
+  supplier     Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  @@unique([id, supplierId])
+  @@index([supplierId, active, displayOrder])
+}
+
+model ChecklistTemplate {
+  id            String               @id @default(uuid()) @db.Uuid
+  supplierId    String               @db.Uuid
+  category      HenkatenCategory
+  active        Boolean              @default(true)
+  version       Int                  @default(1)
+  createdAt     DateTime             @default(now()) @db.Timestamptz(3)
+  createdById   String?              @db.Uuid
+  updatedAt     DateTime             @updatedAt @db.Timestamptz(3)
+  updatedById   String?              @db.Uuid
+  supplier      Supplier             @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  draftItems    ChecklistDraftItem[]
+  versions      ChecklistVersion[]
+
+  @@unique([supplierId, category])
+  @@unique([id, supplierId])
+}
+
+model ChecklistDraftItem {
+  id             String            @id @default(uuid()) @db.Uuid
+  templateId     String            @db.Uuid
+  supplierId     String            @db.Uuid
+  label          String            @db.VarChar(500)
+  normalizedLabel String           @db.VarChar(500)
+  displayOrder   Int
+  template       ChecklistTemplate @relation(fields: [templateId, supplierId], references: [id, supplierId], onDelete: Restrict)
+
+  @@unique([templateId, normalizedLabel])
+  @@index([supplierId, templateId, displayOrder])
+}
+
+model ChecklistVersion {
+  id            String                 @id @default(uuid()) @db.Uuid
+  templateId    String                 @db.Uuid
+  supplierId    String                 @db.Uuid
+  category      HenkatenCategory
+  versionNumber Int
+  publishedAt   DateTime               @default(now()) @db.Timestamptz(3)
+  publishedById String?                @db.Uuid
+  supplier      Supplier               @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  template      ChecklistTemplate      @relation(fields: [templateId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  items         ChecklistVersionItem[]
+
+  @@unique([templateId, versionNumber])
+  @@unique([id, supplierId])
+  @@index([supplierId, category, versionNumber(sort: Desc)])
+}
+
+model ChecklistVersionItem {
+  id               String           @id @default(uuid()) @db.Uuid
+  checklistVersionId String         @db.Uuid
+  supplierId       String           @db.Uuid
+  label            String           @db.VarChar(500)
+  displayOrder     Int
+  checklistVersion ChecklistVersion @relation(fields: [checklistVersionId, supplierId], references: [id, supplierId], onDelete: Restrict)
+
+  @@index([supplierId, checklistVersionId, displayOrder])
+}
+
+model DefaultAssignmentSet {
+  id         String   @id @default(uuid()) @db.Uuid
+  supplierId String   @unique @db.Uuid
+  version    Int      @default(1)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+  updatedById String? @db.Uuid
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+}
+
+model DefaultLineSupervisor {
+  id                 String   @id @default(uuid()) @db.Uuid
+  supplierId         String   @db.Uuid
+  lineId             String   @db.Uuid
+  supervisorMemberId String   @db.Uuid
+  version            Int      @default(1)
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+  createdById        String?  @db.Uuid
+  updatedAt          DateTime @updatedAt @db.Timestamptz(3)
+  updatedById        String?  @db.Uuid
+  supplier           Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  line               Line     @relation(fields: [lineId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  supervisor         Member   @relation(fields: [supervisorMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+
+  @@unique([id, supplierId])
+  @@unique([lineId, supplierId])
+  @@index([supplierId, supervisorMemberId])
+}
+
+model DefaultLineLeader {
+  id                 String   @id @default(uuid()) @db.Uuid
+  supplierId         String   @db.Uuid
+  lineId             String   @db.Uuid
+  lineLeaderMemberId String   @db.Uuid
+  version            Int      @default(1)
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+  createdById        String?  @db.Uuid
+  updatedAt          DateTime @updatedAt @db.Timestamptz(3)
+  updatedById        String?  @db.Uuid
+  supplier           Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  line               Line     @relation(fields: [lineId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  lineLeader         Member   @relation(fields: [lineLeaderMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+
+  @@unique([id, supplierId])
+  @@unique([lineId, supplierId])
+  @@unique([lineLeaderMemberId, supplierId])
+  @@index([supplierId])
+}
+
+model DefaultJobMp {
+  id         String   @id @default(uuid()) @db.Uuid
+  supplierId String   @db.Uuid
+  jobId      String   @db.Uuid
+  mpMemberId String   @db.Uuid
+  version    Int      @default(1)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  createdById String? @db.Uuid
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+  updatedById String? @db.Uuid
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  job        Job      @relation(fields: [jobId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  mp         Member   @relation(fields: [mpMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+
+  @@unique([id, supplierId])
+  @@unique([jobId, supplierId])
+  @@unique([mpMemberId, supplierId])
+  @@index([supplierId])
 }

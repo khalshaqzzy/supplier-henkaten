@@ -44,8 +44,9 @@ Persistent local storage matches the selected v1 topology.
 
 ## Implementation Details
 
-The exact pixel and derivative dimensions are configuration constants validated during photo
-implementation. Paths contain opaque UUIDs only. Authorization is based on database metadata, never
+The decoded image limit is 25 megapixels. Full derivatives are WebP within 1024 by 1024 pixels
+without enlargement at quality 82. Thumbnails are center-cropped 256 by 256 WebP at quality 80.
+Paths contain opaque UUIDs only. Authorization is based on database metadata, never
 the path supplied by a caller. Responses use a fixed safe content type, private cache policy, ETag,
 and `X-Content-Type-Options: nosniff`.
 
@@ -72,11 +73,10 @@ posture.
 
 ## Validation Evidence
 
-Hosted and External PII boundaries and the private storage model are documented and cross-checked
-against the PRD. No photo dependency, file volume, upload route, or media processing code has been
-introduced.
+Sharp processing, private authenticated delivery, signature/MIME checks, bounded decode,
+transactional metadata replacement, and idempotent outbox cleanup are implemented and exercised by
+integration tests.
 
 ## Follow-up
 
-The storage adapter, Sharp configuration, volume path, metadata entity, and upload API will be
-implemented with member management.
+Production containers must mount the configured photo root as a private persistent volume.

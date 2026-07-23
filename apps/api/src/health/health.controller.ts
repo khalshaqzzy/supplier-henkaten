@@ -4,11 +4,13 @@ import type { Response } from 'express';
 import { Public } from '../common/policy.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../persistence/prisma.service.js';
+import { PhotoService } from '../master-data/photo.service.js';
 
 @Controller()
 export class HealthController {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly photos: PhotoService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -28,13 +30,17 @@ export class HealthController {
   async ready(@Res({ passthrough: true }) response: Response) {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
+      await this.photos.ensureReady();
       const [foundation] = await this.prisma.$queryRaw<
         Array<{ tables: bigint; trigger_count: bigint; unfinished_migrations: bigint }>
       >`
         SELECT
           (SELECT count(*) FROM information_schema.tables
             WHERE table_schema = 'public'
-              AND table_name IN ('Supplier', 'User', 'UserSession', 'AuditEvent', 'OutboxEvent')) AS tables,
+              AND table_name IN (
+                'Supplier', 'User', 'UserSession', 'AuditEvent', 'OutboxEvent',
+                'Member', 'Line', 'Job', 'Part', 'ShiftTemplate', 'ChecklistTemplate'
+              )) AS tables,
           (SELECT count(*) FROM pg_trigger
             WHERE tgname = 'AuditEvent_prevent_update_delete') AS trigger_count,
           (SELECT count(*) FROM "_prisma_migrations"
@@ -42,7 +48,7 @@ export class HealthController {
       `;
       if (
         foundation === undefined ||
-        Number(foundation.tables) !== 5 ||
+        Number(foundation.tables) !== 11 ||
         Number(foundation.trigger_count) !== 1 ||
         Number(foundation.unfinished_migrations) !== 0
       ) {
@@ -56,6 +62,7 @@ export class HealthController {
         checks: [
           { name: 'database', status: 'ready' as const },
           { name: 'migrations', status: 'ready' as const },
+          { name: 'photo_storage', status: 'ready' as const },
         ],
       };
     } catch {
@@ -68,6 +75,7 @@ export class HealthController {
         checks: [
           { name: 'database', status: 'not_ready' as const },
           { name: 'migrations', status: 'not_ready' as const },
+          { name: 'photo_storage', status: 'not_ready' as const },
         ],
       };
     }

@@ -26,11 +26,11 @@ Roadmap tidak memberikan estimasi waktu. Urutan didasarkan pada dependency dan r
 
 ## 2. Current Repository Status
 
-Kondisi repository setelah Phase 0-3:
+Kondisi repository setelah Phase 0-4:
 
 - branch aktif: `staging`;
 - `.agent/PRD.md` tersedia dan menjadi product contract;
-- sepuluh ADR dan empat architecture/security baseline tersedia;
+- dua belas ADR dan empat architecture/security baseline tersedia;
 - Node.js 22.23.1 + pnpm 11.16.0 ESM workspace tersedia;
 - active workspace: NestJS API, shared contracts, dan deterministic test fixtures;
 - strict TypeScript, ESLint, Prettier, Vitest, root validation, dan lockfile tersedia;
@@ -40,12 +40,17 @@ Kondisi repository setelah Phase 0-3:
   outbox, health/readiness, authentication, RBAC, TMMIN administration, supplier provisioning, dan
   source-governance core tersedia;
 - pure External provisioning dan Hosted Preparation boundary telah diimplementasikan;
+- Hosted supplier master data telah tersedia: member/account, private photo, line/job, part, Shift
+  Template, versioned 4M checklist, typed Default Assignment, logical deactivation, dan audited
+  TMMIN read-only access;
+- minimum Hosted configuration contributor Phase 4 telah aktif dan tetap fail-closed terhadap
+  contributor External Phase 9;
 - belum ada frontend, Playwright E2E, atau remote deployment files;
 - materi slide tersedia sebagai reference-only input.
 
-Completed phases: **Phase 0, Phase 1, Phase 2, dan Phase 3**
-Next phase: **Phase 4 - Supplier Master Data Backend**
-Next phase status: **planned**
+Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, dan Phase 4**
+Current phase: **tidak ada**
+Next phase: **Phase 5 - Shift dan Working Assignment Backend (`planned`)**
 
 Tidak ada application behavior yang boleh ditandai implemented sampai source code dan acceptance checks terkait benar-benar tersedia di repository.
 
@@ -1120,7 +1125,7 @@ Phase 3 exit criteria:
 
 ## 12. Phase 4 - Supplier Master Data Backend
 
-Status: **planned**
+Status: **done**
 
 Goal: menyediakan seluruh master data dan default configuration yang diperlukan Hosted supplier sebelum shift atau Henkaten dapat berjalan.
 
@@ -1134,7 +1139,7 @@ Unlocks:
 
 ### 4.1 Member dan Account Linkage
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 3.
 
@@ -1166,7 +1171,7 @@ Exit criteria:
 
 ### 4.2 Member Photo Processing
 
-Status: **planned**
+Status: **done**
 
 Dependency: 4.1 dan photo-storage ADR.
 
@@ -1200,7 +1205,7 @@ Exit criteria:
 
 ### 4.3 Line dan Job
 
-Status: **planned**
+Status: **done**
 
 Dependency: 4.1.
 
@@ -1230,7 +1235,7 @@ Exit criteria:
 
 ### 4.4 Part
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 3.
 
@@ -1259,7 +1264,7 @@ Exit criteria:
 
 ### 4.5 Configurable Shift Template
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 3.
 
@@ -1286,7 +1291,7 @@ Exit criteria:
 
 ### 4.6 Versioned 4M Quality Checklist
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 3.
 
@@ -1317,7 +1322,7 @@ Exit criteria:
 
 ### 4.7 Default Assignment
 
-Status: **planned**
+Status: **done**
 
 Dependency: 4.1 dan 4.3.
 
@@ -1349,22 +1354,25 @@ Exit criteria:
 
 ### 4.8 Deactivation dan Referenced-data Protection
 
-Status: **planned**
+Status: **done**
 
 Dependency: 4.1-4.7.
 
 Execution:
 
 - Centralize active/reference validation.
-- Block deactivation when active shift/Open Henkaten/reservation/default assignment requires resource.
+- Block deactivation when current default assignment requires resource.
+- Extend the same policy in Phase 5–7 for active Shift Run, Working Assignment, Open Henkaten,
+  dan reservation.
 - Preserve historical snapshots.
-- Define pre-reference hard-delete policy.
+- Keep every master record under permanent logical retention; do not expose hard-delete APIs.
 - Ensure no broad cascade deletes.
 
 Verification:
 
 - Referenced resource cannot disappear.
-- Safe pre-reference delete only targets exact entity.
+- Deactivation with a current Default Assignment returns `RESOURCE_IN_USE`.
+- No master-data `DELETE` route exists.
 - Audit records correct action.
 
 Data/migration impact:
@@ -1377,7 +1385,7 @@ Exit criteria:
 
 ### 4.9 Master-data API Hardening
 
-Status: **planned**
+Status: **done**
 
 Dependency: 4.1-4.8.
 
@@ -5090,19 +5098,19 @@ No acceptance criterion may remain without an owning phase.
 
 Current recommended batch:
 
-1. Begin Phase 4.1 Member Domain dan Role-account Linkage.
-2. Implement Phase 4 Hosted Preparation master-data capability boundary.
-3. Register the Phase 4 minimum Hosted configuration cutover contributor.
+1. Begin Phase 5.1 Shift Run schema dan state machine.
+2. Snapshot validated Default Assignment into Working Assignment at Start Shift.
+3. Build the preflight engine and hard gates before emergency override behavior.
 
 Initial implementation order inside the next coding batch:
 
-1. add `Member` and role-account relations to Prisma through an expand-only migration;
-2. implement tenant-scoped member repositories and CRUD contracts;
-3. add Supervisor/LL/QC account creation/reset/deactivation while MP remains account-less;
-4. implement secure Hosted-only photo processing/storage;
-5. add line, job, part, shift-template, checklist, and default-assignment aggregates;
-6. enforce `HOSTED_PREPARATION` capability on configuration writes;
-7. register and test the Phase 4 cutover preflight contributor.
+1. add `ShiftRun`, `WorkingAssignment`, dan `AssignmentIssue` through an expand-only migration;
+2. implement `NOT_STARTED` → `ACTIVE` → `ENDED` transition ownership;
+3. snapshot Default Assignment set/version atomically into Working Assignment;
+4. implement vacancy, duplicate MP, inactive resource, and carry-over preflight rules;
+5. enforce Start Shift hard gates and optimistic concurrency;
+6. add audited Supplier Admin emergency override with required reason;
+7. expose shift list/detail/current queries and permission-negative tests.
 
 Do not start React frontend, supplier product domains, or deployment scripts before their owning dependencies.
 

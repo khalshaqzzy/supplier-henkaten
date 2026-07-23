@@ -1,9 +1,10 @@
 # Enterprise Digital Henkaten Management
 
-TypeScript monorepo for the TMMIN Supplier Digital Henkaten platform. Phase 0-3 provides the
+TypeScript monorepo for the TMMIN Supplier Digital Henkaten platform. Phase 0-4 provides the
 NestJS/Express API foundation, Prisma/PostgreSQL persistence, authentication, tenant governance,
-TMMIN administration, supplier provisioning, and controlled Hosted Preparation. Frontends and
-Henkaten operational domains are not implemented yet.
+TMMIN administration, supplier provisioning, controlled Hosted Preparation, Hosted master data,
+versioned 4M checklists, and default assignments. Frontends and Henkaten operational domains are
+not implemented yet.
 
 ## Prerequisites
 
@@ -49,6 +50,10 @@ pnpm db:down
 Copy `.env.example` to an untracked `.env`, replace the local CSRF/throttle values as needed, then
 start the API with `pnpm --filter @tmmin-henkaten/api dev`. Public probes are `GET /health` and
 `GET /ready`; the generated contract is `GET /api/v1/openapi.json`.
+
+Hosted member photos are normalized to private WebP derivatives below `PHOTO_STORAGE_ROOT`
+(default `.local/uploads/member-photos`). The directory must be writable and persistent. It must
+never be exposed as a public static mount; photos are served only through authenticated API routes.
 
 Operator-only bootstrap and recovery use `TMMIN_BOOTSTRAP_USERNAME`,
 `TMMIN_BOOTSTRAP_DISPLAY_NAME`, and `TMMIN_BOOTSTRAP_PASSWORD` from the environment:

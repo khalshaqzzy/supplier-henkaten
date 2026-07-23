@@ -23,9 +23,9 @@ They are never emitted to logs and are sanitized before external display or audi
 
 | Data | Stored | Typical authorized viewers | Log/audit value |
 |---|---:|---|---|
-| member name | yes | permitted supplier roles; TMMIN support/monitoring where required | opaque actor ID or safe snapshot only |
-| registration number | yes | Hosted board/master-data roles | never logged; audit says field changed |
-| member photo | optional | authorized Hosted board/master-data roles | never logged/audited |
+| member name | yes | permitted supplier roles; TMMIN Admin; TMMIN Quality for Hosted monitoring | opaque actor ID or safe snapshot only |
+| registration number | yes | Hosted master-data roles; TMMIN Admin and Quality for Hosted investigation | never logged; audit says field changed |
+| member photo | optional | authorized Hosted board/master-data roles; TMMIN Admin and Quality | never logged/audited |
 | approval actor snapshot | yes, immutable | authorized history/audit roles | safe role/opaque actor context |
 | username | yes | account owner/admin | never included in domain logs |
 | password/session/client secret | hashed/secret metadata only | no viewer | never |
@@ -69,6 +69,8 @@ enter monitoring event contracts.
 - A resource outside the tenant or visibility scope returns `404`.
 - A visible resource with a disallowed capability returns `403`.
 - TMMIN cross-tenant access uses explicit privileged guards and audit.
+- TMMIN Quality may read Hosted member operational PII but cannot read Hosted Preparation data,
+  credentials, usernames, or normalized lookup fields.
 - External clients can ingest only for their supplier and active source epoch.
 - Frontend visibility is not an access control.
 

@@ -81,10 +81,14 @@ carry supplier scope consistently.
 ## Validation Evidence
 
 Aggregate scope, denial precedence, and tenant-aware repository boundaries are documented in the
-normative architecture baseline. Runtime guards, repositories, constraints, and negative tests
-remain required before tenant-owned endpoints are introduced.
+normative architecture baseline. Runtime guards, repositories, constraints, and negative tests now
+protect tenant-owned master-data endpoints.
+
+Supplier master data also uses explicit TMMIN cross-tenant read routes. TMMIN Admin may read Hosted
+and active Hosted Preparation configuration; TMMIN Quality may read only Hosted configuration.
+These reads write safe audit events. Supplier operational roles do not receive unscoped
+master-data list access; their scoped board/read models remain separately owned.
 
 ## Follow-up
 
-Tenant context, scoped repository conventions, object-level guards, and negative security tests will
-be implemented before supplier domain features.
+Shift and Henkaten repositories must preserve the same explicit scope and denial precedence.

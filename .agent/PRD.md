@@ -3,7 +3,7 @@
 | Atribut | Nilai |
 |---|---|
 | Status dokumen | **Approved product contract for v1 planning** |
-| Status implementasi | **Phase 0-3 implemented; Phase 4+ planned** |
+| Status implementasi | **Phase 0-4 implemented; Phase 5+ planned** |
 | Versi dokumen | 1.0 |
 | Tanggal | 23 Juli 2026 |
 | Product owner | TMMIN |
@@ -324,8 +324,8 @@ Legenda: `M` manage, `A` approve/reject, `V` view, `O` operate, `-` tidak memili
 | Manage supplier | M | V | - | - | - | - | - |
 | Manage source mode/API credential | M | - | - | - | - | - | - |
 | Manage Supplier Admin | M | - | - | - | - | - | - |
-| Manage supplier master data | V/support | - | M | V scoped | V scoped | V | - |
-| Manage default assignment | V/support | - | M | V scoped | V scoped | V | - |
+| Manage supplier master data | V read-only | V read-only Hosted | M | V scoped | V scoped | V | - |
+| Manage default assignment | V read-only | V read-only Hosted | M | V scoped | V scoped | V | - |
 | Start/End Shift | - | - | Override only | V | O own line | V | - |
 | Input Henkaten | - | - | - | - | O own line | - | - |
 | Withdraw + Clone | - | - | - | - | O own line | - | - |
@@ -439,7 +439,8 @@ Field minimum:
 Aturan:
 
 - satu member hanya memiliki satu role aktif;
-- perubahan role setelah member direferensikan dicatat di audit;
+- role member immutable setelah dibuat; koreksi role dilakukan dengan menonaktifkan member lama dan
+  membuat member baru;
 - approval history menyimpan role snapshot saat keputusan;
 - foto menerima JPG, PNG, atau WebP maksimum 2 MB;
 - server wajib memvalidasi MIME dan signature, menghapus metadata, serta membuat thumbnail;
@@ -508,8 +509,9 @@ Shift yang melewati tengah malam wajib didukung. Business date mengikuti tanggal
 
 - v1 hanya menyediakan individual CRUD form.
 - Bulk CSV import/export tidak termasuk v1.
-- Resource yang belum pernah direferensikan boleh dihapus hanya sebelum aktivasi pertama.
-- Resource yang pernah direferensikan hanya dapat dinonaktifkan.
+- Seluruh master data permanen sejak dibuat dan tidak memiliki hard-delete API.
+- Koreksi dilakukan melalui update atau deactivation; reactivation tetap mempertahankan identity
+  dan history yang sama.
 - Deactivation wajib ditolak bila resource masih diperlukan active shift, Open Henkaten, reservation, atau active default assignment.
 
 ---

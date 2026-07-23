@@ -78,5 +78,8 @@ registry could block an otherwise valid migration; observability must identify t
 
 ## Follow-up
 
-Phase 4 and Phase 9 must register their production contributors rather than bypassing the registry.
-Phase 13 exposes preflight blockers and preparation/cutover controls to TMMIN Admin.
+The Hosted configuration contributor validates active lines/jobs/parts/Shift Templates, complete
+typed default assignments, active linked members/accounts, and published checklists for all four
+categories. The External credential/projection contributor remains fail-closed until its owning
+implementation is available. Phase 13 exposes preflight blockers and preparation/cutover controls
+to TMMIN Admin.

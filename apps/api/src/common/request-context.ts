@@ -10,6 +10,7 @@ export type RequestPrincipal = {
   realm: 'TMMIN' | 'SUPPLIER';
   role: 'TMMIN_ADMIN' | 'TMMIN_QUALITY' | 'SUPPLIER_ADMIN' | 'SUPERVISOR' | 'LINE_LEADER' | 'QC';
   supplierId?: string;
+  sourceEpoch?: number;
   purpose: 'NORMAL' | 'HOSTED_PREPARATION';
   mustChangePassword: boolean;
   sessionId: string;
