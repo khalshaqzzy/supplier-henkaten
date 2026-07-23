@@ -53,6 +53,7 @@ describe('Hosted shift and Henkaten core', () => {
   let leaderId: string;
   let substituteLeaderId: string;
   let supervisorId: string;
+  let supervisorUsername: string;
   let mp1Id: string;
   let mp2Id: string;
   let replacementMpId: string;
@@ -70,6 +71,10 @@ describe('Hosted shift and Henkaten core', () => {
   let adminCsrf: string;
   let leaderCookie: string[];
   let leaderCsrf: string;
+  let supervisorCookie: string[];
+  let supervisorCsrf: string;
+  let qcCookie: string[];
+  let qcCsrf: string;
   let tmminCookie: string[];
   const checklists = new Map<HenkatenCategory, { versionId: string; itemId: string }>();
 
@@ -124,6 +129,7 @@ describe('Hosted shift and Henkaten core', () => {
       passwordHash,
     );
     supervisorId = supervisor.memberId;
+    supervisorUsername = supervisor.username;
     const leader = await createMemberWithUser(
       'LINE_LEADER',
       'Operational Line Leader',
@@ -139,6 +145,12 @@ describe('Hosted shift and Henkaten core', () => {
       passwordHash,
     );
     substituteLeaderId = substitute.memberId;
+    const qc = await createMemberWithUser(
+      'QC',
+      'Operational QC',
+      `ops-qc-${randomUUID()}`,
+      passwordHash,
+    );
 
     mp1Id = await createMp('Operational MP One');
     mp2Id = await createMp('Operational MP Two');
@@ -255,6 +267,8 @@ describe('Hosted shift and Henkaten core', () => {
 
     ({ cookie: adminCookie, csrf: adminCsrf } = await supplierLogin(adminUsername));
     ({ cookie: leaderCookie, csrf: leaderCsrf } = await supplierLogin(leader.username));
+    ({ cookie: supervisorCookie, csrf: supervisorCsrf } = await supplierLogin(supervisorUsername));
+    ({ cookie: qcCookie, csrf: qcCsrf } = await supplierLogin(qc.username));
     const qualityLogin = await request(app.getHttpServer())
       .post('/api/v1/auth/tmmin/login')
       .set('Origin', tmminOrigin)
@@ -687,6 +701,593 @@ describe('Hosted shift and Henkaten core', () => {
     ).resolves.toEqual({ status: 'NOT_STARTED' });
   });
 
+  it('persists parallel approval evidence, exact retries, and reject-fast release', async () => {
+    const approvedSubmission = await leaderPost(
+      '/api/v1/supplier/henkatens',
+      machinePayload(checklists.get('MACHINE')!),
+      'phase7-machine-approve',
+    );
+    expect(approvedSubmission.status).toBe(201);
+    const henkatenId = approvedSubmission.body.id as string;
+    const supervisorDecision = {
+      expectedVersion: 1,
+      decision: 'APPROVED',
+      comment: 'Supervisor conditions accepted.',
+    };
+    const first = await supplierRolePost(
+      supervisorCookie,
+      supervisorCsrf,
+      `/api/v1/supplier/henkatens/${henkatenId}/decisions`,
+      supervisorDecision,
+      'phase7-supervisor-decision',
+    );
+    expect(first.status).toBe(201);
+    expect(first.body.status).toBe('OPEN');
+    expect(first.body.routes.supervisor.status).toBe('APPROVED');
+    expect(first.body.routes.qc.status).toBe('PENDING');
+    const retry = await supplierRolePost(
+      supervisorCookie,
+      supervisorCsrf,
+      `/api/v1/supplier/henkatens/${henkatenId}/decisions`,
+      supervisorDecision,
+      'phase7-supervisor-decision',
+    );
+    expect(retry.status).toBe(201);
+    expect(retry.body.id).toBe(henkatenId);
+    const final = await supplierRolePost(
+      qcCookie,
+      qcCsrf,
+      `/api/v1/supplier/henkatens/${henkatenId}/decisions`,
+      { expectedVersion: 2, decision: 'APPROVED' },
+      'phase7-qc-decision',
+    );
+    expect(final.status).toBe(201);
+    expect(final.body.status).toBe('APPROVED');
+    expect(final.body.routes.qc.decision.actorRole).toBe('QC');
+    await expect(
+      prisma.warningInstance.findUniqueOrThrow({
+        where: { henkatenId },
+        select: { status: true },
+      }),
+    ).resolves.toEqual({ status: 'CLOSED' });
+
+    const target = await prisma.workingAssignment.findUniqueOrThrow({
+      where: { id: targetWorkingAssignmentId },
+    });
+    const rejectedSubmission = await leaderPost(
+      '/api/v1/supplier/henkatens',
+      {
+        category: 'MAN',
+        shiftRunId,
+        jobId: job1Id,
+        partId,
+        checklistVersionId: checklists.get('MAN')!.versionId,
+        checklistAnswers: [{ itemId: checklists.get('MAN')!.itemId, answer: 'YES' }],
+        cause: 'Rejected operator rotation',
+        detail: 'Exercise reject-fast reservation release.',
+        targetWorkingAssignmentId,
+        targetAssignmentVersion: target.version,
+        replaced: { kind: 'MP', memberId: target.effectiveMpMemberId },
+        replacementMpMemberId: replacementMpId,
+      },
+      'phase7-man-reject',
+    );
+    expect(rejectedSubmission.status).toBe(201);
+    const rejected = await supplierRolePost(
+      qcCookie,
+      qcCsrf,
+      `/api/v1/supplier/henkatens/${rejectedSubmission.body.id as string}/decisions`,
+      { expectedVersion: 1, decision: 'REJECTED', comment: 'QC rejected the change.' },
+      'phase7-qc-reject',
+    );
+    expect(rejected.status).toBe(201);
+    expect(rejected.body.status).toBe('REJECTED');
+    expect(rejected.body.routes.supervisor.status).toBe('NOT_REQUIRED');
+    expect(rejected.body.man.reservationActive).toBe(false);
+    await expect(
+      prisma.workingAssignment.findUniqueOrThrow({
+        where: { id: targetWorkingAssignmentId },
+        select: { effectiveMpMemberId: true },
+      }),
+    ).resolves.toEqual({ effectiveMpMemberId: target.effectiveMpMemberId });
+  });
+
+  it('applies approved Man movement once and End Shift cancels remaining work atomically', async () => {
+    const target = await prisma.workingAssignment.findUniqueOrThrow({
+      where: { id: targetWorkingAssignmentId },
+    });
+    const submission = await leaderPost(
+      '/api/v1/supplier/henkatens',
+      {
+        category: 'MAN',
+        shiftRunId,
+        jobId: job1Id,
+        partId,
+        checklistVersionId: checklists.get('MAN')!.versionId,
+        checklistAnswers: [{ itemId: checklists.get('MAN')!.itemId, answer: 'YES' }],
+        cause: 'Approved operator rotation',
+        detail: 'Apply the qualified replacement to the active assignment.',
+        targetWorkingAssignmentId,
+        targetAssignmentVersion: target.version,
+        replaced: { kind: 'MP', memberId: target.effectiveMpMemberId },
+        replacementMpMemberId: replacementMpId,
+      },
+      'phase7-man-approve',
+    );
+    expect(submission.status).toBe(201);
+    const henkatenId = submission.body.id as string;
+    expect(
+      (
+        await supplierRolePost(
+          supervisorCookie,
+          supervisorCsrf,
+          `/api/v1/supplier/henkatens/${henkatenId}/decisions`,
+          { expectedVersion: 1, decision: 'APPROVED' },
+          'phase7-man-supervisor',
+        )
+      ).status,
+    ).toBe(201);
+    const approved = await supplierRolePost(
+      qcCookie,
+      qcCsrf,
+      `/api/v1/supplier/henkatens/${henkatenId}/decisions`,
+      { expectedVersion: 2, decision: 'APPROVED' },
+      'phase7-man-qc',
+    );
+    expect(approved.status).toBe(201);
+    expect(approved.body.status).toBe('APPROVED');
+    await expect(
+      prisma.workingAssignment.findUniqueOrThrow({
+        where: { id: targetWorkingAssignmentId },
+        select: { effectiveMpMemberId: true },
+      }),
+    ).resolves.toEqual({ effectiveMpMemberId: replacementMpId });
+    await expect(prisma.assignmentMovement.count({ where: { henkatenId } })).resolves.toBe(1);
+    const decision = await prisma.approvalDecision.findFirstOrThrow({ where: { henkatenId } });
+    await expect(
+      prisma.approvalDecision.update({
+        where: { id: decision.id },
+        data: { comment: 'Tampered decision' },
+      }),
+    ).rejects.toThrow();
+    await expect(prisma.assignmentMovement.delete({ where: { henkatenId } })).rejects.toThrow();
+
+    const shift = await prisma.shiftRun.findUniqueOrThrow({ where: { id: shiftRunId } });
+    const endBody = { expectedVersion: shift.version };
+    const ended = await leaderPost(
+      `/api/v1/supplier/shifts/${shiftRunId}/end`,
+      endBody,
+      'phase7-end-main-shift',
+    );
+    expect(ended.status).toBe(201);
+    expect(ended.body.status).toBe('ENDED');
+    expect(ended.body.endSummary.deactivatedWorkingAssignments).toBe(2);
+    const endRetry = await leaderPost(
+      `/api/v1/supplier/shifts/${shiftRunId}/end`,
+      endBody,
+      'phase7-end-main-shift',
+    );
+    expect(endRetry.status).toBe(201);
+    await expect(
+      prisma.workingAssignment.count({ where: { shiftRunId, active: true } }),
+    ).resolves.toBe(0);
+  });
+
+  it('preserves and executes an approved pre-start Man resolution', async () => {
+    const plannedLeader = await createMemberWithUser(
+      'LINE_LEADER',
+      'Planned Resolution Leader',
+      `ops-planned-leader-${randomUUID()}`,
+      await app.get(PasswordService).hash(password),
+    );
+    const plannedReplacement = await createMp('Planned Resolution MP');
+    const plannedLine = await prisma.line.create({
+      data: {
+        supplierId,
+        code: `PLANNED-${randomUUID()}`,
+        normalizedCode: randomUUID(),
+        name: 'Planned Resolution Line',
+        displayOrder: 4,
+      },
+    });
+    const plannedJob = await prisma.job.create({
+      data: {
+        supplierId,
+        lineId: plannedLine.id,
+        name: 'Planned Vacant Job',
+        normalizedName: randomUUID(),
+        displayOrder: 1,
+      },
+    });
+    await Promise.all([
+      prisma.defaultLineSupervisor.create({
+        data: { supplierId, lineId: plannedLine.id, supervisorMemberId: supervisorId },
+      }),
+      prisma.defaultLineLeader.create({
+        data: {
+          supplierId,
+          lineId: plannedLine.id,
+          lineLeaderMemberId: plannedLeader.memberId,
+        },
+      }),
+    ]);
+    const plannedLogin = await supplierLogin(plannedLeader.username);
+    const plan = await supplierRolePost(
+      plannedLogin.cookie,
+      plannedLogin.csrf,
+      '/api/v1/supplier/shifts/preflight',
+      { lineId: plannedLine.id, shiftTemplateId, businessDate },
+    );
+    expect(plan.status).toBe(201);
+    const plannedAssignment = plan.body.workingAssignments[0] as {
+      id: string;
+      version: number;
+    };
+    const submitted = await supplierRolePost(
+      plannedLogin.cookie,
+      plannedLogin.csrf,
+      '/api/v1/supplier/henkatens',
+      {
+        category: 'MAN',
+        shiftRunId: plan.body.id,
+        jobId: plannedJob.id,
+        partId,
+        checklistVersionId: checklists.get('MAN')!.versionId,
+        checklistAnswers: [{ itemId: checklists.get('MAN')!.itemId, answer: 'YES' }],
+        cause: 'Resolve planned vacancy',
+        detail: 'Assign a qualified MP before the shift begins.',
+        targetWorkingAssignmentId: plannedAssignment.id,
+        targetAssignmentVersion: plannedAssignment.version,
+        replaced: { kind: 'VACANT' },
+        replacementMpMemberId: plannedReplacement,
+      },
+      'phase7-prestart-man',
+    );
+    expect(submitted.status).toBe(201);
+    expect(
+      (
+        await supplierRolePost(
+          supervisorCookie,
+          supervisorCsrf,
+          `/api/v1/supplier/henkatens/${submitted.body.id as string}/decisions`,
+          { expectedVersion: 1, decision: 'APPROVED' },
+          'phase7-prestart-supervisor',
+        )
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await supplierRolePost(
+          qcCookie,
+          qcCsrf,
+          `/api/v1/supplier/henkatens/${submitted.body.id as string}/decisions`,
+          { expectedVersion: 2, decision: 'APPROVED' },
+          'phase7-prestart-qc',
+        )
+      ).status,
+    ).toBe(201);
+    const refreshed = await supplierRolePost(
+      plannedLogin.cookie,
+      plannedLogin.csrf,
+      '/api/v1/supplier/shifts/preflight',
+      { lineId: plannedLine.id, shiftTemplateId, businessDate },
+    );
+    expect(refreshed.status).toBe(201);
+    expect(refreshed.body.workingAssignments[0].id).toBe(plannedAssignment.id);
+    expect(refreshed.body.eligible).toBe(true);
+    const started = await supplierRolePost(
+      plannedLogin.cookie,
+      plannedLogin.csrf,
+      `/api/v1/supplier/shifts/${plan.body.id as string}/start`,
+      { expectedVersion: refreshed.body.version },
+    );
+    expect(started.status).toBe(201);
+    expect(started.body.workingAssignments[0].effectiveMpMemberId).toBe(plannedReplacement);
+
+    const reroutedSupervisor = await createMemberWithUser(
+      'SUPERVISOR',
+      'Rerouted Operational Supervisor',
+      `ops-rerouted-supervisor-${randomUUID()}`,
+      await app.get(PasswordService).hash(password),
+    );
+    const reroutedLogin = await supplierLogin(reroutedSupervisor.username);
+    const machine = await supplierRolePost(
+      plannedLogin.cookie,
+      plannedLogin.csrf,
+      '/api/v1/supplier/henkatens',
+      {
+        category: 'MACHINE',
+        shiftRunId: plan.body.id,
+        jobId: plannedJob.id,
+        partId,
+        checklistVersionId: checklists.get('MACHINE')!.versionId,
+        checklistAnswers: [{ itemId: checklists.get('MACHINE')!.itemId, answer: 'YES' }],
+        cause: 'Reroute approval responsibility',
+        detail: 'Preserve the original Supervisor while assigning the pending route.',
+        affectedObject: 'Original machine condition',
+        replacementObject: 'Controlled machine condition',
+      },
+      'phase7-reroute-henkaten',
+    );
+    expect(machine.status).toBe(201);
+    const rerouted = await adminPost(
+      `/api/v1/supplier/henkatens/${machine.body.id as string}/approval-routes/supervisor/reroute`,
+      { expectedVersion: 1, supervisorMemberId: reroutedSupervisor.memberId },
+      'phase7-reroute-command',
+    );
+    expect(rerouted.status).toBe(201);
+    expect(rerouted.body.routes.supervisor.initialResponsibleMemberId).toBe(supervisorId);
+    expect(rerouted.body.routes.supervisor.currentResponsibleMemberId).toBe(
+      reroutedSupervisor.memberId,
+    );
+    const oldSupervisorDenied = await supplierRolePost(
+      supervisorCookie,
+      supervisorCsrf,
+      `/api/v1/supplier/henkatens/${machine.body.id as string}/decisions`,
+      { expectedVersion: 2, decision: 'APPROVED' },
+      'phase7-old-supervisor-denied',
+    );
+    expect(oldSupervisorDenied.status).toBe(403);
+    expect(
+      (
+        await supplierRolePost(
+          reroutedLogin.cookie,
+          reroutedLogin.csrf,
+          `/api/v1/supplier/henkatens/${machine.body.id as string}/decisions`,
+          { expectedVersion: 2, decision: 'APPROVED' },
+          'phase7-rerouted-supervisor-decision',
+        )
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await supplierRolePost(
+          qcCookie,
+          qcCsrf,
+          `/api/v1/supplier/henkatens/${machine.body.id as string}/decisions`,
+          { expectedVersion: 3, decision: 'REJECTED' },
+          'phase7-rerouted-qc-reject',
+        )
+      ).status,
+    ).toBe(201);
+
+    const secondQc = await createMemberWithUser(
+      'QC',
+      'Concurrent Operational QC',
+      `ops-concurrent-qc-${randomUUID()}`,
+      await app.get(PasswordService).hash(password),
+    );
+    const secondQcLogin = await supplierLogin(secondQc.username);
+    const concurrent = await supplierRolePost(
+      plannedLogin.cookie,
+      plannedLogin.csrf,
+      '/api/v1/supplier/henkatens',
+      {
+        category: 'METHOD',
+        shiftRunId: plan.body.id,
+        jobId: plannedJob.id,
+        partId,
+        checklistVersionId: checklists.get('METHOD')!.versionId,
+        checklistAnswers: [{ itemId: checklists.get('METHOD')!.itemId, answer: 'YES' }],
+        cause: 'Concurrent QC decision',
+        detail: 'Only the first QC command may lock the shared route.',
+        affectedObject: 'Original work method',
+        replacementObject: 'Controlled work method',
+      },
+      'phase7-concurrent-qc-henkaten',
+    );
+    const qcRace = await Promise.all([
+      supplierRolePost(
+        qcCookie,
+        qcCsrf,
+        `/api/v1/supplier/henkatens/${concurrent.body.id as string}/decisions`,
+        { expectedVersion: 1, decision: 'APPROVED' },
+        'phase7-concurrent-qc-one',
+      ),
+      supplierRolePost(
+        secondQcLogin.cookie,
+        secondQcLogin.csrf,
+        `/api/v1/supplier/henkatens/${concurrent.body.id as string}/decisions`,
+        { expectedVersion: 1, decision: 'REJECTED' },
+        'phase7-concurrent-qc-two',
+      ),
+    ]);
+    expect(qcRace.map(({ status }) => status).sort()).toEqual([201, 409]);
+
+    const receivingMp = await createMp('Receiving Line MP');
+    const issueResolutionMp = await createMp('Issue Resolution MP');
+    const receivingLeader = await createMemberWithUser(
+      'LINE_LEADER',
+      'Receiving Resolution Leader',
+      `ops-receiving-leader-${randomUUID()}`,
+      await app.get(PasswordService).hash(password),
+    );
+    const receivingLogin = await supplierLogin(receivingLeader.username);
+    const receivingLine = await prisma.line.create({
+      data: {
+        supplierId,
+        code: `RECEIVING-${randomUUID()}`,
+        normalizedCode: randomUUID(),
+        name: 'Receiving Resolution Line',
+        displayOrder: 5,
+      },
+    });
+    const receivingJob = await prisma.job.create({
+      data: {
+        supplierId,
+        lineId: receivingLine.id,
+        name: 'Receiving Resolution Job',
+        normalizedName: randomUUID(),
+        displayOrder: 1,
+      },
+    });
+    await Promise.all([
+      prisma.defaultLineSupervisor.create({
+        data: { supplierId, lineId: receivingLine.id, supervisorMemberId: supervisorId },
+      }),
+      prisma.defaultLineLeader.create({
+        data: {
+          supplierId,
+          lineId: receivingLine.id,
+          lineLeaderMemberId: receivingLeader.memberId,
+        },
+      }),
+      prisma.defaultJobMp.create({
+        data: { supplierId, jobId: receivingJob.id, mpMemberId: receivingMp },
+      }),
+    ]);
+    const receivingPlan = await supplierRolePost(
+      receivingLogin.cookie,
+      receivingLogin.csrf,
+      '/api/v1/supplier/shifts/preflight',
+      { lineId: receivingLine.id, shiftTemplateId, businessDate },
+    );
+    const receivingStarted = await supplierRolePost(
+      receivingLogin.cookie,
+      receivingLogin.csrf,
+      `/api/v1/supplier/shifts/${receivingPlan.body.id as string}/start`,
+      { expectedVersion: receivingPlan.body.version },
+    );
+    expect(receivingStarted.status).toBe(201);
+    const receivingAssignment = receivingStarted.body.workingAssignments[0] as {
+      id: string;
+      version: number;
+    };
+    const plannedSourceAssignment = await prisma.workingAssignment.findUniqueOrThrow({
+      where: { id: plannedAssignment.id },
+    });
+    const donorMove = await supplierRolePost(
+      receivingLogin.cookie,
+      receivingLogin.csrf,
+      '/api/v1/supplier/henkatens',
+      {
+        category: 'MAN',
+        shiftRunId: receivingPlan.body.id,
+        jobId: receivingJob.id,
+        partId,
+        checklistVersionId: checklists.get('MAN')!.versionId,
+        checklistAnswers: [{ itemId: checklists.get('MAN')!.itemId, answer: 'YES' }],
+        cause: 'Cross-shift operator movement',
+        detail: 'Move the qualified MP and create a traceable donor vacancy.',
+        targetWorkingAssignmentId: receivingAssignment.id,
+        targetAssignmentVersion: receivingAssignment.version,
+        replaced: { kind: 'MP', memberId: receivingMp },
+        replacementMpMemberId: plannedReplacement,
+        sourceWorkingAssignmentId: plannedSourceAssignment.id,
+        sourceAssignmentVersion: plannedSourceAssignment.version,
+      },
+      'phase7-cross-shift-man',
+    );
+    expect(donorMove.status).toBe(201);
+    expect(
+      (
+        await supplierRolePost(
+          supervisorCookie,
+          supervisorCsrf,
+          `/api/v1/supplier/henkatens/${donorMove.body.id as string}/decisions`,
+          { expectedVersion: 1, decision: 'APPROVED' },
+          'phase7-cross-shift-supervisor',
+        )
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await supplierRolePost(
+          qcCookie,
+          qcCsrf,
+          `/api/v1/supplier/henkatens/${donorMove.body.id as string}/decisions`,
+          { expectedVersion: 2, decision: 'APPROVED' },
+          'phase7-cross-shift-qc',
+        )
+      ).status,
+    ).toBe(201);
+    const donorIssue = await prisma.assignmentIssue.findFirstOrThrow({
+      where: {
+        supplierId,
+        shiftRunId: plan.body.id,
+        jobId: plannedJob.id,
+        status: 'OPEN',
+        originHenkatenId: donorMove.body.id as string,
+      },
+    });
+    expect(donorIssue.originMovementId).not.toBeNull();
+    const donorAssignment = await prisma.workingAssignment.findUniqueOrThrow({
+      where: { id: plannedAssignment.id },
+    });
+    expect(donorAssignment.effectiveMpMemberId).toBeNull();
+
+    const resolution = await supplierRolePost(
+      plannedLogin.cookie,
+      plannedLogin.csrf,
+      '/api/v1/supplier/henkatens',
+      {
+        category: 'MAN',
+        shiftRunId: plan.body.id,
+        jobId: plannedJob.id,
+        partId,
+        checklistVersionId: checklists.get('MAN')!.versionId,
+        checklistAnswers: [{ itemId: checklists.get('MAN')!.itemId, answer: 'YES' }],
+        cause: 'Resolve linked donor vacancy',
+        detail: 'Fill only the explicitly linked issue after verifying its assignment.',
+        targetWorkingAssignmentId: donorAssignment.id,
+        targetAssignmentVersion: donorAssignment.version,
+        replaced: { kind: 'VACANT' },
+        replacementMpMemberId: issueResolutionMp,
+        resolutionIssueId: donorIssue.id,
+      },
+      'phase7-linked-resolution-man',
+    );
+    expect(resolution.status).toBe(201);
+    expect(
+      (
+        await supplierRolePost(
+          supervisorCookie,
+          supervisorCsrf,
+          `/api/v1/supplier/henkatens/${resolution.body.id as string}/decisions`,
+          { expectedVersion: 1, decision: 'APPROVED' },
+          'phase7-linked-resolution-supervisor',
+        )
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await supplierRolePost(
+          qcCookie,
+          qcCsrf,
+          `/api/v1/supplier/henkatens/${resolution.body.id as string}/decisions`,
+          { expectedVersion: 2, decision: 'APPROVED' },
+          'phase7-linked-resolution-qc',
+        )
+      ).status,
+    ).toBe(201);
+    await expect(
+      prisma.assignmentIssue.findUniqueOrThrow({
+        where: { id: donorIssue.id },
+        select: { status: true, resolutionHenkatenId: true },
+      }),
+    ).resolves.toEqual({
+      status: 'RESOLVED',
+      resolutionHenkatenId: resolution.body.id,
+    });
+
+    for (const [activeShiftId, activeLogin] of [
+      [receivingPlan.body.id as string, receivingLogin],
+      [plan.body.id as string, plannedLogin],
+    ] as const) {
+      const activeShift = await prisma.shiftRun.findUniqueOrThrow({
+        where: { id: activeShiftId },
+      });
+      const ended = await supplierRolePost(
+        activeLogin.cookie,
+        activeLogin.csrf,
+        `/api/v1/supplier/shifts/${activeShiftId}/end`,
+        { expectedVersion: activeShift.version },
+        `phase7-end-${activeShiftId}`,
+      );
+      expect(ended.status).toBe(201);
+    }
+  });
+
   function machinePayload(checklist: { versionId: string; itemId: string }) {
     return {
       category: 'MACHINE',
@@ -733,7 +1334,7 @@ describe('Hosted shift and Henkaten core', () => {
   }
 
   async function createMemberWithUser(
-    role: 'SUPERVISOR' | 'LINE_LEADER',
+    role: 'SUPERVISOR' | 'LINE_LEADER' | 'QC',
     fullName: string,
     username: string,
     passwordHash: string,
@@ -805,6 +1406,22 @@ describe('Hosted shift and Henkaten core', () => {
       .set('Origin', supplierOrigin)
       .set('Cookie', adminCookie)
       .set('X-CSRF-Token', adminCsrf);
+    if (idempotencyKey) call.set('Idempotency-Key', idempotencyKey);
+    return call.send(body as object);
+  }
+
+  function supplierRolePost(
+    cookie: string[],
+    csrf: string,
+    path: string,
+    body: unknown,
+    idempotencyKey?: string,
+  ) {
+    const call = request(app.getHttpServer())
+      .post(path)
+      .set('Origin', supplierOrigin)
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', csrf);
     if (idempotencyKey) call.set('Idempotency-Key', idempotencyKey);
     return call.send(body as object);
   }

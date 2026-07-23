@@ -26,11 +26,11 @@ Roadmap tidak memberikan estimasi waktu. Urutan didasarkan pada dependency dan r
 
 ## 2. Current Repository Status
 
-Kondisi repository setelah Phase 0-6:
+Kondisi repository setelah Phase 0-7:
 
 - branch aktif: `staging`;
 - `.agent/PRD.md` tersedia dan menjadi product contract;
-- empat belas ADR dan empat architecture/security baseline tersedia;
+- enam belas ADR dan empat architecture/security baseline tersedia;
 - Node.js 22.23.1 + pnpm 11.16.0 ESM workspace tersedia;
 - active workspace: NestJS API, shared contracts, dan deterministic test fixtures;
 - strict TypeScript, ESLint, Prettier, Vitest, root validation, dan lockfile tersedia;
@@ -52,12 +52,15 @@ Kondisi repository setelah Phase 0-6:
   contributor telah tersedia;
 - immutable Hosted Henkaten 4M, checklist evidence, idempotent identifier allocation, warning
   aggregation, MP reservation, Withdraw + Clone, dan TMMIN read-only query telah tersedia;
+- persisted parallel Supervisor/QC approval, immutable decision/reroute evidence, reject-fast,
+  atomic approved Man movement, linked vacancy resolution, pre-start Man execution, dan
+  transactional End Shift telah tersedia;
 - belum ada frontend, Playwright E2E, atau remote deployment files;
 - materi slide tersedia sebagai reference-only input.
 
-Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, dan Phase 6**
+Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, dan Phase 7**
 Current phase: **tidak ada**
-Next phase: **Phase 7 - Approval, Man Cascade, dan Shift Finalization Backend (`planned`)**
+Next phase: **Phase 8 - Notification, Assignment Board, Dashboard, dan Audit Backend (`planned`)**
 
 Tidak ada application behavior yang boleh ditandai implemented sampai source code dan acceptance checks terkait benar-benar tersedia di repository.
 
@@ -1935,7 +1938,7 @@ Phase 6 exit criteria:
 
 ## 15. Phase 7 - Approval, Man Cascade, dan Shift Finalization Backend
 
-Status: **planned**
+Status: **done**
 
 Goal: menyelesaikan high-risk transactional behavior: parallel approval, reject-fast, reservation
 finalization/Man movement, cascade vacancy, pre-start resolution, dan End Shift.
@@ -1951,7 +1954,7 @@ Unlocks:
 
 ### 7.1 Parallel Approval Routes
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 6.
 
@@ -1981,7 +1984,7 @@ Exit criteria:
 
 ### 7.2 Reject-fast dan Approved Finalization
 
-Status: **planned**
+Status: **done**
 
 Dependency: 7.1.
 
@@ -2011,7 +2014,7 @@ Exit criteria:
 
 ### 7.3 Optimistic Concurrency dan Stale Decision Handling
 
-Status: **planned**
+Status: **done**
 
 Dependency: 7.1-7.2.
 
@@ -2040,7 +2043,7 @@ Exit criteria:
 
 ### 7.4 MP Reservation Finalization Integration
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 6.5 dan 7.3.
 
@@ -2067,7 +2070,7 @@ Exit criteria:
 
 ### 7.5 Atomic Approved Man Movement
 
-Status: **planned**
+Status: **done**
 
 Dependency: 7.2 dan 7.4.
 
@@ -2098,7 +2101,7 @@ Exit criteria:
 
 ### 7.6 Cross-line Cascade Vacancy
 
-Status: **planned**
+Status: **done**
 
 Dependency: 7.5 dan Phase 5.5.
 
@@ -2127,7 +2130,7 @@ Exit criteria:
 
 ### 7.7 Assignment Issue Resolution
 
-Status: **planned**
+Status: **done**
 
 Dependency: 7.6.
 
@@ -2154,7 +2157,7 @@ Exit criteria:
 
 ### 7.8 Pre-start Man Resolution
 
-Status: **planned**
+Status: **done**
 
 Dependency: 7.4-7.7 dan Phase 5.6.
 
@@ -2183,7 +2186,7 @@ Exit criteria:
 
 ### 7.9 End Shift Finalization
 
-Status: **planned**
+Status: **done**
 
 Dependency: 7.2-7.8.
 
@@ -2218,7 +2221,7 @@ Exit criteria:
 
 ### 7.10 Race-condition Integration Suite
 
-Status: **planned**
+Status: **done**
 
 Dependency: 7.1-7.9.
 
@@ -5104,23 +5107,24 @@ ADR harus dibuat ketika keputusan mulai diimplementasikan, bukan setelah impleme
 
 No acceptance criterion may remain without an owning phase.
 
-## 31. Recommended First Execution Batch
+## 31. Recommended Next Execution Batch
 
 Current recommended batch:
 
-1. Begin Phase 5.1 Shift Run schema dan state machine.
-2. Snapshot validated Default Assignment into Working Assignment at Start Shift.
-3. Build the preflight engine and hard gates before emergency override behavior.
+1. Begin Phase 8.1 transactional notification generation from the stable operational events.
+2. Build recipient-scoped notification persistence and read/acknowledgement APIs.
+3. Add Assignment Board, approval inbox, warning, dashboard, and audit read models.
 
 Initial implementation order inside the next coding batch:
 
-1. add `ShiftRun`, `WorkingAssignment`, dan `AssignmentIssue` through an expand-only migration;
-2. implement `NOT_STARTED` → `ACTIVE` → `ENDED` transition ownership;
-3. snapshot Default Assignment set/version atomically into Working Assignment;
-4. implement vacancy, duplicate MP, inactive resource, and carry-over preflight rules;
-5. enforce Start Shift hard gates and optimistic concurrency;
-6. add audited Supplier Admin emergency override with required reason;
-7. expose shift list/detail/current queries and permission-negative tests.
+1. consume `NOTIFICATION_REQUESTED` and terminal operational outbox events idempotently;
+2. persist tenant/role/member-targeted notifications without weakening outbox ownership;
+3. expose paginated unread/read and acknowledgement commands;
+4. materialize current assignment/4M indicators from Shift Run, Working Assignment, route, and
+   warning state;
+5. add Supplier and TMMIN dashboard aggregates with tenant-aware filters;
+6. expose approval inbox and audit reads from immutable evidence;
+7. add SSE resume/reconnect delivery after durable read models are proven.
 
 Do not start React frontend, supplier product domains, or deployment scripts before their owning dependencies.
 

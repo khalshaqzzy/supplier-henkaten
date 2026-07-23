@@ -63,6 +63,10 @@ export const startShiftRequestSchema = z
   .object({ expectedVersion: optimisticVersionSchema })
   .strict();
 
+export const endShiftRequestSchema = z
+  .object({ expectedVersion: optimisticVersionSchema })
+  .strict();
+
 export const emergencyStartShiftRequestSchema = z
   .object({
     expectedVersion: optimisticVersionSchema,
@@ -124,6 +128,18 @@ export const shiftRunSchema = z
     startedAt: utcTimestampSchema.nullable(),
     startedWithOverride: z.boolean(),
     overrideReason: z.string().max(1_000).nullable(),
+    endedAt: utcTimestampSchema.nullable(),
+    endSummary: z
+      .object({
+        cancelledHenkatens: z.number().int().nonnegative(),
+        releasedReservations: z.number().int().nonnegative(),
+        routesNotRequired: z.number().int().nonnegative(),
+        closedWarnings: z.number().int().nonnegative(),
+        closedAssignmentIssues: z.number().int().nonnegative(),
+        deactivatedWorkingAssignments: z.number().int().nonnegative(),
+      })
+      .strict()
+      .nullable(),
     version: optimisticVersionSchema,
   })
   .strict();
@@ -160,6 +176,11 @@ export const assignmentIssueSchema = z
     status: assignmentIssueStatusSchema,
     originKind: z.string().min(1).max(50),
     originReferenceId: opaqueIdSchema.nullable(),
+    originHenkatenId: opaqueIdSchema.nullable(),
+    originMovementId: opaqueIdSchema.nullable(),
+    resolutionKind: z.string().min(1).max(50).nullable(),
+    resolutionReferenceId: opaqueIdSchema.nullable(),
+    resolutionHenkatenId: opaqueIdSchema.nullable(),
     openedAt: utcTimestampSchema,
     resolvedAt: utcTimestampSchema.nullable(),
     version: optimisticVersionSchema,
@@ -174,6 +195,6 @@ export const preStartResolutionContextSchema = z
   .object({
     shift: shiftRunDetailSchema,
     issues: z.array(assignmentIssueSchema),
-    proposedManResolutionSupported: z.literal(false),
+    proposedManResolutionSupported: z.literal(true),
   })
   .strict();

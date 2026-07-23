@@ -22,9 +22,10 @@ Hosted identifiers use a supplier/business-date counter allocated atomically as
 `Idempotency-Key`, scoped by supplier and creator, and stores a canonical request hash. Exact
 retries return the existing aggregate; conflicting key reuse returns `IDEMPOTENCY_CONFLICT`.
 
-The server derives line from the selected Active Shift Run owned by the authenticated LL. It
-validates active job/part, current source epoch, latest active published checklist, and exactly one
-`YES` per current item before any write.
+The server derives line from the selected owned Shift Run. Non-Man categories require Active state;
+Man may target a `NOT_STARTED` plan for pre-start resolution. Submission validates active job/part,
+current source epoch, latest active published checklist, and exactly one `YES` per current item
+before any write.
 
 Man detail stores target/source Working Assignment versions and replaced/replacement snapshots.
 Partial unique indexes allow only one active reservation per replacement MP and target Working
@@ -59,14 +60,15 @@ Individual warning instances preserve correct aggregation and traceability.
 The aggregate uses supplier-aware composite foreign keys and query indexes for date, status,
 category, line, part, shift, and warning aging. A per-supplier/business-date sequence row allocates
 the identifier under the submission transaction. Active reservation uniqueness is expressed by
-partial indexes. Read presenters derive temporary approval-route shape while persisted route
-decisions remain deferred.
+partial indexes. Submission creates persisted Supervisor and QC routes atomically. Read presenters
+return route responsibility and immutable decision evidence rather than derived placeholders.
 
 ## Consequences
 
 Submission locks Supplier then Shift Run and serializes the per-supplier sequence allocation.
-Warnings and reservations remain durable after release/close. Approval decisions, reject/end
-release behavior, approved Man movement, and cascade remain deferred.
+Warnings and reservations remain durable after release/close. Reject, Withdraw, approved Man
+movement, and End Shift share one terminal-effects boundary for route, reservation, warning,
+transition, audit, and outbox consistency.
 
 ## Validation Plan
 
@@ -93,5 +95,5 @@ passes fresh and prior-schema upgrade paths on PostgreSQL.
 
 ## Follow-up
 
-Future approval/finalization work persists decisions, releases reservations on reject/end, applies
-final approved Man movement, creates cascade vacancies, and finalizes Shift Run cleanup.
+Notification persistence, SSE, approval inboxes, assignment board, and dashboard read models will
+consume the committed route/finalization events.

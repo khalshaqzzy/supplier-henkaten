@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
 
-import { AssignmentIssueService } from './assignment-issue.service.js';
-import { OperationalAccessService } from './operational-access.service.js';
+import { OperationsModule } from '../operations/operations.module.js';
 import { ShiftService } from './shift.service.js';
 import { SupplierShiftController, TmminShiftController } from './shift.controller.js';
 
 @Module({
+  imports: [OperationsModule],
   controllers: [SupplierShiftController, TmminShiftController],
-  providers: [AssignmentIssueService, OperationalAccessService, ShiftService],
-  exports: [AssignmentIssueService, OperationalAccessService, ShiftService],
+  providers: [ShiftService],
+  exports: [ShiftService],
 })
 export class ShiftsModule {}

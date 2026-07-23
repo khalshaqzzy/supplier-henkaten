@@ -14,9 +14,11 @@ also requires a visible degraded state rather than duplicate effective MP assign
 ## Decision
 
 One permanent `ShiftRun` represents the tuple Supplier + Line + Shift Template + business date.
-Repeated preflight refreshes the same `NOT_STARTED` row and replaces its pristine Working
-Assignment plan. Once the shift starts, neither later preflight nor Default Assignment changes
-rebuild that snapshot.
+Repeated preflight refreshes the same `NOT_STARTED` row. Unreferenced plan rows are upserted from
+current defaults, while a Working Assignment referenced by Man evidence retains its identity and an
+approved resolution value. Obsolete referenced rows are excluded from plan membership rather than
+deleted. Once the shift starts, neither later preflight nor Default Assignment changes rebuild that
+snapshot.
 
 The Shift Run stores local-time and IANA timezone snapshots plus calculated UTC boundaries.
 `@js-temporal/polyfill` performs cross-midnight and DST-aware conversion. PostgreSQL partial unique
@@ -66,7 +68,9 @@ from the authenticated principal.
 
 Supplier-row locking serializes shift-slot and operational creation within a supplier. This favors
 correctness and deterministic identifier/assignment behavior over maximum write concurrency.
-`ENDED` persistence exists, but the End Shift command and cleanup remain deferred.
+End Shift deactivates Working Assignments rather than deleting them, preserves final assignment and
+movement history, closes shift-owned Open issues, and persists summary counts on the Ended Shift
+Run.
 
 ## Validation Plan
 
@@ -81,17 +85,19 @@ correctness and deterministic identifier/assignment behavior over maximum write 
 - Supplier-level serialization can become a write-contention point for very large tenants.
 - New commit-time contributors can accidentally change blocker classification without matching
   contract and test changes.
-- Deferred End Shift means Active operational data has no product cleanup command yet.
+- Plan preservation requires every new refresh path to respect referenced assignment identity.
 
 ## Validation Evidence
 
 PostgreSQL integration tests prove concurrent preflight creates one slot, concurrent start yields
 one winner, active snapshots survive later default changes, stale default-set versions block at
-commit, the blocked audit is retained, substitute-LL emergency start creates vacancy issues, and
-Working Assignment effective-MP uniqueness remains intact. Unit tests cover cross-midnight and DST
-boundaries. Fresh and prior-schema upgrade migrations both apply successfully.
+commit, the blocked audit is retained, substitute-LL emergency start creates vacancy issues,
+referenced planned assignments retain IDs across refresh, approved pre-start resolution permits
+normal Start, and End Shift preserves inactive final rows with an exact-retry summary. Working
+Assignment effective-MP uniqueness remains intact. Unit tests cover cross-midnight and DST
+boundaries.
 
 ## Follow-up
 
-Future approval/finalization work executes verified pre-start Man resolution, approved assignment
-movement/cascade, issue resolution, and End Shift.
+Assignment board and dashboard read models will consume the preserved final state and movement
+history.

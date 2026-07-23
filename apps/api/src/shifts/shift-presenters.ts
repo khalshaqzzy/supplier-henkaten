@@ -51,9 +51,26 @@ export function presentShift(row: ShiftRun, workingAssignments?: WorkingAssignme
     startedAt: row.startedAt?.toISOString() ?? null,
     startedWithOverride: row.startedWithOverride,
     overrideReason: row.overrideReason,
+    endedAt: row.endedAt?.toISOString() ?? null,
+    endSummary: parseEndSummary(row.endSummary),
     version: row.version,
     ...(workingAssignments ? { workingAssignments: workingAssignments.map(presentWorking) } : {}),
   };
+}
+
+function parseEndSummary(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const keys = [
+    'cancelledHenkatens',
+    'releasedReservations',
+    'routesNotRequired',
+    'closedWarnings',
+    'closedAssignmentIssues',
+    'deactivatedWorkingAssignments',
+  ] as const;
+  if (keys.some((key) => !Number.isInteger(record[key]) || Number(record[key]) < 0)) return null;
+  return Object.fromEntries(keys.map((key) => [key, Number(record[key])]));
 }
 
 function isBlocking(value: unknown): boolean {

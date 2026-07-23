@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 import {
+  approvalDecisionSchema,
+  approvalRouteSchema,
   approvalRouteStatusSchema,
   checklistAnswerSchema,
   henkatenCategorySchema,
@@ -47,6 +49,7 @@ export const createHenkatenRequestSchema = z.discriminatedUnion('category', [
       replacementMpMemberId: opaqueIdSchema,
       sourceWorkingAssignmentId: opaqueIdSchema.optional(),
       sourceAssignmentVersion: optimisticVersionSchema.optional(),
+      resolutionIssueId: opaqueIdSchema.optional(),
     })
     .strict(),
   ...(['MACHINE', 'MATERIAL', 'METHOD'] as const).map((category) =>
@@ -62,10 +65,36 @@ export const createHenkatenRequestSchema = z.discriminatedUnion('category', [
 ]);
 export type CreateHenkatenRequest = z.infer<typeof createHenkatenRequestSchema>;
 
+export const approvalDecisionEvidenceSchema = z
+  .object({
+    id: opaqueIdSchema,
+    decision: approvalDecisionSchema,
+    actorName: z.string().min(1).max(150),
+    actorRole: z.enum(['SUPERVISOR', 'QC']),
+    comment: z.string().max(2_000).nullable(),
+    decidedAt: utcTimestampSchema,
+    correlationId: z.string().min(1).max(128),
+    resultHenkatenVersion: optimisticVersionSchema,
+  })
+  .strict();
+
+export const approvalRouteStateSchema = z
+  .object({
+    route: approvalRouteSchema,
+    status: approvalRouteStatusSchema,
+    initialResponsibleMemberId: opaqueIdSchema.nullable(),
+    initialResponsibleName: z.string().max(150).nullable(),
+    currentResponsibleMemberId: opaqueIdSchema.nullable(),
+    currentResponsibleName: z.string().max(150).nullable(),
+    version: optimisticVersionSchema,
+    decision: approvalDecisionEvidenceSchema.nullable(),
+  })
+  .strict();
+
 export const approvalRouteSummarySchema = z
   .object({
-    supervisor: approvalRouteStatusSchema,
-    qc: approvalRouteStatusSchema,
+    supervisor: approvalRouteStateSchema,
+    qc: approvalRouteStateSchema,
   })
   .strict();
 
@@ -143,7 +172,27 @@ export const henkatenDetailSchema = henkatenSummarySchema
         replacementMpName: z.string(),
         targetAssignmentVersion: optimisticVersionSchema,
         sourceAssignmentVersion: optimisticVersionSchema.nullable(),
+        resolutionIssueId: opaqueIdSchema.nullable(),
         reservationActive: z.boolean(),
+      })
+      .strict()
+      .nullable(),
+    movement: z
+      .object({
+        id: opaqueIdSchema,
+        targetShiftRunId: opaqueIdSchema,
+        sourceShiftRunId: opaqueIdSchema.nullable(),
+        targetWorkingAssignmentId: opaqueIdSchema,
+        sourceWorkingAssignmentId: opaqueIdSchema.nullable(),
+        targetLineId: opaqueIdSchema,
+        targetJobId: opaqueIdSchema,
+        sourceLineId: opaqueIdSchema.nullable(),
+        sourceJobId: opaqueIdSchema.nullable(),
+        movedMpMemberId: opaqueIdSchema,
+        movedMpName: z.string().min(1).max(150),
+        replacedMpMemberId: opaqueIdSchema.nullable(),
+        replacedMpName: z.string().max(150).nullable(),
+        movedAt: utcTimestampSchema,
       })
       .strict()
       .nullable(),
@@ -163,6 +212,7 @@ export const henkatenListQuerySchema = z
     from: utcTimestampSchema.optional(),
     to: utcTimestampSchema.optional(),
     approvalStatus: approvalRouteStatusSchema.optional(),
+    approvalRoute: approvalRouteSchema.optional(),
   })
   .strict();
 export type HenkatenListQuery = z.infer<typeof henkatenListQuerySchema>;
@@ -177,6 +227,23 @@ export const withdrawHenkatenRequestSchema = z
     reason: z.string().trim().min(1).max(1_000),
   })
   .strict();
+
+export const decideHenkatenRequestSchema = z
+  .object({
+    expectedVersion: optimisticVersionSchema,
+    decision: approvalDecisionSchema,
+    comment: z.string().trim().min(1).max(2_000).optional(),
+  })
+  .strict();
+export type DecideHenkatenRequest = z.infer<typeof decideHenkatenRequestSchema>;
+
+export const rerouteSupervisorRequestSchema = z
+  .object({
+    expectedVersion: optimisticVersionSchema,
+    supervisorMemberId: opaqueIdSchema,
+  })
+  .strict();
+export type RerouteSupervisorRequest = z.infer<typeof rerouteSupervisorRequestSchema>;
 
 export const clonePrefillSchema = z
   .object({

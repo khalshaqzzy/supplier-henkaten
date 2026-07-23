@@ -15,6 +15,7 @@ import { normalizeLookup } from '../auth/auth.service.js';
 import { missing } from '../master-data/member.service.js';
 import { AuditWriter } from '../persistence/audit-writer.js';
 import { OutboxService } from '../persistence/outbox.service.js';
+import { OperationalFinalizationService } from '../operations/operational-finalization.service.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 import { runSerializable } from '../persistence/transaction.js';
 import { presentWorking } from '../shifts/shift-presenters.js';
@@ -30,6 +31,7 @@ export class HenkatenService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriter,
     private readonly outbox: OutboxService,
+    private readonly finalization: OperationalFinalizationService,
   ) {}
 
   async create(
@@ -56,16 +58,30 @@ export class HenkatenService {
           if (existing.submissionPayloadHash !== payloadHash) throw idempotencyConflict();
           return existing.id;
         }
-        await tx.$queryRaw`SELECT id FROM "ShiftRun" WHERE id = ${input.shiftRunId}::uuid FOR UPDATE`;
+        const submittedSource =
+          input.category === 'MAN' && input.sourceWorkingAssignmentId
+            ? await tx.workingAssignment.findFirst({
+                where: {
+                  id: input.sourceWorkingAssignmentId,
+                  supplierId: scope.supplierId,
+                },
+                select: { shiftRunId: true },
+              })
+            : null;
+        await lockShiftRuns(tx, [
+          input.shiftRunId,
+          ...(submittedSource ? [submittedSource.shiftRunId] : []),
+        ]);
         const shift = await tx.shiftRun.findFirst({
           where: {
             id: input.shiftRunId,
             supplierId: scope.supplierId,
-            status: 'ACTIVE',
+            status: { in: ['NOT_STARTED', 'ACTIVE'] },
             lineLeaderMemberId: memberId,
           },
         });
-        if (!shift) throw missing('Owned active Shift Run');
+        if (!shift) throw missing('Owned active or planned Shift Run');
+        if (shift.status === 'NOT_STARTED' && input.category !== 'MAN') throw invalidTransition();
         const [supplier, job, part, checklist] = await Promise.all([
           tx.supplier.findUnique({ where: { id: scope.supplierId } }),
           tx.job.findFirst({
@@ -203,6 +219,18 @@ export class HenkatenService {
                 partNameSnapshot: part.partName,
               },
             },
+            approvalRoutes: {
+              create: [
+                {
+                  route: 'SUPERVISOR',
+                  initialResponsibleMemberId: shift.supervisorMemberId,
+                  initialResponsibleNameSnapshot: shift.supervisorNameSnapshot,
+                  currentResponsibleMemberId: shift.supervisorMemberId,
+                  currentResponsibleNameSnapshot: shift.supervisorNameSnapshot,
+                },
+                { route: 'QC' },
+              ],
+            },
             ...(man
               ? {
                   manDetail: {
@@ -220,6 +248,7 @@ export class HenkatenService {
                       replacementMpNameSnapshot: man.replacement.fullName,
                       targetAssignmentVersion: man.target.version,
                       ...(man.source ? { sourceAssignmentVersion: man.source.version } : {}),
+                      ...(man.issue ? { resolutionIssueId: man.issue.id } : {}),
                     },
                   },
                 }
@@ -320,6 +349,24 @@ export class HenkatenService {
     const memberId = principal.memberId;
     await runSerializable(this.prisma, async (tx) => {
       await lockSupplier(tx, scope.supplierId);
+      const lockCandidate = await tx.henkaten.findFirst({
+        where: { id, supplierId: scope.supplierId },
+        select: {
+          shiftRunId: true,
+          reservation: {
+            select: {
+              sourceWorkingAssignment: { select: { shiftRunId: true } },
+            },
+          },
+        },
+      });
+      if (!lockCandidate) throw missing('Open owned Henkaten');
+      await lockShiftRuns(tx, [
+        lockCandidate.shiftRunId,
+        ...(lockCandidate.reservation?.sourceWorkingAssignment
+          ? [lockCandidate.reservation.sourceWorkingAssignment.shiftRunId]
+          : []),
+      ]);
       await tx.$queryRaw`SELECT id FROM "Henkaten" WHERE id = ${id}::uuid FOR UPDATE`;
       const current = await tx.henkaten.findFirst({
         where: {
@@ -343,35 +390,20 @@ export class HenkatenService {
           version: { increment: 1 },
         },
       });
-      await tx.mPReservation.updateMany({
-        where: { henkatenId: id, supplierId: scope.supplierId, releasedAt: null },
-        data: {
-          releasedAt: now,
-          releaseReason: 'WITHDRAWN',
-          version: { increment: 1 },
-        },
-      });
-      await tx.warningInstance.updateMany({
-        where: { henkatenId: id, supplierId: scope.supplierId, status: 'OPEN' },
-        data: {
-          status: 'CLOSED',
-          closedAt: now,
-          closeReason: 'WITHDRAWN',
-          version: { increment: 1 },
-        },
-      });
-      await tx.henkatenTransition.create({
-        data: {
-          supplierId: scope.supplierId,
-          henkatenId: id,
-          fromStatus: 'OPEN',
-          toStatus: 'CANCELLED',
-          actorUserId: principal.userId,
-          actorRole: principal.role,
-          actorName: principal.displayName,
-          reason: input.reason,
+      await this.finalization.closeTerminalEffects(tx, {
+        supplierId: scope.supplierId,
+        henkatenId: id,
+        henkatenVersion: updated.version,
+        toStatus: 'CANCELLED',
+        reason: 'WITHDRAWN',
+        actor: {
+          userId: principal.userId,
+          role: principal.role,
+          name: principal.displayName,
           correlationId: context.correlationId,
         },
+        markPendingRoutesNotRequired: true,
+        releaseReservation: true,
       });
       await this.audit.write(
         {
@@ -382,21 +414,6 @@ export class HenkatenService {
         },
         tx,
       );
-      for (const eventType of ['HENKATEN_CANCELLED', 'WARNING_CLOSED'] as const) {
-        await this.outbox.enqueue(
-          {
-            eventType,
-            aggregateType: 'Henkaten',
-            aggregateId: id,
-            aggregateVersion: updated.version,
-            supplierId: scope.supplierId,
-            actor: { userId: principal.userId, role: principal.role },
-            correlationId: context.correlationId,
-            payload: { reason: 'WITHDRAWN' },
-          },
-          tx,
-        );
-      }
     });
     return this.get(scope, id, principal);
   }
@@ -426,13 +443,20 @@ export class HenkatenService {
               },
             }
           : {}),
-        ...(query.approvalStatus === 'PENDING' ? { status: 'OPEN' as const } : {}),
-        ...(query.approvalStatus === 'APPROVED' ? { status: 'APPROVED' as const } : {}),
-        ...(query.approvalStatus === 'REJECTED' ? { status: 'REJECTED' as const } : {}),
-        ...(query.approvalStatus === 'NOT_REQUIRED'
-          ? { status: { in: ['CANCELLED', 'REJECTED'] } }
+        ...(query.approvalStatus || query.approvalRoute
+          ? {
+              approvalRoutes: {
+                some: {
+                  ...(query.approvalStatus ? { status: query.approvalStatus } : {}),
+                  ...(query.approvalRoute ? { route: query.approvalRoute } : {}),
+                },
+              },
+            }
           : {}),
         ...roleWhere(principal),
+      },
+      include: {
+        approvalRoutes: { include: { decision: true }, orderBy: { route: 'asc' } },
       },
       orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
       take: query.limit + 1,
@@ -636,7 +660,7 @@ export class HenkatenService {
         supplierId,
         shiftRunId,
         jobId: input.jobId,
-        active: true,
+        includedInPlan: true,
       },
     });
     if (!target) throw missing('Target Working Assignment');
@@ -690,7 +714,25 @@ export class HenkatenService {
       },
     });
     if (reservation) throw reservationConflict();
-    return { target, source, replaced, replacement };
+    const issue = input.resolutionIssueId
+      ? await tx.assignmentIssue.findFirst({
+          where: {
+            id: input.resolutionIssueId,
+            supplierId,
+            shiftRunId,
+            lineId: target.lineId,
+            jobId: target.jobId,
+            status: 'OPEN',
+          },
+        })
+      : null;
+    const existingIssue = await tx.assignmentIssue.findFirst({
+      where: { supplierId, shiftRunId, jobId: target.jobId, status: 'OPEN' },
+    });
+    if ((input.resolutionIssueId && !issue) || (existingIssue && existingIssue.id !== issue?.id)) {
+      throw assignmentConflict();
+    }
+    return { target, source, replaced, replacement, issue };
   }
 }
 
@@ -706,7 +748,16 @@ function roleWhere(principal?: RequestPrincipal): Prisma.HenkatenWhereInput {
     return { id: '00000000-0000-0000-0000-000000000000' };
   }
   return principal.role === 'SUPERVISOR'
-    ? { shiftRun: { supervisorMemberId: principal.memberId } }
+    ? {
+        OR: [
+          { shiftRun: { supervisorMemberId: principal.memberId } },
+          {
+            approvalRoutes: {
+              some: { route: 'SUPERVISOR', currentResponsibleMemberId: principal.memberId },
+            },
+          },
+        ],
+      }
     : { shiftRun: { lineLeaderMemberId: principal.memberId } };
 }
 
@@ -762,6 +813,16 @@ async function nextSequence(
 
 async function lockSupplier(tx: Prisma.TransactionClient, supplierId: string) {
   await tx.$queryRaw`SELECT id FROM "Supplier" WHERE id = ${supplierId}::uuid FOR UPDATE`;
+}
+
+async function lockShiftRuns(tx: Prisma.TransactionClient, ids: string[]) {
+  const sorted = [...new Set(ids)].sort();
+  await tx.$queryRaw`
+    SELECT id FROM "ShiftRun"
+    WHERE id = ANY(${sorted}::uuid[])
+    ORDER BY id
+    FOR UPDATE
+  `;
 }
 
 function auditInput(
@@ -836,6 +897,15 @@ function reservationConflict() {
     code: 'RESERVATION_CONFLICT',
     title: 'Reservation conflict',
     detail: 'The replacement MP or target job already has an active reservation.',
+  });
+}
+
+function invalidTransition() {
+  return new ProblemException({
+    status: 409,
+    code: 'INVALID_TRANSITION',
+    title: 'Invalid transition',
+    detail: 'Only Man Henkaten can be submitted for a planned Shift Run.',
   });
 }
 function assignmentConflict() {

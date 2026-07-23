@@ -2,26 +2,33 @@ import { Controller, Get, Param, Post, Req } from '@nestjs/common';
 
 import {
   createHenkatenRequestSchema,
+  decideHenkatenRequestSchema,
   henkatenListQuerySchema,
   opaqueIdSchema,
+  rerouteSupervisorRequestSchema,
   withdrawHenkatenRequestSchema,
   type CreateHenkatenRequest,
+  type DecideHenkatenRequest,
   type HenkatenListQuery,
+  type RerouteSupervisorRequest,
 } from '@tmmin-henkaten/contracts';
 
 import { mutationContext } from '../administration/mutation-context.js';
+import { requiredIdempotencyKey } from '../common/idempotency.js';
 import { RequireCapabilities } from '../common/policy.js';
 import { ProblemException } from '../common/problem.js';
 import type { ContextRequest } from '../common/request-context.js';
 import { parseWithSchema, ValidatedBody, ValidatedQuery } from '../common/zod.js';
 import { OperationalAccessService } from '../shifts/operational-access.service.js';
 import { HenkatenService } from './henkaten.service.js';
+import { ApprovalService } from './approval.service.js';
 
 @Controller('/api/v1/supplier/henkatens')
 export class SupplierHenkatenController {
   constructor(
     private readonly access: OperationalAccessService,
     private readonly henkatens: HenkatenService,
+    private readonly approvals: ApprovalService,
   ) {}
 
   @RequireCapabilities('SUPPLIER_HENKATEN_READ')
@@ -47,7 +54,43 @@ export class SupplierHenkatenController {
     return this.henkatens.create(
       await this.access.assertHostedOperational(principal),
       body,
-      idempotencyKey(request),
+      requiredIdempotencyKey(request),
+      principal,
+      mutationContext(request),
+    );
+  }
+
+  @RequireCapabilities('SUPPLIER_HENKATEN_DECIDE')
+  @Post('/:id/decisions')
+  async decide(
+    @Param('id') id: string,
+    @ValidatedBody(decideHenkatenRequestSchema) body: DecideHenkatenRequest,
+    @Req() request: ContextRequest,
+  ) {
+    const principal = this.access.principal(request);
+    return this.approvals.decide(
+      await this.access.assertHostedOperational(principal),
+      parseWithSchema(opaqueIdSchema, id),
+      body,
+      requiredIdempotencyKey(request),
+      principal,
+      mutationContext(request),
+    );
+  }
+
+  @RequireCapabilities('SUPPLIER_APPROVAL_REROUTE')
+  @Post('/:id/approval-routes/supervisor/reroute')
+  async rerouteSupervisor(
+    @Param('id') id: string,
+    @ValidatedBody(rerouteSupervisorRequestSchema) body: RerouteSupervisorRequest,
+    @Req() request: ContextRequest,
+  ) {
+    const principal = this.access.principal(request);
+    return this.approvals.rerouteSupervisor(
+      await this.access.assertHostedOperational(principal),
+      parseWithSchema(opaqueIdSchema, id),
+      body,
+      requiredIdempotencyKey(request),
       principal,
       mutationContext(request),
     );
@@ -182,17 +225,4 @@ export class TmminWarningController {
     }
     return this.henkatens.affectedPart(parsedSupplier, partNumber);
   }
-}
-
-function idempotencyKey(request: ContextRequest): string {
-  const value = request.header('Idempotency-Key')?.trim();
-  if (!value || value.length > 128 || !/^[A-Za-z0-9._:-]+$/.test(value)) {
-    throw new ProblemException({
-      status: 400,
-      code: 'VALIDATION_FAILED',
-      title: 'Invalid Idempotency-Key',
-      detail: 'Idempotency-Key is required and must contain 1–128 safe characters.',
-    });
-  }
-  return value;
 }

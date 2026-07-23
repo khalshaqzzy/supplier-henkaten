@@ -10,13 +10,18 @@ type OpenIssueInput = {
   type: AssignmentIssueType;
   originKind: string;
   originReferenceId?: string;
+  originHenkatenId?: string;
+  originMovementId?: string;
 };
 
 type ResolveIssueInput = {
   supplierId: string;
+  issueId: string;
+  shiftRunId: string;
   jobId: string;
   resolutionKind: string;
   resolutionReferenceId: string;
+  resolutionHenkatenId: string;
   resolvedById: string;
 };
 
@@ -40,6 +45,8 @@ export class AssignmentIssueService {
         type: input.type,
         originKind: input.originKind,
         ...(input.originReferenceId ? { originReferenceId: input.originReferenceId } : {}),
+        ...(input.originHenkatenId ? { originHenkatenId: input.originHenkatenId } : {}),
+        ...(input.originMovementId ? { originMovementId: input.originMovementId } : {}),
       },
     });
   }
@@ -50,7 +57,9 @@ export class AssignmentIssueService {
   ): Promise<AssignmentIssue | null> {
     const issue = await tx.assignmentIssue.findFirst({
       where: {
+        id: input.issueId,
         supplierId: input.supplierId,
+        shiftRunId: input.shiftRunId,
         jobId: input.jobId,
         status: 'OPEN',
       },
@@ -62,6 +71,7 @@ export class AssignmentIssueService {
         status: 'RESOLVED',
         resolutionKind: input.resolutionKind,
         resolutionReferenceId: input.resolutionReferenceId,
+        resolutionHenkatenId: input.resolutionHenkatenId,
         resolvedAt: new Date(),
         resolvedById: input.resolvedById,
         version: { increment: 1 },

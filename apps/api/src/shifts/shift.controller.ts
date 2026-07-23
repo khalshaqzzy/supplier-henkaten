@@ -3,6 +3,7 @@ import { Controller, Get, Param, Post, Req } from '@nestjs/common';
 import {
   currentShiftQuerySchema,
   emergencyStartShiftRequestSchema,
+  endShiftRequestSchema,
   opaqueIdSchema,
   prepareShiftRequestSchema,
   shiftListQuerySchema,
@@ -13,6 +14,7 @@ import {
 } from '@tmmin-henkaten/contracts';
 
 import { mutationContext } from '../administration/mutation-context.js';
+import { requiredIdempotencyKey } from '../common/idempotency.js';
 import { RequireCapabilities } from '../common/policy.js';
 import type { ContextRequest } from '../common/request-context.js';
 import { parseWithSchema, ValidatedBody, ValidatedQuery } from '../common/zod.js';
@@ -127,7 +129,7 @@ export class SupplierShiftController {
           this.access.principal(request),
         )
       ).items,
-      proposedManResolutionSupported: false as const,
+      proposedManResolutionSupported: true as const,
     };
   }
 
@@ -143,6 +145,24 @@ export class SupplierShiftController {
       await this.access.assertHostedOperational(principal),
       parseWithSchema(opaqueIdSchema, id),
       body.expectedVersion,
+      principal,
+      mutationContext(request),
+    );
+  }
+
+  @RequireCapabilities('SUPPLIER_SHIFT_OPERATE')
+  @Post('/:id/end')
+  async end(
+    @Param('id') id: string,
+    @ValidatedBody(endShiftRequestSchema) body: { expectedVersion: number },
+    @Req() request: ContextRequest,
+  ) {
+    const principal = this.access.principal(request);
+    return this.shifts.end(
+      await this.access.assertHostedOperational(principal),
+      parseWithSchema(opaqueIdSchema, id),
+      body.expectedVersion,
+      requiredIdempotencyKey(request),
       principal,
       mutationContext(request),
     );

@@ -62,14 +62,17 @@ import {
   assignmentIssuePageSchema,
   clonePrefillSchema,
   createHenkatenRequestSchema,
+  decideHenkatenRequestSchema,
   currentShiftQuerySchema,
   emergencyStartShiftRequestSchema,
+  endShiftRequestSchema,
   henkatenDetailSchema,
   henkatenListQuerySchema,
   henkatenPageSchema,
   henkatenTransitionSchema,
   prepareShiftRequestSchema,
   preStartResolutionContextSchema,
+  rerouteSupervisorRequestSchema,
   shiftListQuerySchema,
   shiftRunDetailSchema,
   shiftRunPageSchema,
@@ -331,6 +334,19 @@ function operationalPaths() {
         },
       },
     },
+    '/api/v1/supplier/shifts/{id}/end': {
+      post: {
+        requestParams: {
+          ...shiftId,
+          header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }),
+        },
+        requestBody: body(endShiftRequestSchema),
+        responses: {
+          '201': json('Ended Shift Run', shiftRunDetailSchema),
+          '409': problem,
+        },
+      },
+    },
     '/api/v1/tmmin/suppliers/{supplierId}/shifts': {
       get: {
         requestParams: { ...supplierOnly, query: shiftListQuerySchema },
@@ -382,6 +398,32 @@ function operationalPaths() {
         requestBody: body(withdrawHenkatenRequestSchema),
         responses: {
           '201': json('Withdrawn Henkaten', henkatenDetailSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/henkatens/{id}/decisions': {
+      post: {
+        requestParams: {
+          ...shiftId,
+          header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }),
+        },
+        requestBody: body(decideHenkatenRequestSchema),
+        responses: {
+          '201': json('Recorded approval decision', henkatenDetailSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/henkatens/{id}/approval-routes/supervisor/reroute': {
+      post: {
+        requestParams: {
+          ...shiftId,
+          header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }),
+        },
+        requestBody: body(rerouteSupervisorRequestSchema),
+        responses: {
+          '201': json('Rerouted Supervisor approval', henkatenDetailSchema),
           '409': problem,
         },
       },

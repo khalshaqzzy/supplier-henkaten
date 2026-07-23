@@ -14,6 +14,7 @@ import { HenkatenModule } from './henkaten/henkaten.module.js';
 import { OpenApiController } from './openapi/openapi.controller.js';
 import { PersistenceModule } from './persistence/persistence.module.js';
 import { MasterDataModule } from './master-data/master-data.module.js';
+import { OperationsModule } from './operations/operations.module.js';
 import { ShiftsModule } from './shifts/shifts.module.js';
 
 @Module({
@@ -63,6 +64,7 @@ import { ShiftsModule } from './shifts/shifts.module.js';
     AuthModule,
     AdministrationModule,
     MasterDataModule,
+    OperationsModule,
     ShiftsModule,
     HenkatenModule,
   ],

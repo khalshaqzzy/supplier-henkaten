@@ -6,6 +6,8 @@ import type {
   ShiftPreflightCheck,
 } from '@tmmin-henkaten/contracts';
 
+import { createHash } from 'node:crypto';
+
 import type { Prisma, WorkingAssignmentState } from '../generated/prisma/client.js';
 import type { MutationContext } from '../administration/mutation-context.js';
 import { decodeCursor, encodeCursor } from '../administration/presenters.js';
@@ -19,6 +21,7 @@ import { PrismaService } from '../persistence/prisma.service.js';
 import { runSerializable } from '../persistence/transaction.js';
 import { missing } from '../master-data/member.service.js';
 import { AssignmentIssueService } from './assignment-issue.service.js';
+import { OperationalFinalizationService } from '../operations/operational-finalization.service.js';
 import { presentShift } from './shift-presenters.js';
 import { shiftBoundaries } from './shift-time.js';
 
@@ -43,6 +46,7 @@ export class ShiftService {
     private readonly audit: AuditWriter,
     private readonly outbox: OutboxService,
     private readonly assignmentIssues: AssignmentIssueService,
+    private readonly finalization: OperationalFinalizationService,
   ) {}
 
   async prepare(
@@ -79,7 +83,12 @@ export class ShiftService {
       if (current && current.status !== 'NOT_STARTED') {
         return tx.shiftRun.findUniqueOrThrow({
           where: { id: current.id },
-          include: { workingAssignments: { orderBy: { jobDisplayOrderSnapshot: 'asc' } } },
+          include: {
+            workingAssignments: {
+              where: { includedInPlan: true },
+              orderBy: { jobDisplayOrderSnapshot: 'asc' },
+            },
+          },
         });
       }
       const checks = await this.evaluate(tx, scope.supplierId, input.lineId, current?.id, source);
@@ -141,42 +150,94 @@ export class ShiftService {
               updatedById: context.actorUserId,
             },
           });
-      await tx.workingAssignment.deleteMany({ where: { shiftRunId: plan.id } });
-      if (source.assignments.length) {
-        await tx.workingAssignment.createMany({
-          data: source.assignments.map((assignment) => ({
+      const existingAssignments = await tx.workingAssignment.findMany({
+        where: { shiftRunId: plan.id },
+      });
+      const referencedTargets = new Set(
+        (
+          await tx.manHenkatenDetail.findMany({
+            where: { targetWorkingAssignment: { shiftRunId: plan.id } },
+            select: { targetWorkingAssignmentId: true },
+          })
+        ).map(({ targetWorkingAssignmentId }) => targetWorkingAssignmentId),
+      );
+      const currentJobIds = new Set(source.assignments.map(({ jobId }) => jobId));
+      for (const existing of existingAssignments) {
+        if (currentJobIds.has(existing.jobId)) continue;
+        if (referencedTargets.has(existing.id)) {
+          await tx.workingAssignment.update({
+            where: { id: existing.id },
+            data: { includedInPlan: false, version: { increment: 1 } },
+          });
+        } else {
+          await tx.workingAssignment.delete({ where: { id: existing.id } });
+        }
+      }
+      for (const assignment of source.assignments) {
+        const existing = existingAssignments.find(({ jobId }) => jobId === assignment.jobId);
+        if (existing && referencedTargets.has(existing.id)) {
+          if (!existing.includedInPlan) {
+            await tx.workingAssignment.update({
+              where: { id: existing.id },
+              data: { includedInPlan: true, version: { increment: 1 } },
+            });
+          }
+          continue;
+        }
+        const assignmentData = {
+          lineId: input.lineId,
+          jobNameSnapshot: assignment.jobName,
+          jobDisplayOrderSnapshot: assignment.displayOrder,
+          sourceDefaultAssignmentId: assignment.defaultId ?? null,
+          sourceDefaultVersion: assignment.defaultVersion ?? null,
+          effectiveMpMemberId: assignment.effectiveMemberId ?? null,
+          candidateMpMemberId: assignment.memberId ?? null,
+          mpNameSnapshot: assignment.memberName ?? null,
+          mpRegistrationSnapshot: assignment.registrationNumber ?? null,
+          state: assignment.state,
+          includedInPlan: true,
+        };
+        await tx.workingAssignment.upsert({
+          where: { shiftRunId_jobId: { shiftRunId: plan.id, jobId: assignment.jobId } },
+          create: {
             supplierId: scope.supplierId,
             shiftRunId: plan.id,
-            lineId: input.lineId,
             jobId: assignment.jobId,
-            jobNameSnapshot: assignment.jobName,
-            jobDisplayOrderSnapshot: assignment.displayOrder,
-            ...(assignment.defaultId ? { sourceDefaultAssignmentId: assignment.defaultId } : {}),
-            ...(assignment.defaultVersion
-              ? { sourceDefaultVersion: assignment.defaultVersion }
-              : {}),
-            ...(assignment.effectiveMemberId
-              ? { effectiveMpMemberId: assignment.effectiveMemberId }
-              : {}),
-            ...(assignment.memberId ? { candidateMpMemberId: assignment.memberId } : {}),
-            ...(assignment.memberName ? { mpNameSnapshot: assignment.memberName } : {}),
-            ...(assignment.registrationNumber
-              ? { mpRegistrationSnapshot: assignment.registrationNumber }
-              : {}),
-            state: assignment.state,
-          })),
+            ...assignmentData,
+          },
+          update: {
+            ...assignmentData,
+            version: { increment: 1 },
+            updatedById: context.actorUserId,
+          },
         });
       }
+      const stabilized = await tx.shiftRun.findUniqueOrThrow({
+        where: { id: plan.id },
+        include: {
+          workingAssignments: {
+            where: { includedInPlan: true },
+            orderBy: { jobDisplayOrderSnapshot: 'asc' },
+          },
+        },
+      });
+      const finalChecks = await this.evaluateExisting(
+        tx,
+        stabilized,
+        source.assignmentSetVersion,
+        source.sourceEpoch,
+      );
+      const finalizedPlan = await tx.shiftRun.update({
+        where: { id: plan.id },
+        data: { latestPreflight: finalChecks, latestPreflightAt: new Date() },
+      });
       await this.audit.write(
         auditInput(context, scope.supplierId, 'SHIFT_PREFLIGHT_COMPLETED', 'ShiftRun', plan.id, {
-          blockerCodes: checks.filter(({ blocking }) => blocking).map(({ code }) => code),
+          blockerCodes: finalChecks.filter(({ blocking }) => blocking).map(({ code }) => code),
         }),
         tx,
       );
-      return tx.shiftRun.findUniqueOrThrow({
-        where: { id: plan.id },
-        include: { workingAssignments: { orderBy: { jobDisplayOrderSnapshot: 'asc' } } },
-      });
+      return { ...finalizedPlan, workingAssignments: stabilized.workingAssignments };
     });
     return presentShift(result, result.workingAssignments);
   }
@@ -189,7 +250,8 @@ export class ShiftService {
     context: MutationContext,
   ) {
     if (principal.role !== 'LINE_LEADER' || !principal.memberId) throw forbidden();
-    return this.activate(scope, id, expectedVersion, principal.memberId, undefined, context);
+    const memberId = principal.memberId;
+    return this.activate(scope, id, expectedVersion, memberId, undefined, context);
   }
 
   async emergencyStart(
@@ -214,6 +276,233 @@ export class ShiftService {
     );
   }
 
+  async end(
+    scope: TenantScope,
+    id: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+    principal: RequestPrincipal,
+    context: MutationContext,
+  ) {
+    if (principal.role !== 'LINE_LEADER' || !principal.memberId) throw forbidden();
+    const memberId = principal.memberId;
+    const payloadHash = createHash('sha256')
+      .update(JSON.stringify({ expectedVersion, id }))
+      .digest('hex');
+    const result = await runSerializable(this.prisma, async (tx) => {
+      await lockSupplier(tx, scope.supplierId);
+      const commandOwner = await tx.shiftRun.findFirst({
+        where: { supplierId: scope.supplierId, endCommandKey: idempotencyKey },
+        include: {
+          workingAssignments: {
+            where: { includedInPlan: true },
+            orderBy: { jobDisplayOrderSnapshot: 'asc' },
+          },
+        },
+      });
+      if (commandOwner) {
+        if (commandOwner.id !== id || commandOwner.endCommandPayloadHash !== payloadHash) {
+          throw endIdempotencyConflict();
+        }
+        return commandOwner;
+      }
+      const lockCandidate = await tx.shiftRun.findFirst({
+        where: {
+          id,
+          supplierId: scope.supplierId,
+          lineLeaderMemberId: memberId,
+        },
+        include: {
+          workingAssignments: {
+            select: { id: true },
+          },
+        },
+      });
+      if (!lockCandidate) throw missing('Owned Shift Run');
+      const lockAssignmentIds = lockCandidate.workingAssignments.map(
+        ({ id: assignmentId }) => assignmentId,
+      );
+      const lockRelated = await tx.henkaten.findMany({
+        where: {
+          supplierId: scope.supplierId,
+          status: 'OPEN',
+          OR: [
+            { shiftRunId: id },
+            {
+              reservation: {
+                is: {
+                  releasedAt: null,
+                  OR: [
+                    { targetWorkingAssignmentId: { in: lockAssignmentIds } },
+                    { sourceWorkingAssignmentId: { in: lockAssignmentIds } },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+        select: {
+          shiftRunId: true,
+          reservation: {
+            select: {
+              targetWorkingAssignment: { select: { shiftRunId: true } },
+              sourceWorkingAssignment: { select: { shiftRunId: true } },
+            },
+          },
+        },
+      });
+      await lockShiftRuns(tx, [
+        id,
+        ...lockRelated.flatMap((henkaten) => [
+          henkaten.shiftRunId,
+          henkaten.reservation?.targetWorkingAssignment.shiftRunId ?? henkaten.shiftRunId,
+          henkaten.reservation?.sourceWorkingAssignment?.shiftRunId ?? henkaten.shiftRunId,
+        ]),
+      ]);
+      const shift = await tx.shiftRun.findFirst({
+        where: {
+          id,
+          supplierId: scope.supplierId,
+          lineLeaderMemberId: memberId,
+        },
+        include: {
+          workingAssignments: {
+            where: { includedInPlan: true },
+            orderBy: { jobDisplayOrderSnapshot: 'asc' },
+          },
+        },
+      });
+      if (!shift) throw missing('Owned Shift Run');
+      if (shift.status === 'ENDED' && shift.endCommandKey === idempotencyKey) {
+        if (shift.endCommandPayloadHash !== payloadHash) throw endIdempotencyConflict();
+        return shift;
+      }
+      if (shift.version !== expectedVersion) throw versionConflict();
+      if (shift.status !== 'ACTIVE') throw invalidTransition();
+      const assignmentIds = shift.workingAssignments.map(({ id: assignmentId }) => assignmentId);
+      const related = await tx.henkaten.findMany({
+        where: {
+          supplierId: scope.supplierId,
+          status: 'OPEN',
+          OR: [
+            { shiftRunId: shift.id },
+            {
+              reservation: {
+                is: {
+                  releasedAt: null,
+                  OR: [
+                    { targetWorkingAssignmentId: { in: assignmentIds } },
+                    { sourceWorkingAssignmentId: { in: assignmentIds } },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+        orderBy: { id: 'asc' },
+      });
+      for (const henkaten of related) {
+        await tx.$queryRaw`SELECT id FROM "Henkaten" WHERE id = ${henkaten.id}::uuid FOR UPDATE`;
+      }
+      let releasedReservations = 0;
+      let closedWarnings = 0;
+      let routesNotRequired = 0;
+      for (const henkaten of related) {
+        const updated = await tx.henkaten.update({
+          where: { id: henkaten.id },
+          data: {
+            status: 'CANCELLED',
+            cancellationReason: 'SHIFT_ENDED',
+            finalizedAt: new Date(),
+            finalizedById: principal.userId,
+            version: { increment: 1 },
+          },
+        });
+        const effects = await this.finalization.closeTerminalEffects(tx, {
+          supplierId: scope.supplierId,
+          henkatenId: henkaten.id,
+          henkatenVersion: updated.version,
+          toStatus: 'CANCELLED',
+          reason: 'SHIFT_ENDED',
+          actor: {
+            userId: principal.userId,
+            role: principal.role,
+            name: principal.displayName,
+            correlationId: context.correlationId,
+          },
+          markPendingRoutesNotRequired: true,
+          releaseReservation: true,
+        });
+        releasedReservations += effects.releasedReservations;
+        closedWarnings += effects.closedWarnings;
+        routesNotRequired += effects.routesNotRequired;
+      }
+      const now = new Date();
+      const closedIssues = await tx.assignmentIssue.updateMany({
+        where: { supplierId: scope.supplierId, shiftRunId: shift.id, status: 'OPEN' },
+        data: {
+          status: 'CLOSED_SHIFT_ENDED',
+          resolutionKind: 'SHIFT_ENDED',
+          resolutionReferenceId: shift.id,
+          resolvedAt: now,
+          resolvedById: principal.userId,
+          version: { increment: 1 },
+        },
+      });
+      const deactivated = await tx.workingAssignment.updateMany({
+        where: { supplierId: scope.supplierId, shiftRunId: shift.id, active: true },
+        data: { active: false, version: { increment: 1 }, updatedById: principal.userId },
+      });
+      const summary = {
+        cancelledHenkatens: related.length,
+        releasedReservations,
+        routesNotRequired,
+        closedWarnings,
+        closedAssignmentIssues: closedIssues.count,
+        deactivatedWorkingAssignments: deactivated.count,
+      };
+      const ended = await tx.shiftRun.update({
+        where: { id: shift.id },
+        data: {
+          status: 'ENDED',
+          endedAt: now,
+          endedById: principal.userId,
+          endSummary: summary,
+          endCommandKey: idempotencyKey,
+          endCommandPayloadHash: payloadHash,
+          version: { increment: 1 },
+          updatedById: principal.userId,
+        },
+      });
+      await this.audit.write(
+        auditInput(context, scope.supplierId, 'SHIFT_ENDED', 'ShiftRun', shift.id, summary),
+        tx,
+      );
+      await this.outbox.enqueue(
+        {
+          eventType: 'SHIFT_ENDED',
+          aggregateType: 'ShiftRun',
+          aggregateId: shift.id,
+          aggregateVersion: ended.version,
+          supplierId: scope.supplierId,
+          actor: { userId: principal.userId, role: principal.role },
+          correlationId: context.correlationId,
+          payload: { lineId: shift.lineId, ...summary },
+        },
+        tx,
+      );
+      return {
+        ...ended,
+        workingAssignments: shift.workingAssignments.map((assignment) => ({
+          ...assignment,
+          active: false,
+          version: assignment.active ? assignment.version + 1 : assignment.version,
+        })),
+      };
+    });
+    return presentShift(result, result.workingAssignments);
+  }
+
   private async activate(
     scope: TenantScope,
     id: string,
@@ -227,7 +516,12 @@ export class ShiftService {
       await tx.$queryRaw`SELECT id FROM "ShiftRun" WHERE id = ${id}::uuid FOR UPDATE`;
       const plan = await tx.shiftRun.findFirst({
         where: { id, supplierId: scope.supplierId },
-        include: { workingAssignments: { orderBy: { jobDisplayOrderSnapshot: 'asc' } } },
+        include: {
+          workingAssignments: {
+            where: { includedInPlan: true },
+            orderBy: { jobDisplayOrderSnapshot: 'asc' },
+          },
+        },
       });
       if (!plan) throw missing('Shift Run');
       if (plan.version !== expectedVersion) throw versionConflict();
@@ -415,7 +709,12 @@ export class ShiftService {
   async get(scope: TenantScope, id: string, principal?: RequestPrincipal) {
     const row = await this.prisma.shiftRun.findFirst({
       where: { id, supplierId: scope.supplierId, ...roleWhere(principal) },
-      include: { workingAssignments: { orderBy: { jobDisplayOrderSnapshot: 'asc' } } },
+      include: {
+        workingAssignments: {
+          where: { includedInPlan: true },
+          orderBy: { jobDisplayOrderSnapshot: 'asc' },
+        },
+      },
     });
     if (!row) throw missing('Shift Run');
     return presentShift(row, row.workingAssignments);
@@ -429,7 +728,12 @@ export class ShiftService {
         ...(lineId ? { lineId } : {}),
         ...roleWhere(principal),
       },
-      include: { workingAssignments: { orderBy: { jobDisplayOrderSnapshot: 'asc' } } },
+      include: {
+        workingAssignments: {
+          where: { includedInPlan: true },
+          orderBy: { jobDisplayOrderSnapshot: 'asc' },
+        },
+      },
     });
     return row ? presentShift(row, row.workingAssignments) : null;
   }
@@ -454,6 +758,11 @@ export class ShiftService {
         status: row.status,
         originKind: row.originKind,
         originReferenceId: row.originReferenceId,
+        originHenkatenId: row.originHenkatenId,
+        originMovementId: row.originMovementId,
+        resolutionKind: row.resolutionKind,
+        resolutionReferenceId: row.resolutionReferenceId,
+        resolutionHenkatenId: row.resolutionHenkatenId,
         openedAt: row.openedAt.toISOString(),
         resolvedAt: row.resolvedAt?.toISOString() ?? null,
         version: row.version,
@@ -881,6 +1190,16 @@ async function lockSupplier(tx: Prisma.TransactionClient, supplierId: string) {
   await tx.$queryRaw`SELECT id FROM "Supplier" WHERE id = ${supplierId}::uuid FOR UPDATE`;
 }
 
+async function lockShiftRuns(tx: Prisma.TransactionClient, ids: string[]) {
+  const sorted = [...new Set(ids)].sort();
+  await tx.$queryRaw`
+    SELECT id FROM "ShiftRun"
+    WHERE id = ANY(${sorted}::uuid[])
+    ORDER BY id
+    FOR UPDATE
+  `;
+}
+
 function auditInput(
   context: MutationContext,
   supplierId: string,
@@ -928,6 +1247,15 @@ function preflightBlocked(): ProblemException {
     code: 'STATE_CONFLICT',
     title: 'Shift start blocked',
     detail: 'The latest Shift Run preflight contains blocking checks.',
+  });
+}
+
+function endIdempotencyConflict(): ProblemException {
+  return new ProblemException({
+    status: 409,
+    code: 'IDEMPOTENCY_CONFLICT',
+    title: 'Idempotency conflict',
+    detail: 'The Idempotency-Key was already used with a different End Shift command.',
   });
 }
 function sourceMismatch(): ProblemException {

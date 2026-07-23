@@ -120,6 +120,23 @@ enum HenkatenCancellationReason {
   SHIFT_ENDED
 }
 
+enum ApprovalRoute {
+  SUPERVISOR
+  QC
+}
+
+enum ApprovalRouteStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  NOT_REQUIRED
+}
+
+enum ApprovalDecisionValue {
+  APPROVED
+  REJECTED
+}
+
 enum ChecklistAnswer {
   YES
   NO
@@ -170,6 +187,10 @@ model Supplier {
   henkatens              Henkaten[]
   mpReservations         MPReservation[]
   warningInstances       WarningInstance[]
+  approvalRoutes         HenkatenApprovalRoute[]
+  approvalDecisions      ApprovalDecision[]
+  approvalRouteRoutings  ApprovalRouteRouting[]
+  assignmentMovements    AssignmentMovement[]
 
   @@unique([normalizedCode], map: "Supplier_normalizedCode_key")
   @@index([sourceMode, active])
@@ -347,6 +368,13 @@ model Member {
   replacementManHenkatens      ManHenkatenDetail[]     @relation("ManReplacementMp")
   createdHenkatens             Henkaten[]              @relation("HenkatenCreator")
   reservations                 MPReservation[]
+  initialApprovalRoutes        HenkatenApprovalRoute[] @relation("ApprovalInitialSupervisor")
+  currentApprovalRoutes        HenkatenApprovalRoute[] @relation("ApprovalCurrentSupervisor")
+  approvalDecisions            ApprovalDecision[]      @relation("ApprovalDecisionActorMember")
+  routingHistoryFrom           ApprovalRouteRouting[]  @relation("ApprovalRoutingFromMember")
+  routingHistoryTo             ApprovalRouteRouting[]  @relation("ApprovalRoutingToMember")
+  movedAssignmentMovements     AssignmentMovement[]    @relation("AssignmentMovementMp")
+  replacedAssignmentMovements  AssignmentMovement[]    @relation("AssignmentMovementReplacedMp")
 
   @@unique([supplierId, normalizedRegistrationNumber])
   @@unique([id, supplierId])
@@ -400,6 +428,8 @@ model Line {
   workingAssignments WorkingAssignment[]
   assignmentIssues   AssignmentIssue[]
   henkatens          Henkaten[]
+  targetMovements    AssignmentMovement[] @relation("AssignmentMovementTargetLine")
+  sourceMovements    AssignmentMovement[] @relation("AssignmentMovementSourceLine")
 
   @@unique([supplierId, normalizedCode])
   @@unique([id, supplierId])
@@ -425,6 +455,8 @@ model Job {
   workingAssignments WorkingAssignment[]
   assignmentIssues   AssignmentIssue[]
   henkatens          Henkaten[]
+  targetMovements    AssignmentMovement[] @relation("AssignmentMovementTargetJob")
+  sourceMovements    AssignmentMovement[] @relation("AssignmentMovementSourceJob")
 
   @@unique([lineId, normalizedName])
   @@unique([id, supplierId])
@@ -632,6 +664,9 @@ model ShiftRun {
   overrideFailedChecks        Json?
   endedAt                     DateTime?           @db.Timestamptz(3)
   endedById                   String?             @db.Uuid
+  endSummary                  Json?
+  endCommandKey               String?             @db.VarChar(128)
+  endCommandPayloadHash       String?             @db.Char(64)
   version                     Int                 @default(1)
   createdAt                   DateTime            @default(now()) @db.Timestamptz(3)
   createdById                 String?             @db.Uuid
@@ -646,6 +681,8 @@ model ShiftRun {
   assignmentIssues            AssignmentIssue[]
   henkatens                   Henkaten[]
   reservations                MPReservation[]
+  targetMovements             AssignmentMovement[] @relation("AssignmentMovementTargetShift")
+  sourceMovements             AssignmentMovement[] @relation("AssignmentMovementSourceShift")
 
   @@unique([id, supplierId])
   @@unique([supplierId, lineId, shiftTemplateId, businessDate])
@@ -670,6 +707,7 @@ model WorkingAssignment {
   mpRegistrationSnapshot    String?                @db.VarChar(100)
   state                     WorkingAssignmentState
   active                    Boolean                @default(false)
+  includedInPlan            Boolean                @default(true)
   version                   Int                    @default(1)
   createdAt                 DateTime               @default(now()) @db.Timestamptz(3)
   updatedAt                 DateTime               @updatedAt @db.Timestamptz(3)
@@ -684,6 +722,8 @@ model WorkingAssignment {
   sourceManHenkatens        ManHenkatenDetail[]    @relation("ManSourceWorking")
   targetReservations        MPReservation[]        @relation("ReservationTargetWorking")
   sourceReservations        MPReservation[]        @relation("ReservationSourceWorking")
+  targetMovements           AssignmentMovement[]   @relation("AssignmentMovementTargetWorking")
+  sourceMovements           AssignmentMovement[]   @relation("AssignmentMovementSourceWorking")
 
   @@unique([id, supplierId])
   @@unique([shiftRunId, jobId])
@@ -703,6 +743,9 @@ model AssignmentIssue {
   originReferenceId     String?               @db.Uuid
   resolutionKind        String?               @db.VarChar(50)
   resolutionReferenceId String?               @db.Uuid
+  originHenkatenId      String?               @db.Uuid
+  originMovementId      String?               @db.Uuid
+  resolutionHenkatenId  String?               @db.Uuid
   openedAt              DateTime              @default(now()) @db.Timestamptz(3)
   resolvedAt            DateTime?             @db.Timestamptz(3)
   resolvedById          String?               @db.Uuid
@@ -711,6 +754,10 @@ model AssignmentIssue {
   shiftRun              ShiftRun?             @relation(fields: [shiftRunId, supplierId], references: [id, supplierId], onDelete: Restrict)
   line                  Line                  @relation(fields: [lineId, supplierId], references: [id, supplierId], onDelete: Restrict)
   job                   Job                   @relation(fields: [jobId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  originHenkaten        Henkaten?             @relation("AssignmentIssueOriginHenkaten", fields: [originHenkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  originMovement        AssignmentMovement?   @relation("AssignmentIssueOriginMovement", fields: [originMovementId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  resolutionHenkaten    Henkaten?             @relation("AssignmentIssueResolutionHenkaten", fields: [resolutionHenkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  resolutionManHenkatens ManHenkatenDetail[]
 
   @@unique([id, supplierId])
   @@index([supplierId, status, openedAt])
@@ -779,6 +826,12 @@ model Henkaten {
   transitions                  HenkatenTransition[]
   reservation                  MPReservation?
   warning                      WarningInstance?
+  approvalRoutes               HenkatenApprovalRoute[]
+  approvalDecisions            ApprovalDecision[]
+  approvalRoutingHistory       ApprovalRouteRouting[]
+  movement                     AssignmentMovement?
+  originatedAssignmentIssues   AssignmentIssue[]       @relation("AssignmentIssueOriginHenkaten")
+  resolvedAssignmentIssues     AssignmentIssue[]       @relation("AssignmentIssueResolutionHenkaten")
 
   @@unique([id, supplierId])
   @@unique([supplierId, identifier])
@@ -833,15 +886,144 @@ model ManHenkatenDetail {
   replacementMpNameSnapshot String             @db.VarChar(150)
   targetAssignmentVersion   Int
   sourceAssignmentVersion   Int?
+  resolutionIssueId         String?            @db.Uuid
   henkaten                  Henkaten           @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
   targetWorkingAssignment   WorkingAssignment  @relation("ManTargetWorking", fields: [targetWorkingAssignmentId, supplierId], references: [id, supplierId], onDelete: Restrict)
   sourceWorkingAssignment   WorkingAssignment? @relation("ManSourceWorking", fields: [sourceWorkingAssignmentId, supplierId], references: [id, supplierId], onDelete: Restrict)
   replacedMp                Member?            @relation("ManReplacedMp", fields: [replacedMpMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
   replacementMp             Member             @relation("ManReplacementMp", fields: [replacementMpMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  resolutionIssue           AssignmentIssue?   @relation(fields: [resolutionIssueId, supplierId], references: [id, supplierId], onDelete: Restrict)
 
   @@unique([id, supplierId])
   @@unique([henkatenId, supplierId])
   @@index([supplierId, replacementMpMemberId])
+  @@index([supplierId, resolutionIssueId])
+}
+
+model HenkatenApprovalRoute {
+  id                              String                @id @default(uuid()) @db.Uuid
+  supplierId                      String                @db.Uuid
+  henkatenId                      String                @db.Uuid
+  route                           ApprovalRoute
+  status                          ApprovalRouteStatus   @default(PENDING)
+  initialResponsibleMemberId      String?               @db.Uuid
+  initialResponsibleNameSnapshot  String?               @db.VarChar(150)
+  currentResponsibleMemberId      String?               @db.Uuid
+  currentResponsibleNameSnapshot  String?               @db.VarChar(150)
+  version                         Int                   @default(1)
+  createdAt                       DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt                       DateTime              @updatedAt @db.Timestamptz(3)
+  supplier                        Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  henkaten                        Henkaten              @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  initialResponsibleMember        Member?               @relation("ApprovalInitialSupervisor", fields: [initialResponsibleMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  currentResponsibleMember        Member?               @relation("ApprovalCurrentSupervisor", fields: [currentResponsibleMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  decision                        ApprovalDecision?
+  routingHistory                  ApprovalRouteRouting[]
+
+  @@unique([id, supplierId])
+  @@unique([henkatenId, route])
+  @@index([supplierId, route, status, createdAt])
+  @@index([supplierId, currentResponsibleMemberId, status])
+}
+
+model ApprovalDecision {
+  id                       String                  @id @default(uuid()) @db.Uuid
+  supplierId               String                  @db.Uuid
+  routeId                  String                  @unique @db.Uuid
+  henkatenId               String                  @db.Uuid
+  decision                 ApprovalDecisionValue
+  actorUserId              String                  @db.Uuid
+  actorMemberId            String?                 @db.Uuid
+  actorNameSnapshot        String                  @db.VarChar(150)
+  actorRole                UserRole
+  comment                  String?                 @db.VarChar(2000)
+  decidedAt                DateTime                @default(now()) @db.Timestamptz(3)
+  sourceIp                 String?                 @db.VarChar(45)
+  correlationId            String                  @db.VarChar(128)
+  expectedHenkatenVersion  Int
+  resultHenkatenVersion    Int
+  idempotencyKey           String                  @db.VarChar(128)
+  commandPayloadHash       String                  @db.Char(64)
+  supplier                 Supplier                @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  route                    HenkatenApprovalRoute   @relation(fields: [routeId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  henkaten                 Henkaten                @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  actorMember              Member?                 @relation("ApprovalDecisionActorMember", fields: [actorMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+
+  @@unique([id, supplierId])
+  @@unique([routeId, supplierId])
+  @@unique([supplierId, actorUserId, idempotencyKey])
+  @@index([supplierId, henkatenId, decidedAt])
+}
+
+model ApprovalRouteRouting {
+  id                       String                 @id @default(uuid()) @db.Uuid
+  supplierId               String                 @db.Uuid
+  routeId                  String                 @db.Uuid
+  henkatenId               String                 @db.Uuid
+  fromMemberId             String?                @db.Uuid
+  fromNameSnapshot         String?                @db.VarChar(150)
+  toMemberId               String                 @db.Uuid
+  toNameSnapshot           String                 @db.VarChar(150)
+  actorUserId              String                 @db.Uuid
+  assignedAt               DateTime               @default(now()) @db.Timestamptz(3)
+  correlationId            String                 @db.VarChar(128)
+  expectedHenkatenVersion  Int
+  resultHenkatenVersion    Int
+  idempotencyKey           String                 @db.VarChar(128)
+  commandPayloadHash       String                 @db.Char(64)
+  supplier                 Supplier               @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  route                    HenkatenApprovalRoute  @relation(fields: [routeId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  henkaten                 Henkaten               @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  fromMember               Member?                @relation("ApprovalRoutingFromMember", fields: [fromMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  toMember                 Member                 @relation("ApprovalRoutingToMember", fields: [toMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+
+  @@unique([id, supplierId])
+  @@unique([supplierId, actorUserId, idempotencyKey])
+  @@index([supplierId, henkatenId, assignedAt])
+}
+
+model AssignmentMovement {
+  id                             String              @id @default(uuid()) @db.Uuid
+  supplierId                     String              @db.Uuid
+  henkatenId                     String              @unique @db.Uuid
+  targetShiftRunId               String              @db.Uuid
+  sourceShiftRunId               String?             @db.Uuid
+  targetWorkingAssignmentId      String              @db.Uuid
+  sourceWorkingAssignmentId      String?             @db.Uuid
+  targetLineId                   String              @db.Uuid
+  targetJobId                    String              @db.Uuid
+  sourceLineId                   String?             @db.Uuid
+  sourceJobId                    String?             @db.Uuid
+  movedMpMemberId                String              @db.Uuid
+  movedMpNameSnapshot            String              @db.VarChar(150)
+  replacedMpMemberId             String?             @db.Uuid
+  replacedMpNameSnapshot         String?             @db.VarChar(150)
+  targetAssignmentVersionBefore Int
+  targetAssignmentVersionAfter  Int
+  sourceAssignmentVersionBefore Int?
+  sourceAssignmentVersionAfter  Int?
+  movedAt                        DateTime            @default(now()) @db.Timestamptz(3)
+  movedById                      String              @db.Uuid
+  correlationId                  String              @db.VarChar(128)
+  supplier                       Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  henkaten                       Henkaten            @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  targetShiftRun                 ShiftRun            @relation("AssignmentMovementTargetShift", fields: [targetShiftRunId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  sourceShiftRun                 ShiftRun?           @relation("AssignmentMovementSourceShift", fields: [sourceShiftRunId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  targetWorkingAssignment        WorkingAssignment   @relation("AssignmentMovementTargetWorking", fields: [targetWorkingAssignmentId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  sourceWorkingAssignment        WorkingAssignment?  @relation("AssignmentMovementSourceWorking", fields: [sourceWorkingAssignmentId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  targetLine                     Line                @relation("AssignmentMovementTargetLine", fields: [targetLineId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  sourceLine                     Line?               @relation("AssignmentMovementSourceLine", fields: [sourceLineId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  targetJob                      Job                 @relation("AssignmentMovementTargetJob", fields: [targetJobId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  sourceJob                      Job?                @relation("AssignmentMovementSourceJob", fields: [sourceJobId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  movedMp                        Member              @relation("AssignmentMovementMp", fields: [movedMpMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  replacedMp                     Member?             @relation("AssignmentMovementReplacedMp", fields: [replacedMpMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  originatedIssues               AssignmentIssue[]   @relation("AssignmentIssueOriginMovement")
+
+  @@unique([id, supplierId])
+  @@unique([henkatenId, supplierId])
+  @@index([supplierId, targetShiftRunId, movedAt])
+  @@index([supplierId, sourceShiftRunId, movedAt])
+  @@index([supplierId, movedMpMemberId, movedAt])
 }
 
 model MPReservation {

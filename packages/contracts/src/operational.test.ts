@@ -4,8 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createHenkatenRequestSchema,
+  decideHenkatenRequestSchema,
+  endShiftRequestSchema,
   emergencyStartShiftRequestSchema,
+  henkatenListQuerySchema,
   prepareShiftRequestSchema,
+  rerouteSupervisorRequestSchema,
 } from './index.js';
 
 const id = () => randomUUID();
@@ -73,5 +77,60 @@ describe('operational contracts', () => {
         replacementObject: 'New method',
       }),
     ).toThrow();
+  });
+
+  it('accepts planned Man issue resolution and rejects invalid decision evidence', () => {
+    expect(
+      createHenkatenRequestSchema.parse({
+        category: 'MAN',
+        shiftRunId: id(),
+        jobId: id(),
+        partId: id(),
+        checklistVersionId: id(),
+        checklistAnswers: [{ itemId: id(), answer: 'YES' }],
+        cause: 'Resolve planned vacancy',
+        detail: 'Move an available MP into the explicitly linked planned assignment.',
+        targetWorkingAssignmentId: id(),
+        targetAssignmentVersion: 2,
+        replaced: { kind: 'VACANT' },
+        replacementMpMemberId: id(),
+        resolutionIssueId: id(),
+      }).category,
+    ).toBe('MAN');
+    expect(
+      decideHenkatenRequestSchema.parse({
+        expectedVersion: 2,
+        decision: 'APPROVED',
+        comment: 'Verified at the line.',
+      }),
+    ).toBeTruthy();
+    expect(() =>
+      decideHenkatenRequestSchema.parse({
+        expectedVersion: 2,
+        decision: 'APPROVED',
+        comment: 'x'.repeat(2_001),
+      }),
+    ).toThrow();
+  });
+
+  it('constrains approval-route filters, reroutes, and shift-end versions', () => {
+    expect(
+      henkatenListQuerySchema.parse({
+        approvalRoute: 'SUPERVISOR',
+        approvalStatus: 'PENDING',
+      }),
+    ).toMatchObject({
+      approvalRoute: 'SUPERVISOR',
+      approvalStatus: 'PENDING',
+    });
+    expect(
+      rerouteSupervisorRequestSchema.parse({
+        expectedVersion: 1,
+        supervisorMemberId: id(),
+      }),
+    ).toBeTruthy();
+    expect(endShiftRequestSchema.parse({ expectedVersion: 3 })).toEqual({
+      expectedVersion: 3,
+    });
   });
 });
