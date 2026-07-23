@@ -138,7 +138,9 @@ Use ADRs for durable architecture decisions such as:
 
 ADRs must include status, date, context, decision, rationale, alternatives considered, implementation details, consequences, validation plan, risks, and follow-up work. ADRs must be comprehensive enough that a future agent can understand why the decision was made without reading the full chat transcript. However, ADR should be written professionally, as if human / developers will be the primary reader. Thus, ADR should not be mentioning anything related to 'phases', users' prompt /request, and should be written in passive and explanatory form.
 
-## 8. Commit Message Rules
+## 8. Commit and Commit Message Rules
+
+Only commit to `staging` branch unless other branch is specified.
 
 Use conventional commit prefixes:
 
