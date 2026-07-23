@@ -33,9 +33,11 @@ describe('authentication contracts', () => {
     expect(
       sessionPrincipalSchema.parse({
         userId,
+        displayName: 'Line Leader Test',
         realm: 'SUPPLIER',
         role: 'LINE_LEADER',
         supplierId,
+        purpose: 'NORMAL',
         mustChangePassword: false,
       }),
     ).toHaveProperty('supplierId', supplierId);
@@ -43,9 +45,11 @@ describe('authentication contracts', () => {
     expect(() =>
       sessionPrincipalSchema.parse({
         userId,
+        displayName: 'Invalid Principal',
         realm: 'TMMIN',
         role: 'LINE_LEADER',
         supplierId,
+        purpose: 'NORMAL',
         mustChangePassword: false,
       }),
     ).toThrow();
@@ -71,8 +75,10 @@ describe('authentication contracts', () => {
     const value = {
       principal: {
         userId,
+        displayName: 'TMMIN Quality Test',
         realm: 'TMMIN',
         role: 'TMMIN_QUALITY',
+        purpose: 'NORMAL',
         mustChangePassword: false,
       },
       idleExpiresAt: '2026-07-23T03:00:00.000Z',

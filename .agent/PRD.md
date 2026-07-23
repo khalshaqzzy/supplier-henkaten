@@ -3,7 +3,7 @@
 | Atribut | Nilai |
 |---|---|
 | Status dokumen | **Approved product contract for v1 planning** |
-| Status implementasi | **Planned - belum diimplementasikan** |
+| Status implementasi | **Phase 0-3 implemented; Phase 4+ planned** |
 | Versi dokumen | 1.0 |
 | Tanggal | 23 Juli 2026 |
 | Product owner | TMMIN |
@@ -106,7 +106,7 @@ Produk ini bukan:
 | Henkaten | Record perubahan 4M yang perlu dikelola dan ditelusuri. |
 | 4M | Man, Machine, Material, Method. |
 | Supplier | Tenant/organisasi pemasok TMMIN. |
-| Supplier Admin | Satu akun administrator utama supplier, dibuat oleh TMMIN. |
+| Supplier Admin | Satu akun administrator utama untuk tenant Hosted atau Hosted Preparation, dibuat oleh TMMIN; pure External tidak memiliki akun platform. |
 | Supervisor / GL | Group Leader yang bertanggung jawab atas satu atau lebih line dan meng-approve Henkaten line tersebut. |
 | Line Leader / TL / LL | Team Leader yang bertanggung jawab atas tepat satu line dan menginput Henkaten. |
 | MP | Man Power/operator yang ditempatkan pada job. MP tidak memiliki akun aplikasi. |
@@ -125,6 +125,7 @@ Produk ini bukan:
 | Reservation | Lock sementara atas MP pengganti selama Man Henkaten Open. |
 | Hosted | Source mode dengan seluruh workflow supplier dijalankan di platform TMMIN. |
 | External | Source mode dengan aplikasi supplier sebagai source of truth dan TMMIN hanya menerima data monitoring. |
+| Hosted Preparation | Akses konfigurasi terkontrol saat tenant masih `EXTERNAL`; bukan source mode ketiga dan tidak mengizinkan workflow operasional Hosted. |
 
 ---
 
@@ -154,6 +155,8 @@ Limit di atas adalah acceptance baseline, bukan license limit. Implementasi tida
 Aturan:
 
 - hanya TMMIN Admin yang dapat menetapkan atau mengubah mode;
+- initial source-mode assignment pada provisioning berbeda dari controlled cutover;
+- supplier `EXTERNAL` baru dibuat inactive tanpa Supplier Admin platform sampai external credential tersedia atau Hosted Preparation dimulai;
 - satu supplier hanya memiliki satu mode aktif;
 - mixed writes HOSTED dan EXTERNAL pada supplier yang sama dilarang;
 - source mode wajib disimpan pada setiap Henkaten projection untuk traceability;
@@ -169,6 +172,16 @@ Cutover mode wajib:
 6. tidak menggabungkan ID sequence dari dua source tanpa namespace.
 
 Untuk cutover ke EXTERNAL, client credential wajib tersedia sebelum aktivasi. Untuk cutover ke HOSTED, minimum master data, Supplier Admin, shift, line, job, checklist, dan default assignment wajib lulus validasi.
+
+### 5.3 Hosted Preparation
+
+- Hosted Preparation hanya dapat dimulai oleh TMMIN Admin pada supplier `EXTERNAL`, dengan alasan dan privacy acknowledgement.
+- `SourceMode` tetap `EXTERNAL`, source epoch tidak berubah, dan External tetap source of truth selama preparation.
+- TMMIN membuat Supplier Admin khusus preparation. Session-nya bertujuan `HOSTED_PREPARATION`.
+- Preparation hanya mengizinkan konfigurasi master data, checklist, dan default assignment setelah capability tersebut tersedia pada Phase 4.
+- Start/End Shift, input/approval Henkaten, dan seluruh Hosted operational write tetap dilarang.
+- Cancel preparation menonaktifkan preparation admin dan mencabut seluruh session preparation.
+- Completion hanya terjadi dalam transaksi cutover `EXTERNAL` ke `HOSTED` setelah seluruh contributor preflight tersedia dan lulus.
 
 ---
 
@@ -396,7 +409,8 @@ TMMIN user berada pada identity realm terpisah dan tidak memasukkan Supplier Cod
 
 ### 9.4 Provisioning dan Reset
 
-- TMMIN Admin membuat tenant dan satu Supplier Admin.
+- Tenant `HOSTED` dibuat active beserta satu Supplier Admin.
+- Tenant `EXTERNAL` dibuat inactive tanpa akun/PII Supplier Admin platform; akun baru dibuat bila Hosted Preparation dimulai.
 - Hanya satu Supplier Admin boleh aktif. Replacement wajib menonaktifkan admin lama secara transaksional.
 - Supplier Admin membuat akun Supervisor, LL, dan QC ketika member dengan role tersebut diregistrasikan.
 - Username dan temporary password diberikan melalui proses operasional aman di luar notification aplikasi; aplikasi hanya menampilkan temporary password satu kali.

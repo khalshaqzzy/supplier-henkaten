@@ -15,6 +15,7 @@
     "clean": "tsc --build tsconfig.build.json --clean",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:unit": "vitest run",
     "test": "vitest run"
   },
   "dependencies": {

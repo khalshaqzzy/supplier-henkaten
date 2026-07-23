@@ -16,6 +16,26 @@ export const userRoleSchema = z.enum([
 ]);
 export type UserRole = z.infer<typeof userRoleSchema>;
 
+export const userStatusSchema = z.enum(['ACTIVE', 'INACTIVE']);
+export type UserStatus = z.infer<typeof userStatusSchema>;
+
+export const sessionPurposeSchema = z.enum(['NORMAL', 'HOSTED_PREPARATION']);
+export type SessionPurpose = z.infer<typeof sessionPurposeSchema>;
+
+export const hostedPreparationStatusSchema = z.enum(['ACTIVE', 'COMPLETED', 'CANCELLED']);
+export type HostedPreparationStatus = z.infer<typeof hostedPreparationStatusSchema>;
+
+export const capabilitySchema = z.enum([
+  'TMMIN_SUPPLIER_READ',
+  'TMMIN_SUPPLIER_MANAGE',
+  'TMMIN_QUALITY_MANAGE',
+  'TMMIN_SOURCE_MANAGE',
+  'SUPPLIER_SELF_SERVICE',
+  'SUPPLIER_MASTER_DATA_MANAGE',
+  'SUPPLIER_HOSTED_PREPARATION',
+]);
+export type Capability = z.infer<typeof capabilitySchema>;
+
 export const memberRoleSchema = z.enum(['SUPERVISOR', 'LINE_LEADER', 'MP', 'QC']);
 export type MemberRole = z.infer<typeof memberRoleSchema>;
 

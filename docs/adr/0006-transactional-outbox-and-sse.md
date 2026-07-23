@@ -4,6 +4,9 @@ Status: Accepted
 
 Date: 2026-07-23
 
+Implementation refinement (Phase 2): the outbox worker polls PostgreSQL and claims work using
+`FOR UPDATE SKIP LOCKED`; `LISTEN/NOTIFY` is not used. SSE delivery remains owned by Phase 8.
+
 Scope: durable domain events, asynchronous processing, browser updates, and replay behavior
 
 ## Context

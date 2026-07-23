@@ -26,23 +26,25 @@ Roadmap tidak memberikan estimasi waktu. Urutan didasarkan pada dependency dan r
 
 ## 2. Current Repository Status
 
-Kondisi repository setelah Phase 0-1:
+Kondisi repository setelah Phase 0-3:
 
 - branch aktif: `staging`;
 - `.agent/PRD.md` tersedia dan menjadi product contract;
-- delapan ADR dan empat architecture/security baseline tersedia;
+- sepuluh ADR dan empat architecture/security baseline tersedia;
 - Node.js 22.23.1 + pnpm 11.16.0 ESM workspace tersedia;
-- active workspace: API compile-only shell, shared contracts, dan deterministic test fixtures;
+- active workspace: NestJS API, shared contracts, dan deterministic test fixtures;
 - strict TypeScript, ESLint, Prettier, Vitest, root validation, dan lockfile tersedia;
 - local PostgreSQL 18 + pgvector 0.8.5 Compose lifecycle tersedia;
-- baseline GitHub CI memiliki quality, database-smoke, dan secret-scan jobs;
-- belum ada NestJS runtime atau application HTTP behavior;
-- belum ada Prisma schema atau migration;
+- baseline GitHub CI memiliki quality, database-integration, dan secret-scan jobs;
+- NestJS/Express runtime, Prisma 7 adapter, initial PostgreSQL migration, OpenAPI 3.1, audit,
+  outbox, health/readiness, authentication, RBAC, TMMIN administration, supplier provisioning, dan
+  source-governance core tersedia;
+- pure External provisioning dan Hosted Preparation boundary telah diimplementasikan;
 - belum ada frontend, Playwright E2E, atau remote deployment files;
 - materi slide tersedia sebagai reference-only input.
 
-Completed phases: **Phase 0 dan Phase 1**
-Next phase: **Phase 2 - API Platform dan Persistence Foundation**
+Completed phases: **Phase 0, Phase 1, Phase 2, dan Phase 3**
+Next phase: **Phase 4 - Supplier Master Data Backend**
 Next phase status: **planned**
 
 Tidak ada application behavior yang boleh ditandai implemented sampai source code dan acceptance checks terkait benar-benar tersedia di repository.
@@ -587,7 +589,7 @@ Phase 1 exit criteria:
 
 ## 10. Phase 2 - API Platform dan Persistence Foundation
 
-Status: **planned**
+Status: **done**
 
 Goal: membuat NestJS runtime, Prisma persistence, tenant context, audit, outbox, health, dan real PostgreSQL test harness.
 
@@ -601,7 +603,7 @@ Unlocks:
 
 ### 2.1 NestJS Runtime Foundation
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 1.
 
@@ -632,7 +634,7 @@ Exit criteria:
 
 ### 2.2 Structured Logging dan Correlation
 
-Status: **planned**
+Status: **done**
 
 Dependency: 2.1.
 
@@ -661,7 +663,7 @@ Exit criteria:
 
 ### 2.3 Prisma Foundation dan Initial Migration
 
-Status: **planned**
+Status: **done**
 
 Dependency: 2.1 dan 1.5.
 
@@ -697,7 +699,7 @@ Exit criteria:
 
 ### 2.4 Tenant Context dan Scoped Repository Convention
 
-Status: **planned**
+Status: **done**
 
 Dependency: 2.2-2.3.
 
@@ -726,7 +728,7 @@ Exit criteria:
 
 ### 2.5 Append-only Audit
 
-Status: **planned**
+Status: **done**
 
 Dependency: 2.2-2.4.
 
@@ -754,7 +756,7 @@ Exit criteria:
 
 ### 2.6 Transactional Outbox
 
-Status: **planned**
+Status: **done**
 
 Dependency: 2.3.
 
@@ -783,7 +785,7 @@ Exit criteria:
 
 ### 2.7 Health, Readiness, dan Database Checks
 
-Status: **planned**
+Status: **done**
 
 Dependency: 2.1-2.6.
 
@@ -811,7 +813,7 @@ Exit criteria:
 
 ### 2.8 PostgreSQL Integration-test Harness
 
-Status: **planned**
+Status: **done**
 
 Dependency: seluruh Phase 2 sebelumnya.
 
@@ -845,7 +847,7 @@ Phase 2 exit criteria:
 
 ## 11. Phase 3 - Authentication, Authorization, dan TMMIN Administration Backend
 
-Status: **planned**
+Status: **done**
 
 Goal: mengimplementasikan identity realms, session lifecycle, RBAC, tenant provisioning, dan source-mode governance sebelum supplier domain APIs.
 
@@ -859,7 +861,7 @@ Unlocks:
 
 ### 3.1 Password Hashing dan History
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 2.
 
@@ -890,7 +892,7 @@ Exit criteria:
 
 ### 3.2 Database-backed Session Lifecycle
 
-Status: **planned**
+Status: **done**
 
 Dependency: 3.1.
 
@@ -922,7 +924,7 @@ Exit criteria:
 
 ### 3.3 Login Throttling dan Account Lockout
 
-Status: **planned**
+Status: **done**
 
 Dependency: 3.1-3.2.
 
@@ -951,7 +953,7 @@ Exit criteria:
 
 ### 3.4 RBAC dan Object-level Authorization
 
-Status: **planned**
+Status: **done**
 
 Dependency: 3.2 dan Phase 2.4.
 
@@ -986,7 +988,7 @@ Exit criteria:
 
 ### 3.5 TMMIN Account Administration
 
-Status: **planned**
+Status: **done**
 
 Dependency: 3.1-3.4.
 
@@ -1015,7 +1017,7 @@ Exit criteria:
 
 ### 3.6 Supplier Provisioning dan Supplier Admin
 
-Status: **planned**
+Status: **done**
 
 Dependency: 3.1-3.5.
 
@@ -1045,7 +1047,7 @@ Exit criteria:
 
 ### 3.7 Source Mode dan Source Epoch Cutover
 
-Status: **planned**
+Status: **done - core governance; production contributors deferred to owning phases**
 
 Dependency: 3.6.
 
@@ -1076,9 +1078,17 @@ Exit criteria:
 
 - Source mode governance tersedia dan extensible untuk Phase 9.
 
+Implementation note:
+
+- `HostedPreparation`, contributor registry, locking transaction, source epoch/session invalidation,
+  audit, dan outbox contract tersedia.
+- Production cutover sengaja fail-closed sampai Phase 4 menambahkan minimum Hosted configuration
+  contributor dan Phase 9 menambahkan External credential/projection contributors.
+- Supplier `EXTERNAL` baru tetap inactive sampai credential Phase 9 tersedia.
+
 ### 3.8 Auth dan Tenant Security Suite
 
-Status: **planned**
+Status: **done**
 
 Dependency: 3.1-3.7.
 
@@ -5080,21 +5090,19 @@ No acceptance criterion may remain without an owning phase.
 
 Current recommended batch:
 
-1. Begin Phase 2.1 NestJS Runtime Foundation.
-2. Continue Phase 2.2 structured logging and correlation ID.
-3. Add Prisma foundation and initial non-domain persistence migration in Phase 2.3.
-4. Implement tenant context and scoped repository conventions before domain repositories.
-5. Add append-only audit, transactional outbox, health/readiness, and PostgreSQL integration harness.
+1. Begin Phase 4.1 Member Domain dan Role-account Linkage.
+2. Implement Phase 4 Hosted Preparation master-data capability boundary.
+3. Register the Phase 4 minimum Hosted configuration cutover contributor.
 
 Initial implementation order inside the next coding batch:
 
-1. extend the compile-only API workspace into a NestJS Express runtime;
-2. add environment schema validation and global Problem Details mapping;
-3. add structured logging and correlation middleware;
-4. add Prisma 7 and its first migration;
-5. add tenant-context and transaction-client abstractions;
-6. add audit/outbox tables and repository contracts;
-7. add liveness/readiness endpoints and a real PostgreSQL integration-test lifecycle.
+1. add `Member` and role-account relations to Prisma through an expand-only migration;
+2. implement tenant-scoped member repositories and CRUD contracts;
+3. add Supervisor/LL/QC account creation/reset/deactivation while MP remains account-less;
+4. implement secure Hosted-only photo processing/storage;
+5. add line, job, part, shift-template, checklist, and default-assignment aggregates;
+6. enforce `HOSTED_PREPARATION` capability on configuration writes;
+7. register and test the Phase 4 cutover preflight contributor.
 
 Do not start React frontend, supplier product domains, or deployment scripts before their owning dependencies.
 

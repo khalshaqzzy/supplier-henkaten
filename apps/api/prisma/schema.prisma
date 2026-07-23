@@ -1,0 +1,233 @@
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  moduleFormat           = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension    = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SourceMode {
+  HOSTED
+  EXTERNAL
+}
+
+enum IdentityRealm {
+  TMMIN
+  SUPPLIER
+}
+
+enum UserRole {
+  TMMIN_ADMIN
+  TMMIN_QUALITY
+  SUPPLIER_ADMIN
+  SUPERVISOR
+  LINE_LEADER
+  QC
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum SessionPurpose {
+  NORMAL
+  HOSTED_PREPARATION
+}
+
+enum SessionRevocationReason {
+  LOGOUT
+  PASSWORD_CHANGED
+  PASSWORD_RESET
+  USER_DEACTIVATED
+  USER_REACTIVATED
+  ROLE_CHANGED
+  SUPPLIER_DEACTIVATED
+  SOURCE_MODE_CHANGED
+  PREPARATION_CANCELLED
+  ADMIN_REPLACED
+  OPERATOR_RECOVERY
+}
+
+enum HostedPreparationStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum AuditResult {
+  SUCCESS
+  FAILURE
+}
+
+model Supplier {
+  id                      String              @id @default(uuid()) @db.Uuid
+  code                    String              @db.VarChar(50)
+  normalizedCode          String              @db.VarChar(50)
+  name                    String              @db.VarChar(200)
+  timezone                String              @db.VarChar(100)
+  sourceMode              SourceMode
+  sourceEpoch             Int                 @default(1)
+  active                  Boolean             @default(true)
+  version                 Int                 @default(1)
+  sourceModeChangedAt     DateTime?           @db.Timestamptz(3)
+  sourceModeChangedById   String?             @db.Uuid
+  createdAt               DateTime            @default(now()) @db.Timestamptz(3)
+  createdById             String?             @db.Uuid
+  updatedAt               DateTime            @updatedAt @db.Timestamptz(3)
+  updatedById             String?             @db.Uuid
+  users                   User[]
+  sessions                UserSession[]
+  hostedPreparations      HostedPreparation[]
+  auditEvents             AuditEvent[]
+  outboxEvents            OutboxEvent[]
+
+  @@unique([normalizedCode], map: "Supplier_normalizedCode_key")
+  @@index([sourceMode, active])
+}
+
+model User {
+  id                          String          @id @default(uuid()) @db.Uuid
+  realm                       IdentityRealm
+  supplierId                  String?         @db.Uuid
+  role                        UserRole
+  username                    String          @db.VarChar(100)
+  normalizedUsername          String          @db.VarChar(100)
+  displayName                 String          @db.VarChar(150)
+  passwordHash                String          @db.VarChar(512)
+  mustChangePassword          Boolean         @default(true)
+  passwordEpoch               Int             @default(1)
+  authorizationEpoch          Int             @default(1)
+  failedLoginCount            Int             @default(0)
+  failedLoginWindowStartedAt  DateTime?       @db.Timestamptz(3)
+  lockedUntil                 DateTime?       @db.Timestamptz(3)
+  status                      UserStatus      @default(ACTIVE)
+  protectedBootstrapAdmin     Boolean         @default(false)
+  version                     Int             @default(1)
+  createdAt                   DateTime        @default(now()) @db.Timestamptz(3)
+  createdById                 String?         @db.Uuid
+  updatedAt                   DateTime        @updatedAt @db.Timestamptz(3)
+  updatedById                 String?         @db.Uuid
+  supplier                    Supplier?       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  sessions                    UserSession[]
+  passwordHistory             PasswordHistory[]
+  hostedPreparations          HostedPreparation[]
+
+  @@index([supplierId, role, status])
+  @@index([realm, role, status])
+}
+
+model UserSession {
+  id                    String                    @id @default(uuid()) @db.Uuid
+  userId                String                    @db.Uuid
+  supplierId            String?                   @db.Uuid
+  realm                 IdentityRealm
+  purpose               SessionPurpose            @default(NORMAL)
+  sourceEpoch           Int?
+  passwordEpoch         Int
+  authorizationEpoch    Int
+  tokenHash             Bytes                     @unique
+  createdAt             DateTime                  @default(now()) @db.Timestamptz(3)
+  lastActivityAt        DateTime                  @db.Timestamptz(3)
+  idleExpiresAt         DateTime                  @db.Timestamptz(3)
+  absoluteExpiresAt     DateTime                  @db.Timestamptz(3)
+  revokedAt             DateTime?                 @db.Timestamptz(3)
+  revocationReason      SessionRevocationReason?
+  sourceIp              String?                   @db.VarChar(45)
+  userAgent             String?                   @db.VarChar(512)
+  version               Int                       @default(1)
+  user                  User                      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  supplier              Supplier?                 @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  @@index([userId, revokedAt])
+  @@index([supplierId, revokedAt])
+  @@index([idleExpiresAt, absoluteExpiresAt])
+}
+
+model PasswordHistory {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  passwordHash String  @db.VarChar(512)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model HostedPreparation {
+  id                    String                  @id @default(uuid()) @db.Uuid
+  supplierId            String                  @db.Uuid
+  adminUserId           String                  @db.Uuid
+  sourceEpoch           Int
+  status                HostedPreparationStatus @default(ACTIVE)
+  reason                String                  @db.VarChar(1000)
+  privacyAcknowledgedAt DateTime                @db.Timestamptz(3)
+  startedAt             DateTime                @default(now()) @db.Timestamptz(3)
+  startedById           String                  @db.Uuid
+  completedAt           DateTime?               @db.Timestamptz(3)
+  completedById         String?                 @db.Uuid
+  cancelledAt           DateTime?               @db.Timestamptz(3)
+  cancelledById         String?                 @db.Uuid
+  version               Int                     @default(1)
+  supplier              Supplier                @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  adminUser             User                    @relation(fields: [adminUserId], references: [id], onDelete: Restrict)
+
+  @@index([supplierId, status])
+}
+
+model AuditEvent {
+  id            String        @id @default(uuid()) @db.Uuid
+  occurredAt    DateTime      @default(now()) @db.Timestamptz(3)
+  actorKind     String        @db.VarChar(30)
+  actorUserId   String?       @db.Uuid
+  actorRole     UserRole?
+  actorSupplierId String?     @db.Uuid
+  supplierId    String?       @db.Uuid
+  action        String        @db.VarChar(150)
+  resourceType  String        @db.VarChar(100)
+  resourceId    String?       @db.Uuid
+  changeSummary Json?
+  reason        String?       @db.VarChar(1000)
+  correlationId String        @db.VarChar(128)
+  sourceIp      String?       @db.VarChar(45)
+  userAgent     String?       @db.VarChar(512)
+  result        AuditResult
+  sourceMode    SourceMode?
+  sourceEpoch   Int?
+  supplier      Supplier?     @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  @@index([supplierId, occurredAt(sort: Desc)])
+  @@index([actorUserId, occurredAt(sort: Desc)])
+  @@index([resourceType, resourceId, occurredAt(sort: Desc)])
+}
+
+model OutboxEvent {
+  id               String     @id @default(uuid()) @db.Uuid
+  eventType        String     @db.VarChar(150)
+  schemaVersion    Int
+  aggregateType    String     @db.VarChar(100)
+  aggregateId      String     @db.Uuid
+  aggregateVersion Int
+  supplierId       String?    @db.Uuid
+  occurredAt       DateTime   @default(now()) @db.Timestamptz(3)
+  actor            Json
+  correlationId    String     @db.VarChar(128)
+  causationId      String?    @db.Uuid
+  payload          Json
+  availableAt      DateTime   @default(now()) @db.Timestamptz(3)
+  attemptCount     Int        @default(0)
+  lockedAt         DateTime?  @db.Timestamptz(3)
+  lockedBy         String?    @db.VarChar(100)
+  processedAt      DateTime?  @db.Timestamptz(3)
+  failedAt         DateTime?  @db.Timestamptz(3)
+  lastSafeError    String?    @db.VarChar(500)
+  createdAt        DateTime   @default(now()) @db.Timestamptz(3)
+  supplier         Supplier?  @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  @@index([processedAt, failedAt, availableAt])
+  @@index([supplierId, occurredAt])
+}

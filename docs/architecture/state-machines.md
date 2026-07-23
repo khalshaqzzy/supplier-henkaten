@@ -26,6 +26,23 @@ stateDiagram-v2
 Historic data retains its original mode and epoch. The old source's sessions or credentials are
 revoked in the cutover transaction.
 
+Initial provisioning is not a cutover: `HOSTED` is created active with a Supplier Admin, while
+`EXTERNAL` is created inactive without a platform Supplier Admin until Phase 9 credentials exist.
+
+### 1.1 Hosted Preparation
+
+`HostedPreparation` has `ACTIVE`, `COMPLETED`, and `CANCELLED` states. It is not a SourceMode.
+
+| Current | Command | Result |
+|---|---|---|
+| none | start on EXTERNAL with privacy acknowledgement | ACTIVE; preparation admin created |
+| ACTIVE | cancel | CANCELLED; admin inactive; sessions revoked |
+| ACTIVE | successful EXTERNAL → HOSTED cutover | COMPLETED in the cutover transaction |
+| COMPLETED/CANCELLED | any mutation | rejected |
+
+While ACTIVE, External remains source of truth. Only preparation-scoped configuration writes may
+be added by Phase 4; shift and Henkaten operational writes remain denied.
+
 ## 2. User and Session
 
 User account state is `ACTIVE` or `INACTIVE`. `mustChangePassword`, `lockedUntil`, and failed-attempt
@@ -49,6 +66,9 @@ Session:
 
 Session state is derived from `revokedAt`, `idleExpiresAt`, and `absoluteExpiresAt`; terminal sessions
 are not reactivated.
+
+Session purpose is `NORMAL` or `HOSTED_PREPARATION`. A preparation session does not inherit Hosted
+operational capabilities.
 
 ## 3. Shift Run
 

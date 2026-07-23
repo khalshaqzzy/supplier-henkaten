@@ -12,6 +12,7 @@ materials/
 # JavaScript and TypeScript
 node_modules/
 dist/
+apps/api/src/generated/
 coverage/
 *.tsbuildinfo
 .eslintcache

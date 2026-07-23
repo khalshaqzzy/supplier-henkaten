@@ -4,6 +4,10 @@ Status: Accepted
 
 Date: 2026-07-23
 
+Implementation refinement (Phase 2): Prisma 7 uses the `prisma-client` ESM generator and
+`@prisma/adapter-pg`; runtime never applies migrations. Zod remains the runtime authoring source,
+and the committed OpenAPI 3.1 artifact is generated and drift-checked from those schemas.
+
 Scope: backend architecture, persistence, runtime contracts, and migration strategy
 
 ## Context

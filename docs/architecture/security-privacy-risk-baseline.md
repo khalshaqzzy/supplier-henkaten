@@ -56,6 +56,12 @@ Forbidden:
 External contracts do not declare forbidden fields. Unknown fields are rejected at the ingestion
 boundary. Documentation warns suppliers not to place PII or secrets in freeform content.
 
+Pure External provisioning stores supplier organization metadata only: no platform Supplier Admin,
+member name, registration number, photo, username, or password. Hosted Preparation is an explicit
+privacy-boundary crossing: the TMMIN Admin must acknowledge privacy handling before a preparation
+admin and later Hosted master data may be created. Preparation does not authorize External PII to
+enter monitoring event contracts.
+
 ## 4. Authorization and Enumeration
 
 - Backend authorization is default deny.

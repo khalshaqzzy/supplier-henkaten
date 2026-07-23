@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { identityRealmSchema, userRoleSchema } from './enums.js';
+import { identityRealmSchema, sessionPurposeSchema, userRoleSchema } from './enums.js';
 import { opaqueIdSchema, utcTimestampSchema } from './common.js';
 
 const usernameSchema = z.string().trim().min(1).max(100);
@@ -27,9 +27,11 @@ export type TmminLoginRequest = z.infer<typeof tmminLoginRequestSchema>;
 export const sessionPrincipalSchema = z
   .object({
     userId: opaqueIdSchema,
+    displayName: z.string().min(1).max(150),
     realm: identityRealmSchema,
     role: userRoleSchema,
     supplierId: opaqueIdSchema.optional(),
+    purpose: sessionPurposeSchema,
     mustChangePassword: z.boolean(),
   })
   .strict()

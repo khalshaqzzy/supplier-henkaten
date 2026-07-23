@@ -53,13 +53,16 @@ jobs:
         run: pnpm typecheck
 
       - name: Test
-        run: pnpm test
+        run: pnpm test:unit
+
+      - name: Check OpenAPI contract
+        run: pnpm openapi:check
 
       - name: Build
         run: pnpm build
 
-  database-smoke:
-    name: database-smoke
+  database-integration:
+    name: database-integration
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -77,6 +80,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22.23.1
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Validate Compose configuration
         run: docker compose config --quiet
@@ -93,8 +100,18 @@ jobs:
       - name: Reset disposable test database
         run: pnpm db:test:reset
 
-      - name: Verify database after reset
-        run: pnpm db:verify
+      - name: Apply fresh test migrations
+        run: pnpm db:test:migrate
+
+      - name: Run PostgreSQL integration tests
+        run: pnpm test:integration
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://supplier_henkaten:supplier_henkaten_local_only@127.0.0.1:55432/supplier_henkaten_test
+          RELEASE_SHA: ci
+          SESSION_CSRF_SECRET: integration-test-csrf-secret-at-least-32
+          AUTH_THROTTLE_SECRET: integration-test-throttle-secret-32
+          OUTBOX_ENABLED: 'false'
 
       - name: Stop PostgreSQL
         if: always()

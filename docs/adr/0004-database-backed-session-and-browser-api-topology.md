@@ -4,6 +4,10 @@ Status: Accepted
 
 Date: 2026-07-23
 
+Implementation refinement (Phase 3): cookies use `SameSite=Strict`; CSRF uses an HMAC-derived
+synchronizer token bound to session UUID and realm. Realm-specific `/auth/supplier/*` and
+`/auth/tmmin/*` routes never accept the other realm's cookie.
+
 Scope: browser authentication sessions, cookies, CSRF, identity realms, and API routing
 
 ## Context

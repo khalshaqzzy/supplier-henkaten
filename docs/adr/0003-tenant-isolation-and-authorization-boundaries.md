@@ -4,6 +4,10 @@ Status: Accepted
 
 Date: 2026-07-23
 
+Implementation refinement (Phase 2-3): immutable `TenantScope` and separate TMMIN capability paths
+are implemented with default-deny route metadata. Supplier-facing mutation contracts do not expose
+a freely writable `supplierId`; outside-tenant IDs resolve as not found.
+
 Scope: supplier data isolation, cross-tenant administration, repository access, and denial behavior
 
 ## Context

@@ -1,7 +1,9 @@
 # Enterprise Digital Henkaten Management
 
-TypeScript monorepo for the TMMIN Supplier Digital Henkaten platform. The repository is currently at
-the architecture and local-tooling foundation: no product API or frontend is running yet.
+TypeScript monorepo for the TMMIN Supplier Digital Henkaten platform. Phase 0-3 provides the
+NestJS/Express API foundation, Prisma/PostgreSQL persistence, authentication, tenant governance,
+TMMIN administration, supplier provisioning, and controlled Hosted Preparation. Frontends and
+Henkaten operational domains are not implemented yet.
 
 ## Prerequisites
 
@@ -25,7 +27,7 @@ pnpm validate
 
 The active workspaces are:
 
-- `@tmmin-henkaten/api` — compile-only API foundation; NestJS runtime begins later;
+- `@tmmin-henkaten/api` — NestJS API, Prisma client/migrations, OpenAPI, auth, and administration;
 - `@tmmin-henkaten/contracts` — shared Zod runtime contracts and TypeScript types;
 - `@tmmin-henkaten/test-fixtures` — deterministic test-only builders.
 
@@ -39,9 +41,40 @@ pnpm db:up
 pnpm db:wait
 pnpm db:verify
 pnpm db:test:reset
+pnpm db:test:migrate
 pnpm db:migrate
 pnpm db:down
 ```
+
+Copy `.env.example` to an untracked `.env`, replace the local CSRF/throttle values as needed, then
+start the API with `pnpm --filter @tmmin-henkaten/api dev`. Public probes are `GET /health` and
+`GET /ready`; the generated contract is `GET /api/v1/openapi.json`.
+
+Operator-only bootstrap and recovery use `TMMIN_BOOTSTRAP_USERNAME`,
+`TMMIN_BOOTSTRAP_DISPLAY_NAME`, and `TMMIN_BOOTSTRAP_PASSWORD` from the environment:
+
+```bash
+pnpm build
+pnpm admin:bootstrap
+pnpm admin:recover
+```
+
+Both commands deliberately keep credentials out of arguments and logs. Bootstrap is idempotent;
+recovery rotates the protected administrator password and revokes its sessions.
+
+## Tests and generated contracts
+
+```bash
+pnpm test:unit
+pnpm db:test:reset
+pnpm db:test:migrate
+pnpm test:integration
+pnpm openapi:check
+```
+
+Integration tests require the disposable PostgreSQL database and never use SQLite or a host
+PostgreSQL service. Run `pnpm openapi:generate` only when an intentional Zod-backed public contract
+change must update `apps/api/openapi/openapi.json`.
 
 `db:down` preserves the local main database volume. `db:destroy` is the only command that removes
 the project volume and prints the exact Compose project before deletion.

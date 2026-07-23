@@ -62,6 +62,18 @@ function canRunDocker(arguments_) {
   return result.status === 0;
 }
 
+function runPnpm(arguments_, environment = process.env) {
+  const result = spawnSync('pnpm', arguments_, {
+    cwd: process.cwd(),
+    env: environment,
+    stdio: 'inherit',
+  });
+  if (result.error !== undefined) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`pnpm ${arguments_.join(' ')} failed.`);
+  }
+}
+
 function query(database, sql) {
   return runDocker(
     [
@@ -156,7 +168,15 @@ switch (command) {
     verifyDatabase();
     break;
   case 'migrate':
-    console.log('Database migration dispatcher: 0 registered migrations (Prisma begins later).');
+    runPnpm(['--filter', '@tmmin-henkaten/api', 'run', 'prisma:migrate:deploy']);
+    break;
+  case 'test-migrate':
+    runPnpm(['--filter', '@tmmin-henkaten/api', 'run', 'prisma:migrate:deploy'], {
+      ...process.env,
+      DATABASE_URL:
+        process.env.TEST_DATABASE_URL ??
+        `postgresql://${databaseUser}:${process.env.POSTGRES_PASSWORD ?? 'supplier_henkaten_local_only'}@127.0.0.1:${process.env.POSTGRES_PORT ?? '55432'}/${testDatabase}`,
+    });
     break;
   case 'test-reset':
     resetTestDatabase();
@@ -170,7 +190,7 @@ switch (command) {
     break;
   default:
     console.error(
-      'Usage: node scripts/database.mjs <up|wait|verify|migrate|test-reset|down|destroy>',
+      'Usage: node scripts/database.mjs <up|wait|verify|migrate|test-reset|test-migrate|down|destroy>',
     );
     process.exitCode = 1;
 }

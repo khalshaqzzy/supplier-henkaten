@@ -10,7 +10,7 @@ export type OpaqueId = z.infer<typeof opaqueIdSchema>;
 export const utcTimestampSchema = z
   .string()
   .datetime({ offset: true })
-  .transform((value) => new Date(value).toISOString());
+  .overwrite((value) => new Date(value).toISOString());
 export type UtcTimestamp = z.output<typeof utcTimestampSchema>;
 
 export const correlationIdSchema = z
