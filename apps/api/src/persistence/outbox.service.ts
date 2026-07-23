@@ -22,17 +22,24 @@ export type OutboxInput = {
   payload: Record<string, unknown>;
 };
 
-type ClaimedOutboxEvent = {
+export type ClaimedOutboxEvent = {
   id: string;
   eventType: string;
   attemptCount: number;
+  aggregateType: string;
+  aggregateId: string;
+  aggregateVersion: number;
+  supplierId: string | null;
+  occurredAt: Date;
+  actor: unknown;
+  correlationId: string;
   payload: unknown;
 };
 
 @Injectable()
 export class OutboxService implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(OutboxService.name);
-  private readonly handlers = new Map<string, OutboxHandler>();
+  private readonly handlers = new Map<string, OutboxHandler[]>();
   private timer?: NodeJS.Timeout;
   private stopping = false;
   private inFlight: Promise<void> | undefined;
@@ -44,8 +51,9 @@ export class OutboxService implements OnModuleInit, OnApplicationShutdown {
   ) {}
 
   register(eventType: string, handler: OutboxHandler): void {
-    if (this.handlers.has(eventType)) throw new Error(`Duplicate outbox handler: ${eventType}`);
-    this.handlers.set(eventType, handler);
+    const handlers = this.handlers.get(eventType) ?? [];
+    handlers.push(handler);
+    this.handlers.set(eventType, handlers);
   }
 
   async enqueue(input: OutboxInput, client: OutboxClient = this.prisma): Promise<string> {
@@ -86,10 +94,9 @@ export class OutboxService implements OnModuleInit, OnApplicationShutdown {
   async processBatch(): Promise<void> {
     const events = await this.claimBatch();
     for (const event of events) {
-      const handler = this.handlers.get(event.eventType);
+      const handlers = this.handlers.get(event.eventType) ?? [];
       try {
-        if (!handler) throw new Error('UnregisteredOutboxHandler');
-        await handler(event);
+        for (const handler of handlers) await handler(event);
         await this.prisma.outboxEvent.update({
           where: { id: event.id },
           data: { processedAt: new Date(), lockedAt: null, lockedBy: null },
@@ -103,7 +110,8 @@ export class OutboxService implements OnModuleInit, OnApplicationShutdown {
   private async claimBatch(): Promise<ClaimedOutboxEvent[]> {
     return this.prisma.$transaction(async (transaction) => {
       const claimed = await transaction.$queryRaw<ClaimedOutboxEvent[]>`
-        SELECT id, "eventType", "attemptCount", payload
+        SELECT id, "eventType", "attemptCount", "aggregateType", "aggregateId",
+               "aggregateVersion", "supplierId", "occurredAt", actor, "correlationId", payload
         FROM "OutboxEvent"
         WHERE "processedAt" IS NULL
           AND "failedAt" IS NULL

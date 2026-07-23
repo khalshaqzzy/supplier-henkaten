@@ -6,4 +6,5 @@ export * from './events.js';
 export * from './health.js';
 export * from './henkaten.js';
 export * from './master-data.js';
+export * from './read-models.js';
 export * from './shifts.js';

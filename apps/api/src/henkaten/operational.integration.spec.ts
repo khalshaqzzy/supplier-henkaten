@@ -11,6 +11,7 @@ import { AppModule } from '../app.module.js';
 import { PasswordService } from '../auth/password.service.js';
 import { correlationMiddleware } from '../common/request-context.js';
 import { PrismaService } from '../persistence/prisma.service.js';
+import { OutboxService } from '../persistence/outbox.service.js';
 import { SourceGovernanceService } from '../administration/source-governance.service.js';
 
 const supplierOrigin = 'http://localhost:5173';
@@ -790,6 +791,62 @@ describe('Hosted shift and Henkaten core', () => {
         select: { effectiveMpMemberId: true },
       }),
     ).resolves.toEqual({ effectiveMpMemberId: target.effectiveMpMemberId });
+  });
+
+  it('serves durable notifications, scoped board/dashboard, and redacted audit reads', async () => {
+    await app.get(OutboxService).processBatch();
+
+    const supervisorNotifications = await request(app.getHttpServer())
+      .get('/api/v1/supplier/notifications')
+      .set('Cookie', supervisorCookie);
+    expect(supervisorNotifications.status).toBe(200);
+    expect(supervisorNotifications.body.items.length).toBeGreaterThan(0);
+    const notification = supervisorNotifications.body.items[0] as {
+      id: string;
+      version: number;
+    };
+    const read = await request(app.getHttpServer())
+      .patch(`/api/v1/supplier/notifications/${notification.id}/read-state`)
+      .set('Origin', supplierOrigin)
+      .set('Cookie', supervisorCookie)
+      .set('X-CSRF-Token', supervisorCsrf)
+      .send({ read: true, expectedVersion: notification.version });
+    expect(read.status).toBe(200);
+    expect(read.body.readAt).toBeTypeOf('string');
+
+    const board = await request(app.getHttpServer())
+      .get('/api/v1/supplier/assignment-board')
+      .set('Cookie', adminCookie);
+    expect(board.status).toBe(200);
+    const boardBody = responseBody<{
+      lines: Array<{
+        lineId: string;
+        jobs: Array<{ indicators: unknown[] }>;
+      }>;
+    }>(board);
+    expect(boardBody.lines.some((line) => line.lineId === lineId)).toBe(true);
+    const mainLine = boardBody.lines.find((line) => line.lineId === lineId)!;
+    expect(mainLine.jobs).toHaveLength(2);
+    expect(mainLine.jobs.some((job) => job.indicators.length > 0)).toBe(true);
+
+    const dashboard = await request(app.getHttpServer())
+      .get('/api/v1/supplier/dashboard')
+      .set('Cookie', adminCookie);
+    expect(dashboard.status).toBe(200);
+    expect(dashboard.body.totals.all).toBeGreaterThan(0);
+    expect(dashboard.body.pendingApprovals.supervisor).toBeGreaterThanOrEqual(0);
+
+    const audit = await request(app.getHttpServer())
+      .get('/api/v1/supplier/audit')
+      .set('Cookie', adminCookie);
+    expect(audit.status).toBe(200);
+    expect(JSON.stringify(audit.body)).not.toMatch(/passwordHash|tokenHash|authorization/i);
+
+    const globalDashboard = await request(app.getHttpServer())
+      .get('/api/v1/tmmin/dashboard')
+      .set('Cookie', tmminCookie);
+    expect(globalDashboard.status).toBe(200);
+    expect(globalDashboard.body.suppliers.hosted).toBeGreaterThan(0);
   });
 
   it('applies approved Man movement once and End Shift cancels remaining work atomically', async () => {

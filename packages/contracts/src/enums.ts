@@ -45,6 +45,13 @@ export const capabilitySchema = z.enum([
   'SUPPLIER_HENKATEN_DECIDE',
   'SUPPLIER_APPROVAL_REROUTE',
   'TMMIN_HENKATEN_READ',
+  'SUPPLIER_NOTIFICATION_READ',
+  'SUPPLIER_BOARD_READ',
+  'SUPPLIER_DASHBOARD_READ',
+  'SUPPLIER_AUDIT_READ',
+  'TMMIN_DASHBOARD_READ',
+  'TMMIN_AUDIT_READ',
+  'TMMIN_EXTERNAL_CLIENT_MANAGE',
 ]);
 export type Capability = z.infer<typeof capabilitySchema>;
 

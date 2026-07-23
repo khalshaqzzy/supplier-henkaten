@@ -26,11 +26,11 @@ Roadmap tidak memberikan estimasi waktu. Urutan didasarkan pada dependency dan r
 
 ## 2. Current Repository Status
 
-Kondisi repository setelah Phase 0-7:
+Kondisi repository setelah Phase 0-8:
 
 - branch aktif: `staging`;
 - `.agent/PRD.md` tersedia dan menjadi product contract;
-- enam belas ADR dan empat architecture/security baseline tersedia;
+- tujuh belas ADR dan lima architecture/security baseline tersedia;
 - Node.js 22.23.1 + pnpm 11.16.0 ESM workspace tersedia;
 - active workspace: NestJS API, shared contracts, dan deterministic test fixtures;
 - strict TypeScript, ESLint, Prettier, Vitest, root validation, dan lockfile tersedia;
@@ -55,12 +55,14 @@ Kondisi repository setelah Phase 0-7:
 - persisted parallel Supervisor/QC approval, immutable decision/reroute evidence, reject-fast,
   atomic approved Man movement, linked vacancy resolution, pre-start Man execution, dan
   transactional End Shift telah tersedia;
+- durable per-user notification, scoped Assignment Board, supplier/TMMIN dashboard, audit read API,
+  dan resumable SSE invalidation stream telah tersedia;
 - belum ada frontend, Playwright E2E, atau remote deployment files;
 - materi slide tersedia sebagai reference-only input.
 
-Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, dan Phase 7**
+Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, dan Phase 8**
 Current phase: **tidak ada**
-Next phase: **Phase 8 - Notification, Assignment Board, Dashboard, dan Audit Backend (`planned`)**
+Next phase: **Phase 9 - External REST API Backend (`planned`)**
 
 Tidak ada application behavior yang boleh ditandai implemented sampai source code dan acceptance checks terkait benar-benar tersedia di repository.
 
@@ -2259,7 +2261,7 @@ Phase 7 exit criteria:
 
 ## 16. Phase 8 - Notification, Assignment Board, Dashboard, dan Audit Backend
 
-Status: **planned**
+Status: **done**
 
 Goal: membangun durable notification, realtime board read model, supplier/TMMIN dashboard queries, warning explorer, dan audit read APIs.
 
@@ -2276,7 +2278,7 @@ Unlocks:
 
 ### 8.1 Transactional Notification Generation
 
-Status: **planned**
+Status: **done**
 
 Dependency: outbox dan Phase 7 events.
 
@@ -2305,7 +2307,7 @@ Exit criteria:
 
 ### 8.2 Per-user Read/Unread State
 
-Status: **planned**
+Status: **done**
 
 Dependency: 8.1.
 
@@ -2333,7 +2335,7 @@ Exit criteria:
 
 ### 8.3 Assignment Board Read Model
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 7.
 
@@ -2363,7 +2365,7 @@ Exit criteria:
 
 ### 8.4 SSE Realtime Stream dan Stale Fallback
 
-Status: **planned**
+Status: **done**
 
 Dependency: 8.1-8.3.
 
@@ -2394,7 +2396,7 @@ Exit criteria:
 
 ### 8.5 Supplier Dashboard Aggregations
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 7.
 
@@ -2426,7 +2428,7 @@ Exit criteria:
 
 ### 8.6 TMMIN Warning dan Global Dashboard
 
-Status: **planned**
+Status: **done**
 
 Dependency: 8.5 dan warning Phase 6.
 
@@ -2456,7 +2458,7 @@ Exit criteria:
 
 ### 8.7 Audit Timeline dan Read APIs
 
-Status: **planned**
+Status: **done**
 
 Dependency: audit data dari Phase 2-7.
 
@@ -2485,7 +2487,7 @@ Exit criteria:
 
 ### 8.8 Backend Read-model Hardening
 
-Status: **planned**
+Status: **done**
 
 Dependency: 8.1-8.7.
 

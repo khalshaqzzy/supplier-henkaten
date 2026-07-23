@@ -168,6 +168,7 @@ model Supplier {
   hostedPreparations     HostedPreparation[]
   auditEvents            AuditEvent[]
   outboxEvents           OutboxEvent[]
+  notifications          Notification[]
   members                Member[]
   memberPhotos           MemberPhoto[]
   lines                  Line[]
@@ -224,6 +225,7 @@ model User {
   sessions                   UserSession[]
   passwordHistory            PasswordHistory[]
   hostedPreparations         HostedPreparation[]
+  notifications              Notification[]
 
   @@unique([memberId])
   @@index([supplierId, role, status])
@@ -339,6 +341,28 @@ model OutboxEvent {
 
   @@index([processedAt, failedAt, availableAt])
   @@index([supplierId, occurredAt])
+}
+
+model Notification {
+  id              String   @id @default(uuid()) @db.Uuid
+  supplierId      String   @db.Uuid
+  recipientUserId String   @db.Uuid
+  sourceEventId   String   @db.Uuid
+  kind            String   @db.VarChar(50)
+  title           String   @db.VarChar(200)
+  body            String   @db.VarChar(1000)
+  resourceType    String   @db.VarChar(100)
+  resourceId      String   @db.VarChar(200)
+  deepLink        String?  @db.VarChar(500)
+  readAt          DateTime? @db.Timestamptz(3)
+  version         Int      @default(1)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  supplier        Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  recipient       User     @relation(fields: [recipientUserId], references: [id], onDelete: Restrict)
+
+  @@unique([sourceEventId, recipientUserId])
+  @@index([recipientUserId, readAt, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([supplierId, createdAt(sort: Desc)])
 }
 
 model Member {

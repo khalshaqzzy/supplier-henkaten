@@ -16,6 +16,7 @@ import { PersistenceModule } from './persistence/persistence.module.js';
 import { MasterDataModule } from './master-data/master-data.module.js';
 import { OperationsModule } from './operations/operations.module.js';
 import { ShiftsModule } from './shifts/shifts.module.js';
+import { ReadModelModule } from './read-models/read-model.module.js';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { ShiftsModule } from './shifts/shifts.module.js';
     OperationsModule,
     ShiftsModule,
     HenkatenModule,
+    ReadModelModule,
   ],
   controllers: [HealthController, OpenApiController],
   providers: [

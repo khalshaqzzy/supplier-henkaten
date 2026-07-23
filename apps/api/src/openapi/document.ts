@@ -80,6 +80,18 @@ import {
   warningInstanceSchema,
   withdrawHenkatenRequestSchema,
   workingAssignmentSchema,
+  assignmentBoardSchema,
+  auditPageSchema,
+  auditQuerySchema,
+  boardQuerySchema,
+  dashboardQuerySchema,
+  notificationListQuerySchema,
+  notificationPageSchema,
+  notificationReadRequestSchema,
+  notificationSchema,
+  notificationUnreadCountSchema,
+  supplierDashboardSchema,
+  tmminDashboardSchema,
 } from '@tmmin-henkaten/contracts';
 
 const noContent = { description: 'No content' };
@@ -241,8 +253,71 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       },
       ...masterDataPaths(),
       ...operationalPaths(),
+      ...readModelPaths(),
     },
   }) as unknown as Record<string, unknown>;
+}
+
+function readModelPaths() {
+  return {
+    '/api/v1/supplier/notifications': {
+      get: {
+        requestParams: { query: notificationListQuerySchema },
+        responses: { '200': json('Current user notifications', notificationPageSchema) },
+      },
+    },
+    '/api/v1/supplier/notifications/unread-count': {
+      get: {
+        responses: { '200': json('Unread notification count', notificationUnreadCountSchema) },
+      },
+    },
+    '/api/v1/supplier/notifications/{id}/read-state': {
+      patch: {
+        requestParams: idPath,
+        requestBody: body(notificationReadRequestSchema),
+        responses: { '200': json('Updated notification', notificationSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/assignment-board': {
+      get: {
+        requestParams: { query: boardQuerySchema },
+        responses: { '200': json('Current assignment board', assignmentBoardSchema) },
+      },
+    },
+    '/api/v1/supplier/dashboard': {
+      get: {
+        requestParams: { query: dashboardQuerySchema },
+        responses: { '200': json('Supplier dashboard', supplierDashboardSchema) },
+      },
+    },
+    '/api/v1/supplier/audit': {
+      get: {
+        requestParams: { query: auditQuerySchema },
+        responses: { '200': json('Supplier audit timeline', auditPageSchema) },
+      },
+    },
+    '/api/v1/supplier/realtime': {
+      get: {
+        requestParams: { query: boardQuerySchema },
+        responses: {
+          '200': {
+            description:
+              'Authenticated SSE invalidation stream. REST read models remain canonical.',
+            content: { 'text/event-stream': { schema: z.string() } },
+          },
+        },
+      },
+    },
+    '/api/v1/tmmin/dashboard': {
+      get: { responses: { '200': json('TMMIN global dashboard', tmminDashboardSchema) } },
+    },
+    '/api/v1/tmmin/audit': {
+      get: {
+        requestParams: { query: auditQuerySchema },
+        responses: { '200': json('TMMIN privileged audit timeline', auditPageSchema) },
+      },
+    },
+  };
 }
 
 function operationalPaths() {

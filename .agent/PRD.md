@@ -3,7 +3,7 @@
 | Atribut | Nilai |
 |---|---|
 | Status dokumen | **Approved product contract for v1 planning** |
-| Status implementasi | **Phase 0-7 implemented; Phase 8+ planned** |
+| Status implementasi | **Phase 0-8 implemented; Phase 9+ planned** |
 | Versi dokumen | 1.0 |
 | Tanggal | 23 Juli 2026 |
 | Product owner | TMMIN |
