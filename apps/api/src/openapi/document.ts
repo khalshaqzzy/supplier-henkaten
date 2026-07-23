@@ -822,10 +822,35 @@ function masterDataPaths() {
       },
     },
     '/api/v1/supplier/master-data/lines/{lineId}/jobs/{id}': {
+      get: {
+        requestParams: jobPath,
+        responses: { '200': json('Job', jobSchema), '404': problem },
+      },
       patch: {
         requestParams: jobPath,
         requestBody: body(updateJobRequestSchema),
         responses: { '200': json('Updated job', jobSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/lines/{lineId}/jobs/{id}/activate': {
+      post: {
+        requestParams: jobPath,
+        requestBody: body(expectedVersionSchema),
+        responses: { '201': json('Activated job', jobSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/lines/{lineId}/jobs/{id}/deactivate': {
+      post: {
+        requestParams: jobPath,
+        requestBody: body(expectedVersionSchema),
+        responses: { '201': json('Deactivated job', jobSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/lines/{lineId}/jobs/reorder': {
+      post: {
+        requestParams: linePath,
+        requestBody: body(reorderRequestSchema),
+        responses: { '201': { description: 'Jobs reordered' }, '409': problem },
       },
     },
     '/api/v1/supplier/master-data/parts': collectionPath(
@@ -886,19 +911,24 @@ function masterDataPaths() {
     '/api/v1/supplier/master-data/default-assignments': {
       get: { responses: { '200': json('Default assignments', defaultAssignmentsSchema) } },
     },
-    '/api/v1/supplier/master-data/lines/{resourceId}/default-supervisor': assignmentPath(
+    '/api/v1/supplier/master-data/lines/{lineId}/default-supervisor': assignmentPath(
+      'lineId',
       assignmentMutationRequestSchema,
     ),
-    '/api/v1/supplier/master-data/lines/{resourceId}/default-line-leader': assignmentPath(
+    '/api/v1/supplier/master-data/lines/{lineId}/default-line-leader': assignmentPath(
+      'lineId',
       assignmentMutationRequestSchema,
     ),
-    '/api/v1/supplier/master-data/jobs/{resourceId}/default-mp': assignmentPath(
+    '/api/v1/supplier/master-data/jobs/{jobId}/default-mp': assignmentPath(
+      'jobId',
       assignmentMutationRequestSchema,
     ),
-    '/api/v1/supplier/master-data/lines/{resourceId}/default-line-leader/move': assignmentPath(
+    '/api/v1/supplier/master-data/lines/{lineId}/default-line-leader/move': assignmentPath(
+      'lineId',
       assignmentMoveRequestSchema,
     ),
-    '/api/v1/supplier/master-data/jobs/{resourceId}/default-mp/move': assignmentPath(
+    '/api/v1/supplier/master-data/jobs/{jobId}/default-mp/move': assignmentPath(
+      'jobId',
       assignmentMoveRequestSchema,
     ),
     '/api/v1/supplier/master-data/{kind}/{resourceId}/remove': {
@@ -938,9 +968,38 @@ function masterDataPaths() {
       },
     },
     '/api/v1/tmmin/suppliers/{supplierId}/master-data/lines': tmminListPath(linePageSchema),
+    '/api/v1/tmmin/suppliers/{supplierId}/master-data/lines/{lineId}/jobs': {
+      get: {
+        requestParams: {
+          path: z.object({
+            supplierId: z.string().uuid(),
+            lineId: z.string().uuid(),
+          }),
+          query: masterListQuerySchema,
+        },
+        responses: { '200': json('Hosted jobs', jobPageSchema), '404': problem },
+      },
+    },
     '/api/v1/tmmin/suppliers/{supplierId}/master-data/parts': tmminListPath(partPageSchema),
     '/api/v1/tmmin/suppliers/{supplierId}/master-data/shift-templates':
       tmminListPath(shiftTemplatePageSchema),
+    '/api/v1/tmmin/suppliers/{supplierId}/master-data/checklists/{category}/versions': {
+      get: {
+        requestParams: {
+          path: z.object({
+            supplierId: z.string().uuid(),
+            category: z.enum(['MAN', 'MACHINE', 'MATERIAL', 'METHOD']),
+          }),
+        },
+        responses: {
+          '200': json(
+            'Hosted checklist versions',
+            z.object({ items: z.array(checklistVersionSchema) }),
+          ),
+          '404': problem,
+        },
+      },
+    },
     '/api/v1/tmmin/suppliers/{supplierId}/master-data/default-assignments': {
       get: {
         requestParams: { path: z.object({ supplierId: z.string().uuid() }) },
@@ -991,10 +1050,10 @@ function checklistStatusPath() {
   };
 }
 
-function assignmentPath(requestSchema: z.ZodType) {
+function assignmentPath(parameter: 'jobId' | 'lineId', requestSchema: z.ZodType) {
   return {
     post: {
-      requestParams: { path: z.object({ resourceId: z.string().uuid() }) },
+      requestParams: { path: z.object({ [parameter]: z.string().uuid() }) },
       requestBody: body(requestSchema),
       responses: { '201': json('Default assignments', defaultAssignmentsSchema), '409': problem },
     },

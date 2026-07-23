@@ -26,11 +26,11 @@ Roadmap tidak memberikan estimasi waktu. Urutan didasarkan pada dependency dan r
 
 ## 2. Current Repository Status
 
-Kondisi repository setelah Phase 0-9:
+Kondisi repository setelah Phase 0-10:
 
 - branch aktif: `staging`;
 - `.agent/PRD.md` tersedia dan menjadi product contract;
-- delapan belas ADR dan enam architecture/security baseline tersedia;
+- sembilan belas ADR dan delapan architecture/security baseline tersedia;
 - Node.js 22.23.1 + pnpm 11.16.0 ESM workspace tersedia;
 - active workspace: NestJS API, shared contracts, dan deterministic test fixtures;
 - strict TypeScript, ESLint, Prettier, Vitest, root validation, dan lockfile tersedia;
@@ -60,12 +60,15 @@ Kondisi repository setelah Phase 0-9:
 - epoch-bound external client/secret lifecycle, opaque 15-minute token, strict public event
   contracts, immutable ordered ingestion, per-item batch processing, External projection/warning,
   TMMIN notification, dan unified dashboard/freshness telah tersedia;
+- executable 140-operation NestJS/OpenAPI reconciliation, direct external policy/rate-limit tests,
+  migration upgrade evidence, additive cursor indexes, dan repeatable Compact HTTP/query-plan
+  baseline telah tersedia;
 - belum ada frontend, Playwright E2E, atau remote deployment files;
 - materi slide tersedia sebagai reference-only input.
 
-Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8, dan Phase 9**
+Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8, Phase 9, dan Phase 10**
 Current phase: **tidak ada**
-Next phase: **Phase 10 - Backend Contract Freeze dan Hardening (`planned`)**
+Next phase: **Phase 11 - Frontend dan Shared UI Foundation (`planned`)**
 
 Tidak ada application behavior yang boleh ditandai implemented sampai source code dan acceptance checks terkait benar-benar tersedia di repository.
 
@@ -2823,7 +2826,7 @@ Implementation note:
 
 ## 18. Phase 10 - Backend Contract Freeze dan Hardening
 
-Status: **planned**
+Status: **done**
 
 Goal: menutup backend implementation gap, mengunci contracts, menguji concurrency/security/performance, dan memastikan frontend dapat dibangun tanpa backend redesign.
 
@@ -2837,7 +2840,7 @@ Unlocks:
 
 ### 10.1 Unit Coverage Completion
 
-Status: **planned**
+Status: **done**
 
 Dependency: all backend phases.
 
@@ -2862,7 +2865,7 @@ Exit criteria:
 
 ### 10.2 Full PostgreSQL Integration Suite
 
-Status: **planned**
+Status: **done**
 
 Dependency: 10.1.
 
@@ -2887,7 +2890,7 @@ Exit criteria:
 
 ### 10.3 Concurrency dan Failure-path Suite
 
-Status: **planned**
+Status: **done**
 
 Dependency: 10.2.
 
@@ -2913,7 +2916,7 @@ Exit criteria:
 
 ### 10.4 OpenAPI dan Shared-contract Reconciliation
 
-Status: **planned**
+Status: **done**
 
 Dependency: 10.1-10.3.
 
@@ -2940,7 +2943,7 @@ Exit criteria:
 
 ### 10.5 Query dan Index Review
 
-Status: **planned**
+Status: **done**
 
 Dependency: 10.2.
 
@@ -2966,7 +2969,7 @@ Exit criteria:
 
 ### 10.6 Backend Performance Baseline
 
-Status: **planned**
+Status: **done**
 
 Dependency: 10.5.
 
@@ -2991,7 +2994,7 @@ Exit criteria:
 
 ### 10.7 Security Negative Tests dan Backend Freeze
 
-Status: **planned**
+Status: **done**
 
 Dependency: 10.1-10.6.
 
@@ -3023,6 +3026,25 @@ Exit criteria:
 Phase 10 exit criteria:
 
 - Backend APIs, contracts, database behavior, security, and preliminary performance stable.
+
+Implementation note:
+
+- Controller metadata dan generated OpenAPI sekarang direkonsiliasi exactly: 124 paths dan 140 HTTP
+  operations. Test ini menemukan dan menutup sebelas undocumented operations serta lima path
+  parameter drift.
+- Direct unit evidence mencakup canonical external hashing, source-version/terminal rules, IP
+  allowlist, token fixed window, ingestion token bucket, dan Retry-After semantics.
+- Full fresh PostgreSQL suite lulus 31 tests; prior concurrency/failure suite tetap aktif dan
+  External coverage menambah allowlist, old epoch, immediate token revoke, dan concurrent identical
+  ingestion.
+- Migration 008 menambahkan deterministic pagination/cursor indexes dan lulus fresh serta 007→008
+  upgrade-path verification.
+- Dedicated `pnpm test:baseline` memakai empty disposable `_test` database dan seed 42 supplier ×
+  20 line × 300 member × 500 job, ditambah 500 projection dan 1.000 audit rows per supplier.
+- Seluruh measured dashboard/read/mutation/ingestion p95 lulus target dengan 0% unexpected error;
+  high-cardinality plan memakai index-only scan.
+- Backend v1 freeze mengizinkan additive read field, pagination/filter/sort, safe error code,
+  read-only route, dan index; breaking change memerlukan migration plan atau version baru.
 
 ---
 
@@ -5129,22 +5151,19 @@ No acceptance criterion may remain without an owning phase.
 
 Current recommended batch:
 
-1. Begin Phase 8.1 transactional notification generation from the stable operational events.
-2. Build recipient-scoped notification persistence and read/acknowledgement APIs.
-3. Add Assignment Board, approval inbox, warning, dashboard, and audit read models.
+1. Begin Phase 11.1 supplier/TMMIN Vite workspaces and shared UI package.
+2. Generate the typed API client from the frozen 140-operation backend contract.
+3. Establish session, CSRF mutation, problem mapping, accessibility, and browser-test foundations.
 
 Initial implementation order inside the next coding batch:
 
-1. consume `NOTIFICATION_REQUESTED` and terminal operational outbox events idempotently;
-2. persist tenant/role/member-targeted notifications without weakening outbox ownership;
-3. expose paginated unread/read and acknowledgement commands;
-4. materialize current assignment/4M indicators from Shift Run, Working Assignment, route, and
-   warning state;
-5. add Supplier and TMMIN dashboard aggregates with tenant-aware filters;
-6. expose approval inbox and audit reads from immutable evidence;
-7. add SSE resume/reconnect delivery after durable read models are proven.
-
-Do not start React frontend, supplier product domains, or deployment scripts before their owning dependencies.
+1. scaffold only the workspaces owned by Phase 11 and preserve strict ESM/TypeScript quality gates;
+2. derive frontend request/response types from shared Zod/OpenAPI rather than duplicating enums;
+3. implement realm-specific session bootstrap, logout, password flow, and CSRF-aware fetch wrapper;
+4. map RFC 9457 problem responses into loading/empty/error/forbidden/conflict/stale UI states;
+5. establish shared accessible desktop tokens/components without moving business policy client-side;
+6. add frontend unit/build checks and a real-API Playwright harness;
+7. keep Phase 12-14 feature screens and Phase 15 deployment files behind their owning dependencies.
 
 ## 32. Deferred dan Explicitly Out-of-scope
 

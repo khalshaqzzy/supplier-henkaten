@@ -114,6 +114,8 @@ describe('External API credential and ingestion boundary', () => {
       .send({ client_id: clientId, client_secret: clientSecret });
     expect(token.status).toBe(200);
     expect(token.headers['cache-control']).toBe('no-store');
+    expect(token.headers['retry-after']).toBeUndefined();
+    expect(token.headers['ratelimit-limit']).toBe('10');
     expect(token.body.expires_in).toBe(900);
     expect(token.body.scope).toBe('henkaten:ingest');
     accessToken = token.body.access_token as string;
@@ -262,7 +264,30 @@ describe('External API credential and ingestion boundary', () => {
     ).resolves.toEqual({ sourceVersion: 1 });
   });
 
-  it('revokes secrets and all outstanding tokens immediately', async () => {
+  it('denies a valid secret when the request IP is outside its allowlist', async () => {
+    const restricted = await tmminPost(`/api/v1/tmmin/suppliers/${supplierId}/external-clients`, {
+      name: 'Restricted integration',
+      ipAllowlist: ['203.0.113.10'],
+    });
+    expect(restricted.status).toBe(201);
+    const denied = await request(app.getHttpServer()).post('/api/v1/external/auth/token').send({
+      client_id: restricted.body.client.clientId,
+      client_secret: restricted.body.clientSecret,
+    });
+    expect(denied.status).toBe(401);
+    expect(denied.body.code).toBe('AUTHENTICATION_FAILED');
+  });
+
+  it('invalidates old-epoch tokens and revokes all outstanding tokens immediately', async () => {
+    await prisma.supplier.update({
+      where: { id: supplierId },
+      data: { sourceEpoch: { increment: 1 } },
+    });
+    const staleEpoch = await request(app.getHttpServer())
+      .get('/api/v1/external/ingestions/external-event-1')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(staleEpoch.status).toBe(401);
+
     const revoked = await tmminPost(
       `/api/v1/tmmin/suppliers/${supplierId}/external-clients/${clientRecordId}/revoke`,
       { expectedVersion: clientVersion },
@@ -272,6 +297,11 @@ describe('External API credential and ingestion boundary', () => {
       .get('/api/v1/external/ingestions/external-event-1')
       .set('Authorization', `Bearer ${accessToken}`);
     expect(denied.status).toBe(401);
+    expect(
+      await prisma.externalAccessToken.count({
+        where: { clientId: clientRecordId, revokedAt: null },
+      }),
+    ).toBe(0);
   });
 
   function tmminPost(path: string, body: object) {

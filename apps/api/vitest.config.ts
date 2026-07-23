@@ -10,7 +10,7 @@ export default defineConfig({
         test: {
           name: 'unit',
           include: ['src/**/*.spec.ts'],
-          exclude: ['src/**/*.integration.spec.ts'],
+          exclude: ['src/**/*.integration.spec.ts', 'src/**/*.baseline.spec.ts'],
           environment: 'node',
         },
       },
@@ -23,6 +23,17 @@ export default defineConfig({
           maxWorkers: 1,
           testTimeout: 30_000,
           hookTimeout: 30_000,
+        },
+      },
+      {
+        test: {
+          name: 'baseline',
+          include: ['src/**/*.baseline.spec.ts'],
+          environment: 'node',
+          fileParallelism: false,
+          maxWorkers: 1,
+          testTimeout: 120_000,
+          hookTimeout: 120_000,
         },
       },
     ],

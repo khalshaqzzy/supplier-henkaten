@@ -321,6 +321,7 @@ model AuditEvent {
   supplier        Supplier?   @relation(fields: [supplierId], references: [id], onDelete: Restrict)
 
   @@index([supplierId, occurredAt(sort: Desc)])
+  @@index([supplierId, occurredAt(sort: Desc), id(sort: Desc)])
   @@index([actorUserId, occurredAt(sort: Desc)])
   @@index([resourceType, resourceId, occurredAt(sort: Desc)])
 }
@@ -350,6 +351,7 @@ model OutboxEvent {
 
   @@index([processedAt, failedAt, availableAt])
   @@index([supplierId, occurredAt])
+  @@index([supplierId, occurredAt, id])
 }
 
 model Notification {
@@ -480,6 +482,7 @@ model ExternalHenkatenProjection {
   @@unique([id, supplierId])
   @@unique([supplierId, sourceEpoch, sourceHenkatenId])
   @@index([supplierId, status, updatedAt(sort: Desc)])
+  @@index([supplierId, updatedAt(sort: Desc), id(sort: Desc)])
   @@index([status, updatedAt(sort: Desc)])
 }
 
@@ -522,6 +525,7 @@ model Member {
   @@unique([id, supplierId])
   @@index([supplierId, active, role])
   @@index([supplierId, fullName])
+  @@index([supplierId, active, fullName, id])
 }
 
 model MemberPhoto {
@@ -603,6 +607,7 @@ model Job {
   @@unique([lineId, normalizedName])
   @@unique([id, supplierId])
   @@index([supplierId, lineId, active, displayOrder])
+  @@index([supplierId, lineId, active, displayOrder, id])
 }
 
 model Part {

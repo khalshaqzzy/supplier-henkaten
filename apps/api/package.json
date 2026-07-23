@@ -17,6 +17,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
+    "test:baseline": "vitest run --project baseline",
     "openapi:generate": "nest build && node dist/openapi/generate.js --write",
     "openapi:check": "nest build && node dist/openapi/generate.js --check",
     "prisma:migrate:deploy": "prisma migrate deploy --config prisma.config.ts",

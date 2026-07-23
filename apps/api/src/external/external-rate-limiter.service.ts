@@ -51,7 +51,7 @@ function result(allowed: boolean, remaining: number, resetAt: number, now: numbe
     allowed,
     limit: 10,
     remaining: Math.max(0, remaining),
-    retryAfterSeconds: Math.max(1, Math.ceil((resetAt - now) / 1_000)),
+    retryAfterSeconds: allowed ? 0 : Math.max(1, Math.ceil((resetAt - now) / 1_000)),
     resetAt,
   };
 }

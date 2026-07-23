@@ -1,118 +1,138 @@
-# Session Handoff — External Ingestion and Unified Monitoring
+# Session Handoff — Backend Contract Freeze and Hardening
 
 Tanggal: 2026-07-23
 Branch: `staging`
-Status repository: Phase 0–9 selesai; Phase 10 `planned`
+Status repository: Phase 0–10 selesai; Phase 11 `planned`
 
 ## 1. Outcome
 
-Backend sekarang menerima External Henkaten monitoring dengan authorization, privacy, ordering, dan
-traceability yang terikat ke supplier/source epoch:
+Backend v1 sekarang memiliki executable contract freeze, direct policy evidence, upgrade-safe query
+hardening, dan repeatable Compact baseline:
 
-- TMMIN-managed external client lifecycle dengan one-time Argon2id-hashed secret, rotation maksimal
-  dua active secret, revoke, optional IP allowlist, dan optimistic version;
-- opaque 15-minute bearer token dengan stored SHA-256 digest, fixed scope, epoch validation, immediate
-  revocation, generic auth failure, dan `Cache-Control: no-store`;
-- strict Zod/OpenAPI `1.0` event contract untuk MAN/MACHINE/MATERIAL/METHOD dan seluruh lifecycle;
-- immutable raw event, canonical SHA-256 idempotency, contiguous source version, terminal freeze,
-  current projection, freshness, warning, audit, dan outbox dalam satu serializable transaction;
-- single, per-item batch, dan ingestion-status API dengan bounded 5 MiB/500-item input;
-- TMMIN projection history, unified Hosted/External dashboard, external warning notification, dan
-  source-mode badge tanpa External Assignment Board;
-- token-attempt dan ingestion rate limit yang sesuai single-instance topology;
-- PostgreSQL concurrency, partial-batch, contract, privacy, and revocation evidence.
+- NestJS controller metadata direkonsiliasi exactly dengan generated OpenAPI;
+- 124 paths/140 HTTP operations terdokumentasi dan byte-drift checked;
+- sebelas undocumented operations serta lima assignment path-parameter drift telah diperbaiki;
+- canonical external hash, ordering/terminal state, IP allowlist, token window, ingestion bucket, dan
+  Retry-After memiliki direct unit evidence;
+- External security-negative suite mencakup forbidden field, allowlist, source epoch, revoked
+  client/token, scope, conflict, out-of-order, partial batch, dan concurrent identical delivery;
+- deterministic cursor/list indexes tersedia untuk job, member, audit, outbox, dan External
+  projection;
+- fresh migration 001→008 dan upgrade checkpoint 001→007 kemudian 008 keduanya lulus;
+- Compact HTTP baseline pada maximum supplier/master-data profile lulus seluruh preliminary p95 dan
+  error targets.
 
-## 2. Locked Decisions
+Backend contract siap menjadi dependency frontend tanpa backend redesign.
 
-- Authorization identity adalah tuple client + supplier + source epoch + scope + optional IP.
-- Secret plaintext hanya dikembalikan sekali; bearer plaintext tidak pernah disimpan.
-- Source cutover memerlukan active next-epoch credential untuk target External dan merevoke external
-  client/token ketika kembali ke Hosted.
-- Accepted raw event immutable; projection hanya current monitoring view dan dapat direkonstruksi
-  dari history.
-- Idempotency key dibatasi oleh supplier + epoch + opaque event ID. Canonical hash membedakan exact
-  retry dari conflict.
-- Batch memproses satu transaction per item dan mengembalikan result pada original input position.
-- Unified warning menggunakan exactly-one Hosted Henkaten atau External projection relation.
-- External projection/warning hanya read-only untuk TMMIN; supplier External tidak mendapat Hosted
-  session, workflow, board, atau personnel model.
-- In-process rate counter hanya valid untuk satu API instance; multiple replicas memerlukan
-  coordinated counter lebih dahulu.
+## 2. Frozen Contract
 
-## 3. Persistence dan Migration
+Frozen:
+
+- OpenAPI `3.1.0`, API `1.0.0`, External schema `1.0`;
+- public route method/path/parameter identity;
+- request requiredness dan validation semantics;
+- enum, lifecycle status, result, dan problem-code names;
+- idempotency, source-version, approval, warning, assignment, dan source-epoch semantics.
+
+Allowed within v1:
+
+- optional read fields;
+- pagination metadata;
+- backward-compatible filter/sort;
+- new safe error code untuk previously unspecified failure;
+- additive read-only endpoint;
+- additive index/internal query improvement.
+
+Breaking removal/rename/required-field/semantic/authorization/enum change memerlukan explicit
+contract migration atau version baru.
+
+## 3. Contract Reconciliation
+
+`apps/api/src/openapi/contract-freeze.spec.ts` walks `AppModule`, controller, dan handler metadata,
+normalizes Nest `:parameter` ke OpenAPI `{parameter}`, lalu membandingkan exact operation sets.
+
+Gap yang ditutup:
+
+- supplier job detail, activate, deactivate, dan reorder docs;
+- TMMIN job list dan checklist-version list docs;
+- line/job assignment parameter names;
+- generated OpenAPI artifact diregenerasi.
+
+Route baru tanpa OpenAPI atau obsolete OpenAPI tanpa controller sekarang menggagalkan unit suite.
+
+## 4. Unit, Concurrency, dan Security Evidence
+
+Direct unit policy:
+
+- canonical JSON key ordering dan array-order preservation;
+- first/sequential/terminal External source versions;
+- allowlist fail-closed;
+- token 10/minute client/IP fixed window dan reset;
+- ingestion 300 burst/120 per minute refill;
+- `Retry-After` hanya pada denied request.
+
+Full integration suite tetap mencakup auth, cross-realm/tenant/role, CSRF/CORS, administration,
+master data/photo, shift, assignment, Henkaten 4M, approval, Man movement, finalization, notification,
+dashboard/audit/SSE, outbox retry/poison, dan External flows. Critical races memiliki exactly-one
+legal outcome. No test-detected Critical/High backend security gap remains.
+
+## 5. Migration dan Query Review
 
 Migration baru:
 
-- `apps/api/prisma/migrations/20260723000700_external_ingestion/migration.sql`
+- `apps/api/prisma/migrations/20260723000800_backend_read_indexes/migration.sql`
 
-Entity baru:
+Index baru:
 
-- `ExternalApiClient`;
-- `ExternalApiSecret`;
-- `ExternalAccessToken`;
-- `ExternalIngestionEvent`;
-- `ExternalHenkatenProjection`.
+- audit `(supplierId, occurredAt DESC, id DESC)`;
+- outbox/SSE `(supplierId, occurredAt, id)`;
+- External projection `(supplierId, updatedAt DESC, id DESC)`;
+- member `(supplierId, active, fullName, id)`;
+- job `(supplierId, lineId, active, displayOrder, id)`.
 
-`WarningInstance` sekarang menyimpan `sourceMode` dan exactly one of `henkatenId` atau
-`externalProjectionId`. Database menegakkan credential/projection uniqueness, positive versions,
-event/source-version uniqueness, dan raw-event update/delete prevention trigger.
+Compact `EXPLAIN (ANALYZE, BUFFERS)` menggunakan index-only scan untuk job, member, External
+projection, dan audit bounded reads. No cache/materialized view diperlukan.
 
-Fresh disposable PostgreSQL migration 001→007 lulus.
+## 6. Compact Baseline
 
-## 4. API dan Contract Changes
+Dedicated command: `pnpm test:baseline`.
 
-TMMIN credential/projection:
+Guard:
 
-- `GET|POST /api/v1/tmmin/suppliers/{supplierId}/external-clients`;
-- `POST /api/v1/tmmin/suppliers/{supplierId}/external-clients/{id}/rotate-secret`;
-- `POST /api/v1/tmmin/suppliers/{supplierId}/external-clients/{id}/revoke`;
-- `GET /api/v1/tmmin/suppliers/{supplierId}/external-projections`;
-- `GET /api/v1/tmmin/suppliers/{supplierId}/external-projections/{id}`.
+- database name wajib berakhir `_test`;
+- Supplier table wajib kosong;
+- baseline terpisah dari functional integration suite.
 
-External public boundary:
+Profile:
 
-- `POST /api/v1/external/auth/token`;
-- `POST /api/v1/external/henkaten/events`;
-- `POST /api/v1/external/henkaten/events/batch`;
-- `GET /api/v1/external/ingestions/{eventId}`.
+- 42 suppliers;
+- 20 lines, 300 members, 500 jobs per supplier;
+- 500 current External projections per supplier;
+- 1,000 permanent audit rows per supplier.
 
-TMMIN notifications:
+Measured local HTTP results:
 
-- `GET /api/v1/tmmin/notifications`;
-- `GET /api/v1/tmmin/notifications/unread-count`;
-- `PATCH /api/v1/tmmin/notifications/{id}/read-state`.
+| Workload | p50 | p95 | p99 | Error |
+|---|---:|---:|---:|---:|
+| TMMIN dashboard | 19.59 ms | 22.16 ms | 36.29 ms | 0% |
+| External projection list | 2.16 ms | 2.81 ms | 2.91 ms | 0% |
+| TMMIN audit | 9.21 ms | 11.74 ms | 12.00 ms | 0% |
+| Notification list | 1.08 ms | 1.87 ms | 2.12 ms | 0% |
+| Standard audited mutation | 2.51 ms | 3.36 ms | 4.89 ms | 0% |
+| External single ingest | 4.44 ms | 5.42 ms | 6.04 ms | 0% |
 
-## 5. Ingestion Behavior
-
-- First event harus `HENKATEN_OPENED`, status `OPEN`, source version 1.
-- Subsequent event harus exactly current + 1; gap/stale/terminal update ditolak.
-- Approved memerlukan Supervisor dan QC Approved; Rejected memerlukan reject evidence; Cancelled
-  memerlukan reason.
-- Semua checklist item harus `YES`, category payload harus match discriminator, dan unknown field
-  ditolak.
-- Exact retry mengembalikan `DUPLICATE`; same event ID/different canonical hash mengembalikan 409.
-- Concurrent identical first delivery menghasilkan exactly one raw event/projection side effect,
-  dengan outcome `ACCEPTED` + `DUPLICATE`.
-- Batch mixed result tidak me-rollback unrelated valid event.
-
-## 6. Monitoring, Notification, dan Privacy
-
-Global dashboard menggabungkan Hosted dan External category/outcome/open-warning counts serta
-accepted/rejected ingestion dan last-successful freshness. Open External projection membuka warning;
-terminal projection menutup warning. Outbox-derived notification dikirim idempotently ke active
-TMMIN Admin dan menggunakan TMMIN user-scoped notification endpoint.
-
-External event contract tidak memiliki Hosted member/registration/photo/account/contact/attendance/
-health/skill fields. Audit/log hanya menyimpan safe identity, result code, correlation, epoch, dan
-source IP; tidak ada secret, bearer, atau Authorization value.
+Ini preliminary sequential latency evidence untuk frontend readiness. 30-concurrent-user staging load,
+approval saturation, dan board/warning propagation tetap release gate kemudian.
 
 ## 7. Documentation
 
-- ADR 0018 mendefinisikan epoch-bound client/token, immutable ordered ingestion, projection, batch,
-  dan single-instance rate-limit decisions.
-- `docs/architecture/external-ingestion.md` mendokumentasikan authorization, event contract,
-  transaction/idempotency flow, batch, monitoring, abuse, dan privacy boundary.
-- Read-model architecture, PRD implementation status, dan roadmap diperbarui menjadi Phase 0–9.
+- ADR 0019 mendefinisikan executable contract freeze, allowed post-freeze changes, explicit
+  baseline project, dan evidence-based query evolution.
+- `docs/architecture/backend-contract-freeze.md` mendokumentasikan contract chain, version rules,
+  test layers, security boundary, dan change review.
+- `docs/architecture/backend-performance-baseline.md` mencatat repeatable profile, metrics,
+  query-plan evidence, serta interpretation boundary.
+- PRD implementation status dan roadmap diperbarui menjadi Phase 0–10.
 
 ## 8. Validation Selesai
 
@@ -122,56 +142,53 @@ Development validation:
 - formatter — passed;
 - lint — passed;
 - typecheck — passed;
-- unit — contracts 23, fixtures 6, API 7; 36 passed;
-- OpenAPI generation — passed;
-- disposable database reset + fresh migration 001→007 — passed;
-- full PostgreSQL integration — 5 files, 30 tests passed.
-
-Integration evidence mencakup seluruh prior auth/master/shift/Henkaten/approval/read-model behavior
-serta External secret storage, token, exact/conflicting retry, version gap, terminal projection,
-immutable evidence, partial batch, unified dashboard/warning, notification, concurrent identical
-delivery, dan immediate revocation.
+- unit — contracts 23, fixtures 6, API 14; 43 passed;
+- OpenAPI generation/reconciliation — 124 paths, 140 operations passed;
+- fresh migration 001→008 — passed;
+- upgrade migration 001→007 then 008 — passed, five new indexes verified;
+- full PostgreSQL integration — 5 files, 31 tests passed;
+- Compact baseline — 2 tests passed, all p95/error gates passed.
 
 ## 9. Final Local CI Parity
 
 Clean-artifact parity dijalankan dengan official Darwin arm64 Node.js `22.23.1` dan pnpm `11.16.0`.
-Existing build output, generated Prisma client, dan test-photo output dipindahkan ke isolated
-temporary artifact hold sebelum checks:
+Existing build output, generated Prisma client, dan local baseline/upgrade output dipindahkan ke
+isolated temporary artifact hold sebelum checks:
 
 - `pnpm install --frozen-lockfile`;
 - `pnpm format:check`;
 - `pnpm lint`;
 - `pnpm typecheck`;
-- `pnpm test:unit` — contracts 23, fixtures 6, API 7; 36 passed;
-- `pnpm openapi:check`;
+- `pnpm test:unit` — contracts 23, fixtures 6, API 14; 43 passed;
+- `pnpm openapi:check` — exact 140-operation reconciliation passed;
 - `pnpm build`;
 - `docker compose config --quiet`;
 - `pnpm db:up`, `pnpm db:wait`, dan `pnpm db:verify` — PostgreSQL 18.4, pgvector 0.8.5;
-- `pnpm db:test:reset` dan `pnpm db:test:migrate` — fresh migration 001→007 passed;
-- CI environment `pnpm test:integration` — 5 files, 30 tests passed;
+- `pnpm db:test:reset` dan `pnpm db:test:migrate` — fresh migration 001→008 passed;
+- CI environment `pnpm test:integration` — 5 files, 31 tests passed;
+- second fresh reset/migrate dan `pnpm test:baseline` — 2 tests, all p95/error/index-plan gates
+  passed;
 - `pnpm db:down`;
 - Gitleaks 8.24.3 directory scan — no leaks;
 - `git diff --check` — passed.
 
-Satu initial parity attempt mengalami transport-only `socket hang up` pada existing Hosted test tanpa
-application/database error. Fresh full-database rerun lulus 30/30. Compose down dan tidak ada dev
-server, watcher, test process, atau agent-started container.
+Compose down dan tidak ada dev server, watcher, test process, atau agent-started container.
 
 ## 10. Delivery
 
 Target commit:
 
-- `feat: add secure external henkaten ingestion`
+- `test: freeze and baseline backend contracts`
 
 Setelah commit: Gitleaks commit scan, push `staging`, dan inspect GitHub Actions `quality`,
 `database-integration`, serta `secret-scan` sampai green.
 
 ## 11. Next Recommended Batch
 
-Mulai backend contract freeze dan hardening:
+Mulai frontend/shared UI foundation:
 
-1. audit critical policy unit coverage dan consolidate race/failure evidence;
-2. reconcile implemented route inventory, Zod schemas, generated OpenAPI, enum/error names;
-3. review Compact-scale list/board/dashboard/warning/audit/notification/external query plans;
-4. capture repeatable p50/p95/p99 baseline and error rate;
-5. run security-negative matrix, resolve Critical/High gaps, and publish freeze boundary.
+1. scaffold supplier/TMMIN Vite workspaces dan shared UI package;
+2. generate typed API client dari frozen OpenAPI/shared Zod contract;
+3. implement session bootstrap, CSRF-aware mutation client, global problem mapping;
+4. establish accessible desktop tokens, loading/empty/error/forbidden/conflict/stale states;
+5. add frontend unit, build, and initial Playwright harness without changing frozen backend semantics.

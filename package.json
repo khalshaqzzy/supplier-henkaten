@@ -24,6 +24,7 @@
     "test": "pnpm test:unit",
     "test:unit": "pnpm generate && pnpm shared:build && pnpm -r --sort --if-present run test:unit",
     "test:integration": "pnpm generate && pnpm shared:build && pnpm --filter @tmmin-henkaten/api run test:integration",
+    "test:baseline": "pnpm generate && pnpm shared:build && pnpm --filter @tmmin-henkaten/api run test:baseline",
     "validate": "pnpm runtime:check && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm openapi:check && pnpm build",
     "db:up": "node scripts/database.mjs up",
     "db:wait": "node scripts/database.mjs wait",

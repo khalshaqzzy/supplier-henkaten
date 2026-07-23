@@ -200,7 +200,7 @@ export class ExternalService {
       client.supplier.active &&
       client.supplier.sourceMode === 'EXTERNAL' &&
       client.sourceEpoch === client.supplier.sourceEpoch &&
-      allowedIp(client.ipAllowlist, ip);
+      externalIpAllowed(client.ipAllowlist, ip);
     let verified = false;
     if (validClient && client) {
       const activeSecrets = client.secrets.filter(
@@ -292,7 +292,7 @@ export class ExternalService {
       token.sourceEpoch !== supplier.sourceEpoch ||
       client.sourceEpoch !== supplier.sourceEpoch ||
       !token.scopes.includes('henkaten:ingest') ||
-      !allowedIp(client.ipAllowlist, ip)
+      !externalIpAllowed(client.ipAllowlist, ip)
     ) {
       throw authenticationFailed();
     }
@@ -317,7 +317,7 @@ export class ExternalService {
     correlationId: string,
     ip: string,
   ) {
-    const payloadHash = createHash('sha256').update(canonicalJson(event)).digest('hex');
+    const payloadHash = createHash('sha256').update(canonicalizeExternalJson(event)).digest('hex');
     try {
       return await runSerializable(this.prisma, async (tx) => {
         await tx.$queryRaw`SELECT id FROM "Supplier" WHERE id = ${principal.supplierId}::uuid FOR UPDATE`;
@@ -358,7 +358,7 @@ export class ExternalService {
             },
           },
         });
-        assertOrdering(current, event);
+        assertExternalOrdering(current, event);
         const projection = current
           ? await tx.externalHenkatenProjection.update({
               where: { id: current.id },
@@ -599,7 +599,7 @@ function projectionData(event: ExternalHenkatenEvent) {
   };
 }
 
-function assertOrdering(
+export function assertExternalOrdering(
   current: { sourceVersion: number; status: string } | null,
   event: ExternalHenkatenEvent,
 ) {
@@ -706,18 +706,18 @@ function tokenHash(token: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(createHash('sha256').update(token).digest());
 }
 
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+export function canonicalizeExternalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalizeExternalJson).join(',')}]`;
   if (value && typeof value === 'object') {
     return `{${Object.entries(value as Record<string, unknown>)
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`)
+      .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalizeExternalJson(entry)}`)
       .join(',')}}`;
   }
   return JSON.stringify(value);
 }
 
-function allowedIp(allowlist: string[], ip: string): boolean {
+export function externalIpAllowed(allowlist: string[], ip: string): boolean {
   return allowlist.length === 0 || allowlist.includes(ip);
 }
 
