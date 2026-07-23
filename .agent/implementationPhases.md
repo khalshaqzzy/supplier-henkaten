@@ -26,11 +26,11 @@ Roadmap tidak memberikan estimasi waktu. Urutan didasarkan pada dependency dan r
 
 ## 2. Current Repository Status
 
-Kondisi repository setelah Phase 0-4:
+Kondisi repository setelah Phase 0-6:
 
 - branch aktif: `staging`;
 - `.agent/PRD.md` tersedia dan menjadi product contract;
-- dua belas ADR dan empat architecture/security baseline tersedia;
+- empat belas ADR dan empat architecture/security baseline tersedia;
 - Node.js 22.23.1 + pnpm 11.16.0 ESM workspace tersedia;
 - active workspace: NestJS API, shared contracts, dan deterministic test fixtures;
 - strict TypeScript, ESLint, Prettier, Vitest, root validation, dan lockfile tersedia;
@@ -47,12 +47,17 @@ Kondisi repository setelah Phase 0-4:
   TMMIN read-only access;
 - minimum Hosted configuration contributor Phase 4 telah aktif dan tetap fail-closed terhadap
   contributor External Phase 9;
+- durable Shift Run plan, atomic normal/emergency Start Shift, Working Assignment snapshot,
+  Assignment Issue foundation, scoped query, reference protection, dan operational cutover
+  contributor telah tersedia;
+- immutable Hosted Henkaten 4M, checklist evidence, idempotent identifier allocation, warning
+  aggregation, MP reservation, Withdraw + Clone, dan TMMIN read-only query telah tersedia;
 - belum ada frontend, Playwright E2E, atau remote deployment files;
 - materi slide tersedia sebagai reference-only input.
 
-Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, dan Phase 4**
+Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, dan Phase 6**
 Current phase: **tidak ada**
-Next phase: **Phase 5 - Shift dan Working Assignment Backend (`planned`)**
+Next phase: **Phase 7 - Approval, Man Cascade, dan Shift Finalization Backend (`planned`)**
 
 Tidak ada application behavior yang boleh ditandai implemented sampai source code dan acceptance checks terkait benar-benar tersedia di repository.
 
@@ -1420,7 +1425,7 @@ Phase 4 exit criteria:
 
 ## 13. Phase 5 - Shift dan Working Assignment Backend
 
-Status: **planned**
+Status: **done**
 
 Goal: mengimplementasikan Shift Run, assignment snapshot, preflight, hard gates, override, dan Assignment Issue foundation.
 
@@ -1434,7 +1439,7 @@ Unlocks:
 
 ### 5.1 Shift Run Schema dan State Machine
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 4.
 
@@ -1462,7 +1467,7 @@ Exit criteria:
 
 ### 5.2 Working Assignment Snapshot
 
-Status: **planned**
+Status: **done**
 
 Dependency: 5.1 dan Phase 4.7.
 
@@ -1490,7 +1495,7 @@ Exit criteria:
 
 ### 5.3 Preflight Engine dan Hard Gates
 
-Status: **planned**
+Status: **done**
 
 Dependency: 5.1-5.2.
 
@@ -1524,7 +1529,7 @@ Exit criteria:
 
 ### 5.4 Emergency Start Shift Override
 
-Status: **planned**
+Status: **done**
 
 Dependency: 5.3.
 
@@ -1553,7 +1558,7 @@ Exit criteria:
 
 ### 5.5 Assignment Issue Foundation
 
-Status: **planned**
+Status: **done**
 
 Dependency: 5.2.
 
@@ -1582,7 +1587,7 @@ Exit criteria:
 
 ### 5.6 Pre-start Resolution Contract
 
-Status: **planned**
+Status: **done**
 
 Dependency: 5.3 dan 5.5.
 
@@ -1609,7 +1614,7 @@ Exit criteria:
 
 ### 5.7 Shift Query dan Permission Tests
 
-Status: **planned**
+Status: **done**
 
 Dependency: 5.1-5.6.
 
@@ -1644,9 +1649,10 @@ Phase 5 exit criteria:
 
 ## 14. Phase 6 - Henkaten Core Backend
 
-Status: **planned**
+Status: **done**
 
-Goal: mengimplementasikan Henkaten record, checklist snapshot, non-Man flows, warning, query/history, dan Withdraw + Clone.
+Goal: mengimplementasikan Henkaten record, checklist snapshot, seluruh 4M flow, MP reservation,
+warning, query/history, dan Withdraw + Clone.
 
 Depends on:
 
@@ -1659,7 +1665,7 @@ Unlocks:
 
 ### 6.1 Henkaten Schema, Identifier, dan Snapshot
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 5.
 
@@ -1689,7 +1695,7 @@ Exit criteria:
 
 ### 6.2 Lifecycle dan Transition Guards
 
-Status: **planned**
+Status: **done**
 
 Dependency: 6.1.
 
@@ -1718,7 +1724,7 @@ Exit criteria:
 
 ### 6.3 Checklist Snapshot dan All-Yes Enforcement
 
-Status: **planned**
+Status: **done**
 
 Dependency: 6.1 dan Phase 4.6.
 
@@ -1746,7 +1752,7 @@ Exit criteria:
 
 ### 6.4 Machine, Material, dan Method Submission
 
-Status: **planned**
+Status: **done**
 
 Dependency: 6.1-6.3.
 
@@ -1776,7 +1782,7 @@ Exit criteria:
 
 ### 6.5 Man Submission Contract tanpa Movement
 
-Status: **planned**
+Status: **done**
 
 Dependency: 6.1-6.3 dan Working Assignment.
 
@@ -1787,7 +1793,8 @@ Execution:
 - Validate replacement MP role/tenant/active.
 - Reject same replaced/replacement.
 - Store assignment versions and source-job reference.
-- Do not apply move or reservation yet; Phase 7 owns both atomically.
+- Create MP reservation atomically with submission and leave Working Assignment unchanged.
+- Enforce active replacement-MP and target-Working-Assignment uniqueness.
 - Define submission service extension point.
 
 Verification:
@@ -1795,6 +1802,7 @@ Verification:
 - Invalid target/replacement rejected.
 - Cross-supplier MP rejected.
 - Stale assignment version rejected.
+- Concurrent reservation race leaves one winner.
 
 Data/migration impact:
 
@@ -1802,11 +1810,11 @@ Data/migration impact:
 
 Exit criteria:
 
-- Man payload/context stable for reservation implementation.
+- Man payload/context and reservation are stable for Phase 7 approval/movement.
 
 ### 6.6 Warning Instance dan Affected-part Aggregation
 
-Status: **planned**
+Status: **done**
 
 Dependency: 6.2.
 
@@ -1835,7 +1843,7 @@ Exit criteria:
 
 ### 6.7 List, Detail, Filter, dan History APIs
 
-Status: **planned**
+Status: **done**
 
 Dependency: 6.1-6.6.
 
@@ -1863,7 +1871,7 @@ Exit criteria:
 
 ### 6.8 Withdraw + Clone
 
-Status: **planned**
+Status: **done**
 
 Dependency: 6.2-6.7.
 
@@ -1872,6 +1880,7 @@ Execution:
 - Restrict Withdraw to LL own line and Open record.
 - Require reason.
 - Transition to CANCELLED.
+- Release only the withdrawn Henkaten's active reservation.
 - Close warning and emit event.
 - Define clone-prefill response.
 - Revalidate latest checklist and assignment on new submit.
@@ -1893,7 +1902,7 @@ Exit criteria:
 
 ### 6.9 Terminal Immutability dan Henkaten Core Tests
 
-Status: **planned**
+Status: **done**
 
 Dependency: 6.1-6.8.
 
@@ -1919,7 +1928,7 @@ Exit criteria:
 Phase 6 exit criteria:
 
 - Semua category dapat disubmit dan ditelusuri.
-- Warning, immutable snapshot, dan correction flow complete.
+- Warning, immutable snapshot, MP reservation, dan correction flow complete.
 - Approval routes dan Man movement belum dinyatakan complete.
 
 ---
@@ -1928,7 +1937,8 @@ Phase 6 exit criteria:
 
 Status: **planned**
 
-Goal: menyelesaikan high-risk transactional behavior: parallel approval, reject-fast, MP reservation/movement, cascade vacancy, pre-start resolution, dan End Shift.
+Goal: menyelesaikan high-risk transactional behavior: parallel approval, reject-fast, reservation
+finalization/Man movement, cascade vacancy, pre-start resolution, dan End Shift.
 
 Depends on:
 
@@ -2028,7 +2038,7 @@ Exit criteria:
 
 - No lost update atau double decision.
 
-### 7.4 MP Reservation
+### 7.4 MP Reservation Finalization Integration
 
 Status: **planned**
 
@@ -2036,22 +2046,20 @@ Dependency: Phase 6.5 dan 7.3.
 
 Execution:
 
-- Create reservation within Man submission transaction.
-- Enforce one active reservation per MP.
-- Enforce one active target-job Man change.
-- Store source/target assignment version.
-- Release on Rejected/Cancelled.
-- Expose reservation state to preflight/read models.
+- Reuse the Phase 6 reservation and source/target assignment versions.
+- Release reservation on Rejected and End Shift cancellation.
+- Integrate reservation verification/release with final approval and movement.
+- Preserve Phase 6 release-on-Withdraw behavior.
 
 Verification:
 
-- Concurrent reservation race leaves one winner.
-- Rejected/Withdraw frees MP.
-- Stale assignment blocks reservation.
+- Rejected and End Shift free the MP.
+- Approval/reject/end races leave one valid reservation outcome.
+- Stale assignment blocks approval finalization.
 
 Data/migration impact:
 
-- MPReservation table and partial unique indexes.
+- Approval/finalization references only; MPReservation table and partial indexes already exist.
 
 Exit criteria:
 

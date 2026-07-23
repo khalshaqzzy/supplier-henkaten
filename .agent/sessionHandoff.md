@@ -1,266 +1,234 @@
-# Session Handoff — Phase 4
+# Session Handoff — Shift, Working Assignment, and Hosted Henkaten Core
 
 Tanggal: 2026-07-23
 Branch: `staging`
-Status repository: Phase 0–4 selesai; Phase 5 `planned`
-Phase 4 commit: `4137545 feat: add hosted supplier master data management`
-CI remediation target: `fix: make CI validation hermetic`
+Status repository: Phase 0–6 selesai; Phase 7 `planned`
 
 ## 1. Outcome
 
-Phase 4 menambahkan backend Supplier Master Data lengkap untuk tenant Hosted dan Hosted
-Preparation:
+Backend operasional Hosted sekarang mencakup:
 
-- member Supervisor, Line Leader, MP, dan QC dengan permanent logical retention;
-- linked operational account dan one-time temporary credential untuk Supervisor/LL/QC; MP tetap
-  tanpa akun;
-- private member-photo upload, normalization, thumbnail, authenticated delivery, dan asynchronous
-  old-file cleanup;
-- line, job, part, dan configurable Shift Template;
-- persisted checklist draft serta immutable published version untuk MAN/MACHINE/MATERIAL/METHOD;
-- typed Default Assignment untuk Supervisor per line, satu LL per line, dan satu MP per job;
-- optimistic concurrency, active-capacity limits, deactivation/reference protection, audit, dan
-  tenant/source boundary;
-- read-only cross-tenant master-data API untuk TMMIN Admin dan TMMIN Quality sesuai privacy policy;
-- real Phase 4 minimum Hosted configuration contributor untuk source cutover.
+- durable `ShiftRun` slot untuk supplier + line + Shift Template + business date;
+- IANA/DST-aware UTC boundary, atomic normal Start Shift, dan audited emergency start;
+- immutable Default Assignment snapshot menjadi `WorkingAssignment`;
+- vacancy/conflict/reserved representation tanpa duplicate effective MP;
+- durable `AssignmentIssue` foundation dan pre-start resolution read context;
+- persisted preflight check, commit-time recalculation, query scope, reference protection, dan
+  operational source-cutover blocker;
+- immutable Hosted Henkaten untuk MAN/MACHINE/MATERIAL/METHOD;
+- latest published checklist validation dan all-YES evidence snapshot;
+- transactional Hosted identifier, idempotency, lifecycle history, warning, audit, dan outbox;
+- atomic Man MP reservation tanpa mengubah Working Assignment sebelum final approval;
+- warning-instance dan normalized affected-part aggregation;
+- scoped list/detail/history, Withdraw, dan Clone prefill;
+- read-only Shift/Henkaten/warning APIs untuk TMMIN Admin dan TMMIN Quality.
 
-Tidak ada Shift Run, Working Assignment, Henkaten, frontend, External ingestion, atau deployment
-yang dibuat pada phase ini.
+Approval decision, release reservation saat Reject/End, approved Man movement/cascade, pre-start
+Man execution, Assignment Issue resolution melalui verified Man workflow, dan End Shift tetap
+milik Phase 7.
 
-## 2. Product dan Security Decisions
+## 2. Locked Decisions
 
-- Seluruh master data permanen sejak dibuat. Tidak ada public hard-delete endpoint.
-- Member role immutable. Koreksi role dilakukan dengan deactivate lalu create replacement.
-- Active capacity per supplier adalah 300 member, 20 line, dan 500 job; capacity-changing
-  transaction mengunci Supplier row.
-- Nomor registrasi, line code, job name dalam line, part number, dan supplier username memakai
-  normalized uniqueness yang tetap reserved setelah deactivation.
-- Supplier Admin `NORMAL` hanya dapat mutate tenant aktif ber-mode `HOSTED`.
-- Supplier Admin dengan purpose `HOSTED_PREPARATION` dapat mengelola konfigurasi Phase 4 ketika
-  preparation dan source epoch masih valid; operational writes tetap belum tersedia.
-- Pure `EXTERNAL` tanpa preparation ditolak dengan `SOURCE_MODE_MISMATCH`.
-- TMMIN Admin dapat membaca Hosted dan active Hosted Preparation; TMMIN Quality hanya dapat membaca
-  Hosted. Semua privileged read menulis safe audit tanpa nilai PII.
-- TMMIN Quality dapat melihat Hosted member name, registration number, dan photo, tetapi tidak
-  username, credential, normalized lookup field, session, atau hash.
-- Supervisor/LL/QC belum memperoleh broad master-data read API. Role-scoped operational board
-  menjadi milik Phase 8.
-
-PRD, domain model, state machine, events/errors, privacy baseline, dan roadmap telah diselaraskan.
+- Satu permanent Shift Run row mewakili satu slot. Repeated preflight hanya refresh plan
+  `NOT_STARTED`; Active snapshot tidak dibangun ulang.
+- Setiap active Job wajib memiliki candidate MP karena v1 belum memiliki optional-job flag.
+- PostgreSQL partial uniqueness menjaga satu Active shift per line, satu Active shift per effective
+  LL, satu effective MP, satu Open issue per job, dan satu active reservation per replacement/target.
+- Emergency start missing default LL wajib membawa active substitute LL. Substitute hanya
+  disimpan pada Shift Run dan tidak mengubah Default Assignment.
+- Override menyimpan original failed checks. Candidate bermasalah menjadi VACANT/CONFLICTED/RESERVED
+  non-effective row dan menghasilkan Open Assignment Issue.
+- Start selalu menghitung ulang source epoch, master/account, defaults, assignment availability,
+  checklist, issue, Open Henkaten, dan reservation di transaction.
+- Henkaten line selalu diturunkan dari Active Shift Run milik authenticated LL.
+- Hosted create memerlukan `Idempotency-Key` per supplier + creator dan canonical request hash.
+- Man reservation dibuat dalam transaction submission dan menyimpan Shift Run end boundary;
+  Working Assignment belum bergerak.
+- Withdraw hanya owner LL, hanya Open, version-checked, dan atomically release reservation serta
+  close warning instance miliknya.
+- Affected-part grouping menggunakan supplier + normalized part-number snapshot.
+- Clone tidak membawa accepted answers; latest checklist dan current master/assignment validity
+  dikembalikan untuk prefill.
 
 ## 3. Persistence dan Migration
 
 Migration baru:
 
-- `apps/api/prisma/migrations/20260723000200_supplier_master_data/migration.sql`
+- `apps/api/prisma/migrations/20260723000300_shift_henkaten_core/migration.sql`
+- `apps/api/prisma/migrations/20260723000400_operational_tenant_boundaries/migration.sql`
 
 Entity baru:
 
-- `Member`, `MemberPhoto`;
-- `Line`, `Job`, `Part`, `ShiftTemplate`;
-- `ChecklistTemplate`, `ChecklistDraftItem`, `ChecklistVersion`, `ChecklistVersionItem`;
-- `DefaultAssignmentSet`, `DefaultLineSupervisor`, `DefaultLineLeader`, `DefaultJobMp`.
+- `ShiftRun`, `WorkingAssignment`, `AssignmentIssue`;
+- `HenkatenDailySequence`, `Henkaten`;
+- `HenkatenChecklistSnapshot`, `HenkatenChecklistAnswer`;
+- `ManHenkatenDetail`, `MPReservation`, `WarningInstance`, `HenkatenTransition`.
 
-`User.memberId` menghubungkan operational account ke non-MP member. Composite supplier-aware
-foreign keys mencegah relasi lintas tenant. PostgreSQL trigger menolak perubahan `Member.role` dan
-UPDATE/DELETE terhadap published checklist versions/items. Foreign key memakai restrictive
-deletion; tidak ada cascade business-data delete.
+Defense-in-depth:
 
-Migration berhasil:
+- supplier-aware composite foreign keys untuk operational master/context references;
+- partial unique indexes untuk Active Shift/LL/effective MP/Open issue/active reservation;
+- Henkaten evidence dan transition UPDATE/DELETE prevention triggers;
+- immutable context dan terminal Henkaten trigger;
+- state/check constraints untuk shift snapshot, assignments, issue resolution, Henkaten terminal
+  state, Man references, reservations, dan warnings.
 
-- upgrade main database dari Phase 3 ke Phase 4;
-- fresh disposable test database dengan migration Phase 3 + Phase 4;
-- repeated `migrate deploy` tanpa pending migration.
+Migration evidence:
 
-## 4. API dan Contracts
+- upgrade main local database dari schema Phase 4 melalui migration 003 lalu 004 berhasil;
+- fresh disposable database dengan migration 001–004 berhasil;
+- Prisma client generation dan strict typecheck berhasil.
 
-Supplier routes berada di `/api/v1/supplier/master-data`:
+## 4. Supplier API
 
-- member list/detail/create/update/activate/deactivate;
-- linked account update/activate/deactivate/reset-password;
-- photo upload/remove dan full/thumbnail delivery;
-- line, nested job, part, dan Shift Template CRUD/status/reorder;
-- checklist draft/update/publish/version/status;
-- Default Assignment read serta Supervisor/LL/MP assign/change/move/remove.
+Shift:
 
-TMMIN read-only routes berada di
-`/api/v1/tmmin/suppliers/{supplierId}/master-data` untuk member/photo, line/job, part, Shift
-Template, published checklist, dan current Default Assignment.
+- `GET /api/v1/supplier/shifts`
+- `GET /api/v1/supplier/shifts/current`
+- `POST /api/v1/supplier/shifts/preflight`
+- `GET /api/v1/supplier/shifts/assignment-issues`
+- `GET /api/v1/supplier/shifts/{id}`
+- `GET /api/v1/supplier/shifts/{id}/preflight`
+- `GET /api/v1/supplier/shifts/{id}/working-assignments`
+- `GET /api/v1/supplier/shifts/{id}/assignment-issues`
+- `GET /api/v1/supplier/shifts/{id}/resolution-context`
+- `POST /api/v1/supplier/shifts/{id}/start`
+- `POST /api/v1/supplier/shifts/{id}/emergency-start`
 
-Shared Zod contracts menambahkan master-data enums, schemas, pagination/search/filter/sort,
-multipart/binary photo interface, capability, domain-event vocabulary, dan errors:
+Henkaten:
 
-- `CAPACITY_EXCEEDED`;
-- `RESOURCE_IN_USE`;
-- `IMMUTABLE_FIELD`;
-- `INVALID_IMAGE`;
-- `CHECKLIST_NOT_PUBLISHED`.
+- `GET|POST /api/v1/supplier/henkatens`
+- `GET /api/v1/supplier/henkatens/{id}`
+- `GET /api/v1/supplier/henkatens/{id}/history`
+- `POST /api/v1/supplier/henkatens/{id}/withdraw`
+- `GET /api/v1/supplier/henkatens/{id}/clone-prefill`
 
-Committed OpenAPI 3.1 telah diregenerasi dan runtime memuat 71 paths.
+Authorization:
 
-## 5. Member Photo Boundary
+- Supplier Admin: all-line read dan emergency start; tidak dapat submit/withdraw/approve.
+- LL: own snapshotted line plan/start/read serta submit/withdraw.
+- Supervisor: supervised snapshotted-line read.
+- QC: tenant-wide read.
+- Hosted Preparation dan stale/wrong source epoch tidak dapat melakukan operational write.
 
-Dependencies:
+## 5. TMMIN Read-only API
 
-- `sharp@0.35.3`;
-- `multer@2.2.0`;
-- `@types/multer@2.2.0`.
+- `GET /api/v1/tmmin/suppliers/{supplierId}/shifts`
+- `GET /api/v1/tmmin/suppliers/{supplierId}/shifts/{id}`
+- `GET /api/v1/tmmin/suppliers/{supplierId}/henkatens`
+- `GET /api/v1/tmmin/suppliers/{supplierId}/henkatens/{id}`
+- `GET /api/v1/tmmin/suppliers/{supplierId}/henkatens/warnings`
+- `GET /api/v1/tmmin/suppliers/{supplierId}/henkatens/warnings/{warningId}`
+- `GET /api/v1/tmmin/warnings/affected-parts`
+- `GET /api/v1/tmmin/warnings/affected-parts/{supplierId}/{partNumber}`
 
-Runtime configuration:
+TMMIN Admin dan TMMIN Quality hanya memperoleh read capability; tidak ada submission, withdrawal,
+shift operation, atau approval authority.
 
-- `PHOTO_STORAGE_ROOT`, default local `.local/uploads/member-photos`.
+## 6. Preflight Checks
 
-Pipeline:
+Persisted/returned check codes:
 
-- single multipart field `photo`, maksimum 2 MiB;
-- JPEG/PNG/WebP dengan MIME dan decoded format yang cocok;
-- corrupt, animated/multi-page, dan gambar di atas 25 megapixel ditolak;
-- EXIF orientation dinormalisasi dan metadata dibuang;
-- full WebP maksimal 1024×1024 quality 82 tanpa enlargement;
-- thumbnail WebP 256×256 center-crop quality 80;
-- generated opaque paths pada private persistent root;
-- temporary write dan atomic rename pada volume yang sama;
-- replacement/removal menandai old metadata dan enqueue idempotent cleanup;
-- delivery setelah database authorization dengan `image/webp`, private cache, ETag, dan `nosniff`;
-- readiness memeriksa storage root writable.
+- `ACTIVE_SHIFT_EXISTS`
+- `LINE_INACTIVE`
+- `SHIFT_TEMPLATE_INACTIVE`
+- `SUPERVISOR_MISSING`
+- `LINE_LEADER_MISSING`
+- `LINE_LEADER_CONFLICT`
+- `REQUIRED_JOB_VACANT`
+- `DUPLICATE_MP`
+- `MP_INACTIVE`
+- `MP_ACTIVE_ELSEWHERE`
+- `MP_RESERVED`
+- `ASSIGNMENT_ISSUE_OPEN`
+- `OPEN_HENKATEN_CARRY_OVER`
+- `CHECKLIST_INVALID`
+- `STALE_PLANNED_ASSIGNMENT`
+- `SOURCE_EPOCH_STALE`
 
-Tidak ada backup photo volume; accepted critical recovery risk tetap berlaku.
+Emergency override tidak dapat melewati source validity, inactive line/template, slot/Active line,
+Active LL uniqueness, stale plan, atau stale source epoch.
 
-## 6. Checklist, Assignment, dan Cutover
+## 7. Validation Evidence
 
-- Checklist template dibuat lazily per supplier/category.
-- Draft adalah persisted working copy dan replacement menaikkan template version.
-- Publish memerlukan minimal satu unique normalized item dan menghasilkan immutable numbered
-  version.
-- Semua empat current active published categories wajib agar Hosted cutover eligible.
-- Default Assignment menggunakan typed relations dan supplier-level monotonic assignment-set
-  version.
-- Supervisor dapat memegang beberapa line; LL maksimal satu line; MP maksimal satu job.
-- LL/MP move melepas donor dan mengisi target dalam satu transaction.
-- Default mutation tidak membuat Henkaten atau Working Assignment.
-- Phase 4 contributor memeriksa active Supplier Admin, line+Supervisor+LL, job+MP, part, Shift
-  Template, dan empat published checklist.
-- Phase 9 contributor tetap blocking, sehingga production source cutover belum dapat diselesaikan.
+Targeted checks yang sudah lulus:
 
-## 7. Documentation dan ADR
+- strict shared-contract dan API typecheck;
+- lint setelah Prisma/shared generation;
+- migration 003 upgrade path;
+- migration 004 upgrade path;
+- migration 001–004 fresh disposable path;
+- operational PostgreSQL/Supertest suite: 9 tests.
 
-ADR baru:
+Operational suite membuktikan:
 
-- `0011-permanent-master-data-and-member-account-lifecycle.md`;
-- `0012-versioned-checklists-and-typed-default-assignments.md`.
+- concurrent preflight menghasilkan satu durable slot;
+- concurrent Start menghasilkan satu winner;
+- snapshot Active tidak berubah setelah default update;
+- stale plan diblokir pada commit dan blocked audit tetap tersimpan;
+- substitute-LL override membuat visible vacancy issue;
+- keempat category 4M, all-YES, idempotency, dan concurrent sequence;
+- stable filtered keyset pagination setelah concurrent insert;
+- Man reservation conflict dan unchanged Working Assignment;
+- Withdraw release reservation dan close warning secara atomik;
+- multiple Open warning mempertahankan affected-part state;
+- immutable evidence/context/terminal database guards;
+- role, source-purpose, tenant, dan TMMIN read-only boundary;
+- reference deactivation dan operational source cutover blocker.
 
-ADR yang diperbarui:
+Full clean-artifact CI parity command/result dicatat setelah final validation pada section 10.
 
-- 0003 tenant isolation dan privileged read;
-- 0005 master-data lock ordering;
-- 0007 photo validation/storage/cleanup;
-- 0010 real Phase 4 cutover contributor.
+## 8. Documentation
 
-Kedua ADR baru memuat actual validation evidence. README dan `.env.example` memuat photo storage
-serta Phase 4 development surface.
-
-## 8. Verification Evidence
-
-Semua verification dijalankan dengan Node.js `22.23.1`.
-
-Unit:
-
-- contracts: 14 passed;
-- deterministic fixtures: 6 passed;
-- API unit: 5 passed.
-
-PostgreSQL integration/Supertest:
-
-- 3 test files;
-- 11 tests passed;
-- fresh/upgrade migration, tenant constraints, immutable triggers, account/member linkage,
-  one-time credential, pure External/Hosted Preparation boundaries, default assignments, checklist
-  publish, malformed/cross-tenant photo denial, photo processing/delivery, privileged PII-read
-  audit, and cutover contributor covered.
-
-Quality/database commands yang lulus:
-
-- `pnpm install --frozen-lockfile`;
-- `pnpm format:check`;
-- `pnpm lint`;
-- `pnpm typecheck`;
-- `pnpm test:unit`;
-- `pnpm db:verify`;
-- `pnpm db:test:reset`;
-- `pnpm db:test:migrate`;
-- `pnpm test:integration`;
-- `pnpm openapi:check`;
-- `pnpm build`;
-- `pnpm validate`;
-- `docker compose config --quiet`;
-- `git diff --check`.
-
-Runtime smoke:
-
-- `/health` → `200`;
-- `/ready` → `200`, checks database, migrations, dan photo storage semuanya `ready`;
-- `/api/v1/openapi.json` → valid OpenAPI 3.1 dengan 71 paths.
-
-API smoke process dihentikan setelah verifikasi. Local Docker container dihentikan pada final
-cleanup tanpa menghapus persistent main volume.
+- PRD implementation status menjadi Phase 0–6 dan substitute-LL/idempotency rules dinormalkan.
+- Roadmap Phase 5–6 `done`; reservation creation + Withdraw release dipindah ke Phase 6.
+- Phase 7.4 sekarang hanya melengkapi Reject/End/final-approval reservation integration.
+- ADR 0013 mencatat durable shift slot/preflight/Working Assignment.
+- ADR 0014 mencatat Henkaten aggregate/reservation/warning transaction boundary.
+- ADR 0005/0010/0011/0012 diperbarui dengan lock, cutover, reference, dan snapshot evidence.
 
 ## 9. Intentional Deferrals
 
-- Phase 5: Shift Run, Working Assignment snapshot, preflight, hard gate, emergency override,
-  Assignment Issue.
-- Phase 6–7: Henkaten, approval, reservation, Man movement, End Shift finalization.
-- Phase 8: board, notification, SSE, dashboard, audit read APIs.
-- Phase 9: External credentials/ingestion dan final source-cutover contributors.
-- Phase 10: backend contract freeze/performance/security hardening.
-- Phase 11+: frontend, E2E, containers, deployment, dan UAT.
+- approval decision dan persisted approval routes;
+- reject-fast/final Approved lifecycle;
+- approved Man movement dan movement ledger;
+- cross-line cascade vacancy dan verified issue resolution;
+- pre-start Man execution;
+- End Shift;
+- notification delivery, SSE, Assignment Board, dashboard, dan audit UI/read views;
+- frontend, External ingestion, deployment, dan UAT.
 
-Phase 5–7 harus memperluas reference protection untuk active Shift Run, Working Assignment, Open
-Henkaten, dan reservation.
+## 10. Final CI Parity
 
-## 10. Next Recommended Batch
+Clean-artifact parity dijalankan dengan Node.js `22.23.1` dan pnpm `11.16.0`:
 
-Mulai Phase 5.1:
+- `pnpm clean`
+- `pnpm install --frozen-lockfile`
+- `pnpm format:check`
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test:unit` — contracts 17, fixtures 6, API unit 7; semuanya lulus
+- `pnpm openapi:check` — lulus; committed OpenAPI 3.1 memiliki 95 paths
+- `pnpm build` — seluruh workspace lulus
+- `docker compose config --quiet`
+- `pnpm db:up && pnpm db:wait && pnpm db:verify`
+- `pnpm db:test:reset && pnpm db:test:migrate` — fresh migration 001–004 lulus
+- full `pnpm test:integration` — 20 tests lulus
+- `pnpm db:down`
+- Gitleaks `8.24.3` working-tree directory scan — no leaks
+- `git diff --check` — lulus
 
-1. expand-only migration untuk `ShiftRun`, `WorkingAssignment`, dan `AssignmentIssue`;
-2. implement Shift Run state machine dan one-active-shift-per-line invariant;
-3. snapshot Default Assignment set/version saat Start Shift;
-4. implement preflight vacancy/conflict/carry-over hard gates;
-5. implement audited emergency override dengan required reason;
-6. expose shift list/detail/current queries dan real PostgreSQL concurrency tests.
+Compose stack telah dihentikan dan tidak ada dev server, watcher, test process, atau container yang
+ditinggalkan.
 
-Jangan memulai Henkaten, frontend, External ingestion, atau deployment sebelum dependency phase
-masing-masing terpenuhi.
+## 11. Next Recommended Batch
 
-## 11. CI Failure Remediation
+Mulai Phase 7.1:
 
-GitHub Actions run `29991802871` untuk commit Phase 4 diinspeksi menggunakan `gh` CLI. Ketiga job
-gagal dengan akar masalah berikut:
-
-- `quality`: `pnpm lint` bergantung pada generated Prisma client yang hanya tersedia dari local
-  run sebelumnya. Clean GitHub checkout menghasilkan type-resolution failures.
-- `database-integration`: `pnpm test:integration` membuat Prisma client tetapi tidak membuild
-  `@tmmin-henkaten/contracts`, sehingga Vitest tidak dapat me-resolve package export pada clean
-  checkout.
-- `secret-scan`: Gitleaks `8.24.3` mendeteksi false positive pada frasa dokumentasi
-  `signature/MIME checks` di ADR 0007.
-
-Remediation:
-
-- root `lint`, `openapi:check`, dan `test:integration` sekarang menghasilkan/build prerequisite
-  sendiri;
-- Gitleaks dipin ke `8.24.3`, safe CI-only test values di-allowlist secara exact, historical
-  false-positive fingerprint diabaikan secara exact, dan kalimat ADR diperjelas;
-- `.agent/rules.md` sekarang mewajibkan local GitHub Actions parity checks dari clean-artifact
-  state sebelum commit, pre-commit working-tree Gitleaks scan, dan `gh` verification setelah push;
-- ADR 0001 mencatat hermetic workspace-command requirement.
-
-Actual local parity evidence:
-
-- generated Prisma client dan semua workspace `dist` directories dihapus;
-- frozen install, format, lint, typecheck, unit, OpenAPI drift, dan build lulus;
-- generated Prisma client dan shared `dist` dihapus lagi sebelum database job;
-- Compose validation, PostgreSQL 18/pgvector verification, fresh migrations, dan 11 integration
-  tests lulus;
-- Gitleaks `8.24.3` directory scan lulus tanpa finding;
-- Gitleaks commit scan terhadap commit Phase 4 lulus dengan exact historical false-positive
-  fingerprint handling.
+1. add immutable Supervisor/QC approval decision persistence;
+2. implement parallel route decision dan reject-fast finalization;
+3. integrate existing reservation dengan Reject, End Shift, dan final Approved;
+4. apply approved Man movement atomically tanpa mengubah Default Assignment;
+5. create cascade Assignment Issue dan resolve hanya melalui verified Man workflow;
+6. implement pre-start resolution execution dan End Shift;
+7. complete approval/withdraw/end/movement race suite.

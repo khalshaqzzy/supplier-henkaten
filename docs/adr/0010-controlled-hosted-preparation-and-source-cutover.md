@@ -83,3 +83,8 @@ typed default assignments, active linked members/accounts, and published checkli
 categories. The External credential/projection contributor remains fail-closed until its owning
 implementation is available. Phase 13 exposes preflight blockers and preparation/cutover controls
 to TMMIN Admin.
+
+The `hosted-operational-state` contributor blocks source cutover while any Hosted Shift Run is
+Active, Henkaten is Open, or MP reservation is active. Operational write routes also require a
+normal Hosted session whose source epoch still equals the Supplier epoch; Hosted Preparation
+cannot start shifts or submit/withdraw Henkaten.

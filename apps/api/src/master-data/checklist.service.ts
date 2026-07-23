@@ -161,6 +161,19 @@ export class ChecklistService {
     const updated = await this.prisma.$transaction(async (tx) => {
       const template = await this.ensureTemplate(scope.supplierId, category, tx);
       if (template.version !== expectedVersion) throw versionConflict();
+      if (
+        !active &&
+        (await tx.shiftRun.count({
+          where: { supplierId: scope.supplierId, status: 'ACTIVE' },
+        }))
+      ) {
+        throw new ProblemException({
+          status: 409,
+          code: 'RESOURCE_IN_USE',
+          title: 'Resource is in use',
+          detail: 'Checklist configuration is required by an active Shift Run.',
+        });
+      }
       const row = await tx.checklistTemplate.update({
         where: { id: template.id },
         data: { active, version: { increment: 1 }, updatedById: context.actorUserId },

@@ -57,6 +57,26 @@ import {
   updateMemberRequestSchema,
   updatePartRequestSchema,
   updateShiftTemplateRequestSchema,
+  affectedPartPageSchema,
+  affectedPartDetailSchema,
+  assignmentIssuePageSchema,
+  clonePrefillSchema,
+  createHenkatenRequestSchema,
+  currentShiftQuerySchema,
+  emergencyStartShiftRequestSchema,
+  henkatenDetailSchema,
+  henkatenListQuerySchema,
+  henkatenPageSchema,
+  henkatenTransitionSchema,
+  prepareShiftRequestSchema,
+  preStartResolutionContextSchema,
+  shiftListQuerySchema,
+  shiftRunDetailSchema,
+  shiftRunPageSchema,
+  startShiftRequestSchema,
+  warningInstanceSchema,
+  withdrawHenkatenRequestSchema,
+  workingAssignmentSchema,
 } from '@tmmin-henkaten/contracts';
 
 const noContent = { description: 'No content' };
@@ -217,8 +237,224 @@ export function buildOpenApiDocument(): Record<string, unknown> {
         },
       },
       ...masterDataPaths(),
+      ...operationalPaths(),
     },
   }) as unknown as Record<string, unknown>;
+}
+
+function operationalPaths() {
+  const shiftId = { path: z.object({ id: z.string().uuid() }) };
+  const supplierAndId = {
+    path: z.object({ supplierId: z.string().uuid(), id: z.string().uuid() }),
+  };
+  const supplierOnly = { path: z.object({ supplierId: z.string().uuid() }) };
+  return {
+    '/api/v1/supplier/shifts': {
+      get: {
+        requestParams: { query: shiftListQuerySchema },
+        responses: { '200': json('Shift Runs', shiftRunPageSchema) },
+      },
+    },
+    '/api/v1/supplier/shifts/current': {
+      get: {
+        requestParams: { query: currentShiftQuerySchema },
+        responses: {
+          '200': json('Current Shift Run', shiftRunDetailSchema.nullable()),
+        },
+      },
+    },
+    '/api/v1/supplier/shifts/preflight': {
+      post: {
+        requestBody: body(prepareShiftRequestSchema),
+        responses: {
+          '201': json('Durable Shift Run plan and preflight', shiftRunDetailSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/shifts/assignment-issues': {
+      get: {
+        responses: { '200': json('Assignment Issues', assignmentIssuePageSchema) },
+      },
+    },
+    '/api/v1/supplier/shifts/{id}': {
+      get: {
+        requestParams: shiftId,
+        responses: { '200': json('Shift Run', shiftRunDetailSchema), '404': problem },
+      },
+    },
+    '/api/v1/supplier/shifts/{id}/preflight': {
+      get: {
+        requestParams: shiftId,
+        responses: { '200': json('Shift Run preflight', shiftRunDetailSchema), '404': problem },
+      },
+    },
+    '/api/v1/supplier/shifts/{id}/working-assignments': {
+      get: {
+        requestParams: shiftId,
+        responses: {
+          '200': json(
+            'Working Assignments',
+            z.object({ items: z.array(workingAssignmentSchema) }).strict(),
+          ),
+        },
+      },
+    },
+    '/api/v1/supplier/shifts/{id}/assignment-issues': {
+      get: {
+        requestParams: shiftId,
+        responses: { '200': json('Assignment Issues', assignmentIssuePageSchema) },
+      },
+    },
+    '/api/v1/supplier/shifts/{id}/resolution-context': {
+      get: {
+        requestParams: shiftId,
+        responses: {
+          '200': json('Pre-start resolution context', preStartResolutionContextSchema),
+        },
+      },
+    },
+    '/api/v1/supplier/shifts/{id}/start': {
+      post: {
+        requestParams: shiftId,
+        requestBody: body(startShiftRequestSchema),
+        responses: { '201': json('Started Shift Run', shiftRunDetailSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/shifts/{id}/emergency-start': {
+      post: {
+        requestParams: shiftId,
+        requestBody: body(emergencyStartShiftRequestSchema),
+        responses: {
+          '201': json('Emergency-started Shift Run', shiftRunDetailSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/shifts': {
+      get: {
+        requestParams: { ...supplierOnly, query: shiftListQuerySchema },
+        responses: { '200': json('Supplier Shift Runs', shiftRunPageSchema), '404': problem },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/shifts/{id}': {
+      get: {
+        requestParams: supplierAndId,
+        responses: { '200': json('Supplier Shift Run', shiftRunDetailSchema), '404': problem },
+      },
+    },
+    '/api/v1/supplier/henkatens': {
+      get: {
+        requestParams: { query: henkatenListQuerySchema },
+        responses: { '200': json('Henkaten records', henkatenPageSchema) },
+      },
+      post: {
+        requestParams: {
+          header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }),
+        },
+        requestBody: body(createHenkatenRequestSchema),
+        responses: {
+          '201': json('Submitted Henkaten', henkatenDetailSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/henkatens/{id}': {
+      get: {
+        requestParams: shiftId,
+        responses: { '200': json('Henkaten detail', henkatenDetailSchema), '404': problem },
+      },
+    },
+    '/api/v1/supplier/henkatens/{id}/history': {
+      get: {
+        requestParams: shiftId,
+        responses: {
+          '200': json(
+            'Henkaten lifecycle history',
+            z.object({ items: z.array(henkatenTransitionSchema) }).strict(),
+          ),
+        },
+      },
+    },
+    '/api/v1/supplier/henkatens/{id}/withdraw': {
+      post: {
+        requestParams: shiftId,
+        requestBody: body(withdrawHenkatenRequestSchema),
+        responses: {
+          '201': json('Withdrawn Henkaten', henkatenDetailSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/henkatens/{id}/clone-prefill': {
+      get: {
+        requestParams: shiftId,
+        responses: { '200': json('Clone prefill', clonePrefillSchema), '404': problem },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/henkatens': {
+      get: {
+        requestParams: { ...supplierOnly, query: henkatenListQuerySchema },
+        responses: { '200': json('Supplier Henkaten records', henkatenPageSchema) },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/henkatens/warnings': {
+      get: {
+        requestParams: supplierOnly,
+        responses: {
+          '200': json(
+            'Supplier warning instances',
+            z.object({
+              items: z.array(warningInstanceSchema),
+              pageInfo: z.object({
+                hasNextPage: z.boolean(),
+                nextCursor: z.string().nullable(),
+              }),
+            }),
+          ),
+        },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/henkatens/warnings/{warningId}': {
+      get: {
+        requestParams: {
+          path: z.object({
+            supplierId: z.string().uuid(),
+            warningId: z.string().uuid(),
+          }),
+        },
+        responses: { '200': json('Warning instance', warningInstanceSchema), '404': problem },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/henkatens/{id}': {
+      get: {
+        requestParams: supplierAndId,
+        responses: {
+          '200': json('Supplier Henkaten detail', henkatenDetailSchema),
+          '404': problem,
+        },
+      },
+    },
+    '/api/v1/tmmin/warnings/affected-parts': {
+      get: {
+        responses: { '200': json('Affected part groups', affectedPartPageSchema) },
+      },
+    },
+    '/api/v1/tmmin/warnings/affected-parts/{supplierId}/{partNumber}': {
+      get: {
+        requestParams: {
+          path: z.object({
+            supplierId: z.string().uuid(),
+            partNumber: z.string().min(1).max(100),
+          }),
+        },
+        responses: {
+          '200': json('Affected part detail', affectedPartDetailSchema),
+          '404': problem,
+        },
+      },
+    },
+  };
 }
 
 function masterDataPaths() {

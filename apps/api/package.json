@@ -30,6 +30,7 @@
     "@nestjs/core": "11.1.28",
     "@nestjs/platform-express": "11.1.28",
     "@nestjs/throttler": "6.5.0",
+    "@js-temporal/polyfill": "0.5.1",
     "@prisma/adapter-pg": "7.9.0",
     "@prisma/client": "7.9.0",
     "@tmmin-henkaten/contracts": "workspace:*",

@@ -107,6 +107,7 @@ export class SessionService {
       realm: session.realm,
       role: user.role,
       ...(user.supplierId ? { supplierId: user.supplierId } : {}),
+      ...(user.memberId ? { memberId: user.memberId } : {}),
       ...(session.sourceEpoch ? { sourceEpoch: session.sourceEpoch } : {}),
       purpose: session.purpose,
       mustChangePassword: user.mustChangePassword,

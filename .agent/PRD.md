@@ -3,7 +3,7 @@
 | Atribut | Nilai |
 |---|---|
 | Status dokumen | **Approved product contract for v1 planning** |
-| Status implementasi | **Phase 0-4 implemented; Phase 5+ planned** |
+| Status implementasi | **Phase 0-6 implemented; Phase 7+ planned** |
 | Versi dokumen | 1.0 |
 | Tanggal | 23 Juli 2026 |
 | Product owner | TMMIN |
@@ -624,6 +624,8 @@ Pre-start Man Henkaten memiliki target planned Shift Run. Shift baru dapat dimul
 
 - Hanya Supplier Admin yang dapat melakukan emergency override.
 - Alasan minimum 10 karakter wajib diisi.
+- Bila default LL tidak tersedia, Supplier Admin wajib memilih satu substitute LL aktif; pilihan
+  tersebut hanya menjadi snapshot Shift Run dan tidak mengubah Default Assignment.
 - Override tidak menghapus issue atau memalsukan preflight menjadi valid.
 - Shift menjadi Active dengan `startedWithOverride=true`.
 - Assignment Board wajib menampilkan critical unresolved banner.
@@ -698,6 +700,8 @@ Aturan:
 
 - Hosted LL hanya dapat memilih line sendiri.
 - Line tidak diinput manual; diambil dari current assignment LL.
+- Hosted submission wajib membawa `Idempotency-Key` yang unik per supplier + creator; exact retry
+  mengembalikan record yang sama dan reuse dengan payload berbeda menghasilkan `409 Conflict`.
 - Job harus aktif pada line tersebut.
 - Part harus aktif pada supplier tersebut.
 - Cause dan detail change wajib, masing-masing maksimum 2.000 karakter.

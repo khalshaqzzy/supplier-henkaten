@@ -86,6 +86,13 @@ Positive optimistic versions, canonical conflict codes, transaction ownership, a
 captured in shared contracts and normative architecture documents. Real transaction and race
 validation remains owned by the persistence and domain implementation.
 
+The implemented shift and Henkaten services now exercise the lock order. Shift planning/start locks
+Supplier then Shift Run; Henkaten submission locks Supplier then Shift Run; Withdraw locks Supplier
+then Henkaten. PostgreSQL serializable transactions and partial unique indexes arbitrate concurrent
+slot/start, effective-MP, identifier, reservation, and target-job races. Integration tests verify
+one-winner behavior, preview-to-commit recalculation, idempotent Henkaten retry, and atomic
+reservation release/warning close.
+
 ## Follow-up
 
 Reusable transaction, lock, and retry helpers will be implemented with the persistence foundation

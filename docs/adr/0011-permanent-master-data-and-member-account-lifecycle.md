@@ -88,3 +88,7 @@ Privileged reads may create audit volume and must not record the PII values them
 
 Assignment Board and audit read views must reuse these authorization rules. Operational reference
 contributors are added with Shift and Henkaten persistence.
+
+Deactivation guards now include planned/Active Shift Runs, active Working Assignments, Open
+Henkaten, and active MP reservations. Line, Job, Part, Shift Template, checklist, and member
+deactivation fail with `RESOURCE_IN_USE` when the operational references would be invalidated.
