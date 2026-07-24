@@ -9,6 +9,7 @@ import { runSerializable } from '../persistence/transaction.js';
 import type { MutationContext } from './mutation-context.js';
 import { presentSupplier } from './presenters.js';
 import { notFound, versionConflict } from './user-admin.service.js';
+import { HostedReadinessService } from './hosted-readiness.service.js';
 
 export type CutoverBlocker = { contributor: string; code: string; detail: string };
 
@@ -34,12 +35,17 @@ export class SourceGovernanceService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriter,
     private readonly outbox: OutboxService,
+    private readonly hostedReadiness: HostedReadinessService,
   ) {
     this.register({
       name: 'phase-4-hosted-configuration',
-      async check(transaction, supplier, targetMode) {
+      check: async (transaction, supplier, targetMode) => {
         if (targetMode !== 'HOSTED') return [];
-        return hostedConfigurationBlockers(transaction, supplier.id);
+        const readiness = await this.hostedReadiness.evaluate(supplier.id, transaction);
+        return readiness.blockers.map(({ contributor: _contributor, area: _area, ...blocker }) => ({
+          contributor: 'phase-4-hosted-configuration',
+          ...blocker,
+        }));
       },
     });
     this.register({
@@ -277,88 +283,4 @@ export class SourceGovernanceService {
     }
     return blockers;
   }
-}
-
-async function hostedConfigurationBlockers(
-  transaction: Prisma.TransactionClient,
-  supplierId: string,
-): Promise<CutoverBlocker[]> {
-  const [
-    adminCount,
-    lines,
-    jobs,
-    partCount,
-    shiftCount,
-    checklistCategories,
-    supervisorAssignments,
-    leaderAssignments,
-    mpAssignments,
-  ] = await Promise.all([
-    transaction.user.count({
-      where: { supplierId, role: 'SUPPLIER_ADMIN', status: 'ACTIVE' },
-    }),
-    transaction.line.findMany({ where: { supplierId, active: true }, select: { id: true } }),
-    transaction.job.findMany({ where: { supplierId, active: true }, select: { id: true } }),
-    transaction.part.count({ where: { supplierId, active: true } }),
-    transaction.shiftTemplate.count({ where: { supplierId, active: true } }),
-    transaction.checklistVersion.findMany({
-      where: { supplierId, template: { active: true } },
-      distinct: ['category'],
-      select: { category: true },
-    }),
-    transaction.defaultLineSupervisor.findMany({
-      where: {
-        supplierId,
-        line: { active: true },
-        supervisor: {
-          active: true,
-          users: { some: { status: 'ACTIVE', role: 'SUPERVISOR' } },
-        },
-      },
-      select: { lineId: true },
-    }),
-    transaction.defaultLineLeader.findMany({
-      where: {
-        supplierId,
-        line: { active: true },
-        lineLeader: {
-          active: true,
-          users: { some: { status: 'ACTIVE', role: 'LINE_LEADER' } },
-        },
-      },
-      select: { lineId: true },
-    }),
-    transaction.defaultJobMp.findMany({
-      where: { supplierId, job: { active: true }, mp: { active: true } },
-      select: { jobId: true },
-    }),
-  ]);
-  const blockers: CutoverBlocker[] = [];
-  const add = (code: string, detail: string) =>
-    blockers.push({ contributor: 'phase-4-hosted-configuration', code, detail });
-  if (adminCount !== 1)
-    add('HOSTED_ADMIN_MISSING', 'Exactly one active Supplier Admin is required.');
-  if (!lines.length) add('ACTIVE_LINE_MISSING', 'At least one active line is required.');
-  if (!jobs.length) add('ACTIVE_JOB_MISSING', 'At least one active job is required.');
-  if (!partCount) add('ACTIVE_PART_MISSING', 'At least one active part is required.');
-  if (!shiftCount)
-    add('ACTIVE_SHIFT_TEMPLATE_MISSING', 'At least one active Shift Template is required.');
-  const categories = new Set(checklistCategories.map(({ category }) => category));
-  for (const category of ['MAN', 'MACHINE', 'MATERIAL', 'METHOD'] as const) {
-    if (!categories.has(category)) {
-      add(`CHECKLIST_${category}_MISSING`, `A published active ${category} checklist is required.`);
-    }
-  }
-  const supervised = new Set(supervisorAssignments.map(({ lineId }) => lineId));
-  const led = new Set(leaderAssignments.map(({ lineId }) => lineId));
-  for (const { id } of lines) {
-    if (!supervised.has(id))
-      add('LINE_SUPERVISOR_MISSING', 'Every active line needs a Supervisor.');
-    if (!led.has(id)) add('LINE_LEADER_MISSING', 'Every active line needs a Line Leader.');
-  }
-  const staffed = new Set(mpAssignments.map(({ jobId }) => jobId));
-  if (jobs.some(({ id }) => !staffed.has(id))) {
-    add('JOB_MP_MISSING', 'Every active job needs a default MP.');
-  }
-  return blockers;
 }

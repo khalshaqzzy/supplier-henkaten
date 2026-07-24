@@ -304,6 +304,86 @@
                       ],
                       "additionalProperties": false
                     },
+                    "capabilities": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "TMMIN_SUPPLIER_READ",
+                          "TMMIN_SUPPLIER_MANAGE",
+                          "TMMIN_QUALITY_MANAGE",
+                          "TMMIN_SOURCE_MANAGE",
+                          "SUPPLIER_SELF_SERVICE",
+                          "SUPPLIER_MASTER_DATA_MANAGE",
+                          "SUPPLIER_MASTER_DATA_READ",
+                          "TMMIN_MASTER_DATA_READ",
+                          "SUPPLIER_HOSTED_PREPARATION",
+                          "SUPPLIER_SHIFT_READ",
+                          "SUPPLIER_SHIFT_OPERATE",
+                          "SUPPLIER_SHIFT_OVERRIDE",
+                          "TMMIN_SHIFT_READ",
+                          "SUPPLIER_HENKATEN_READ",
+                          "SUPPLIER_HENKATEN_SUBMIT",
+                          "SUPPLIER_HENKATEN_WITHDRAW",
+                          "SUPPLIER_HENKATEN_DECIDE",
+                          "SUPPLIER_APPROVAL_REROUTE",
+                          "TMMIN_HENKATEN_READ",
+                          "SUPPLIER_NOTIFICATION_READ",
+                          "SUPPLIER_BOARD_READ",
+                          "SUPPLIER_DASHBOARD_READ",
+                          "SUPPLIER_AUDIT_READ",
+                          "TMMIN_DASHBOARD_READ",
+                          "TMMIN_AUDIT_READ",
+                          "TMMIN_EXTERNAL_CLIENT_MANAGE"
+                        ]
+                      }
+                    },
+                    "supplier": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "code": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 50
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "sourceMode": {
+                          "type": "string",
+                          "enum": [
+                            "HOSTED",
+                            "EXTERNAL"
+                          ]
+                        },
+                        "sourceEpoch": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "code",
+                        "name",
+                        "timezone",
+                        "sourceMode",
+                        "sourceEpoch"
+                      ],
+                      "additionalProperties": false
+                    },
                     "idleExpiresAt": {
                       "type": "string",
                       "format": "date-time",
@@ -322,6 +402,7 @@
                   },
                   "required": [
                     "principal",
+                    "capabilities",
                     "idleExpiresAt",
                     "absoluteExpiresAt",
                     "csrfToken"
@@ -529,6 +610,86 @@
                       ],
                       "additionalProperties": false
                     },
+                    "capabilities": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "TMMIN_SUPPLIER_READ",
+                          "TMMIN_SUPPLIER_MANAGE",
+                          "TMMIN_QUALITY_MANAGE",
+                          "TMMIN_SOURCE_MANAGE",
+                          "SUPPLIER_SELF_SERVICE",
+                          "SUPPLIER_MASTER_DATA_MANAGE",
+                          "SUPPLIER_MASTER_DATA_READ",
+                          "TMMIN_MASTER_DATA_READ",
+                          "SUPPLIER_HOSTED_PREPARATION",
+                          "SUPPLIER_SHIFT_READ",
+                          "SUPPLIER_SHIFT_OPERATE",
+                          "SUPPLIER_SHIFT_OVERRIDE",
+                          "TMMIN_SHIFT_READ",
+                          "SUPPLIER_HENKATEN_READ",
+                          "SUPPLIER_HENKATEN_SUBMIT",
+                          "SUPPLIER_HENKATEN_WITHDRAW",
+                          "SUPPLIER_HENKATEN_DECIDE",
+                          "SUPPLIER_APPROVAL_REROUTE",
+                          "TMMIN_HENKATEN_READ",
+                          "SUPPLIER_NOTIFICATION_READ",
+                          "SUPPLIER_BOARD_READ",
+                          "SUPPLIER_DASHBOARD_READ",
+                          "SUPPLIER_AUDIT_READ",
+                          "TMMIN_DASHBOARD_READ",
+                          "TMMIN_AUDIT_READ",
+                          "TMMIN_EXTERNAL_CLIENT_MANAGE"
+                        ]
+                      }
+                    },
+                    "supplier": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "code": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 50
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "sourceMode": {
+                          "type": "string",
+                          "enum": [
+                            "HOSTED",
+                            "EXTERNAL"
+                          ]
+                        },
+                        "sourceEpoch": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "code",
+                        "name",
+                        "timezone",
+                        "sourceMode",
+                        "sourceEpoch"
+                      ],
+                      "additionalProperties": false
+                    },
                     "idleExpiresAt": {
                       "type": "string",
                       "format": "date-time",
@@ -547,6 +708,7 @@
                   },
                   "required": [
                     "principal",
+                    "capabilities",
                     "idleExpiresAt",
                     "absoluteExpiresAt",
                     "csrfToken"
@@ -727,6 +889,86 @@
                       ],
                       "additionalProperties": false
                     },
+                    "capabilities": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "TMMIN_SUPPLIER_READ",
+                          "TMMIN_SUPPLIER_MANAGE",
+                          "TMMIN_QUALITY_MANAGE",
+                          "TMMIN_SOURCE_MANAGE",
+                          "SUPPLIER_SELF_SERVICE",
+                          "SUPPLIER_MASTER_DATA_MANAGE",
+                          "SUPPLIER_MASTER_DATA_READ",
+                          "TMMIN_MASTER_DATA_READ",
+                          "SUPPLIER_HOSTED_PREPARATION",
+                          "SUPPLIER_SHIFT_READ",
+                          "SUPPLIER_SHIFT_OPERATE",
+                          "SUPPLIER_SHIFT_OVERRIDE",
+                          "TMMIN_SHIFT_READ",
+                          "SUPPLIER_HENKATEN_READ",
+                          "SUPPLIER_HENKATEN_SUBMIT",
+                          "SUPPLIER_HENKATEN_WITHDRAW",
+                          "SUPPLIER_HENKATEN_DECIDE",
+                          "SUPPLIER_APPROVAL_REROUTE",
+                          "TMMIN_HENKATEN_READ",
+                          "SUPPLIER_NOTIFICATION_READ",
+                          "SUPPLIER_BOARD_READ",
+                          "SUPPLIER_DASHBOARD_READ",
+                          "SUPPLIER_AUDIT_READ",
+                          "TMMIN_DASHBOARD_READ",
+                          "TMMIN_AUDIT_READ",
+                          "TMMIN_EXTERNAL_CLIENT_MANAGE"
+                        ]
+                      }
+                    },
+                    "supplier": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "code": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 50
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "sourceMode": {
+                          "type": "string",
+                          "enum": [
+                            "HOSTED",
+                            "EXTERNAL"
+                          ]
+                        },
+                        "sourceEpoch": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "code",
+                        "name",
+                        "timezone",
+                        "sourceMode",
+                        "sourceEpoch"
+                      ],
+                      "additionalProperties": false
+                    },
                     "idleExpiresAt": {
                       "type": "string",
                       "format": "date-time",
@@ -745,6 +987,7 @@
                   },
                   "required": [
                     "principal",
+                    "capabilities",
                     "idleExpiresAt",
                     "absoluteExpiresAt",
                     "csrfToken"
@@ -925,6 +1168,86 @@
                       ],
                       "additionalProperties": false
                     },
+                    "capabilities": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "TMMIN_SUPPLIER_READ",
+                          "TMMIN_SUPPLIER_MANAGE",
+                          "TMMIN_QUALITY_MANAGE",
+                          "TMMIN_SOURCE_MANAGE",
+                          "SUPPLIER_SELF_SERVICE",
+                          "SUPPLIER_MASTER_DATA_MANAGE",
+                          "SUPPLIER_MASTER_DATA_READ",
+                          "TMMIN_MASTER_DATA_READ",
+                          "SUPPLIER_HOSTED_PREPARATION",
+                          "SUPPLIER_SHIFT_READ",
+                          "SUPPLIER_SHIFT_OPERATE",
+                          "SUPPLIER_SHIFT_OVERRIDE",
+                          "TMMIN_SHIFT_READ",
+                          "SUPPLIER_HENKATEN_READ",
+                          "SUPPLIER_HENKATEN_SUBMIT",
+                          "SUPPLIER_HENKATEN_WITHDRAW",
+                          "SUPPLIER_HENKATEN_DECIDE",
+                          "SUPPLIER_APPROVAL_REROUTE",
+                          "TMMIN_HENKATEN_READ",
+                          "SUPPLIER_NOTIFICATION_READ",
+                          "SUPPLIER_BOARD_READ",
+                          "SUPPLIER_DASHBOARD_READ",
+                          "SUPPLIER_AUDIT_READ",
+                          "TMMIN_DASHBOARD_READ",
+                          "TMMIN_AUDIT_READ",
+                          "TMMIN_EXTERNAL_CLIENT_MANAGE"
+                        ]
+                      }
+                    },
+                    "supplier": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "code": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 50
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "sourceMode": {
+                          "type": "string",
+                          "enum": [
+                            "HOSTED",
+                            "EXTERNAL"
+                          ]
+                        },
+                        "sourceEpoch": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "code",
+                        "name",
+                        "timezone",
+                        "sourceMode",
+                        "sourceEpoch"
+                      ],
+                      "additionalProperties": false
+                    },
                     "idleExpiresAt": {
                       "type": "string",
                       "format": "date-time",
@@ -943,6 +1266,7 @@
                   },
                   "required": [
                     "principal",
+                    "capabilities",
                     "idleExpiresAt",
                     "absoluteExpiresAt",
                     "csrfToken"
@@ -27063,6 +27387,18 @@
                               "CANCELLED"
                             ]
                           },
+                          "sourceMode": {
+                            "type": "string",
+                            "enum": [
+                              "HOSTED",
+                              "EXTERNAL"
+                            ]
+                          },
+                          "sourceEpoch": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
                           "category": {
                             "type": "string",
                             "enum": [
@@ -27453,6 +27789,8 @@
                           "jobId",
                           "partId",
                           "status",
+                          "sourceMode",
+                          "sourceEpoch",
                           "category",
                           "businessDate",
                           "occurredAt",
@@ -28009,6 +28347,18 @@
                         "CANCELLED"
                       ]
                     },
+                    "sourceMode": {
+                      "type": "string",
+                      "enum": [
+                        "HOSTED",
+                        "EXTERNAL"
+                      ]
+                    },
+                    "sourceEpoch": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "category": {
                       "type": "string",
                       "enum": [
@@ -28858,6 +29208,8 @@
                     "jobId",
                     "partId",
                     "status",
+                    "sourceMode",
+                    "sourceEpoch",
                     "category",
                     "businessDate",
                     "occurredAt",
@@ -28990,6 +29342,254 @@
         }
       }
     },
+    "/api/v1/supplier/henkatens/form-options": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "category",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MAN",
+                "MACHINE",
+                "MATERIAL",
+                "METHOD"
+              ]
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "part",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Henkaten form options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "generatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "checklist": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "category": {
+                              "type": "string",
+                              "enum": [
+                                "MAN",
+                                "MACHINE",
+                                "MATERIAL",
+                                "METHOD"
+                              ]
+                            },
+                            "versionNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "publishedAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            },
+                            "items": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "displayOrder": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "label",
+                                  "displayOrder"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "category",
+                            "versionNumber",
+                            "publishedAt",
+                            "items"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "parts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "partNumber": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "partName": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "partNumber",
+                          "partName"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "replacementMembers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "fullName": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 150
+                          },
+                          "registrationNumber": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "reserved": {
+                            "type": "boolean"
+                          },
+                          "currentAssignment": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "version": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "shiftRunId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "lineId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "lineName": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 150
+                                  },
+                                  "jobId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "jobName": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 150
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "version",
+                                  "shiftRunId",
+                                  "lineId",
+                                  "lineName",
+                                  "jobId",
+                                  "jobName"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "fullName",
+                          "registrationNumber",
+                          "reserved",
+                          "currentAssignment"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "generatedAt",
+                    "checklist",
+                    "parts",
+                    "replacementMembers"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/supplier/henkatens/{id}": {
       "get": {
         "parameters": [
@@ -29050,6 +29650,18 @@
                         "REJECTED",
                         "CANCELLED"
                       ]
+                    },
+                    "sourceMode": {
+                      "type": "string",
+                      "enum": [
+                        "HOSTED",
+                        "EXTERNAL"
+                      ]
+                    },
+                    "sourceEpoch": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
                     },
                     "category": {
                       "type": "string",
@@ -29900,6 +30512,8 @@
                     "jobId",
                     "partId",
                     "status",
+                    "sourceMode",
+                    "sourceEpoch",
                     "category",
                     "businessDate",
                     "occurredAt",
@@ -30150,6 +30764,16 @@
               "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
             },
             "required": true
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "required": true
           }
         ],
         "requestBody": {
@@ -30225,6 +30849,18 @@
                         "REJECTED",
                         "CANCELLED"
                       ]
+                    },
+                    "sourceMode": {
+                      "type": "string",
+                      "enum": [
+                        "HOSTED",
+                        "EXTERNAL"
+                      ]
+                    },
+                    "sourceEpoch": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
                     },
                     "category": {
                       "type": "string",
@@ -31075,6 +31711,8 @@
                     "jobId",
                     "partId",
                     "status",
+                    "sourceMode",
+                    "sourceEpoch",
                     "category",
                     "businessDate",
                     "occurredAt",
@@ -31312,6 +31950,18 @@
                         "CANCELLED"
                       ]
                     },
+                    "sourceMode": {
+                      "type": "string",
+                      "enum": [
+                        "HOSTED",
+                        "EXTERNAL"
+                      ]
+                    },
+                    "sourceEpoch": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "category": {
                       "type": "string",
                       "enum": [
@@ -32161,6 +32811,8 @@
                     "jobId",
                     "partId",
                     "status",
+                    "sourceMode",
+                    "sourceEpoch",
                     "category",
                     "businessDate",
                     "occurredAt",
@@ -32391,6 +33043,18 @@
                         "CANCELLED"
                       ]
                     },
+                    "sourceMode": {
+                      "type": "string",
+                      "enum": [
+                        "HOSTED",
+                        "EXTERNAL"
+                      ]
+                    },
+                    "sourceEpoch": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "category": {
                       "type": "string",
                       "enum": [
@@ -33240,6 +33904,8 @@
                     "jobId",
                     "partId",
                     "status",
+                    "sourceMode",
+                    "sourceEpoch",
                     "category",
                     "businessDate",
                     "occurredAt",
@@ -33924,6 +34590,18 @@
                               "CANCELLED"
                             ]
                           },
+                          "sourceMode": {
+                            "type": "string",
+                            "enum": [
+                              "HOSTED",
+                              "EXTERNAL"
+                            ]
+                          },
+                          "sourceEpoch": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
                           "category": {
                             "type": "string",
                             "enum": [
@@ -34314,6 +34992,8 @@
                           "jobId",
                           "partId",
                           "status",
+                          "sourceMode",
+                          "sourceEpoch",
                           "category",
                           "businessDate",
                           "occurredAt",
@@ -34757,6 +35437,18 @@
                         "REJECTED",
                         "CANCELLED"
                       ]
+                    },
+                    "sourceMode": {
+                      "type": "string",
+                      "enum": [
+                        "HOSTED",
+                        "EXTERNAL"
+                      ]
+                    },
+                    "sourceEpoch": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
                     },
                     "category": {
                       "type": "string",
@@ -35607,6 +36299,8 @@
                     "jobId",
                     "partId",
                     "status",
+                    "sourceMode",
+                    "sourceEpoch",
                     "category",
                     "businessDate",
                     "occurredAt",
@@ -36637,6 +37331,72 @@
                             ],
                             "additionalProperties": false
                           },
+                          "activeOverride": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "reason": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 1000
+                                  },
+                                  "startedAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                                  },
+                                  "unresolvedIssueCount": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "failedChecks": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "code": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 100
+                                        },
+                                        "message": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 500
+                                        },
+                                        "resourceType": {
+                                          "type": "string",
+                                          "maxLength": 100
+                                        },
+                                        "resourceId": {
+                                          "type": "string",
+                                          "format": "uuid",
+                                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                        }
+                                      },
+                                      "required": [
+                                        "code",
+                                        "message"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "reason",
+                                  "startedAt",
+                                  "unresolvedIssueCount",
+                                  "failedChecks"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "jobs": {
                             "type": "array",
                             "items": {
@@ -36827,6 +37587,7 @@
                           "businessDate",
                           "supervisor",
                           "lineLeader",
+                          "activeOverride",
                           "jobs"
                         ],
                         "additionalProperties": false
@@ -36910,6 +37671,52 @@
               "minLength": 1,
               "maxLength": 200
             }
+          },
+          {
+            "in": "query",
+            "name": "shiftTemplateId",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "approvalRoute",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SUPERVISOR",
+                "QC"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "approvalStatus",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "APPROVED",
+                "REJECTED",
+                "NOT_REQUIRED"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "granularity",
+            "schema": {
+              "default": "DAY",
+              "type": "string",
+              "enum": [
+                "DAY",
+                "WEEK",
+                "MONTH"
+              ]
+            }
           }
         ],
         "responses": {
@@ -36924,6 +37731,62 @@
                       "type": "string",
                       "format": "date-time",
                       "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "filterOptions": {
+                      "type": "object",
+                      "properties": {
+                        "lines": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "shiftTemplates": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "lines",
+                        "shiftTemplates"
+                      ],
+                      "additionalProperties": false
                     },
                     "totals": {
                       "type": "object",
@@ -37000,6 +37863,170 @@
                         "qc"
                       ],
                       "additionalProperties": false
+                    },
+                    "approvalAging": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "bucket": {
+                            "type": "string",
+                            "enum": [
+                              "UNDER_4_HOURS",
+                              "FOUR_TO_EIGHT_HOURS",
+                              "EIGHT_TO_24_HOURS",
+                              "OVER_24_HOURS"
+                            ]
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "bucket",
+                          "count"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "trend": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "periodStart": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          },
+                          "total": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "man": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "machine": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "material": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "method": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "approved": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "rejected": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "cancelled": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "periodStart",
+                          "total",
+                          "man",
+                          "machine",
+                          "material",
+                          "method",
+                          "approved",
+                          "rejected",
+                          "cancelled"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "assignmentIssues": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "VACANCY",
+                              "CONFLICT"
+                            ]
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "count"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "recentOverrides": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "shiftRunId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "lineId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "lineName": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 150
+                          },
+                          "businessDate": {
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          },
+                          "startedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          }
+                        },
+                        "required": [
+                          "shiftRunId",
+                          "lineId",
+                          "lineName",
+                          "businessDate",
+                          "reason",
+                          "startedAt"
+                        ],
+                        "additionalProperties": false
+                      }
                     },
                     "byCategory": {
                       "type": "array",
@@ -37130,13 +38157,159 @@
                   },
                   "required": [
                     "generatedAt",
+                    "filterOptions",
                     "totals",
                     "pendingApprovals",
+                    "approvalAging",
+                    "trend",
+                    "assignmentIssues",
+                    "recentOverrides",
                     "byCategory",
                     "byLine",
                     "byPart",
                     "outcomes",
                     "recentActivity"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/supplier/setup-readiness": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Supplier setup readiness",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "generatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "areas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "area": {
+                            "type": "string",
+                            "enum": [
+                              "SHIFT_TEMPLATES",
+                              "MEMBERS_ACCOUNTS",
+                              "LINES_JOBS",
+                              "PARTS",
+                              "CHECKLISTS",
+                              "DEFAULT_ASSIGNMENTS"
+                            ]
+                          },
+                          "ready": {
+                            "type": "boolean"
+                          },
+                          "activeCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "requiredCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "blockerCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "area",
+                          "ready",
+                          "activeCount",
+                          "requiredCount",
+                          "blockerCount"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "blockers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "area": {
+                            "type": "string",
+                            "enum": [
+                              "SHIFT_TEMPLATES",
+                              "MEMBERS_ACCOUNTS",
+                              "LINES_JOBS",
+                              "PARTS",
+                              "CHECKLISTS",
+                              "DEFAULT_ASSIGNMENTS"
+                            ]
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "detail": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "resourceType": {
+                            "type": "string",
+                            "maxLength": 100
+                          },
+                          "resourceId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        },
+                        "required": [
+                          "area",
+                          "code",
+                          "detail"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextArea": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "SHIFT_TEMPLATES",
+                            "MEMBERS_ACCOUNTS",
+                            "LINES_JOBS",
+                            "PARTS",
+                            "CHECKLISTS",
+                            "DEFAULT_ASSIGNMENTS"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "generatedAt",
+                    "ready",
+                    "areas",
+                    "blockers",
+                    "nextArea"
                   ],
                   "additionalProperties": false
                 }
@@ -37248,6 +38421,18 @@
                               }
                             ]
                           },
+                          "lineId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "changeSummary": {
                             "anyOf": [
                               {
@@ -37281,6 +38466,7 @@
                           "action",
                           "resourceType",
                           "resourceId",
+                          "lineId",
                           "changeSummary",
                           "result",
                           "correlationId"
@@ -38127,6 +39313,18 @@
                               }
                             ]
                           },
+                          "lineId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "changeSummary": {
                             "anyOf": [
                               {
@@ -38160,6 +39358,7 @@
                           "action",
                           "resourceType",
                           "resourceId",
+                          "lineId",
                           "changeSummary",
                           "result",
                           "correlationId"

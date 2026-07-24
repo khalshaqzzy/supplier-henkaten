@@ -61,6 +61,7 @@ export const CAPABILITIES: Readonly<Record<RequestPrincipal['role'], ReadonlySet
     'SUPPLIER_NOTIFICATION_READ',
     'SUPPLIER_BOARD_READ',
     'SUPPLIER_DASHBOARD_READ',
+    'SUPPLIER_AUDIT_READ',
   ]),
   LINE_LEADER: new Set([
     'SUPPLIER_SELF_SERVICE',
@@ -72,6 +73,7 @@ export const CAPABILITIES: Readonly<Record<RequestPrincipal['role'], ReadonlySet
     'SUPPLIER_NOTIFICATION_READ',
     'SUPPLIER_BOARD_READ',
     'SUPPLIER_DASHBOARD_READ',
+    'SUPPLIER_AUDIT_READ',
   ]),
   QC: new Set([
     'SUPPLIER_SELF_SERVICE',
@@ -81,6 +83,7 @@ export const CAPABILITIES: Readonly<Record<RequestPrincipal['role'], ReadonlySet
     'SUPPLIER_NOTIFICATION_READ',
     'SUPPLIER_BOARD_READ',
     'SUPPLIER_DASHBOARD_READ',
+    'SUPPLIER_AUDIT_READ',
   ]),
 };
 
@@ -120,7 +123,7 @@ export class RoutePolicyGuard implements CanActivate {
     }
     if (policy.kind === 'authenticated') return true;
 
-    const granted = CAPABILITIES[principal.role];
+    const granted = capabilitiesForPrincipal(principal);
     if (!policy.capabilities.every((capability) => granted.has(capability))) {
       throw new ProblemException({
         status: 403,
@@ -131,4 +134,21 @@ export class RoutePolicyGuard implements CanActivate {
     }
     return true;
   }
+}
+
+export function capabilitiesForPrincipal(
+  principal: Pick<RequestPrincipal, 'role' | 'purpose'>,
+): ReadonlySet<Capability> {
+  const granted = CAPABILITIES[principal.role];
+  if (principal.purpose !== 'HOSTED_PREPARATION') return granted;
+  return new Set(
+    [...granted].filter((capability) =>
+      [
+        'SUPPLIER_SELF_SERVICE',
+        'SUPPLIER_MASTER_DATA_READ',
+        'SUPPLIER_MASTER_DATA_MANAGE',
+        'SUPPLIER_HOSTED_PREPARATION',
+      ].includes(capability),
+    ),
+  );
 }

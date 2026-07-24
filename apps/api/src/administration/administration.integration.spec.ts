@@ -191,6 +191,46 @@ describe('Phase 3 administration flows', () => {
       });
     expect(preparationLogin.status).toBe(200);
     expect(preparationLogin.body.principal.purpose).toBe('HOSTED_PREPARATION');
+    expect(preparationLogin.body.capabilities).toEqual(
+      expect.arrayContaining([
+        'SUPPLIER_SELF_SERVICE',
+        'SUPPLIER_MASTER_DATA_READ',
+        'SUPPLIER_MASTER_DATA_MANAGE',
+      ]),
+    );
+    expect(preparationLogin.body.capabilities).not.toContain('SUPPLIER_DASHBOARD_READ');
+    const preparationTemporaryPassword = preparation.body.credential.temporaryPassword as string;
+    const preparationPassword = 'Preparation-Integration-Password-456';
+    const preparationPasswordChange = await request(app.getHttpServer())
+      .post('/api/v1/auth/supplier/change-password')
+      .set('Origin', supplierOrigin)
+      .set('Cookie', preparationLogin.headers['set-cookie'] ?? '')
+      .set('X-CSRF-Token', preparationLogin.body.csrfToken)
+      .send({
+        currentPassword: preparationTemporaryPassword,
+        newPassword: preparationPassword,
+      });
+    expect(preparationPasswordChange.status).toBe(204);
+    const preparationRelogin = await request(app.getHttpServer())
+      .post('/api/v1/auth/supplier/login')
+      .set('Origin', supplierOrigin)
+      .set('Content-Type', 'application/json')
+      .send({
+        supplierCode: externalCode,
+        username: preparationUsername,
+        password: preparationPassword,
+      });
+    expect(preparationRelogin.status).toBe(200);
+    const preparationCookie = preparationRelogin.headers['set-cookie'] ?? '';
+    const setupReadiness = await request(app.getHttpServer())
+      .get('/api/v1/supplier/setup-readiness')
+      .set('Cookie', preparationCookie);
+    expect(setupReadiness.status).toBe(200);
+    const operationalDenied = await request(app.getHttpServer())
+      .get('/api/v1/supplier/dashboard')
+      .set('Cookie', preparationCookie);
+    expect(operationalDenied.status).toBe(403);
+    expect(operationalDenied.body.code).toBe('FORBIDDEN');
 
     const preflight = await request(app.getHttpServer())
       .post(`/api/v1/tmmin/suppliers/${external.body.supplier.id}/source/preflight`)

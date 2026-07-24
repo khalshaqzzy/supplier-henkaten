@@ -30,6 +30,8 @@ export function presentHenkatenSummary(row: SummaryRow) {
     jobId: row.jobId,
     partId: row.partId,
     status: row.status,
+    sourceMode: row.sourceMode,
+    sourceEpoch: row.sourceEpoch,
     category: row.category,
     businessDate: databaseDate(row.businessDate),
     occurredAt: row.occurredAt.toISOString(),

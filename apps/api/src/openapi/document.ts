@@ -67,6 +67,8 @@ import {
   emergencyStartShiftRequestSchema,
   endShiftRequestSchema,
   henkatenDetailSchema,
+  henkatenFormOptionsQuerySchema,
+  henkatenFormOptionsSchema,
   henkatenListQuerySchema,
   henkatenPageSchema,
   henkatenTransitionSchema,
@@ -91,6 +93,7 @@ import {
   notificationSchema,
   notificationUnreadCountSchema,
   supplierDashboardSchema,
+  supplierSetupReadinessSchema,
   tmminDashboardSchema,
   createExternalClientRequestSchema,
   externalBatchRequestSchema,
@@ -408,6 +411,13 @@ function readModelPaths() {
         responses: { '200': json('Supplier dashboard', supplierDashboardSchema) },
       },
     },
+    '/api/v1/supplier/setup-readiness': {
+      get: {
+        responses: {
+          '200': json('Supplier setup readiness', supplierSetupReadinessSchema),
+        },
+      },
+    },
     '/api/v1/supplier/audit': {
       get: {
         requestParams: { query: auditQuerySchema },
@@ -588,6 +598,12 @@ function operationalPaths() {
         },
       },
     },
+    '/api/v1/supplier/henkatens/form-options': {
+      get: {
+        requestParams: { query: henkatenFormOptionsQuerySchema },
+        responses: { '200': json('Henkaten form options', henkatenFormOptionsSchema) },
+      },
+    },
     '/api/v1/supplier/henkatens/{id}': {
       get: {
         requestParams: shiftId,
@@ -607,7 +623,10 @@ function operationalPaths() {
     },
     '/api/v1/supplier/henkatens/{id}/withdraw': {
       post: {
-        requestParams: shiftId,
+        requestParams: {
+          ...shiftId,
+          header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }),
+        },
         requestBody: body(withdrawHenkatenRequestSchema),
         responses: {
           '201': json('Withdrawn Henkaten', henkatenDetailSchema),

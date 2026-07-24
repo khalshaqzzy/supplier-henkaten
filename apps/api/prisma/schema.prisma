@@ -307,6 +307,7 @@ model AuditEvent {
   actorRole       UserRole?
   actorSupplierId String?     @db.Uuid
   supplierId      String?     @db.Uuid
+  lineId          String?     @db.Uuid
   action          String      @db.VarChar(150)
   resourceType    String      @db.VarChar(100)
   resourceId      String?     @db.Uuid
@@ -322,6 +323,7 @@ model AuditEvent {
 
   @@index([supplierId, occurredAt(sort: Desc)])
   @@index([supplierId, occurredAt(sort: Desc), id(sort: Desc)])
+  @@index([supplierId, lineId, occurredAt(sort: Desc), id(sort: Desc)])
   @@index([actorUserId, occurredAt(sort: Desc)])
   @@index([resourceType, resourceId, occurredAt(sort: Desc)])
 }

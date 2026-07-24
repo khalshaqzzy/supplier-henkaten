@@ -2,7 +2,11 @@ import { createHash } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
 
-import type { CreateHenkatenRequest, HenkatenListQuery } from '@tmmin-henkaten/contracts';
+import type {
+  CreateHenkatenRequest,
+  HenkatenFormOptionsQuery,
+  HenkatenListQuery,
+} from '@tmmin-henkaten/contracts';
 
 import type { Prisma } from '../generated/prisma/client.js';
 import type { MutationContext } from '../administration/mutation-context.js';
@@ -409,6 +413,7 @@ export class HenkatenService {
         {
           ...auditInput(context, scope.supplierId, 'HENKATEN_WITHDRAWN', id, {
             identifier: current.identifier,
+            lineId: current.lineId,
           }),
           reason: input.reason,
         },
@@ -480,6 +485,103 @@ export class HenkatenService {
     });
     if (!row) throw missing('Henkaten');
     return presentHenkatenDetail(row);
+  }
+
+  async formOptions(scope: TenantScope, query: HenkatenFormOptionsQuery) {
+    const partSearch = query.part ? normalizeLookup(query.part) : null;
+    const [checklist, parts, members] = await Promise.all([
+      this.prisma.checklistVersion.findFirst({
+        where: {
+          supplierId: scope.supplierId,
+          category: query.category,
+          template: { active: true },
+        },
+        include: { items: { orderBy: { displayOrder: 'asc' } } },
+        orderBy: { versionNumber: 'desc' },
+      }),
+      this.prisma.part.findMany({
+        where: {
+          supplierId: scope.supplierId,
+          active: true,
+          ...(partSearch
+            ? {
+                OR: [
+                  { normalizedPartNumber: { contains: partSearch } },
+                  { normalizedPartName: { contains: partSearch } },
+                ],
+              }
+            : {}),
+        },
+        orderBy: [{ normalizedPartNumber: 'asc' }, { id: 'asc' }],
+        take: 50,
+      }),
+      this.prisma.member.findMany({
+        where: { supplierId: scope.supplierId, active: true, role: 'MP' },
+        select: {
+          id: true,
+          fullName: true,
+          registrationNumber: true,
+          reservations: { where: { releasedAt: null }, select: { id: true }, take: 1 },
+          effectiveWorkingAssignments: {
+            where: { active: true },
+            orderBy: { updatedAt: 'desc' },
+            take: 1,
+            select: {
+              id: true,
+              version: true,
+              shiftRunId: true,
+              lineId: true,
+              jobId: true,
+              line: { select: { name: true } },
+              job: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
+        take: 500,
+      }),
+    ]);
+    return {
+      generatedAt: new Date().toISOString(),
+      checklist: checklist
+        ? {
+            id: checklist.id,
+            category: checklist.category,
+            versionNumber: checklist.versionNumber,
+            publishedAt: checklist.publishedAt.toISOString(),
+            items: checklist.items.map((item) => ({
+              id: item.id,
+              label: item.label,
+              displayOrder: item.displayOrder,
+            })),
+          }
+        : null,
+      parts: parts.map((part) => ({
+        id: part.id,
+        partNumber: part.partNumber,
+        partName: part.partName,
+      })),
+      replacementMembers: members.map((member) => {
+        const assignment = member.effectiveWorkingAssignments[0];
+        return {
+          id: member.id,
+          fullName: member.fullName,
+          registrationNumber: member.registrationNumber,
+          reserved: member.reservations.length > 0,
+          currentAssignment: assignment
+            ? {
+                id: assignment.id,
+                version: assignment.version,
+                shiftRunId: assignment.shiftRunId,
+                lineId: assignment.lineId,
+                lineName: assignment.line.name,
+                jobId: assignment.jobId,
+                jobName: assignment.job.name,
+              }
+            : null,
+        };
+      }),
+    };
   }
 
   async clonePrefill(scope: TenantScope, id: string, principal: RequestPrincipal) {

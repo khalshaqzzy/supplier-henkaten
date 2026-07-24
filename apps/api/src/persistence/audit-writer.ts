@@ -17,6 +17,7 @@ export type AuditInput = {
   actorRole?: UserRole;
   actorSupplierId?: string;
   supplierId?: string;
+  lineId?: string;
   action: string;
   resourceType: string;
   resourceId?: string;
@@ -36,12 +37,14 @@ export class AuditWriter {
   constructor(private readonly prisma: PrismaService) {}
 
   async write(input: AuditInput, client: AuditClient = this.prisma): Promise<void> {
+    const lineId = input.lineId ?? inferredLineId(input.changeSummary);
     const data: Prisma.AuditEventUncheckedCreateInput = {
       actorKind: input.actorKind,
       ...(input.actorUserId ? { actorUserId: input.actorUserId } : {}),
       ...(input.actorRole ? { actorRole: input.actorRole } : {}),
       ...(input.actorSupplierId ? { actorSupplierId: input.actorSupplierId } : {}),
       ...(input.supplierId ? { supplierId: input.supplierId } : {}),
+      ...(lineId ? { lineId } : {}),
       action: input.action,
       resourceType: input.resourceType,
       ...(input.resourceId ? { resourceId: input.resourceId } : {}),
@@ -60,4 +63,9 @@ export class AuditWriter {
       data,
     });
   }
+}
+
+function inferredLineId(changeSummary?: Record<string, unknown>): string | undefined {
+  const value = changeSummary?.lineId;
+  return typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value) ? value : undefined;
 }

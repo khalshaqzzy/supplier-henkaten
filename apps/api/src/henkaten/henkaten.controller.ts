@@ -4,12 +4,14 @@ import {
   createHenkatenRequestSchema,
   decideHenkatenRequestSchema,
   henkatenListQuerySchema,
+  henkatenFormOptionsQuerySchema,
   opaqueIdSchema,
   rerouteSupervisorRequestSchema,
   withdrawHenkatenRequestSchema,
   type CreateHenkatenRequest,
   type DecideHenkatenRequest,
   type HenkatenListQuery,
+  type HenkatenFormOptionsQuery,
   type RerouteSupervisorRequest,
 } from '@tmmin-henkaten/contracts';
 
@@ -58,6 +60,15 @@ export class SupplierHenkatenController {
       principal,
       mutationContext(request),
     );
+  }
+
+  @RequireCapabilities('SUPPLIER_HENKATEN_SUBMIT')
+  @Get('/form-options')
+  formOptions(
+    @ValidatedQuery(henkatenFormOptionsQuerySchema) query: HenkatenFormOptionsQuery,
+    @Req() request: ContextRequest,
+  ) {
+    return this.henkatens.formOptions(this.access.supplierScope(request), query);
   }
 
   @RequireCapabilities('SUPPLIER_HENKATEN_DECIDE')

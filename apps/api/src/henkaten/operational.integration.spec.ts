@@ -282,6 +282,26 @@ describe('Hosted shift and Henkaten core', () => {
     await app.close();
   });
 
+  it('serves submit-scoped current checklist, part search, and replacement movement context', async () => {
+    const options = await request(app.getHttpServer())
+      .get('/api/v1/supplier/henkatens/form-options?category=MAN&part=Operational')
+      .set('Cookie', leaderCookie);
+    expect(options.status).toBe(200);
+    const body = responseBody<{
+      checklist: { id: string; items: unknown[] } | null;
+      parts: Array<{ id: string }>;
+      replacementMembers: Array<{
+        id: string;
+        reserved: boolean;
+        currentAssignment: { id: string; version: number } | null;
+      }>;
+    }>(options);
+    expect(body.checklist?.id).toBe(checklists.get('MAN')!.versionId);
+    expect(body.checklist?.items).toHaveLength(1);
+    expect(body.parts.some((part) => part.id === partId)).toBe(true);
+    expect(body.replacementMembers.some((member) => member.id === replacementMpId)).toBe(true);
+  });
+
   it('creates one durable slot under concurrent preflight and starts atomically once', async () => {
     const input = { lineId, shiftTemplateId, businessDate };
     const plans = await Promise.all([
@@ -517,8 +537,8 @@ describe('Hosted shift and Henkaten core', () => {
         machinePayload(checklists.get('MACHINE')!),
         'preparation-denied',
       );
-      expect(preparationDenied.status).toBe(409);
-      expect(preparationDenied.body.code).toBe('SOURCE_MODE_MISMATCH');
+      expect(preparationDenied.status).toBe(403);
+      expect(preparationDenied.body.code).toBe('FORBIDDEN');
     } finally {
       await prisma.userSession.updateMany({
         where: { userId: leaderUserId, revokedAt: null },
@@ -796,6 +816,26 @@ describe('Hosted shift and Henkaten core', () => {
   it('serves durable notifications, scoped board/dashboard, and redacted audit reads', async () => {
     await app.get(OutboxService).processBatch();
 
+    const session = await request(app.getHttpServer())
+      .get('/api/v1/auth/supplier/session')
+      .set('Cookie', adminCookie);
+    expect(session.status).toBe(200);
+    expect(session.body.capabilities).toContain('SUPPLIER_DASHBOARD_READ');
+    expect(session.body.supplier).toMatchObject({
+      id: supplierId,
+      code: supplierCode,
+      timezone: 'Asia/Jakarta',
+      sourceMode: 'HOSTED',
+      sourceEpoch: 1,
+    });
+
+    const readiness = await request(app.getHttpServer())
+      .get('/api/v1/supplier/setup-readiness')
+      .set('Cookie', adminCookie);
+    expect(readiness.status).toBe(200);
+    expect(readiness.body.areas).toHaveLength(6);
+    expect(readiness.body).toHaveProperty('nextArea');
+
     const supervisorNotifications = await request(app.getHttpServer())
       .get('/api/v1/supplier/notifications')
       .set('Cookie', supervisorCookie);
@@ -821,11 +861,13 @@ describe('Hosted shift and Henkaten core', () => {
     const boardBody = responseBody<{
       lines: Array<{
         lineId: string;
+        activeOverride: unknown;
         jobs: Array<{ indicators: unknown[] }>;
       }>;
     }>(board);
     expect(boardBody.lines.some((line) => line.lineId === lineId)).toBe(true);
     const mainLine = boardBody.lines.find((line) => line.lineId === lineId)!;
+    expect(mainLine).toHaveProperty('activeOverride');
     expect(mainLine.jobs).toHaveLength(2);
     expect(mainLine.jobs.some((job) => job.indicators.length > 0)).toBe(true);
 
@@ -835,12 +877,68 @@ describe('Hosted shift and Henkaten core', () => {
     expect(dashboard.status).toBe(200);
     expect(dashboard.body.totals.all).toBeGreaterThan(0);
     expect(dashboard.body.pendingApprovals.supervisor).toBeGreaterThanOrEqual(0);
+    expect(dashboard.body.approvalAging).toHaveLength(4);
+    expect(Array.isArray(dashboard.body.trend)).toBe(true);
+    expect(Array.isArray(dashboard.body.assignmentIssues)).toBe(true);
+    expect(Array.isArray(dashboard.body.recentOverrides)).toBe(true);
+
+    const hostedList = await request(app.getHttpServer())
+      .get('/api/v1/supplier/henkatens?limit=1')
+      .set('Cookie', adminCookie);
+    expect(hostedList.status).toBe(200);
+    expect(hostedList.body.items[0]).toMatchObject({ sourceMode: 'HOSTED', sourceEpoch: 1 });
 
     const audit = await request(app.getHttpServer())
       .get('/api/v1/supplier/audit')
       .set('Cookie', adminCookie);
     expect(audit.status).toBe(200);
-    expect(JSON.stringify(audit.body)).not.toMatch(/passwordHash|tokenHash|authorization/i);
+    const auditBody = responseBody<{ items: Array<{ lineId: string | null }> }>(audit);
+    expect(JSON.stringify(auditBody)).not.toMatch(/passwordHash|tokenHash|authorization/i);
+    expect(auditBody.items.every((item) => 'lineId' in item)).toBe(true);
+
+    const foreignLineId = randomUUID();
+    await prisma.auditEvent.create({
+      data: {
+        actorKind: 'SYSTEM',
+        supplierId,
+        lineId: foreignLineId,
+        action: 'FOREIGN_LINE_EVIDENCE',
+        resourceType: 'ShiftRun',
+        resourceId: randomUUID(),
+        correlationId: randomUUID(),
+        sourceMode: 'HOSTED',
+        result: 'SUCCESS',
+      },
+    });
+    const allowedSupervisorLines = new Set(
+      (
+        await prisma.shiftRun.findMany({
+          where: { supplierId, supervisorMemberId: supervisorId },
+          distinct: ['lineId'],
+          select: { lineId: true },
+        })
+      ).map(({ lineId: allowedLineId }) => allowedLineId),
+    );
+    const supervisorAudit = await request(app.getHttpServer())
+      .get('/api/v1/supplier/audit')
+      .set('Cookie', supervisorCookie);
+    expect(supervisorAudit.status).toBe(200);
+    const supervisorAuditBody = responseBody<{
+      items: Array<{ lineId: string | null; action: string }>;
+    }>(supervisorAudit);
+    expect(
+      supervisorAuditBody.items.every(
+        (item) => item.lineId !== null && allowedSupervisorLines.has(item.lineId),
+      ),
+    ).toBe(true);
+    expect(supervisorAuditBody.items.some((item) => item.action === 'FOREIGN_LINE_EVIDENCE')).toBe(
+      false,
+    );
+
+    const qcAudit = await request(app.getHttpServer())
+      .get('/api/v1/supplier/audit')
+      .set('Cookie', qcCookie);
+    expect(qcAudit.status).toBe(200);
 
     const globalDashboard = await request(app.getHttpServer())
       .get('/api/v1/tmmin/dashboard')

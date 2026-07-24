@@ -37,6 +37,10 @@ export class ReadModelService {
           include: { approvalRoutes: true },
           orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
         },
+        assignmentIssues: {
+          where: { status: 'OPEN' },
+          select: { id: true },
+        },
       },
       orderBy: [{ lineCodeSnapshot: 'asc' }, { id: 'asc' }],
     });
@@ -80,6 +84,15 @@ export class ReadModelService {
           memberId: shift.lineLeaderMemberId,
           name: shift.lineLeaderNameSnapshot,
         },
+        activeOverride:
+          shift.startedWithOverride && shift.overrideReason && shift.startedAt
+            ? {
+                reason: shift.overrideReason,
+                startedAt: shift.startedAt.toISOString(),
+                unresolvedIssueCount: shift.assignmentIssues.length,
+                failedChecks: overrideChecks(shift.overrideFailedChecks),
+              }
+            : null,
         jobs: shift.workingAssignments.map((assignment) => ({
           assignmentId: assignment.id,
           jobId: assignment.jobId,
@@ -116,6 +129,42 @@ export class ReadModelService {
   }
 
   async supplierDashboard(scope: TenantScope, principal: RequestPrincipal, query: DashboardQuery) {
+    const auditLineIds = await this.auditLineScope(scope, principal);
+    const roleShiftScope = shiftScope(principal);
+    const [lineOptions, shiftTemplateOptions] = await Promise.all([
+      this.prisma.line.findMany({
+        where: {
+          supplierId: scope.supplierId,
+          active: true,
+          ...(Object.keys(roleShiftScope).length ? { shiftRuns: { some: roleShiftScope } } : {}),
+        },
+        orderBy: [{ displayOrder: 'asc' }, { id: 'asc' }],
+        select: { id: true, code: true, name: true },
+      }),
+      this.prisma.shiftTemplate.findMany({
+        where: {
+          supplierId: scope.supplierId,
+          active: true,
+          ...(Object.keys(roleShiftScope).length ? { shiftRuns: { some: roleShiftScope } } : {}),
+        },
+        orderBy: [{ displayOrder: 'asc' }, { id: 'asc' }],
+        select: { id: true, name: true },
+      }),
+    ]);
+    const scopedShiftWhere: Prisma.ShiftRunWhereInput = {
+      supplierId: scope.supplierId,
+      ...shiftScope(principal),
+      ...(query.lineId ? { lineId: query.lineId } : {}),
+      ...(query.shiftTemplateId ? { shiftTemplateId: query.shiftTemplateId } : {}),
+      ...(query.from || query.to
+        ? {
+            scheduledStartAt: {
+              ...(query.from ? { gte: new Date(query.from) } : {}),
+              ...(query.to ? { lte: new Date(query.to) } : {}),
+            },
+          }
+        : {}),
+    };
     const where: Prisma.HenkatenWhereInput = {
       supplierId: scope.supplierId,
       ...henkatenScope(principal),
@@ -130,6 +179,17 @@ export class ReadModelService {
       ...(query.status ? { status: query.status } : {}),
       ...(query.category ? { category: query.category } : {}),
       ...(query.lineId ? { lineId: query.lineId } : {}),
+      ...(query.shiftTemplateId ? { shiftRun: { shiftTemplateId: query.shiftTemplateId } } : {}),
+      ...(query.approvalRoute || query.approvalStatus
+        ? {
+            approvalRoutes: {
+              some: {
+                ...(query.approvalRoute ? { route: query.approvalRoute } : {}),
+                ...(query.approvalStatus ? { status: query.approvalStatus } : {}),
+              },
+            },
+          }
+        : {}),
       ...(query.part
         ? {
             OR: [
@@ -139,69 +199,119 @@ export class ReadModelService {
           }
         : {}),
     };
-    const [status, category, line, part, routes, warnings, issues, overrides, recent] =
-      await Promise.all([
-        this.prisma.henkaten.groupBy({
-          by: ['status'],
-          where,
-          _count: { _all: true },
-        }),
-        this.prisma.henkaten.groupBy({
-          by: ['category'],
-          where,
-          _count: { _all: true },
-        }),
-        this.prisma.henkaten.groupBy({
-          by: ['lineNameSnapshot'],
-          where,
-          _count: { _all: true },
-          orderBy: { _count: { lineNameSnapshot: 'desc' } },
-          take: 20,
-        }),
-        this.prisma.henkaten.groupBy({
-          by: ['partNumberSnapshot'],
-          where,
-          _count: { _all: true },
-          orderBy: { _count: { partNumberSnapshot: 'desc' } },
-          take: 20,
-        }),
-        this.prisma.henkatenApprovalRoute.groupBy({
-          by: ['route'],
-          where: {
-            supplierId: scope.supplierId,
-            status: 'PENDING',
-            henkaten: where,
-          },
-          _count: { _all: true },
-        }),
-        this.prisma.warningInstance.count({
-          where: { supplierId: scope.supplierId, status: 'OPEN', henkaten: where },
-        }),
-        this.prisma.assignmentIssue.count({
-          where: {
-            supplierId: scope.supplierId,
-            status: 'OPEN',
-            ...(Object.keys(shiftScope(principal)).length
-              ? { shiftRun: shiftScope(principal) }
-              : {}),
-          },
-        }),
-        this.prisma.shiftRun.count({
-          where: {
-            supplierId: scope.supplierId,
-            startedWithOverride: true,
-            ...shiftScope(principal),
-          },
-        }),
-        this.prisma.auditEvent.findMany({
-          where: { supplierId: scope.supplierId },
-          orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-          take: 20,
-        }),
-      ]);
+    const [
+      status,
+      category,
+      line,
+      part,
+      routes,
+      pendingRouteRows,
+      warnings,
+      issueGroups,
+      overrideCount,
+      recentOverrides,
+      trendRows,
+      recent,
+    ] = await Promise.all([
+      this.prisma.henkaten.groupBy({
+        by: ['status'],
+        where,
+        _count: { _all: true },
+      }),
+      this.prisma.henkaten.groupBy({
+        by: ['category'],
+        where,
+        _count: { _all: true },
+      }),
+      this.prisma.henkaten.groupBy({
+        by: ['lineNameSnapshot'],
+        where,
+        _count: { _all: true },
+        orderBy: { _count: { lineNameSnapshot: 'desc' } },
+        take: 20,
+      }),
+      this.prisma.henkaten.groupBy({
+        by: ['partNumberSnapshot'],
+        where,
+        _count: { _all: true },
+        orderBy: { _count: { partNumberSnapshot: 'desc' } },
+        take: 20,
+      }),
+      this.prisma.henkatenApprovalRoute.groupBy({
+        by: ['route'],
+        where: {
+          supplierId: scope.supplierId,
+          status: 'PENDING',
+          henkaten: where,
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.henkatenApprovalRoute.findMany({
+        where: {
+          supplierId: scope.supplierId,
+          status: 'PENDING',
+          henkaten: where,
+        },
+        select: { createdAt: true },
+      }),
+      this.prisma.warningInstance.count({
+        where: { supplierId: scope.supplierId, status: 'OPEN', henkaten: where },
+      }),
+      this.prisma.assignmentIssue.groupBy({
+        by: ['type'],
+        where: {
+          supplierId: scope.supplierId,
+          status: 'OPEN',
+          shiftRun: scopedShiftWhere,
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.shiftRun.count({
+        where: {
+          startedWithOverride: true,
+          ...scopedShiftWhere,
+        },
+      }),
+      this.prisma.shiftRun.findMany({
+        where: {
+          startedWithOverride: true,
+          ...scopedShiftWhere,
+        },
+        orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
+        take: 10,
+        select: {
+          id: true,
+          lineId: true,
+          lineNameSnapshot: true,
+          businessDate: true,
+          overrideReason: true,
+          startedAt: true,
+        },
+      }),
+      this.prisma.henkaten.findMany({
+        where,
+        select: { occurredAt: true, category: true, status: true },
+        orderBy: { occurredAt: 'asc' },
+      }),
+      this.prisma.auditEvent.findMany({
+        where: {
+          supplierId: scope.supplierId,
+          ...(auditLineIds ? { lineId: { in: auditLineIds } } : {}),
+        },
+        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+        take: 20,
+      }),
+    ]);
     const byStatus = new Map(status.map((item) => [item.status, item._count._all]));
+    const approvalAging = approvalAgingBuckets(pendingRouteRows.map(({ createdAt }) => createdAt));
+    const trend = aggregateDashboardTrend(trendRows, query.granularity);
+    const unresolvedIssueCount = issueGroups.reduce((sum, item) => sum + item._count._all, 0);
     return {
       generatedAt: new Date().toISOString(),
+      filterOptions: {
+        lines: lineOptions,
+        shiftTemplates: shiftTemplateOptions,
+      },
       totals: {
         all: status.reduce((sum, item) => sum + item._count._all, 0),
         open: byStatus.get('OPEN') ?? 0,
@@ -209,13 +319,33 @@ export class ReadModelService {
         rejected: byStatus.get('REJECTED') ?? 0,
         cancelled: byStatus.get('CANCELLED') ?? 0,
         activeWarnings: warnings,
-        unresolvedAssignmentIssues: issues,
-        emergencyOverrides: overrides,
+        unresolvedAssignmentIssues: unresolvedIssueCount,
+        emergencyOverrides: overrideCount,
       },
       pendingApprovals: {
         supervisor: routes.find(({ route }) => route === 'SUPERVISOR')?._count._all ?? 0,
         qc: routes.find(({ route }) => route === 'QC')?._count._all ?? 0,
       },
+      approvalAging,
+      trend,
+      assignmentIssues: issueGroups.map((item) => ({
+        type: item.type,
+        count: item._count._all,
+      })),
+      recentOverrides: recentOverrides.flatMap((shift) =>
+        shift.overrideReason && shift.startedAt
+          ? [
+              {
+                shiftRunId: shift.id,
+                lineId: shift.lineId,
+                lineName: shift.lineNameSnapshot,
+                businessDate: shift.businessDate.toISOString().slice(0, 10),
+                reason: shift.overrideReason,
+                startedAt: shift.startedAt.toISOString(),
+              },
+            ]
+          : [],
+      ),
       byCategory: category.map((item) => ({ label: item.category, count: item._count._all })),
       byLine: line.map((item) => ({ label: item.lineNameSnapshot, count: item._count._all })),
       byPart: part.map((item) => ({ label: item.partNumberSnapshot, count: item._count._all })),
@@ -342,8 +472,15 @@ export class ReadModelService {
     };
   }
 
-  async supplierAudit(scope: TenantScope, query: AuditQuery) {
-    return this.auditPage({ supplierId: scope.supplierId }, query);
+  async supplierAudit(scope: TenantScope, principal: RequestPrincipal, query: AuditQuery) {
+    const lineIds = await this.auditLineScope(scope, principal);
+    return this.auditPage(
+      {
+        supplierId: scope.supplierId,
+        ...(lineIds ? { lineId: { in: lineIds } } : {}),
+      },
+      query,
+    );
   }
 
   async tmminAudit(query: AuditQuery) {
@@ -374,6 +511,7 @@ export class ReadModelService {
         action: row.action,
         resourceType: row.resourceType,
         resourceId: row.resourceId,
+        lineId: row.lineId,
         changeSummary: redact(row.changeSummary),
         result: row.result,
         correlationId: row.correlationId,
@@ -383,6 +521,25 @@ export class ReadModelService {
         nextCursor: hasNextPage && items.at(-1) ? encodeCursor(items.at(-1)!.id) : null,
       },
     };
+  }
+
+  private async auditLineScope(
+    scope: TenantScope,
+    principal: RequestPrincipal,
+  ): Promise<string[] | null> {
+    if (['SUPPLIER_ADMIN', 'QC'].includes(principal.role)) return null;
+    if (!principal.memberId) return [];
+    const shifts = await this.prisma.shiftRun.findMany({
+      where: {
+        supplierId: scope.supplierId,
+        ...(principal.role === 'SUPERVISOR'
+          ? { supervisorMemberId: principal.memberId }
+          : { lineLeaderMemberId: principal.memberId }),
+      },
+      distinct: ['lineId'],
+      select: { lineId: true },
+    });
+    return shifts.map(({ lineId }) => lineId);
   }
 }
 
@@ -430,4 +587,114 @@ function redact(value: Prisma.JsonValue | null): Record<string, unknown> | null 
       .filter(([key]) => !denied.test(key))
       .map(([key, entry]) => [key, typeof entry === 'string' ? entry.slice(0, 500) : entry]),
   );
+}
+
+function overrideChecks(value: Prisma.JsonValue | null): Array<{
+  code: string;
+  message: string;
+  resourceType?: string;
+  resourceId?: string;
+}> {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+    const code = 'code' in entry && typeof entry.code === 'string' ? entry.code : null;
+    const message = 'message' in entry && typeof entry.message === 'string' ? entry.message : null;
+    if (!code || !message) return [];
+    const resourceType =
+      'resourceType' in entry && typeof entry.resourceType === 'string'
+        ? entry.resourceType
+        : undefined;
+    const resourceId =
+      'resourceId' in entry && typeof entry.resourceId === 'string' ? entry.resourceId : undefined;
+    return [
+      {
+        code,
+        message,
+        ...(resourceType ? { resourceType } : {}),
+        ...(resourceId ? { resourceId } : {}),
+      },
+    ];
+  });
+}
+
+function approvalAgingBuckets(createdAt: Date[]) {
+  const counts = new Map<string, number>([
+    ['UNDER_4_HOURS', 0],
+    ['FOUR_TO_EIGHT_HOURS', 0],
+    ['EIGHT_TO_24_HOURS', 0],
+    ['OVER_24_HOURS', 0],
+  ]);
+  const now = Date.now();
+  for (const created of createdAt) {
+    const hours = (now - created.getTime()) / 3_600_000;
+    const bucket =
+      hours < 4
+        ? 'UNDER_4_HOURS'
+        : hours < 8
+          ? 'FOUR_TO_EIGHT_HOURS'
+          : hours < 24
+            ? 'EIGHT_TO_24_HOURS'
+            : 'OVER_24_HOURS';
+    counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
+  }
+  return [...counts].map(([bucket, count]) => ({ bucket, count }));
+}
+
+function aggregateDashboardTrend(
+  rows: Array<{
+    occurredAt: Date;
+    category: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
+    status: 'OPEN' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  }>,
+  granularity: 'DAY' | 'WEEK' | 'MONTH',
+) {
+  const periods = new Map<
+    string,
+    {
+      periodStart: string;
+      total: number;
+      man: number;
+      machine: number;
+      material: number;
+      method: number;
+      approved: number;
+      rejected: number;
+      cancelled: number;
+    }
+  >();
+  for (const row of rows) {
+    const periodStart = dashboardPeriod(row.occurredAt, granularity);
+    const current = periods.get(periodStart) ?? {
+      periodStart,
+      total: 0,
+      man: 0,
+      machine: 0,
+      material: 0,
+      method: 0,
+      approved: 0,
+      rejected: 0,
+      cancelled: 0,
+    };
+    current.total += 1;
+    current[row.category.toLowerCase() as 'man' | 'machine' | 'material' | 'method'] += 1;
+    if (row.status !== 'OPEN') {
+      current[row.status.toLowerCase() as 'approved' | 'rejected' | 'cancelled'] += 1;
+    }
+    periods.set(periodStart, current);
+  }
+  return [...periods.values()].sort((left, right) =>
+    left.periodStart.localeCompare(right.periodStart),
+  );
+}
+
+function dashboardPeriod(value: Date, granularity: 'DAY' | 'WEEK' | 'MONTH'): string {
+  const date = new Date(value);
+  date.setUTCHours(0, 0, 0, 0);
+  if (granularity === 'WEEK') {
+    const day = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() - day + 1);
+  }
+  if (granularity === 'MONTH') date.setUTCDate(1);
+  return date.toISOString();
 }

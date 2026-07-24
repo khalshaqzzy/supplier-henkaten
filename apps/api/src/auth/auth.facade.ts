@@ -4,7 +4,9 @@ import type { Request, Response } from 'express';
 import type { IdentityRealm } from '../generated/prisma/client.js';
 import { ProblemException } from '../common/problem.js';
 import type { ContextRequest } from '../common/request-context.js';
+import { capabilitiesForPrincipal } from '../common/policy.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
+import { PrismaService } from '../persistence/prisma.service.js';
 import { cookieName } from './auth.guards.js';
 import { AuthService } from './auth.service.js';
 import { SessionService } from './session.service.js';
@@ -14,6 +16,7 @@ export class AuthControllerFacade {
   constructor(
     private readonly auth: AuthService,
     private readonly sessions: SessionService,
+    private readonly prisma: PrismaService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -40,19 +43,22 @@ export class AuthControllerFacade {
     });
     setSessionCookie(response, realm, session.rawToken, session.absoluteExpiresAt, this.config);
     response.setHeader('Cache-Control', 'no-store');
+    const principal = {
+      userId: user.id,
+      displayName: user.displayName,
+      realm: user.realm,
+      role: user.role,
+      ...(user.supplierId ? { supplierId: user.supplierId } : {}),
+      purpose:
+        user.supplierId && realm === 'SUPPLIER'
+          ? await this.sessions.purpose(session.id)
+          : 'NORMAL',
+      mustChangePassword: user.mustChangePassword,
+    } as const;
     return {
-      principal: {
-        userId: user.id,
-        displayName: user.displayName,
-        realm: user.realm,
-        role: user.role,
-        ...(user.supplierId ? { supplierId: user.supplierId } : {}),
-        purpose:
-          user.supplierId && realm === 'SUPPLIER'
-            ? await this.sessions.purpose(session.id)
-            : 'NORMAL',
-        mustChangePassword: user.mustChangePassword,
-      },
+      principal,
+      capabilities: [...capabilitiesForPrincipal(principal)],
+      ...(await this.supplierContext(user.supplierId)),
       idleExpiresAt: session.idleExpiresAt.toISOString(),
       absoluteExpiresAt: session.absoluteExpiresAt.toISOString(),
       csrfToken: this.sessions.csrfToken(session.rawToken, session.id, realm),
@@ -62,16 +68,19 @@ export class AuthControllerFacade {
   async session(request: ContextRequest) {
     const principal = requirePrincipal(request);
     const expiry = await this.sessions.expiry(principal.sessionId);
+    const publicPrincipal = {
+      userId: principal.userId,
+      displayName: principal.displayName,
+      realm: principal.realm,
+      role: principal.role,
+      ...(principal.supplierId ? { supplierId: principal.supplierId } : {}),
+      purpose: principal.purpose,
+      mustChangePassword: principal.mustChangePassword,
+    } as const;
     return {
-      principal: {
-        userId: principal.userId,
-        displayName: principal.displayName,
-        realm: principal.realm,
-        role: principal.role,
-        ...(principal.supplierId ? { supplierId: principal.supplierId } : {}),
-        purpose: principal.purpose,
-        mustChangePassword: principal.mustChangePassword,
-      },
+      principal: publicPrincipal,
+      capabilities: [...capabilitiesForPrincipal(principal)],
+      ...(await this.supplierContext(principal.supplierId)),
       idleExpiresAt: expiry.idleExpiresAt.toISOString(),
       absoluteExpiresAt: expiry.absoluteExpiresAt.toISOString(),
       csrfToken: this.sessions.csrfToken(
@@ -111,6 +120,22 @@ export class AuthControllerFacade {
         detail: 'Login origin or content type is invalid.',
       });
     }
+  }
+
+  private async supplierContext(supplierId?: string | null) {
+    if (!supplierId) return {};
+    const supplier = await this.prisma.supplier.findUniqueOrThrow({
+      where: { id: supplierId },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        timezone: true,
+        sourceMode: true,
+        sourceEpoch: true,
+      },
+    });
+    return { supplier };
   }
 }
 

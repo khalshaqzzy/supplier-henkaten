@@ -20,6 +20,7 @@ import { RequireCapabilities } from '../common/policy.js';
 import type { ContextRequest } from '../common/request-context.js';
 import { parseWithSchema, ValidatedBody, ValidatedQuery } from '../common/zod.js';
 import { OperationalAccessService } from '../shifts/operational-access.service.js';
+import { HostedReadinessService } from '../administration/hosted-readiness.service.js';
 import { NotificationService } from './notification.service.js';
 import { ReadModelService } from './read-model.service.js';
 import { RealtimeService } from './realtime.service.js';
@@ -31,6 +32,7 @@ export class SupplierReadModelController {
     private readonly notifications: NotificationService,
     private readonly reads: ReadModelService,
     private readonly realtime: RealtimeService,
+    private readonly hostedReadiness: HostedReadinessService,
   ) {}
 
   @RequireCapabilities('SUPPLIER_NOTIFICATION_READ')
@@ -86,10 +88,21 @@ export class SupplierReadModelController {
     );
   }
 
+  @RequireCapabilities('SUPPLIER_MASTER_DATA_READ')
+  @Get('/setup-readiness')
+  setupReadiness(@Req() request: ContextRequest) {
+    const scope = this.access.supplierScope(request);
+    return this.hostedReadiness.evaluate(scope.supplierId);
+  }
+
   @RequireCapabilities('SUPPLIER_AUDIT_READ')
   @Get('/audit')
   audit(@ValidatedQuery(auditQuerySchema) query: AuditQuery, @Req() request: ContextRequest) {
-    return this.reads.supplierAudit(this.access.supplierScope(request), query);
+    return this.reads.supplierAudit(
+      this.access.supplierScope(request),
+      this.access.principal(request),
+      query,
+    );
   }
 
   @RequireCapabilities('SUPPLIER_BOARD_READ')
