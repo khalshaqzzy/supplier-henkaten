@@ -65,12 +65,13 @@ Kondisi repository setelah Phase 0-10:
   baseline telah tersedia;
 - role-scoped route, page-state, user-flow, dan frontend contract-gap specification tersedia di
   `.agent/PAGES.md`;
-- belum ada frontend, Playwright E2E, atau remote deployment files;
+- dua React/Vite frontend workspace dan shared Henkaten Design System tersedia; production feature
+  workflows, typed API client, session bootstrap, Playwright E2E, dan remote deployment belum ada;
 - materi slide tersedia sebagai reference-only input.
 
 Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8, Phase 9, dan Phase 10**
-Current phase: **tidak ada**
-Next phase: **Phase 11 - Frontend dan Shared UI Foundation (`planned`)**
+Current phase: **Phase 11 - Frontend dan Shared UI Foundation (`in_progress`)**
+Next subphase: **11.3 Typed API Client (`planned`)**
 
 Tidak ada application behavior yang boleh ditandai implemented sampai source code dan acceptance checks terkait benar-benar tersedia di repository.
 
@@ -3052,7 +3053,7 @@ Implementation note:
 
 ## 19. Phase 11 - Frontend dan Shared UI Foundation
 
-Status: **planned**
+Status: **in_progress**
 
 Goal: membuat dua React Vite applications, shared design primitives, typed API client, session handling, dan common UX states setelah backend contract freeze.
 
@@ -3069,7 +3070,7 @@ Unlocks:
 
 ### 11.1 Frontend Workspace Scaffold
 
-Status: **planned**
+Status: **completed**
 
 Dependency: Phase 10.
 
@@ -3098,9 +3099,17 @@ Exit criteria:
 
 - Dua frontend shells tersedia di workspace.
 
+Completion evidence (2026-07-24):
+
+- `apps/supplier-web` dan `apps/tmmin-web` tersedia sebagai React/Vite/TypeScript app terpisah.
+- `packages/ui` menjadi shared package tanpa direct database/backend dependency.
+- dev port `5173`/`5174` dan preview port `4173`/`4174` deterministic.
+- root product routes menyatakan Phase 11 foundation; public `/design` dipasang sebelum future
+  session/bootstrap boundary.
+
 ### 11.2 Shared Tailwind/shadcn UI Foundation
 
-Status: **planned**
+Status: **completed**
 
 Dependency: 11.1.
 
@@ -3135,6 +3144,19 @@ Data/migration impact:
 Exit criteria:
 
 - Feature pages dapat dibangun tanpa duplicated primitive components.
+
+Completion evidence (2026-07-24):
+
+- CSS-first Tailwind v4, shadcn-compatible workspace aliases, Radix behavior, Lucide, Inter Variable,
+  TanStack Table, dan Recharts terpasang.
+- `--hds-*` raw, semantic, state, domain, typography, spacing, shape, elevation, motion, density,
+  layer, breakpoint, focus, chart, dan component tokens tersedia dalam CSS dan typed registry.
+- shared catalog mencakup actions, inputs, navigation, feedback, overlays, data display, dan domain
+  components dengan controlled/uncontrolled API yang relevan.
+- `/design` pada kedua app merender token specimens, component state matrices, domain semantics,
+  accessibility contract, guidelines, dan delapan product patterns berdasarkan reference images.
+- unit/API, token contract, lint, typecheck, build, dan browser verification menjadi evidence
+  completion; detail command/result dicatat pada session handoff.
 
 ### 11.3 Typed API Client
 
@@ -5165,19 +5187,22 @@ No acceptance criterion may remain without an owning phase.
 
 Current recommended batch:
 
-1. Begin Phase 11.1 supplier/TMMIN Vite workspaces and shared UI package.
-2. Generate the typed API client from the frozen 140-operation backend contract.
-3. Establish session, CSRF mutation, problem mapping, accessibility, and browser-test foundations.
+1. Begin Phase 11.3 by generating the typed API client from the frozen 140-operation backend
+   contract.
+2. Establish realm-specific session, CSRF mutation, and RFC 9457 problem mapping foundations.
+3. Build Phase 11.4 route guards and accessibility/browser-test infrastructure on the completed
+   shared UI foundation.
 
 Initial implementation order inside the next coding batch:
 
-1. scaffold only the workspaces owned by Phase 11 and preserve strict ESM/TypeScript quality gates;
-2. derive frontend request/response types from shared Zod/OpenAPI rather than duplicating enums;
-3. implement realm-specific session bootstrap, logout, password flow, and CSRF-aware fetch wrapper;
-4. map RFC 9457 problem responses into loading/empty/error/forbidden/conflict/stale UI states;
-5. establish shared accessible desktop tokens/components without moving business policy client-side;
-6. add frontend unit/build checks and a real-API Playwright harness;
-7. keep Phase 12-14 feature screens and Phase 15 deployment files behind their owning dependencies.
+1. derive frontend request/response types from shared Zod/OpenAPI rather than duplicating enums;
+2. implement a shared CSRF-aware fetch boundary with correlation ID and cursor helpers;
+3. implement realm-specific session bootstrap, logout, forced-password flow, and safe return path;
+4. map RFC 9457 problem responses into the existing
+   loading/empty/error/forbidden/conflict/stale UI states;
+5. add route-level guards and real-API browser-test harnesses without moving authorization or
+   business policy client-side;
+6. keep Phase 12-14 feature screens and Phase 15 deployment files behind their owning dependencies.
 
 ## 32. Deferred dan Explicitly Out-of-scope
 

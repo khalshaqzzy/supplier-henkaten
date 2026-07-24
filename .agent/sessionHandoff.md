@@ -1,145 +1,177 @@
-# Session Handoff — Frontend Page and User-flow Specification
+# Session Handoff — Enterprise Design System dan Public `/design`
 
 Tanggal: 2026-07-24
+
 Branch: `staging`
-Status repository: Phase 0–10 selesai; Phase 11 `planned`
+
+Status repository: Phase 0–10 selesai; Phase 11 `in_progress`; Phase 11.1 dan 11.2 selesai
 
 ## 1. Current Objective and Outcome
 
-Frontend planning sekarang memiliki spesifikasi keputusan-lengkap untuk dua aplikasi tanpa
-mendefinisikan visual design:
+Frontend Phase 11 sekarang memiliki fondasi React/Vite untuk dua identity realm serta shared Henkaten
+Design System:
 
-- `.agent/PAGES.md` menetapkan fondasi UX, route, role visibility, information/action elements,
-  validation, page states, deep links, user flows, API dependency, dan contract gaps;
-- Supplier-facing specification mencakup Supplier Admin, Supervisor, Line Leader, QC, dan reduced
-  Hosted Preparation session;
-- TMMIN-facing specification memisahkan TMMIN Admin mutations dari TMMIN Quality read-only
-  monitoring;
-- Hosted dan External detail memiliki semantics berbeda dan tidak mencampur identity, PII,
-  assignment, atau source-of-truth;
-- setiap dependency yang belum tersedia ditandai `ADDITIVE API REQUIRED` atau `POLICY MISMATCH`;
-- ADR 0020 mengunci dual-app, role-scoped information architecture dan PRD-first gap handling.
+- `apps/supplier-web` berjalan pada dev port `5173`;
+- `apps/tmmin-web` berjalan pada dev port `5174`;
+- `packages/ui` menjadi runtime source bersama untuk token, primitive, domain component, composed
+  pattern, dan `DesignSystemShowcase`;
+- `/design` tersedia langsung tanpa login pada kedua app, dipasang sebelum future session guard,
+  tidak muncul dalam product navigation, memakai sample data non-sensitif, dan menetapkan
+  `noindex,nofollow`;
+- root route selain `/design` tetap berupa explicit frontend-foundation placeholder. Production
+  workflows dan API integration belum termasuk dalam pekerjaan ini.
 
-Belum ada frontend source code yang dibuat. Phase 11 tetap `planned`.
+`DesignSystemShowcase` memvisualisasikan seluruh token contract, public component catalog, domain
+semantics, accessibility contract, usage guidance, dan delapan critical product patterns dari
+`.agent/design/`.
 
-## 2. Files Changed
+## 2. Deep Visual Analysis dan Direction
 
-- `.agent/PAGES.md` — new normative frontend page and user-flow specification.
-- `docs/adr/0020-role-scoped-frontend-information-architecture.md` — accepted IA decision and
-  tradeoffs.
-- `.agent/implementationPhases.md` — references `PAGES.md` from Phases 11–14 without changing phase
-  status.
-- `.agent/sessionHandoff.md` — current session outcome, gaps, validation, and next action.
+Delapan reference image dianalisis sebagai satu enterprise UI family. Ciri yang dipertahankan:
 
-No public API, shared schema, database, migration, application runtime, or deployment file changed.
+- fixed sidebar, compact global header, canvas hampir putih, white surface, border tipis, dan
+  elevation rendah;
+- hierarchy page heading yang tegas, body copy ringkas, control 36 px, row 44 px, dan data density
+  tinggi;
+- filter bar, stat cards, dense data table, timeline, contextual right rail, readiness, dan blocker
+  sebagai pola utama;
+- orange terang untuk brand/current navigation/primary emphasis serta state colors yang vivid tetapi
+  tidak saling mencampur;
+- status selalu memiliki icon dan label selain color;
+- radius kecil, motion singkat, tanpa gradient, glow, glass, oversized radius, atau decorative
+  background.
 
-## 3. Decisions
+Revisi visual terakhir meningkatkan fidelity dengan:
 
-- `supplier-web` and `tmmin-web` retain separate session realms and route trees.
-- Navigation is capability-aware for usability, while backend authorization remains authoritative.
-- Hosted Preparation uses a reduced Supplier shell limited to setup/master data/checklists/default
-  assignments/account/logout.
-- URL query state preserves safe list/filter context; cursor paging and aggregation remain
-  server-authoritative.
-- Frontend must implement loading, empty, forbidden, retryable error, conflict, stale, and
-  realtime-disconnected behavior where applicable.
-- Temporary passwords and external client secrets are one-time response data and are not persisted.
-- PRD-complete pages remain specified even when the current API lacks a read model. Missing behavior
-  is not removed and may not be replaced with client-only domain policy.
-- TMMIN Quality remains read-only for supplier domain; notification read/unread is user-local state
-  only.
-- External records do not require Hosted member photo, registration number, credential, or
-  Assignment Board fields.
+- brand accent `#FF5A1F`;
+- accessible primary action `#D63F07` untuk mempertahankan white-text contrast, dengan bright
+  orange tetap dipakai pada brand mark dan current navigation;
+- information accent `#2F6FED`, success `#16A34A`, warning `#F59E0B`, dan danger `#F04438`;
+- 4M contract tetap PRD-authoritative: Man blue, Machine green, Material amber, Method red;
+- seluruh delapan pattern sekarang dirender di dalam full Supplier/TMMIN shell, bukan sebagai panel
+  terisolasi.
 
-## 4. Contract Gaps Identified
+Screenshot hanya menjadi visual input. Behavior yang tidak didukung PRD seperti Export, Save Draft,
+Skills, Calendars, source approval tambahan, auto-accept, dan tooling checks tidak diwarisi.
 
-Fifteen gaps are registered in `.agent/PAGES.md`. The release-relevant groups are:
+## 3. Files dan Architecture
 
-1. Supplier session lacks authoritative tenant shell context.
-2. Supplier onboarding lacks authoritative Hosted readiness summary.
-3. Supplier dashboard lacks full PRD aging, trends, detail, and filters.
-4. Supplier audit capability for Supervisor/LL/QC differs from the PRD permission matrix.
-5. TMMIN has no read-only Hosted Assignment Board endpoint.
-6. TMMIN dashboard has no PRD filter query and lacks several aggregates.
-7. No unified cross-supplier Hosted/External Henkaten explorer endpoint exists.
-8. Supplier/privileged-user lists lack server search/status/source filters.
-9. Warning aggregation lacks full filter/pagination and richer instance context.
-10. Supplier detail does not expose current Supplier Admin or reloadable Hosted Preparation state.
-11. External ingestion diagnostics lack rejected/duplicate history, error aggregate, and
-    correlation lookup.
-12. TMMIN Quality lacks a sanitized ingestion-health read model independent of credential
-    management.
-13. Assignment Board lacks explicit critical override/unresolved summary.
-14. Source governance lacks a recoverable summary and dedicated history projection.
-15. Hosted and External Henkaten read schemas omit part of the required source mode/epoch
-    traceability.
+Frontend workspace:
 
-Gap resolution is constrained to backward-compatible optional read fields, filter/pagination
-parameters, or read-only endpoints under the backend contract-freeze rules.
+- `apps/supplier-web/` — Supplier Vite app, independent root placeholder, public `/design`;
+- `apps/tmmin-web/` — TMMIN Vite app, independent root placeholder, public `/design`;
+- `packages/ui/` — CSS-first Tailwind v4 foundation, shadcn-compatible aliases, Radix behavior,
+  Lucide, self-hosted Inter Variable, TanStack Table, Recharts, tests, dan public barrel;
+- `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`, dan `eslint.config.js` — workspace scripts,
+  dependencies, dan typed lint coverage.
 
-## 5. Traceability Completed
+Documentation:
 
-The page specification was reconciled against:
+- `.agent/PAGES.md` — public utility route `/design` dan behavior constraint;
+- `.agent/implementationPhases.md` — Phase 11 `in_progress`, 11.1/11.2 completed, 11.3 next;
+- `docs/adr/0021-shared-enterprise-design-system-and-public-showcase.md` — shared design-system
+  architecture dan permanent public showcase decision;
+- `.agent/sessionHandoff.md` — current implementation evidence.
 
-- PRD personas, permission matrix, identity lifecycle, master data, assignment, Shift, Henkaten,
-  approval, warning, notification, dashboard, IA, accessibility, and acceptance criteria;
-- Phase 11–14 frontend and E2E roadmap;
-- shared Zod contracts for auth, administration, master data, shifts, Henkaten, read models,
-  External API, enums, errors, and health;
-- generated OpenAPI with 124 paths and 140 operations;
-- backend capability mapping and supplier/TMMIN controller boundaries.
+Tidak ada backend API, OpenAPI operation, shared domain schema, database, atau migration yang
+diubah. Reference image di `.agent/design/` tidak disalin ke public bundle. Existing `.DS_Store`
+tetap merupakan perubahan milik pengguna.
 
-Critical user flows documented:
+## 4. Token dan Component Coverage
 
-- realm login, forced reset, expiry, and intended destination;
-- HOSTED and EXTERNAL provisioning;
-- Hosted Preparation, cancellation, and cutover;
-- HOSTED-to-EXTERNAL cutover;
-- individual master-data lifecycle and optimistic conflict;
-- default assignment and atomic move;
-- normal/blocked/override Start Shift and End Shift;
-- four-category Henkaten submission;
-- parallel approval and reject-fast;
-- Withdraw and Clone;
-- cross-line Man movement/donor issue;
-- notification deep links;
-- warning lifecycle;
-- external credential rotation/revocation/loss;
-- source-correct Hosted/External monitoring.
+CSS runtime token dan typed metadata memakai prefix `--hds-*`, meliputi:
 
-## 6. Validation
+- raw neutral/orange, semantic surface/text/border/action;
+- neutral/info/success/warning/danger serta Hosted/External source;
+- lifecycle, approval, assignment, freshness, realtime, Shift, source, 4M, dan chart roles;
+- typography, spacing, control height, density, radius, elevation, focus, motion, layering, dan
+  breakpoints.
 
-Completed:
+Public components mencakup:
 
-- `pnpm format:check` — passed; all matched files use Prettier formatting;
-- `git diff --check` — passed;
-- targeted heading/label check — 64 page-spec headings detected and GAP-01 through GAP-15 are
-  present exactly as registered;
-- Phase 11, 12, 13, and 14 references to `.agent/PAGES.md` verified.
+- actions, fields, selection, date, navigation, feedback, overlays, and failure states;
+- card, panel, stat, table, chart, timeline, stepper, accordion, and activity patterns;
+- 4M, source, Henkaten status, approval, assignment, freshness, realtime, people, filters,
+  readiness, blockers, one-time secret, form error, dan last-updated semantics.
 
-The active shell reported Node.js `26.3.1` while the repository requests `>=22.23.1 <23`. This did
-not change the documentation-only Prettier result, but frontend implementation and full CI parity
-must use the pinned Node.js `22.23.1`.
+Controlled/uncontrolled behavior, loading/duplicate-submit prevention, keyboard navigation, Escape,
+focus containment/return, reduced motion, and accessible label/error association diuji pada shared
+package.
 
-Application tests were not run because this session changes documentation only.
+## 5. `/design` Sections dan Product Proof
 
-## 7. Blockers
+Long-form showcase menyediakan anchor navigation untuk:
 
-No blocker exists for beginning Phase 11 frontend foundation.
+1. Overview dan context/density controls;
+2. raw/semantic/domain tokens;
+3. live component state matrices;
+4. domain semantics;
+5. Supplier Overview;
+6. Assignment Board;
+7. Create Man Henkaten;
+8. Henkaten Detail/Approval;
+9. Blocked Shift Preflight;
+10. Default Assignment + Atomic Move;
+11. TMMIN Global Overview;
+12. Source Governance;
+13. accessibility contract;
+14. guidelines dan public coverage report.
 
-The registered API gaps block full acceptance of their associated Phase 12/13 pages, but they do
-not block workspace scaffold, typed client, session shell, route guards, common failure states, or
-initial page routing. They should be resolved during the constrained additive integration work,
-with contract and authorization tests, before affected pages are declared complete.
+Seluruh angka dan identity dalam pattern diberi label `Sample data` dan tidak merepresentasikan
+operasi aktual.
+
+## 6. Validation Evidence
+
+Runtime validation dilakukan dengan Node.js `22.23.1` dan pnpm `11.16.0`:
+
+- `pnpm install --frozen-lockfile` — passed;
+- `pnpm validate` — passed:
+  - runtime check;
+  - Prettier check;
+  - ESLint;
+  - workspace typecheck;
+  - 57 unit tests total, termasuk 14 shared UI tests;
+  - OpenAPI freeze check;
+  - full workspace build;
+- shared UI tests mencakup controlled selection, switch, pagination boundary, loading
+  `aria-busy`, duplicate-submit prevention, label/error association, tabs arrow keys, menu/dialog
+  Escape, focus return, domain mapping, token scans, reduced motion, dan automated axe scan tanpa
+  blocking violation.
+
+Browser evidence:
+
+- direct unauthenticated `/design` access berhasil pada Supplier dan TMMIN;
+- latest 1440×900 visual audit memastikan full shell fidelity, `noindex,nofollow`, bright token
+  output, dan tidak ada page-level horizontal overflow;
+- documentation layout telah diaudit pada 1280×720, 768, dan 390 widths; wide product canvases
+  mempertahankan desktop specimen melalui container-local scrolling;
+- visible 2 px blue focus ring dengan 2 px offset, tabs/menu/dialog keyboard behavior, overlay
+  layering, standard motion, dan reduced-motion mode diperiksa;
+- source inspection memastikan `/design` tidak memanggil session/API bootstrap.
+
+Build menghasilkan warning non-blocking bahwa lazy-loaded showcase chunk melebihi 500 kB. Route
+tersebut sudah dipisahkan dari root product bundle dengan dynamic import; further section-level
+splitting dapat dilakukan bila download budget untuk utility route ditetapkan.
+
+## 7. Known Gaps dan Non-goals
+
+- Phase 11.3 typed API client belum dibuat.
+- Session bootstrap, CSRF client, forced reset, route guards, dan product workflows masih planned.
+- Delapan composed specimens adalah implementation proof untuk design system, bukan production
+  feature pages.
+- Light theme saja; dark theme tidak memiliki source reference.
+- Product UI tetap desktop minimum 1280 px. Responsive support pada task ini ditujukan untuk
+  dokumentasi `/design`.
+- API contract gaps tetap berada di `.agent/PAGES.md`; frontend tidak menyimulasikan missing policy
+  dengan client-only logic.
 
 ## 8. Next Recommended Action
 
-Begin Phase 11 using `.agent/PAGES.md` as the behavior contract:
+Mulai Phase 11.3:
 
-1. scaffold `apps/supplier-web`, `apps/tmmin-web`, and `packages/ui`;
-2. generate the shared typed API client and realm-specific session bootstrap;
-3. implement capability/session-purpose route metadata;
-4. implement common loading/error/forbidden/conflict/stale behavior;
-5. create route-level tests from the Supplier and TMMIN visibility matrices;
-6. prioritize additive GAP-01 and GAP-02 before Supplier application shell/onboarding completion;
-7. keep all Phase 12/13 feature pages behind their documented API dependencies.
+1. generate request/response types dari shared Zod/OpenAPI contract;
+2. implement shared fetch boundary untuk cookies, CSRF, correlation ID, problem details, cursor,
+   upload, dan SSE;
+3. lanjutkan Phase 11.4 realm-specific session bootstrap dan route guards;
+4. pertahankan `/design` di luar session boundary;
+5. gunakan shared component catalog dan product specimens sebagai rujukan implementasi Phase 12–14.

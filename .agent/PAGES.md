@@ -64,6 +64,22 @@ Setiap halaman atau kelompok halaman menjelaskan:
 - Route yang tidak dikenal menghasilkan Not Found. Route valid tanpa capability menghasilkan
   Forbidden, bukan dialihkan diam-diam ke halaman lain.
 
+### 1.4 Public Design-system Utility Route
+
+- `supplier-web` dan `tmmin-web` menyediakan `/design` sebagai utility route publik.
+- Route dipasang sebelum session bootstrap dan route guards, tidak melakukan request session/API,
+  tidak tampil pada product navigation, dan menetapkan `noindex,nofollow`.
+- Route menggunakan mock data non-sensitif berlabel “Sample data”; credential, PII nyata,
+  environment detail, dan response internal tidak boleh dirender.
+- Route selalu disertakan pada production build tanpa environment flag dan menggunakan
+  `DesignSystemShowcase` yang sama dari `packages/ui`.
+- Query atau context switch di route hanya mengubah specimen Supplier/TMMIN dan density
+  dokumentasi; tidak membuat atau mensimulasikan session produk.
+- Product route tetap desktop minimum 1280×720. Utility route harus dapat diaudit pada desktop,
+  tablet, dan mobile tanpa page-level horizontal overflow; specimen product yang lebar boleh
+  scroll di dalam container sendiri.
+- Dependency: `AVAILABLE`; route tidak memiliki dependency backend.
+
 ---
 
 ## 2. Fondasi UX Lintas Aplikasi

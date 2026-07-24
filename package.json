@@ -11,6 +11,8 @@
   "scripts": {
     "runtime:check": "node scripts/check-runtime.mjs",
     "dev": "pnpm -r --parallel --if-present run dev",
+    "dev:supplier": "pnpm --filter @tmmin-henkaten/supplier-web run dev",
+    "dev:tmmin": "pnpm --filter @tmmin-henkaten/tmmin-web run dev",
     "clean": "pnpm -r --if-present run clean",
     "generate": "pnpm --filter @tmmin-henkaten/api run generate",
     "openapi:generate": "pnpm --filter @tmmin-henkaten/api run openapi:generate",
