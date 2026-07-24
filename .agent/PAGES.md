@@ -112,8 +112,8 @@ Session expiry saat pengguna sedang bekerja:
 Dependency:
 
 - `AVAILABLE`: supplier/TMMIN login, session, change-password, dan logout.
-- `ADDITIVE API REQUIRED`: Supplier session belum memuat nama/code/timezone/source mode tenant untuk
-  application context yang authoritative.
+- `AVAILABLE`: Supplier session memuat capability dan id/code/name/timezone/source mode/source epoch
+  tenant untuk application context yang authoritative.
 
 ### 2.2 Navigation dan Permission
 
@@ -280,8 +280,8 @@ Legenda: `V` view, `O` operate, `M` manage, `D` decide, `-` tidak tersedia.
 
 Catatan:
 
-- API saat ini hanya memberikan `SUPPLIER_AUDIT_READ` kepada Supplier Admin. Akses audit
-  Supervisor, Line Leader, dan QC pada PRD adalah `POLICY MISMATCH`.
+- `SUPPLIER_AUDIT_READ` tersedia untuk Supplier Admin/QC pada tenant scope dan
+  Supervisor/Line Leader pada allowed-line scope berdasarkan persisted line evidence.
 - Hosted Preparation hanya boleh membuka setup/master-data, default assignment, account, dan logout.
   Semua operational route ditolak sebelum request bila purpose session masih preparation.
 
@@ -364,7 +364,7 @@ Catatan:
   logout.
 - **Validasi dan rules:** tidak menyediakan role/profile editing.
 - **States:** session loading, expiry warning, logout failure/retry.
-- **Dependency:** `AVAILABLE`; supplier identity metadata tambahan adalah `ADDITIVE API REQUIRED`.
+- **Dependency:** `AVAILABLE`, termasuk Supplier identity/source metadata.
 
 ### 3.4 Overview dan Setup
 
@@ -383,9 +383,8 @@ Catatan:
 - **States:** new tenant mengarah ke setup untuk Admin; role tanpa activity mendapat scope-specific
   empty state; section errors tidak menjadi angka nol.
 - **Alur keluar:** filtered Henkaten, approval queue, shift issue, board line, atau setup.
-- **Dependency:** basic totals/category/line/part/outcome/recent activity `AVAILABLE`.
-  Approval aging, time-series trend, Shift Template/approval filters, dan detailed issue/override
-  drill-down adalah `ADDITIVE API REQUIRED`.
+- **Dependency:** `AVAILABLE`; approval aging, time-series trend, full approved filters,
+  role-scoped filter options, serta detailed issue/override summaries dihitung server-side.
 
 #### Supplier Setup Progress
 
@@ -401,9 +400,9 @@ Catatan:
   change.
 - **Alur keluar:** deep link ke prerequisite berikutnya; normal Hosted Admin kembali ke overview
   saat ready; preparation Admin tetap tidak dapat masuk operational pages.
-- **Dependency:** individual master-data reads `AVAILABLE`; authoritative consolidated readiness dan
-  normal Hosted readiness endpoint `ADDITIVE API REQUIRED`. TMMIN cutover preflight tidak boleh
-  dipakai sebagai supplier self-service authority.
+- **Dependency:** `AVAILABLE`; consolidated readiness memakai evaluator yang sama dengan
+  source-governance readiness. TMMIN cutover preflight tidak dipakai sebagai supplier
+  self-service endpoint.
 
 ### 3.5 Assignment Board
 
@@ -420,8 +419,8 @@ Catatan:
 - **States:** no active shift, active shift empty jobs, disconnected/stale, line removed from scope,
   retry failure, and realtime refetch.
 - **Alur keluar:** Henkaten detail, shift detail, Assignment Issue resolution bila role berhak.
-- **Dependency:** board read model dan SSE `AVAILABLE`. Explicit critical override banner detail di
-  board response mungkin membutuhkan additive read field: `ADDITIVE API REQUIRED`.
+- **Dependency:** `AVAILABLE`, termasuk explicit active override/unresolved context dan SSE
+  invalidation.
 
 ### 3.6 Henkaten Pages
 
@@ -476,8 +475,7 @@ Catatan:
 - **States:** Open awaiting both, Open awaiting one, terminal outcomes, route already decided,
   resource unavailable, stale action.
 - **Alur keluar:** remain on refreshed detail after action; Clone opens clone route.
-- **Dependency:** detail/history/withdraw/clone-prefill/decision/reroute `AVAILABLE`; Hosted
-  `sourceMode/sourceEpoch` traceability fields are `ADDITIVE API REQUIRED`.
+- **Dependency:** `AVAILABLE`, termasuk immutable Hosted `sourceMode/sourceEpoch` traceability.
 
 #### Clone Henkaten
 
@@ -509,8 +507,8 @@ Catatan:
 - **States:** empty queue, another approver already decided, Henkaten became terminal, stale version,
   successful decision.
 - **Alur keluar:** refresh detail and queue; next pending item hanya dibuka atas user action.
-- **Dependency:** Henkaten list filter/detail/decision `AVAILABLE`. Approval aging bucket filter
-  beyond timestamps is `ADDITIVE API REQUIRED`.
+- **Dependency:** `AVAILABLE`; queue menyajikan timestamp/aging context dan server-side route/status
+  filtering.
 
 ### 3.8 Shift Pages
 
@@ -592,7 +590,7 @@ Catatan:
 - **Elements:** counts/active state/readiness untuk member, line/job, part, Shift Template, checklist,
   dan defaults; links ke tiap area; Hosted Preparation context.
 - **States:** empty/partial/ready and read failures per area.
-- **Dependency:** individual reads `AVAILABLE`; consolidated status `ADDITIVE API REQUIRED`.
+- **Dependency:** `AVAILABLE`, termasuk consolidated readiness status.
 
 #### Members, Accounts, and Photos
 
@@ -674,12 +672,12 @@ Catatan:
 ### 3.11 Supplier Audit
 
 - **Route:** `/audit`
-- **Pengguna:** Supplier Admin sekarang; scoped Supervisor/LL/QC setelah policy resolution.
+- **Pengguna:** Supplier Admin/QC tenant scope; Supervisor/LL allowed-line scope.
 - **Tujuan:** menelusuri immutable domain/security actions tanpa mutation.
 - **Elements:** occurred time, actor kind/role, action, resource, change summary, result, correlation
   ID; action/resource/resource ID filters; cursor pagination; resource deep link.
 - **States:** empty history, forbidden, referenced resource unavailable.
-- **Dependency:** Supplier Admin `AVAILABLE`; Supervisor/LL/QC `POLICY MISMATCH`.
+- **Dependency:** `AVAILABLE`; migration preserves nullable line evidence and stable cursor index.
 
 ---
 
@@ -1208,10 +1206,10 @@ Line Leader/MP:
 
 | ID | Area | Required behavior | Current contract | Status | Required resolution |
 |---|---|---|---|---|---|
-| GAP-01 | Supplier session | Shell knows tenant name/code/timezone/source mode authoritatively. | Session only returns principal, purpose, expiry, CSRF. | `ADDITIVE API REQUIRED` | Add optional tenant context to Supplier session or safe self-context read. |
-| GAP-02 | Setup | Supplier Admin receives authoritative Hosted readiness and blockers. | Only individual reads and TMMIN cutover preflight exist. | `ADDITIVE API REQUIRED` | Add Supplier-safe readiness read model; do not duplicate preflight policy in React. |
-| GAP-03 | Supplier dashboard | Approval aging, time trend, detailed issues/overrides, full PRD filters. | Basic totals/category/line/part/outcomes/recent activity and limited filters. | `ADDITIVE API REQUIRED` | Add read fields and backward-compatible filter parameters. |
-| GAP-04 | Supplier audit | Supervisor/LL scoped and QC tenant audit per PRD. | Capability only granted to Supplier Admin. | `POLICY MISMATCH` | Reconcile PRD visibility with scoped backend authorization/tests before exposing routes. |
+| GAP-01 | Supplier session | Shell knows tenant name/code/timezone/source mode authoritatively. | Session returns authoritative capability list plus Supplier id/code/name/timezone/source mode/source epoch. | `AVAILABLE` | Implemented additively; purpose-aware backend filtering remains authoritative. |
+| GAP-02 | Setup | Supplier Admin receives authoritative Hosted readiness and blockers. | `GET /api/v1/supplier/setup-readiness` returns ordered areas, counts, blocker evidence, readiness time, and next blocked area using the shared governance evaluator. | `AVAILABLE` | Implemented additively with evaluator parity tests. |
+| GAP-03 | Supplier dashboard | Approval aging, time trend, detailed issues/overrides, full PRD filters. | Dashboard accepts the approved date/status/4M/line/part/Shift Template/approval/granularity filters and returns server-side aging, trends, issues, overrides, rankings, activity, and filter options. | `AVAILABLE` | Implemented additively and role-scoped. |
+| GAP-04 | Supplier audit | Supervisor/LL scoped and QC tenant audit per PRD. | Admin/QC receive tenant scope; Supervisor/Line Leader receive authorized-line scope backed by persisted nullable line evidence. | `AVAILABLE` | Policy, migration/backfill, cursor index, presenter, and negative authorization tests implemented. |
 | GAP-05 | TMMIN board | Read-only current Hosted Assignment Board. | Board endpoint requires Supplier session. | `ADDITIVE API REQUIRED` | Add TMMIN-scoped read-only board endpoint with Hosted-only policy. |
 | GAP-06 | TMMIN dashboard | PRD supplier/source/date/status/4M/line/part/aging/freshness filters and rankings. | Dashboard accepts no query and returns basic aggregates. | `ADDITIVE API REQUIRED` | Add server-side filters and aggregate fields. |
 | GAP-07 | Global explorer | Cross-supplier Hosted+External Henkaten query. | Reads are supplier-scoped and source-specific. | `ADDITIVE API REQUIRED` | Add unified read-only query or source-aware cross-supplier endpoints. |
@@ -1220,9 +1218,9 @@ Line Leader/MP:
 | GAP-10 | Supplier detail | Current Supplier Admin and Hosted Preparation recover after reload. | Supplier detail returns only Supplier summary. | `ADDITIVE API REQUIRED` | Add safe nested summaries or dedicated reads. |
 | GAP-11 | External health | Rejected/duplicate history, error aggregates, correlation lookup. | Dashboard freshness and accepted projection events only. | `ADDITIVE API REQUIRED` | Add sanitized ingestion-health read model and event queries. |
 | GAP-12 | Quality external health | Quality sees monitoring health without credential-management permission. | Client list is Admin-only; projection/dashboard data is incomplete for diagnosis. | `ADDITIVE API REQUIRED` | Add Quality-safe health projection excluding client secret and mutation. |
-| GAP-13 | Board override | Board exposes critical unresolved override context. | Board schema has assignments/indicators but no explicit override summary. | `ADDITIVE API REQUIRED` | Add optional override/unresolved issue summary to board read model. |
+| GAP-13 | Board override | Board exposes critical unresolved override context. | Assignment Board returns explicit nullable active override and unresolved context. | `AVAILABLE` | Implemented additively; UI renders only server-provided context. |
 | GAP-14 | Source traceability | Source preparation/current admin state and dedicated cutover history. | Mutations and generic audit exist; detail state is incomplete. | `ADDITIVE API REQUIRED` | Add source governance summary; retain audit as immutable evidence. |
-| GAP-15 | Henkaten source traceability | Hosted list/detail exposes immutable source mode/epoch and External projection exposes source epoch. | Hosted read schemas omit both fields; External projection exposes mode but omits epoch. | `ADDITIVE API REQUIRED` | Add optional `sourceMode`/`sourceEpoch` read fields as applicable without changing lifecycle semantics. |
+| GAP-15 | Henkaten source traceability | Hosted list/detail exposes immutable source mode/epoch and External projection exposes source epoch. | Hosted list/detail now expose immutable `sourceMode` and `sourceEpoch`; External projection traceability remains a Phase 13 concern. | `AVAILABLE` | Supplier requirement implemented additively without lifecycle changes. |
 
 Gap resolution rules:
 
@@ -1232,6 +1230,11 @@ Gap resolution rules:
 - no filter may operate only on the currently loaded cursor page;
 - no permission may be broadened only in route visibility;
 - External PII minimization and TMMIN read-only boundaries remain unchanged.
+
+Phase 11–12 resolution note (2026-07-24): GAP-01/02/03/04/13/15 are available in shared
+contracts, OpenAPI, PostgreSQL-backed services, authorization tests, and Supplier production pages.
+GAP-05–12 and GAP-14 remain explicit Phase 13 dependencies and must not be simulated in the TMMIN
+frontend.
 
 ---
 

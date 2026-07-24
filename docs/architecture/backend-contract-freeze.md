@@ -2,7 +2,7 @@
 
 ## Frozen Surface
 
-The backend v1 surface contains 124 paths and 140 HTTP operations. Runtime NestJS controller
+The backend v1 surface contains 126 paths and 142 HTTP operations. Runtime NestJS controller
 metadata, shared Zod schemas, generated OpenAPI 3.1, and the committed OpenAPI artifact are one
 enforced contract chain.
 
@@ -62,7 +62,7 @@ Requires migration plan or a new version:
 | Layer | Evidence |
 |---|---|
 | Shared contract | Zod valid/invalid examples, strict over-posting rejection |
-| Operation inventory | 140 runtime operations equal 140 OpenAPI operations |
+| Operation inventory | 142 runtime operations equal 142 OpenAPI operations |
 | Artifact | generated JSON equals committed JSON |
 | Unit policy | state machines, canonicalization, IP policy, rate windows/buckets |
 | PostgreSQL integration | auth, tenancy, master, shift, approval, movement, read models, outbox, External |

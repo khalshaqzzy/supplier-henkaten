@@ -9,11 +9,11 @@ Enterprise Digital Henkaten Management requires two desktop web applications wit
 identity realms and responsibilities. Supplier users operate Hosted workflows within one tenant,
 while TMMIN users administer tenants and monitor Hosted and External records across suppliers.
 
-The approved PRD defines the complete product behavior. The frozen backend provides 140 HTTP
-operations and stable shared schemas, but several frontend read requirements remain broader than
-the current read models. Examples include complete dashboard filters and aging, cross-supplier
-Henkaten search, reloadable Hosted Preparation state, TMMIN read-only Assignment Board access, and
-sanitized External ingestion diagnostics for TMMIN Quality.
+The approved PRD defines the complete product behavior. The original backend freeze provided 140
+HTTP operations and stable shared schemas. Supplier frontend resolution added two backward-
+compatible reads, producing 142 operations; TMMIN requirements such as cross-supplier Henkaten
+search, reloadable Hosted Preparation state, read-only Assignment Board access, and sanitized
+External ingestion diagnostics remain broader than the current read models.
 
 Without one route and behavior specification, feature implementation could duplicate navigation
 decisions, conflate Hosted and External data, hide unsupported requirements, or move authorization
@@ -122,6 +122,24 @@ contracts.
 - Hosted and External detail behavior is explicitly separated.
 - Page specifications contain no component, CSS, token, spacing, typography, or layout direction.
 
+## Phase 11–12 Additive Contract Resolution
+
+The Supplier gaps identified while defining this architecture were resolved additively:
+
+- Supplier session now carries authoritative capabilities and Supplier context;
+- Hosted Preparation capabilities are restricted by backend purpose policy;
+- setup readiness reuses the same evaluator as source-governance preflight;
+- Supplier dashboard filtering and aggregates are server-side and role-scoped;
+- Assignment Board exposes active override context;
+- Hosted Henkaten reads expose immutable source mode and epoch;
+- Henkaten creation options expose only the published checklist, searchable active parts, and
+  reservation/assignment-aware MP candidates required by Line Leader submission;
+- audit events retain nullable line-scope evidence, allowing Admin/QC tenant scope and
+  Supervisor/Line Leader allowed-line scope.
+
+These changes preserve the decision that React is not a policy or aggregation authority. TMMIN
+contract gaps remain owned by Phase 13.
+
 ## Risks
 
 - Additive read-model work may expand during real frontend integration if current response shapes
@@ -138,4 +156,3 @@ contracts.
   reconciliation tests.
 - Add route-guard, role visibility, source-specific detail, failure-state, and full-stack E2E tests
   as the corresponding frontend phases are implemented.
-
