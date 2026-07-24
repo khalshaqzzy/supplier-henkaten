@@ -1,194 +1,145 @@
-# Session Handoff — Backend Contract Freeze and Hardening
+# Session Handoff — Frontend Page and User-flow Specification
 
-Tanggal: 2026-07-23
+Tanggal: 2026-07-24
 Branch: `staging`
 Status repository: Phase 0–10 selesai; Phase 11 `planned`
 
-## 1. Outcome
+## 1. Current Objective and Outcome
 
-Backend v1 sekarang memiliki executable contract freeze, direct policy evidence, upgrade-safe query
-hardening, dan repeatable Compact baseline:
+Frontend planning sekarang memiliki spesifikasi keputusan-lengkap untuk dua aplikasi tanpa
+mendefinisikan visual design:
 
-- NestJS controller metadata direkonsiliasi exactly dengan generated OpenAPI;
-- 124 paths/140 HTTP operations terdokumentasi dan byte-drift checked;
-- sebelas undocumented operations serta lima assignment path-parameter drift telah diperbaiki;
-- canonical external hash, ordering/terminal state, IP allowlist, token window, ingestion bucket, dan
-  Retry-After memiliki direct unit evidence;
-- External security-negative suite mencakup forbidden field, allowlist, source epoch, revoked
-  client/token, scope, conflict, out-of-order, partial batch, dan concurrent identical delivery;
-- deterministic cursor/list indexes tersedia untuk job, member, audit, outbox, dan External
-  projection;
-- fresh migration 001→008 dan upgrade checkpoint 001→007 kemudian 008 keduanya lulus;
-- Compact HTTP baseline pada maximum supplier/master-data profile lulus seluruh preliminary p95 dan
-  error targets.
+- `.agent/PAGES.md` menetapkan fondasi UX, route, role visibility, information/action elements,
+  validation, page states, deep links, user flows, API dependency, dan contract gaps;
+- Supplier-facing specification mencakup Supplier Admin, Supervisor, Line Leader, QC, dan reduced
+  Hosted Preparation session;
+- TMMIN-facing specification memisahkan TMMIN Admin mutations dari TMMIN Quality read-only
+  monitoring;
+- Hosted dan External detail memiliki semantics berbeda dan tidak mencampur identity, PII,
+  assignment, atau source-of-truth;
+- setiap dependency yang belum tersedia ditandai `ADDITIVE API REQUIRED` atau `POLICY MISMATCH`;
+- ADR 0020 mengunci dual-app, role-scoped information architecture dan PRD-first gap handling.
 
-Backend contract siap menjadi dependency frontend tanpa backend redesign.
+Belum ada frontend source code yang dibuat. Phase 11 tetap `planned`.
 
-## 2. Frozen Contract
+## 2. Files Changed
 
-Frozen:
+- `.agent/PAGES.md` — new normative frontend page and user-flow specification.
+- `docs/adr/0020-role-scoped-frontend-information-architecture.md` — accepted IA decision and
+  tradeoffs.
+- `.agent/implementationPhases.md` — references `PAGES.md` from Phases 11–14 without changing phase
+  status.
+- `.agent/sessionHandoff.md` — current session outcome, gaps, validation, and next action.
 
-- OpenAPI `3.1.0`, API `1.0.0`, External schema `1.0`;
-- public route method/path/parameter identity;
-- request requiredness dan validation semantics;
-- enum, lifecycle status, result, dan problem-code names;
-- idempotency, source-version, approval, warning, assignment, dan source-epoch semantics.
+No public API, shared schema, database, migration, application runtime, or deployment file changed.
 
-Allowed within v1:
+## 3. Decisions
 
-- optional read fields;
-- pagination metadata;
-- backward-compatible filter/sort;
-- new safe error code untuk previously unspecified failure;
-- additive read-only endpoint;
-- additive index/internal query improvement.
+- `supplier-web` and `tmmin-web` retain separate session realms and route trees.
+- Navigation is capability-aware for usability, while backend authorization remains authoritative.
+- Hosted Preparation uses a reduced Supplier shell limited to setup/master data/checklists/default
+  assignments/account/logout.
+- URL query state preserves safe list/filter context; cursor paging and aggregation remain
+  server-authoritative.
+- Frontend must implement loading, empty, forbidden, retryable error, conflict, stale, and
+  realtime-disconnected behavior where applicable.
+- Temporary passwords and external client secrets are one-time response data and are not persisted.
+- PRD-complete pages remain specified even when the current API lacks a read model. Missing behavior
+  is not removed and may not be replaced with client-only domain policy.
+- TMMIN Quality remains read-only for supplier domain; notification read/unread is user-local state
+  only.
+- External records do not require Hosted member photo, registration number, credential, or
+  Assignment Board fields.
 
-Breaking removal/rename/required-field/semantic/authorization/enum change memerlukan explicit
-contract migration atau version baru.
+## 4. Contract Gaps Identified
 
-## 3. Contract Reconciliation
+Fifteen gaps are registered in `.agent/PAGES.md`. The release-relevant groups are:
 
-`apps/api/src/openapi/contract-freeze.spec.ts` walks `AppModule`, controller, dan handler metadata,
-normalizes Nest `:parameter` ke OpenAPI `{parameter}`, lalu membandingkan exact operation sets.
+1. Supplier session lacks authoritative tenant shell context.
+2. Supplier onboarding lacks authoritative Hosted readiness summary.
+3. Supplier dashboard lacks full PRD aging, trends, detail, and filters.
+4. Supplier audit capability for Supervisor/LL/QC differs from the PRD permission matrix.
+5. TMMIN has no read-only Hosted Assignment Board endpoint.
+6. TMMIN dashboard has no PRD filter query and lacks several aggregates.
+7. No unified cross-supplier Hosted/External Henkaten explorer endpoint exists.
+8. Supplier/privileged-user lists lack server search/status/source filters.
+9. Warning aggregation lacks full filter/pagination and richer instance context.
+10. Supplier detail does not expose current Supplier Admin or reloadable Hosted Preparation state.
+11. External ingestion diagnostics lack rejected/duplicate history, error aggregate, and
+    correlation lookup.
+12. TMMIN Quality lacks a sanitized ingestion-health read model independent of credential
+    management.
+13. Assignment Board lacks explicit critical override/unresolved summary.
+14. Source governance lacks a recoverable summary and dedicated history projection.
+15. Hosted and External Henkaten read schemas omit part of the required source mode/epoch
+    traceability.
 
-Gap yang ditutup:
+Gap resolution is constrained to backward-compatible optional read fields, filter/pagination
+parameters, or read-only endpoints under the backend contract-freeze rules.
 
-- supplier job detail, activate, deactivate, dan reorder docs;
-- TMMIN job list dan checklist-version list docs;
-- line/job assignment parameter names;
-- generated OpenAPI artifact diregenerasi.
+## 5. Traceability Completed
 
-Route baru tanpa OpenAPI atau obsolete OpenAPI tanpa controller sekarang menggagalkan unit suite.
+The page specification was reconciled against:
 
-## 4. Unit, Concurrency, dan Security Evidence
+- PRD personas, permission matrix, identity lifecycle, master data, assignment, Shift, Henkaten,
+  approval, warning, notification, dashboard, IA, accessibility, and acceptance criteria;
+- Phase 11–14 frontend and E2E roadmap;
+- shared Zod contracts for auth, administration, master data, shifts, Henkaten, read models,
+  External API, enums, errors, and health;
+- generated OpenAPI with 124 paths and 140 operations;
+- backend capability mapping and supplier/TMMIN controller boundaries.
 
-Direct unit policy:
+Critical user flows documented:
 
-- canonical JSON key ordering dan array-order preservation;
-- first/sequential/terminal External source versions;
-- allowlist fail-closed;
-- token 10/minute client/IP fixed window dan reset;
-- ingestion 300 burst/120 per minute refill;
-- `Retry-After` hanya pada denied request.
+- realm login, forced reset, expiry, and intended destination;
+- HOSTED and EXTERNAL provisioning;
+- Hosted Preparation, cancellation, and cutover;
+- HOSTED-to-EXTERNAL cutover;
+- individual master-data lifecycle and optimistic conflict;
+- default assignment and atomic move;
+- normal/blocked/override Start Shift and End Shift;
+- four-category Henkaten submission;
+- parallel approval and reject-fast;
+- Withdraw and Clone;
+- cross-line Man movement/donor issue;
+- notification deep links;
+- warning lifecycle;
+- external credential rotation/revocation/loss;
+- source-correct Hosted/External monitoring.
 
-Full integration suite tetap mencakup auth, cross-realm/tenant/role, CSRF/CORS, administration,
-master data/photo, shift, assignment, Henkaten 4M, approval, Man movement, finalization, notification,
-dashboard/audit/SSE, outbox retry/poison, dan External flows. Critical races memiliki exactly-one
-legal outcome. No test-detected Critical/High backend security gap remains.
+## 6. Validation
 
-## 5. Migration dan Query Review
+Completed:
 
-Migration baru:
+- `pnpm format:check` — passed; all matched files use Prettier formatting;
+- `git diff --check` — passed;
+- targeted heading/label check — 64 page-spec headings detected and GAP-01 through GAP-15 are
+  present exactly as registered;
+- Phase 11, 12, 13, and 14 references to `.agent/PAGES.md` verified.
 
-- `apps/api/prisma/migrations/20260723000800_backend_read_indexes/migration.sql`
+The active shell reported Node.js `26.3.1` while the repository requests `>=22.23.1 <23`. This did
+not change the documentation-only Prettier result, but frontend implementation and full CI parity
+must use the pinned Node.js `22.23.1`.
 
-Index baru:
+Application tests were not run because this session changes documentation only.
 
-- audit `(supplierId, occurredAt DESC, id DESC)`;
-- outbox/SSE `(supplierId, occurredAt, id)`;
-- External projection `(supplierId, updatedAt DESC, id DESC)`;
-- member `(supplierId, active, fullName, id)`;
-- job `(supplierId, lineId, active, displayOrder, id)`.
+## 7. Blockers
 
-Compact `EXPLAIN (ANALYZE, BUFFERS)` menggunakan index-only scan untuk job, member, External
-projection, dan audit bounded reads. No cache/materialized view diperlukan.
+No blocker exists for beginning Phase 11 frontend foundation.
 
-## 6. Compact Baseline
+The registered API gaps block full acceptance of their associated Phase 12/13 pages, but they do
+not block workspace scaffold, typed client, session shell, route guards, common failure states, or
+initial page routing. They should be resolved during the constrained additive integration work,
+with contract and authorization tests, before affected pages are declared complete.
 
-Dedicated command: `pnpm test:baseline`.
+## 8. Next Recommended Action
 
-Guard:
+Begin Phase 11 using `.agent/PAGES.md` as the behavior contract:
 
-- database name wajib berakhir `_test`;
-- Supplier table wajib kosong;
-- baseline terpisah dari functional integration suite.
-
-Profile:
-
-- 42 suppliers;
-- 20 lines, 300 members, 500 jobs per supplier;
-- 500 current External projections per supplier;
-- 1,000 permanent audit rows per supplier.
-
-Measured local HTTP results:
-
-| Workload | p50 | p95 | p99 | Error |
-|---|---:|---:|---:|---:|
-| TMMIN dashboard | 19.59 ms | 22.16 ms | 36.29 ms | 0% |
-| External projection list | 2.16 ms | 2.81 ms | 2.91 ms | 0% |
-| TMMIN audit | 9.21 ms | 11.74 ms | 12.00 ms | 0% |
-| Notification list | 1.08 ms | 1.87 ms | 2.12 ms | 0% |
-| Standard audited mutation | 2.51 ms | 3.36 ms | 4.89 ms | 0% |
-| External single ingest | 4.44 ms | 5.42 ms | 6.04 ms | 0% |
-
-Ini preliminary sequential latency evidence untuk frontend readiness. 30-concurrent-user staging load,
-approval saturation, dan board/warning propagation tetap release gate kemudian.
-
-## 7. Documentation
-
-- ADR 0019 mendefinisikan executable contract freeze, allowed post-freeze changes, explicit
-  baseline project, dan evidence-based query evolution.
-- `docs/architecture/backend-contract-freeze.md` mendokumentasikan contract chain, version rules,
-  test layers, security boundary, dan change review.
-- `docs/architecture/backend-performance-baseline.md` mencatat repeatable profile, metrics,
-  query-plan evidence, serta interpretation boundary.
-- PRD implementation status dan roadmap diperbarui menjadi Phase 0–10.
-
-## 8. Validation Selesai
-
-Development validation:
-
-- Prisma generate — passed;
-- formatter — passed;
-- lint — passed;
-- typecheck — passed;
-- unit — contracts 23, fixtures 6, API 14; 43 passed;
-- OpenAPI generation/reconciliation — 124 paths, 140 operations passed;
-- fresh migration 001→008 — passed;
-- upgrade migration 001→007 then 008 — passed, five new indexes verified;
-- full PostgreSQL integration — 5 files, 31 tests passed;
-- Compact baseline — 2 tests passed, all p95/error gates passed.
-
-## 9. Final Local CI Parity
-
-Clean-artifact parity dijalankan dengan official Darwin arm64 Node.js `22.23.1` dan pnpm `11.16.0`.
-Existing build output, generated Prisma client, dan local baseline/upgrade output dipindahkan ke
-isolated temporary artifact hold sebelum checks:
-
-- `pnpm install --frozen-lockfile`;
-- `pnpm format:check`;
-- `pnpm lint`;
-- `pnpm typecheck`;
-- `pnpm test:unit` — contracts 23, fixtures 6, API 14; 43 passed;
-- `pnpm openapi:check` — exact 140-operation reconciliation passed;
-- `pnpm build`;
-- `docker compose config --quiet`;
-- `pnpm db:up`, `pnpm db:wait`, dan `pnpm db:verify` — PostgreSQL 18.4, pgvector 0.8.5;
-- `pnpm db:test:reset` dan `pnpm db:test:migrate` — fresh migration 001→008 passed;
-- CI environment `pnpm test:integration` — 5 files, 31 tests passed;
-- second fresh reset/migrate dan `pnpm test:baseline` — 2 tests, all p95/error/index-plan gates
-  passed;
-- `pnpm db:down`;
-- Gitleaks 8.24.3 directory scan — no leaks;
-- `git diff --check` — passed.
-
-Compose down dan tidak ada dev server, watcher, test process, atau agent-started container.
-
-## 10. Delivery
-
-Target commit:
-
-- `test: freeze and baseline backend contracts`
-
-Setelah commit: Gitleaks commit scan, push `staging`, dan inspect GitHub Actions `quality`,
-`database-integration`, serta `secret-scan` sampai green.
-
-## 11. Next Recommended Batch
-
-Mulai frontend/shared UI foundation:
-
-1. scaffold supplier/TMMIN Vite workspaces dan shared UI package;
-2. generate typed API client dari frozen OpenAPI/shared Zod contract;
-3. implement session bootstrap, CSRF-aware mutation client, global problem mapping;
-4. establish accessible desktop tokens, loading/empty/error/forbidden/conflict/stale states;
-5. add frontend unit, build, and initial Playwright harness without changing frozen backend semantics.
+1. scaffold `apps/supplier-web`, `apps/tmmin-web`, and `packages/ui`;
+2. generate the shared typed API client and realm-specific session bootstrap;
+3. implement capability/session-purpose route metadata;
+4. implement common loading/error/forbidden/conflict/stale behavior;
+5. create route-level tests from the Supplier and TMMIN visibility matrices;
+6. prioritize additive GAP-01 and GAP-02 before Supplier application shell/onboarding completion;
+7. keep all Phase 12/13 feature pages behind their documented API dependencies.

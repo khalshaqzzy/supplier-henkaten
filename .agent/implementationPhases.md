@@ -2,7 +2,7 @@
 
 Document status: Active implementation roadmap
 Created: 2026-07-23
-Last updated: 2026-07-23
+Last updated: 2026-07-24
 Source of truth: `.agent/PRD.md`
 Implementation approach: Backend-first
 Workspace tooling: Node.js 22 + pnpm workspaces, tanpa Turborepo
@@ -30,7 +30,7 @@ Kondisi repository setelah Phase 0-10:
 
 - branch aktif: `staging`;
 - `.agent/PRD.md` tersedia dan menjadi product contract;
-- sembilan belas ADR dan delapan architecture/security baseline tersedia;
+- dua puluh ADR dan delapan architecture/security baseline tersedia;
 - Node.js 22.23.1 + pnpm 11.16.0 ESM workspace tersedia;
 - active workspace: NestJS API, shared contracts, dan deterministic test fixtures;
 - strict TypeScript, ESLint, Prettier, Vitest, root validation, dan lockfile tersedia;
@@ -63,6 +63,8 @@ Kondisi repository setelah Phase 0-10:
 - executable 140-operation NestJS/OpenAPI reconciliation, direct external policy/rate-limit tests,
   migration upgrade evidence, additive cursor indexes, dan repeatable Compact HTTP/query-plan
   baseline telah tersedia;
+- role-scoped route, page-state, user-flow, dan frontend contract-gap specification tersedia di
+  `.agent/PAGES.md`;
 - belum ada frontend, Playwright E2E, atau remote deployment files;
 - materi slide tersedia sebagai reference-only input.
 
@@ -3054,6 +3056,9 @@ Status: **planned**
 
 Goal: membuat dua React Vite applications, shared design primitives, typed API client, session handling, dan common UX states setelah backend contract freeze.
 
+Frontend route, permission, page-state, dan cross-app behavior wajib mengikuti `.agent/PAGES.md`.
+Contract gap di dokumen tersebut tidak boleh ditutup dengan client-only business policy.
+
 Depends on:
 
 - Phase 10.
@@ -3338,6 +3343,9 @@ Phase 11 exit criteria:
 Status: **planned**
 
 Goal: mengimplementasikan seluruh Hosted supplier workflows untuk Supplier Admin, Supervisor, LL, dan QC.
+
+Supplier route catalog, role visibility, page behavior, dan user-flow acceptance mengikuti
+`.agent/PAGES.md`.
 
 Depends on:
 
@@ -3723,6 +3731,9 @@ Status: **planned**
 
 Goal: mengimplementasikan TMMIN tenant administration, warnings, global monitoring, External integration health, audit, dan system status.
 
+TMMIN route catalog, Admin/Quality permission boundary, dan Hosted/External detail treatment
+mengikuti `.agent/PAGES.md`.
+
 Depends on:
 
 - Phase 11;
@@ -4013,6 +4024,9 @@ Phase 13 exit criteria:
 Status: **planned**
 
 Goal: menguji seluruh application sebagai satu local full stack dan melakukan hanya backend adjustments yang diizinkan setelah contract freeze.
+
+Integration pass wajib merekonsiliasi seluruh `ADDITIVE API REQUIRED` dan `POLICY MISMATCH` pada
+`.agent/PAGES.md`; unresolved release-critical gap tidak boleh disamarkan oleh frontend.
 
 Depends on:
 
