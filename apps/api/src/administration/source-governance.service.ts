@@ -44,14 +44,90 @@ export class SourceGovernanceService {
     });
     this.register({
       name: 'phase-9-external-credentials-and-projection',
-      check(_transaction, _supplier, _targetMode) {
-        return Promise.resolve([
-          {
-            contributor: 'phase-9-external-credentials-and-projection',
-            code: 'CONTRIBUTOR_NOT_IMPLEMENTED',
-            detail: 'External credential and projection validation is delivered in Phase 9.',
+      async check(transaction, supplier, targetMode) {
+        if (targetMode !== 'EXTERNAL') return [];
+        const client = await transaction.externalApiClient.findFirst({
+          where: {
+            supplierId: supplier.id,
+            sourceEpoch: supplier.sourceEpoch + 1,
+            status: 'ACTIVE',
+            secrets: { some: { revokedAt: null } },
           },
+        });
+        return client
+          ? []
+          : [
+              {
+                contributor: 'phase-9-external-credentials-and-projection',
+                code: 'EXTERNAL_CREDENTIAL_MISSING',
+                detail: 'An active credential for the next source epoch is required.',
+              },
+            ];
+      },
+      async revokeOldSource(transaction, supplier, targetMode) {
+        if (targetMode !== 'HOSTED') return;
+        const clients = await transaction.externalApiClient.findMany({
+          where: { supplierId: supplier.id, status: 'ACTIVE' },
+          select: { id: true },
+        });
+        const ids = clients.map(({ id }) => id);
+        if (!ids.length) return;
+        const now = new Date();
+        await transaction.externalApiClient.updateMany({
+          where: { id: { in: ids } },
+          data: { status: 'REVOKED', version: { increment: 1 } },
+        });
+        await transaction.externalApiSecret.updateMany({
+          where: { clientId: { in: ids }, revokedAt: null },
+          data: { revokedAt: now },
+        });
+        await transaction.externalAccessToken.updateMany({
+          where: { clientId: { in: ids }, revokedAt: null },
+          data: { revokedAt: now },
+        });
+      },
+    });
+    this.register({
+      name: 'hosted-operational-state',
+      async check(transaction, supplier, targetMode) {
+        if (targetMode !== 'EXTERNAL') return [];
+        const [activeShift, openHenkaten, activeReservation] = await Promise.all([
+          transaction.shiftRun.findFirst({
+            where: { supplierId: supplier.id, status: 'ACTIVE' },
+            select: { id: true },
+          }),
+          transaction.henkaten.findFirst({
+            where: { supplierId: supplier.id, status: 'OPEN' },
+            select: { id: true },
+          }),
+          transaction.mPReservation.findFirst({
+            where: { supplierId: supplier.id, releasedAt: null },
+            select: { id: true },
+          }),
         ]);
+        const blockers: CutoverBlocker[] = [];
+        if (activeShift) {
+          blockers.push({
+            contributor: 'hosted-operational-state',
+            code: 'ACTIVE_SHIFT_EXISTS',
+            detail: 'Hosted source cutover is blocked by an active Shift Run.',
+          });
+        }
+        if (openHenkaten) {
+          blockers.push({
+            contributor: 'hosted-operational-state',
+            code: 'OPEN_HENKATEN_EXISTS',
+            detail: 'Hosted source cutover is blocked by an Open Henkaten.',
+          });
+        }
+        if (activeReservation) {
+          blockers.push({
+            contributor: 'hosted-operational-state',
+            code: 'ACTIVE_MP_RESERVATION_EXISTS',
+            detail: 'Hosted source cutover is blocked by an active MP reservation.',
+          });
+        }
+        return blockers;
       },
     });
   }

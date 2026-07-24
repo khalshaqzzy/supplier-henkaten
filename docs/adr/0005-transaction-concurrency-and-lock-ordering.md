@@ -22,10 +22,10 @@ Critical multi-record workflows use Prisma interactive transactions. Parameteriz
 the required lock. Lock acquisition follows this order:
 
 1. Supplier;
-2. Line and ShiftRun;
+2. involved Shift Runs in canonical UUID order;
 3. Henkaten;
 4. approval route and MP reservation;
-5. Job;
+5. Working Assignment and Job in canonical UUID order;
 6. Member/MP;
 7. warning, Assignment Issue, audit, and outbox.
 
@@ -86,10 +86,20 @@ Positive optimistic versions, canonical conflict codes, transaction ownership, a
 captured in shared contracts and normative architecture documents. Real transaction and race
 validation remains owned by the persistence and domain implementation.
 
+The implemented shift, Henkaten, approval, movement, Withdraw, and End Shift services exercise the
+lock order. Cross-shift Man submission/finalization and End Shift discover all involved Shift Runs
+while holding the Supplier lock, then lock those runs in UUID order before Henkaten and assignment
+state. PostgreSQL serializable transactions and partial unique indexes arbitrate concurrent
+slot/start, effective-MP, identifier, reservation, route, decision, movement, and target-job races.
+Integration tests verify one-winner start and route decisions, two-QC contention, preview-to-commit
+recalculation, exact/conflicting idempotency, cross-shift movement/cascade, and atomic
+reservation/warning/issue finalization.
+
 ## Follow-up
 
-Reusable transaction, lock, and retry helpers will be implemented with the persistence foundation
-and exercised by each owning domain workflow.
+The transaction helper and domain-local canonical lock helpers are exercised by every implemented
+operational workflow. New multi-aggregate commands must preserve this ordering and add a real
+PostgreSQL race test.
 
 Master-data capacity mutations lock Supplier before counting active members, lines, or jobs.
 Checklist publish locks ChecklistTemplate before reading draft and allocating a version number.

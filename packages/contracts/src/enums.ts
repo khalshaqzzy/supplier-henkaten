@@ -35,6 +35,23 @@ export const capabilitySchema = z.enum([
   'SUPPLIER_MASTER_DATA_READ',
   'TMMIN_MASTER_DATA_READ',
   'SUPPLIER_HOSTED_PREPARATION',
+  'SUPPLIER_SHIFT_READ',
+  'SUPPLIER_SHIFT_OPERATE',
+  'SUPPLIER_SHIFT_OVERRIDE',
+  'TMMIN_SHIFT_READ',
+  'SUPPLIER_HENKATEN_READ',
+  'SUPPLIER_HENKATEN_SUBMIT',
+  'SUPPLIER_HENKATEN_WITHDRAW',
+  'SUPPLIER_HENKATEN_DECIDE',
+  'SUPPLIER_APPROVAL_REROUTE',
+  'TMMIN_HENKATEN_READ',
+  'SUPPLIER_NOTIFICATION_READ',
+  'SUPPLIER_BOARD_READ',
+  'SUPPLIER_DASHBOARD_READ',
+  'SUPPLIER_AUDIT_READ',
+  'TMMIN_DASHBOARD_READ',
+  'TMMIN_AUDIT_READ',
+  'TMMIN_EXTERNAL_CLIENT_MANAGE',
 ]);
 export type Capability = z.infer<typeof capabilitySchema>;
 
@@ -43,6 +60,17 @@ export type MemberRole = z.infer<typeof memberRoleSchema>;
 
 export const shiftRunStatusSchema = z.enum(['NOT_STARTED', 'ACTIVE', 'ENDED']);
 export type ShiftRunStatus = z.infer<typeof shiftRunStatusSchema>;
+
+export const workingAssignmentStateSchema = z.enum([
+  'ASSIGNED',
+  'VACANT',
+  'CONFLICTED',
+  'RESERVED',
+]);
+export type WorkingAssignmentState = z.infer<typeof workingAssignmentStateSchema>;
+
+export const assignmentIssueTypeSchema = z.enum(['VACANCY', 'CONFLICT']);
+export type AssignmentIssueType = z.infer<typeof assignmentIssueTypeSchema>;
 
 export const henkatenCategorySchema = z.enum(['MAN', 'MACHINE', 'MATERIAL', 'METHOD']);
 export type HenkatenCategory = z.infer<typeof henkatenCategorySchema>;
@@ -69,6 +97,12 @@ export type CancellationReason = z.infer<typeof cancellationReasonSchema>;
 
 export const assignmentIssueStatusSchema = z.enum(['OPEN', 'RESOLVED', 'CLOSED_SHIFT_ENDED']);
 export type AssignmentIssueStatus = z.infer<typeof assignmentIssueStatusSchema>;
+
+export const checklistAnswerSchema = z.enum(['YES', 'NO']);
+export type ChecklistAnswer = z.infer<typeof checklistAnswerSchema>;
+
+export const warningStatusSchema = z.enum(['OPEN', 'CLOSED']);
+export type WarningStatus = z.infer<typeof warningStatusSchema>;
 
 export const externalEventTypeSchema = z.enum([
   'HENKATEN_OPENED',

@@ -140,12 +140,22 @@ export class SupplierAdminService {
       if (!supplier) throw notFound('Supplier');
       if (supplier.version !== expectedVersion) throw versionConflict();
       if (active && supplier.sourceMode === 'EXTERNAL') {
-        throw new ProblemException({
-          status: 409,
-          code: 'STATE_CONFLICT',
-          title: 'External supplier activation is not available',
-          detail: 'External credential provisioning is delivered in Phase 9.',
+        const client = await transaction.externalApiClient.findFirst({
+          where: {
+            supplierId: id,
+            sourceEpoch: supplier.sourceEpoch,
+            status: 'ACTIVE',
+            secrets: { some: { revokedAt: null } },
+          },
         });
+        if (!client) {
+          throw new ProblemException({
+            status: 409,
+            code: 'STATE_CONFLICT',
+            title: 'External supplier is not ready',
+            detail: 'An active credential for the current source epoch is required.',
+          });
+        }
       }
       const updated = await transaction.supplier.update({
         where: { id },

@@ -138,13 +138,23 @@ export class CatalogService {
       if (!current) throw missing('Line');
       if (current.version !== expectedVersion) throw versionConflict();
       if (!active) {
-        const [jobs, supervisor, leader] = await Promise.all([
+        const [jobs, supervisor, leader, shifts, openHenkaten] = await Promise.all([
           tx.job.count({ where: { lineId: id, active: true } }),
           tx.defaultLineSupervisor.count({ where: { lineId: id } }),
           tx.defaultLineLeader.count({ where: { lineId: id } }),
+          tx.shiftRun.count({
+            where: {
+              supplierId: scope.supplierId,
+              lineId: id,
+              status: { in: ['NOT_STARTED', 'ACTIVE'] },
+            },
+          }),
+          tx.henkaten.count({
+            where: { supplierId: scope.supplierId, lineId: id, status: 'OPEN' },
+          }),
         ]);
-        if (jobs || supervisor || leader)
-          throw resourceInUse('Line still has active jobs or assignments.');
+        if (jobs || supervisor || leader || shifts || openHenkaten)
+          throw resourceInUse('Line still has active jobs, assignments, or operational records.');
       } else if (
         (await tx.line.count({ where: { supplierId: scope.supplierId, active: true } })) >= 20
       ) {
@@ -275,8 +285,28 @@ export class CatalogService {
       });
       if (!current) throw missing('Job');
       if (current.version !== expectedVersion) throw versionConflict();
-      if (!active && (await tx.defaultJobMp.count({ where: { jobId: id } }))) {
-        throw resourceInUse('Job still has an active default MP.');
+      if (
+        !active &&
+        (
+          await Promise.all([
+            tx.defaultJobMp.count({ where: { jobId: id } }),
+            tx.workingAssignment.count({
+              where: { supplierId: scope.supplierId, jobId: id, active: true },
+            }),
+            tx.henkaten.count({
+              where: { supplierId: scope.supplierId, jobId: id, status: 'OPEN' },
+            }),
+            tx.mPReservation.count({
+              where: {
+                supplierId: scope.supplierId,
+                releasedAt: null,
+                targetWorkingAssignment: { jobId: id },
+              },
+            }),
+          ])
+        ).some(Boolean)
+      ) {
+        throw resourceInUse('Job is required by an active assignment or operational record.');
       }
       if (
         active &&
@@ -408,6 +438,14 @@ export class CatalogService {
       const current = await tx.part.findFirst({ where: { id, supplierId: scope.supplierId } });
       if (!current) throw missing('Part');
       if (current.version !== expectedVersion) throw versionConflict();
+      if (
+        !active &&
+        (await tx.henkaten.count({
+          where: { supplierId: scope.supplierId, partId: id, status: 'OPEN' },
+        }))
+      ) {
+        throw resourceInUse('Part is required by an Open Henkaten.');
+      }
       const updated = await tx.part.update({
         where: { id },
         data: { active, version: { increment: 1 }, updatedById: context.actorUserId },
@@ -543,6 +581,18 @@ export class CatalogService {
       });
       if (!current) throw missing('Shift Template');
       if (current.version !== expectedVersion) throw versionConflict();
+      if (
+        !active &&
+        (await tx.shiftRun.count({
+          where: {
+            supplierId: scope.supplierId,
+            shiftTemplateId: id,
+            status: { in: ['NOT_STARTED', 'ACTIVE'] },
+          },
+        }))
+      ) {
+        throw resourceInUse('Shift Template is required by a planned or active Shift Run.');
+      }
       const updated = await tx.shiftTemplate.update({
         where: { id },
         data: { active, version: { increment: 1 }, updatedById: context.actorUserId },

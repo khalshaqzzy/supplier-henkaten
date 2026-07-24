@@ -57,6 +57,55 @@ import {
   updateMemberRequestSchema,
   updatePartRequestSchema,
   updateShiftTemplateRequestSchema,
+  affectedPartPageSchema,
+  affectedPartDetailSchema,
+  assignmentIssuePageSchema,
+  clonePrefillSchema,
+  createHenkatenRequestSchema,
+  decideHenkatenRequestSchema,
+  currentShiftQuerySchema,
+  emergencyStartShiftRequestSchema,
+  endShiftRequestSchema,
+  henkatenDetailSchema,
+  henkatenListQuerySchema,
+  henkatenPageSchema,
+  henkatenTransitionSchema,
+  prepareShiftRequestSchema,
+  preStartResolutionContextSchema,
+  rerouteSupervisorRequestSchema,
+  shiftListQuerySchema,
+  shiftRunDetailSchema,
+  shiftRunPageSchema,
+  startShiftRequestSchema,
+  warningInstanceSchema,
+  withdrawHenkatenRequestSchema,
+  workingAssignmentSchema,
+  assignmentBoardSchema,
+  auditPageSchema,
+  auditQuerySchema,
+  boardQuerySchema,
+  dashboardQuerySchema,
+  notificationListQuerySchema,
+  notificationPageSchema,
+  notificationReadRequestSchema,
+  notificationSchema,
+  notificationUnreadCountSchema,
+  supplierDashboardSchema,
+  tmminDashboardSchema,
+  createExternalClientRequestSchema,
+  externalBatchRequestSchema,
+  externalBatchResponseSchema,
+  externalClientActionRequestSchema,
+  externalClientCredentialSchema,
+  externalClientPageSchema,
+  externalClientSchema,
+  externalHenkatenEventSchema,
+  externalProjectionDetailSchema,
+  externalProjectionPageSchema,
+  externalTokenRequestSchema,
+  externalTokenResponseSchema,
+  ingestionResultSchema,
+  ingestionStatusSchema,
 } from '@tmmin-henkaten/contracts';
 
 const noContent = { description: 'No content' };
@@ -217,8 +266,450 @@ export function buildOpenApiDocument(): Record<string, unknown> {
         },
       },
       ...masterDataPaths(),
+      ...operationalPaths(),
+      ...readModelPaths(),
+      ...externalPaths(),
     },
   }) as unknown as Record<string, unknown>;
+}
+
+function externalPaths() {
+  const supplier = { path: z.object({ supplierId: z.string().uuid() }) };
+  const supplierAndId = {
+    path: z.object({ supplierId: z.string().uuid(), id: z.string().uuid() }),
+  };
+  const bearer = { header: z.object({ Authorization: z.string().startsWith('Bearer ') }) };
+  return {
+    '/api/v1/tmmin/suppliers/{supplierId}/external-clients': {
+      get: {
+        requestParams: supplier,
+        responses: { '200': json('External API clients', externalClientPageSchema) },
+      },
+      post: {
+        requestParams: supplier,
+        requestBody: body(createExternalClientRequestSchema),
+        responses: {
+          '201': json('Issued external client credential', externalClientCredentialSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/external-clients/{id}/rotate-secret': {
+      post: {
+        requestParams: supplierAndId,
+        requestBody: body(externalClientActionRequestSchema),
+        responses: {
+          '201': json('Rotated external client secret', externalClientCredentialSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/external-clients/{id}/revoke': {
+      post: {
+        requestParams: supplierAndId,
+        requestBody: body(externalClientActionRequestSchema),
+        responses: { '200': json('Revoked external client', externalClientSchema), '409': problem },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/external-projections': {
+      get: {
+        requestParams: supplier,
+        responses: { '200': json('External Henkaten projections', externalProjectionPageSchema) },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/external-projections/{id}': {
+      get: {
+        requestParams: supplierAndId,
+        responses: {
+          '200': json('External Henkaten projection detail', externalProjectionDetailSchema),
+          '404': problem,
+        },
+      },
+    },
+    '/api/v1/external/auth/token': {
+      post: {
+        requestBody: body(externalTokenRequestSchema),
+        responses: {
+          '200': json('Short-lived external bearer token', externalTokenResponseSchema),
+          '401': problem,
+          '429': problem,
+        },
+      },
+    },
+    '/api/v1/external/henkaten/events': {
+      post: {
+        requestParams: bearer,
+        requestBody: body(externalHenkatenEventSchema),
+        responses: {
+          '202': json('Accepted external event', ingestionResultSchema),
+          '200': json('Duplicate external event', ingestionResultSchema),
+          '409': problem,
+          '422': problem,
+          '429': problem,
+        },
+      },
+    },
+    '/api/v1/external/henkaten/events/batch': {
+      post: {
+        requestParams: bearer,
+        requestBody: body(externalBatchRequestSchema),
+        responses: {
+          '200': json('Per-item external ingestion results', externalBatchResponseSchema),
+          '400': problem,
+          '413': problem,
+          '429': problem,
+        },
+      },
+    },
+    '/api/v1/external/ingestions/{eventId}': {
+      get: {
+        requestParams: {
+          ...bearer,
+          path: z.object({ eventId: z.string().min(1).max(200) }),
+        },
+        responses: {
+          '200': json('External ingestion status', ingestionStatusSchema),
+          '404': problem,
+        },
+      },
+    },
+  };
+}
+
+function readModelPaths() {
+  return {
+    '/api/v1/supplier/notifications': {
+      get: {
+        requestParams: { query: notificationListQuerySchema },
+        responses: { '200': json('Current user notifications', notificationPageSchema) },
+      },
+    },
+    '/api/v1/supplier/notifications/unread-count': {
+      get: {
+        responses: { '200': json('Unread notification count', notificationUnreadCountSchema) },
+      },
+    },
+    '/api/v1/supplier/notifications/{id}/read-state': {
+      patch: {
+        requestParams: idPath,
+        requestBody: body(notificationReadRequestSchema),
+        responses: { '200': json('Updated notification', notificationSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/assignment-board': {
+      get: {
+        requestParams: { query: boardQuerySchema },
+        responses: { '200': json('Current assignment board', assignmentBoardSchema) },
+      },
+    },
+    '/api/v1/supplier/dashboard': {
+      get: {
+        requestParams: { query: dashboardQuerySchema },
+        responses: { '200': json('Supplier dashboard', supplierDashboardSchema) },
+      },
+    },
+    '/api/v1/supplier/audit': {
+      get: {
+        requestParams: { query: auditQuerySchema },
+        responses: { '200': json('Supplier audit timeline', auditPageSchema) },
+      },
+    },
+    '/api/v1/supplier/realtime': {
+      get: {
+        requestParams: { query: boardQuerySchema },
+        responses: {
+          '200': {
+            description:
+              'Authenticated SSE invalidation stream. REST read models remain canonical.',
+            content: { 'text/event-stream': { schema: z.string() } },
+          },
+        },
+      },
+    },
+    '/api/v1/tmmin/dashboard': {
+      get: { responses: { '200': json('TMMIN global dashboard', tmminDashboardSchema) } },
+    },
+    '/api/v1/tmmin/notifications': {
+      get: {
+        requestParams: { query: notificationListQuerySchema },
+        responses: { '200': json('Current TMMIN user notifications', notificationPageSchema) },
+      },
+    },
+    '/api/v1/tmmin/notifications/unread-count': {
+      get: {
+        responses: {
+          '200': json('Unread TMMIN notification count', notificationUnreadCountSchema),
+        },
+      },
+    },
+    '/api/v1/tmmin/notifications/{id}/read-state': {
+      patch: {
+        requestParams: idPath,
+        requestBody: body(notificationReadRequestSchema),
+        responses: { '200': json('Updated notification', notificationSchema), '409': problem },
+      },
+    },
+    '/api/v1/tmmin/audit': {
+      get: {
+        requestParams: { query: auditQuerySchema },
+        responses: { '200': json('TMMIN privileged audit timeline', auditPageSchema) },
+      },
+    },
+  };
+}
+
+function operationalPaths() {
+  const shiftId = { path: z.object({ id: z.string().uuid() }) };
+  const supplierAndId = {
+    path: z.object({ supplierId: z.string().uuid(), id: z.string().uuid() }),
+  };
+  const supplierOnly = { path: z.object({ supplierId: z.string().uuid() }) };
+  return {
+    '/api/v1/supplier/shifts': {
+      get: {
+        requestParams: { query: shiftListQuerySchema },
+        responses: { '200': json('Shift Runs', shiftRunPageSchema) },
+      },
+    },
+    '/api/v1/supplier/shifts/current': {
+      get: {
+        requestParams: { query: currentShiftQuerySchema },
+        responses: {
+          '200': json('Current Shift Run', shiftRunDetailSchema.nullable()),
+        },
+      },
+    },
+    '/api/v1/supplier/shifts/preflight': {
+      post: {
+        requestBody: body(prepareShiftRequestSchema),
+        responses: {
+          '201': json('Durable Shift Run plan and preflight', shiftRunDetailSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/shifts/assignment-issues': {
+      get: {
+        responses: { '200': json('Assignment Issues', assignmentIssuePageSchema) },
+      },
+    },
+    '/api/v1/supplier/shifts/{id}': {
+      get: {
+        requestParams: shiftId,
+        responses: { '200': json('Shift Run', shiftRunDetailSchema), '404': problem },
+      },
+    },
+    '/api/v1/supplier/shifts/{id}/preflight': {
+      get: {
+        requestParams: shiftId,
+        responses: { '200': json('Shift Run preflight', shiftRunDetailSchema), '404': problem },
+      },
+    },
+    '/api/v1/supplier/shifts/{id}/working-assignments': {
+      get: {
+        requestParams: shiftId,
+        responses: {
+          '200': json(
+            'Working Assignments',
+            z.object({ items: z.array(workingAssignmentSchema) }).strict(),
+          ),
+        },
+      },
+    },
+    '/api/v1/supplier/shifts/{id}/assignment-issues': {
+      get: {
+        requestParams: shiftId,
+        responses: { '200': json('Assignment Issues', assignmentIssuePageSchema) },
+      },
+    },
+    '/api/v1/supplier/shifts/{id}/resolution-context': {
+      get: {
+        requestParams: shiftId,
+        responses: {
+          '200': json('Pre-start resolution context', preStartResolutionContextSchema),
+        },
+      },
+    },
+    '/api/v1/supplier/shifts/{id}/start': {
+      post: {
+        requestParams: shiftId,
+        requestBody: body(startShiftRequestSchema),
+        responses: { '201': json('Started Shift Run', shiftRunDetailSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/shifts/{id}/emergency-start': {
+      post: {
+        requestParams: shiftId,
+        requestBody: body(emergencyStartShiftRequestSchema),
+        responses: {
+          '201': json('Emergency-started Shift Run', shiftRunDetailSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/shifts/{id}/end': {
+      post: {
+        requestParams: {
+          ...shiftId,
+          header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }),
+        },
+        requestBody: body(endShiftRequestSchema),
+        responses: {
+          '201': json('Ended Shift Run', shiftRunDetailSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/shifts': {
+      get: {
+        requestParams: { ...supplierOnly, query: shiftListQuerySchema },
+        responses: { '200': json('Supplier Shift Runs', shiftRunPageSchema), '404': problem },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/shifts/{id}': {
+      get: {
+        requestParams: supplierAndId,
+        responses: { '200': json('Supplier Shift Run', shiftRunDetailSchema), '404': problem },
+      },
+    },
+    '/api/v1/supplier/henkatens': {
+      get: {
+        requestParams: { query: henkatenListQuerySchema },
+        responses: { '200': json('Henkaten records', henkatenPageSchema) },
+      },
+      post: {
+        requestParams: {
+          header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }),
+        },
+        requestBody: body(createHenkatenRequestSchema),
+        responses: {
+          '201': json('Submitted Henkaten', henkatenDetailSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/henkatens/{id}': {
+      get: {
+        requestParams: shiftId,
+        responses: { '200': json('Henkaten detail', henkatenDetailSchema), '404': problem },
+      },
+    },
+    '/api/v1/supplier/henkatens/{id}/history': {
+      get: {
+        requestParams: shiftId,
+        responses: {
+          '200': json(
+            'Henkaten lifecycle history',
+            z.object({ items: z.array(henkatenTransitionSchema) }).strict(),
+          ),
+        },
+      },
+    },
+    '/api/v1/supplier/henkatens/{id}/withdraw': {
+      post: {
+        requestParams: shiftId,
+        requestBody: body(withdrawHenkatenRequestSchema),
+        responses: {
+          '201': json('Withdrawn Henkaten', henkatenDetailSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/henkatens/{id}/decisions': {
+      post: {
+        requestParams: {
+          ...shiftId,
+          header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }),
+        },
+        requestBody: body(decideHenkatenRequestSchema),
+        responses: {
+          '201': json('Recorded approval decision', henkatenDetailSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/henkatens/{id}/approval-routes/supervisor/reroute': {
+      post: {
+        requestParams: {
+          ...shiftId,
+          header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }),
+        },
+        requestBody: body(rerouteSupervisorRequestSchema),
+        responses: {
+          '201': json('Rerouted Supervisor approval', henkatenDetailSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/henkatens/{id}/clone-prefill': {
+      get: {
+        requestParams: shiftId,
+        responses: { '200': json('Clone prefill', clonePrefillSchema), '404': problem },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/henkatens': {
+      get: {
+        requestParams: { ...supplierOnly, query: henkatenListQuerySchema },
+        responses: { '200': json('Supplier Henkaten records', henkatenPageSchema) },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/henkatens/warnings': {
+      get: {
+        requestParams: supplierOnly,
+        responses: {
+          '200': json(
+            'Supplier warning instances',
+            z.object({
+              items: z.array(warningInstanceSchema),
+              pageInfo: z.object({
+                hasNextPage: z.boolean(),
+                nextCursor: z.string().nullable(),
+              }),
+            }),
+          ),
+        },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/henkatens/warnings/{warningId}': {
+      get: {
+        requestParams: {
+          path: z.object({
+            supplierId: z.string().uuid(),
+            warningId: z.string().uuid(),
+          }),
+        },
+        responses: { '200': json('Warning instance', warningInstanceSchema), '404': problem },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/henkatens/{id}': {
+      get: {
+        requestParams: supplierAndId,
+        responses: {
+          '200': json('Supplier Henkaten detail', henkatenDetailSchema),
+          '404': problem,
+        },
+      },
+    },
+    '/api/v1/tmmin/warnings/affected-parts': {
+      get: {
+        responses: { '200': json('Affected part groups', affectedPartPageSchema) },
+      },
+    },
+    '/api/v1/tmmin/warnings/affected-parts/{supplierId}/{partNumber}': {
+      get: {
+        requestParams: {
+          path: z.object({
+            supplierId: z.string().uuid(),
+            partNumber: z.string().min(1).max(100),
+          }),
+        },
+        responses: {
+          '200': json('Affected part detail', affectedPartDetailSchema),
+          '404': problem,
+        },
+      },
+    },
+  };
 }
 
 function masterDataPaths() {
@@ -331,10 +822,35 @@ function masterDataPaths() {
       },
     },
     '/api/v1/supplier/master-data/lines/{lineId}/jobs/{id}': {
+      get: {
+        requestParams: jobPath,
+        responses: { '200': json('Job', jobSchema), '404': problem },
+      },
       patch: {
         requestParams: jobPath,
         requestBody: body(updateJobRequestSchema),
         responses: { '200': json('Updated job', jobSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/lines/{lineId}/jobs/{id}/activate': {
+      post: {
+        requestParams: jobPath,
+        requestBody: body(expectedVersionSchema),
+        responses: { '201': json('Activated job', jobSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/lines/{lineId}/jobs/{id}/deactivate': {
+      post: {
+        requestParams: jobPath,
+        requestBody: body(expectedVersionSchema),
+        responses: { '201': json('Deactivated job', jobSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/lines/{lineId}/jobs/reorder': {
+      post: {
+        requestParams: linePath,
+        requestBody: body(reorderRequestSchema),
+        responses: { '201': { description: 'Jobs reordered' }, '409': problem },
       },
     },
     '/api/v1/supplier/master-data/parts': collectionPath(
@@ -395,19 +911,24 @@ function masterDataPaths() {
     '/api/v1/supplier/master-data/default-assignments': {
       get: { responses: { '200': json('Default assignments', defaultAssignmentsSchema) } },
     },
-    '/api/v1/supplier/master-data/lines/{resourceId}/default-supervisor': assignmentPath(
+    '/api/v1/supplier/master-data/lines/{lineId}/default-supervisor': assignmentPath(
+      'lineId',
       assignmentMutationRequestSchema,
     ),
-    '/api/v1/supplier/master-data/lines/{resourceId}/default-line-leader': assignmentPath(
+    '/api/v1/supplier/master-data/lines/{lineId}/default-line-leader': assignmentPath(
+      'lineId',
       assignmentMutationRequestSchema,
     ),
-    '/api/v1/supplier/master-data/jobs/{resourceId}/default-mp': assignmentPath(
+    '/api/v1/supplier/master-data/jobs/{jobId}/default-mp': assignmentPath(
+      'jobId',
       assignmentMutationRequestSchema,
     ),
-    '/api/v1/supplier/master-data/lines/{resourceId}/default-line-leader/move': assignmentPath(
+    '/api/v1/supplier/master-data/lines/{lineId}/default-line-leader/move': assignmentPath(
+      'lineId',
       assignmentMoveRequestSchema,
     ),
-    '/api/v1/supplier/master-data/jobs/{resourceId}/default-mp/move': assignmentPath(
+    '/api/v1/supplier/master-data/jobs/{jobId}/default-mp/move': assignmentPath(
+      'jobId',
       assignmentMoveRequestSchema,
     ),
     '/api/v1/supplier/master-data/{kind}/{resourceId}/remove': {
@@ -447,9 +968,38 @@ function masterDataPaths() {
       },
     },
     '/api/v1/tmmin/suppliers/{supplierId}/master-data/lines': tmminListPath(linePageSchema),
+    '/api/v1/tmmin/suppliers/{supplierId}/master-data/lines/{lineId}/jobs': {
+      get: {
+        requestParams: {
+          path: z.object({
+            supplierId: z.string().uuid(),
+            lineId: z.string().uuid(),
+          }),
+          query: masterListQuerySchema,
+        },
+        responses: { '200': json('Hosted jobs', jobPageSchema), '404': problem },
+      },
+    },
     '/api/v1/tmmin/suppliers/{supplierId}/master-data/parts': tmminListPath(partPageSchema),
     '/api/v1/tmmin/suppliers/{supplierId}/master-data/shift-templates':
       tmminListPath(shiftTemplatePageSchema),
+    '/api/v1/tmmin/suppliers/{supplierId}/master-data/checklists/{category}/versions': {
+      get: {
+        requestParams: {
+          path: z.object({
+            supplierId: z.string().uuid(),
+            category: z.enum(['MAN', 'MACHINE', 'MATERIAL', 'METHOD']),
+          }),
+        },
+        responses: {
+          '200': json(
+            'Hosted checklist versions',
+            z.object({ items: z.array(checklistVersionSchema) }),
+          ),
+          '404': problem,
+        },
+      },
+    },
     '/api/v1/tmmin/suppliers/{supplierId}/master-data/default-assignments': {
       get: {
         requestParams: { path: z.object({ supplierId: z.string().uuid() }) },
@@ -500,10 +1050,10 @@ function checklistStatusPath() {
   };
 }
 
-function assignmentPath(requestSchema: z.ZodType) {
+function assignmentPath(parameter: 'jobId' | 'lineId', requestSchema: z.ZodType) {
   return {
     post: {
-      requestParams: { path: z.object({ resourceId: z.string().uuid() }) },
+      requestParams: { path: z.object({ [parameter]: z.string().uuid() }) },
       requestBody: body(requestSchema),
       responses: { '201': json('Default assignments', defaultAssignmentsSchema), '409': problem },
     },

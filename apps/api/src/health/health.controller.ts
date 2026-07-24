@@ -39,17 +39,22 @@ export class HealthController {
             WHERE table_schema = 'public'
               AND table_name IN (
                 'Supplier', 'User', 'UserSession', 'AuditEvent', 'OutboxEvent',
-                'Member', 'Line', 'Job', 'Part', 'ShiftTemplate', 'ChecklistTemplate'
+                'Member', 'Line', 'Job', 'Part', 'ShiftTemplate', 'ChecklistTemplate',
+                'Notification', 'ExternalApiClient', 'ExternalApiSecret',
+                'ExternalAccessToken', 'ExternalIngestionEvent', 'ExternalHenkatenProjection'
               )) AS tables,
           (SELECT count(*) FROM pg_trigger
-            WHERE tgname = 'AuditEvent_prevent_update_delete') AS trigger_count,
+            WHERE tgname IN (
+              'AuditEvent_prevent_update_delete',
+              'ExternalIngestionEvent_prevent_update_delete'
+            )) AS trigger_count,
           (SELECT count(*) FROM "_prisma_migrations"
             WHERE finished_at IS NULL OR rolled_back_at IS NOT NULL) AS unfinished_migrations
       `;
       if (
         foundation === undefined ||
-        Number(foundation.tables) !== 11 ||
-        Number(foundation.trigger_count) !== 1 ||
+        Number(foundation.tables) !== 17 ||
+        Number(foundation.trigger_count) !== 2 ||
         Number(foundation.unfinished_migrations) !== 0
       ) {
         throw new Error('FoundationNotReady');

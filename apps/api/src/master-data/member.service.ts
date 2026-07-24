@@ -208,8 +208,37 @@ export class MemberService {
           transaction.defaultLineSupervisor.count({ where: { supervisorMemberId: id } }),
           transaction.defaultLineLeader.count({ where: { lineLeaderMemberId: id } }),
           transaction.defaultJobMp.count({ where: { mpMemberId: id } }),
+          transaction.shiftRun.count({
+            where: {
+              supplierId: scope.supplierId,
+              status: { in: ['NOT_STARTED', 'ACTIVE'] },
+              OR: [{ supervisorMemberId: id }, { lineLeaderMemberId: id }],
+            },
+          }),
+          transaction.workingAssignment.count({
+            where: {
+              supplierId: scope.supplierId,
+              active: true,
+              OR: [{ effectiveMpMemberId: id }, { candidateMpMemberId: id }],
+            },
+          }),
+          transaction.mPReservation.count({
+            where: { supplierId: scope.supplierId, replacementMpMemberId: id, releasedAt: null },
+          }),
+          transaction.henkaten.count({
+            where: {
+              supplierId: scope.supplierId,
+              status: 'OPEN',
+              OR: [
+                { creatorMemberId: id },
+                { manDetail: { replacedMpMemberId: id } },
+                { manDetail: { replacementMpMemberId: id } },
+              ],
+            },
+          }),
         ]);
-        if (references.some(Boolean)) throw resourceInUse('Member has an active assignment.');
+        if (references.some(Boolean))
+          throw resourceInUse('Member is required by an active operational record.');
       } else {
         const count = await transaction.member.count({
           where: { supplierId: scope.supplierId, active: true },

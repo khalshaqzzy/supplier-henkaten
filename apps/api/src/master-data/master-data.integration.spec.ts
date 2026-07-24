@@ -247,7 +247,7 @@ describe('supplier master data', () => {
       preflight.blockers.some(
         ({ contributor }) => contributor === 'phase-9-external-credentials-and-projection',
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('enforces pure External and Hosted Preparation master-data boundaries', async () => {

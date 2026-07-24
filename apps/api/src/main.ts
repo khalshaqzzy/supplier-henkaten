@@ -29,11 +29,11 @@ async function bootstrap(): Promise<void> {
   app.use(correlationMiddleware);
   app.use(helmet());
   app.use(cookieParser());
-  app.use(express.json({ limit: '1mb', type: 'application/json' }));
+  app.use(express.json({ limit: '5mb', type: 'application/json' }));
   app.enableCors({
     credentials: true,
     origin: [...config.corsAllowedOrigins],
-    allowedHeaders: ['Content-Type', 'X-Correlation-ID', 'X-CSRF-Token'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Correlation-ID', 'X-CSRF-Token'],
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
   app.enableShutdownHooks(['SIGINT', 'SIGTERM']);

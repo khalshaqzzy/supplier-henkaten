@@ -10,9 +10,14 @@ import { RoutePolicyGuard } from './common/policy.js';
 import { APP_CONFIG, type AppConfig } from './config/app-config.js';
 import { RuntimeConfigModule } from './config/runtime-config.module.js';
 import { HealthController } from './health/health.controller.js';
+import { HenkatenModule } from './henkaten/henkaten.module.js';
 import { OpenApiController } from './openapi/openapi.controller.js';
 import { PersistenceModule } from './persistence/persistence.module.js';
 import { MasterDataModule } from './master-data/master-data.module.js';
+import { OperationsModule } from './operations/operations.module.js';
+import { ShiftsModule } from './shifts/shifts.module.js';
+import { ReadModelModule } from './read-models/read-model.module.js';
+import { ExternalModule } from './external/external.module.js';
 
 @Module({
   imports: [
@@ -61,6 +66,11 @@ import { MasterDataModule } from './master-data/master-data.module.js';
     AuthModule,
     AdministrationModule,
     MasterDataModule,
+    OperationsModule,
+    ShiftsModule,
+    HenkatenModule,
+    ReadModelModule,
+    ExternalModule,
   ],
   controllers: [HealthController, OpenApiController],
   providers: [

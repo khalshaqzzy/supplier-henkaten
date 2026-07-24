@@ -26,11 +26,11 @@ Roadmap tidak memberikan estimasi waktu. Urutan didasarkan pada dependency dan r
 
 ## 2. Current Repository Status
 
-Kondisi repository setelah Phase 0-4:
+Kondisi repository setelah Phase 0-10:
 
 - branch aktif: `staging`;
 - `.agent/PRD.md` tersedia dan menjadi product contract;
-- dua belas ADR dan empat architecture/security baseline tersedia;
+- sembilan belas ADR dan delapan architecture/security baseline tersedia;
 - Node.js 22.23.1 + pnpm 11.16.0 ESM workspace tersedia;
 - active workspace: NestJS API, shared contracts, dan deterministic test fixtures;
 - strict TypeScript, ESLint, Prettier, Vitest, root validation, dan lockfile tersedia;
@@ -45,14 +45,30 @@ Kondisi repository setelah Phase 0-4:
 - Hosted supplier master data telah tersedia: member/account, private photo, line/job, part, Shift
   Template, versioned 4M checklist, typed Default Assignment, logical deactivation, dan audited
   TMMIN read-only access;
-- minimum Hosted configuration contributor Phase 4 telah aktif dan tetap fail-closed terhadap
-  contributor External Phase 9;
+- minimum Hosted configuration contributor dan External next-epoch credential contributor telah
+  aktif;
+- durable Shift Run plan, atomic normal/emergency Start Shift, Working Assignment snapshot,
+  Assignment Issue foundation, scoped query, reference protection, dan operational cutover
+  contributor telah tersedia;
+- immutable Hosted Henkaten 4M, checklist evidence, idempotent identifier allocation, warning
+  aggregation, MP reservation, Withdraw + Clone, dan TMMIN read-only query telah tersedia;
+- persisted parallel Supervisor/QC approval, immutable decision/reroute evidence, reject-fast,
+  atomic approved Man movement, linked vacancy resolution, pre-start Man execution, dan
+  transactional End Shift telah tersedia;
+- durable per-user notification, scoped Assignment Board, supplier/TMMIN dashboard, audit read API,
+  dan resumable SSE invalidation stream telah tersedia;
+- epoch-bound external client/secret lifecycle, opaque 15-minute token, strict public event
+  contracts, immutable ordered ingestion, per-item batch processing, External projection/warning,
+  TMMIN notification, dan unified dashboard/freshness telah tersedia;
+- executable 140-operation NestJS/OpenAPI reconciliation, direct external policy/rate-limit tests,
+  migration upgrade evidence, additive cursor indexes, dan repeatable Compact HTTP/query-plan
+  baseline telah tersedia;
 - belum ada frontend, Playwright E2E, atau remote deployment files;
 - materi slide tersedia sebagai reference-only input.
 
-Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, dan Phase 4**
+Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8, Phase 9, dan Phase 10**
 Current phase: **tidak ada**
-Next phase: **Phase 5 - Shift dan Working Assignment Backend (`planned`)**
+Next phase: **Phase 11 - Frontend dan Shared UI Foundation (`planned`)**
 
 Tidak ada application behavior yang boleh ditandai implemented sampai source code dan acceptance checks terkait benar-benar tersedia di repository.
 
@@ -1420,7 +1436,7 @@ Phase 4 exit criteria:
 
 ## 13. Phase 5 - Shift dan Working Assignment Backend
 
-Status: **planned**
+Status: **done**
 
 Goal: mengimplementasikan Shift Run, assignment snapshot, preflight, hard gates, override, dan Assignment Issue foundation.
 
@@ -1434,7 +1450,7 @@ Unlocks:
 
 ### 5.1 Shift Run Schema dan State Machine
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 4.
 
@@ -1462,7 +1478,7 @@ Exit criteria:
 
 ### 5.2 Working Assignment Snapshot
 
-Status: **planned**
+Status: **done**
 
 Dependency: 5.1 dan Phase 4.7.
 
@@ -1490,7 +1506,7 @@ Exit criteria:
 
 ### 5.3 Preflight Engine dan Hard Gates
 
-Status: **planned**
+Status: **done**
 
 Dependency: 5.1-5.2.
 
@@ -1524,7 +1540,7 @@ Exit criteria:
 
 ### 5.4 Emergency Start Shift Override
 
-Status: **planned**
+Status: **done**
 
 Dependency: 5.3.
 
@@ -1553,7 +1569,7 @@ Exit criteria:
 
 ### 5.5 Assignment Issue Foundation
 
-Status: **planned**
+Status: **done**
 
 Dependency: 5.2.
 
@@ -1582,7 +1598,7 @@ Exit criteria:
 
 ### 5.6 Pre-start Resolution Contract
 
-Status: **planned**
+Status: **done**
 
 Dependency: 5.3 dan 5.5.
 
@@ -1609,7 +1625,7 @@ Exit criteria:
 
 ### 5.7 Shift Query dan Permission Tests
 
-Status: **planned**
+Status: **done**
 
 Dependency: 5.1-5.6.
 
@@ -1644,9 +1660,10 @@ Phase 5 exit criteria:
 
 ## 14. Phase 6 - Henkaten Core Backend
 
-Status: **planned**
+Status: **done**
 
-Goal: mengimplementasikan Henkaten record, checklist snapshot, non-Man flows, warning, query/history, dan Withdraw + Clone.
+Goal: mengimplementasikan Henkaten record, checklist snapshot, seluruh 4M flow, MP reservation,
+warning, query/history, dan Withdraw + Clone.
 
 Depends on:
 
@@ -1659,7 +1676,7 @@ Unlocks:
 
 ### 6.1 Henkaten Schema, Identifier, dan Snapshot
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 5.
 
@@ -1689,7 +1706,7 @@ Exit criteria:
 
 ### 6.2 Lifecycle dan Transition Guards
 
-Status: **planned**
+Status: **done**
 
 Dependency: 6.1.
 
@@ -1718,7 +1735,7 @@ Exit criteria:
 
 ### 6.3 Checklist Snapshot dan All-Yes Enforcement
 
-Status: **planned**
+Status: **done**
 
 Dependency: 6.1 dan Phase 4.6.
 
@@ -1746,7 +1763,7 @@ Exit criteria:
 
 ### 6.4 Machine, Material, dan Method Submission
 
-Status: **planned**
+Status: **done**
 
 Dependency: 6.1-6.3.
 
@@ -1776,7 +1793,7 @@ Exit criteria:
 
 ### 6.5 Man Submission Contract tanpa Movement
 
-Status: **planned**
+Status: **done**
 
 Dependency: 6.1-6.3 dan Working Assignment.
 
@@ -1787,7 +1804,8 @@ Execution:
 - Validate replacement MP role/tenant/active.
 - Reject same replaced/replacement.
 - Store assignment versions and source-job reference.
-- Do not apply move or reservation yet; Phase 7 owns both atomically.
+- Create MP reservation atomically with submission and leave Working Assignment unchanged.
+- Enforce active replacement-MP and target-Working-Assignment uniqueness.
 - Define submission service extension point.
 
 Verification:
@@ -1795,6 +1813,7 @@ Verification:
 - Invalid target/replacement rejected.
 - Cross-supplier MP rejected.
 - Stale assignment version rejected.
+- Concurrent reservation race leaves one winner.
 
 Data/migration impact:
 
@@ -1802,11 +1821,11 @@ Data/migration impact:
 
 Exit criteria:
 
-- Man payload/context stable for reservation implementation.
+- Man payload/context and reservation are stable for Phase 7 approval/movement.
 
 ### 6.6 Warning Instance dan Affected-part Aggregation
 
-Status: **planned**
+Status: **done**
 
 Dependency: 6.2.
 
@@ -1835,7 +1854,7 @@ Exit criteria:
 
 ### 6.7 List, Detail, Filter, dan History APIs
 
-Status: **planned**
+Status: **done**
 
 Dependency: 6.1-6.6.
 
@@ -1863,7 +1882,7 @@ Exit criteria:
 
 ### 6.8 Withdraw + Clone
 
-Status: **planned**
+Status: **done**
 
 Dependency: 6.2-6.7.
 
@@ -1872,6 +1891,7 @@ Execution:
 - Restrict Withdraw to LL own line and Open record.
 - Require reason.
 - Transition to CANCELLED.
+- Release only the withdrawn Henkaten's active reservation.
 - Close warning and emit event.
 - Define clone-prefill response.
 - Revalidate latest checklist and assignment on new submit.
@@ -1893,7 +1913,7 @@ Exit criteria:
 
 ### 6.9 Terminal Immutability dan Henkaten Core Tests
 
-Status: **planned**
+Status: **done**
 
 Dependency: 6.1-6.8.
 
@@ -1919,16 +1939,17 @@ Exit criteria:
 Phase 6 exit criteria:
 
 - Semua category dapat disubmit dan ditelusuri.
-- Warning, immutable snapshot, dan correction flow complete.
+- Warning, immutable snapshot, MP reservation, dan correction flow complete.
 - Approval routes dan Man movement belum dinyatakan complete.
 
 ---
 
 ## 15. Phase 7 - Approval, Man Cascade, dan Shift Finalization Backend
 
-Status: **planned**
+Status: **done**
 
-Goal: menyelesaikan high-risk transactional behavior: parallel approval, reject-fast, MP reservation/movement, cascade vacancy, pre-start resolution, dan End Shift.
+Goal: menyelesaikan high-risk transactional behavior: parallel approval, reject-fast, reservation
+finalization/Man movement, cascade vacancy, pre-start resolution, dan End Shift.
 
 Depends on:
 
@@ -1941,7 +1962,7 @@ Unlocks:
 
 ### 7.1 Parallel Approval Routes
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 6.
 
@@ -1971,7 +1992,7 @@ Exit criteria:
 
 ### 7.2 Reject-fast dan Approved Finalization
 
-Status: **planned**
+Status: **done**
 
 Dependency: 7.1.
 
@@ -2001,7 +2022,7 @@ Exit criteria:
 
 ### 7.3 Optimistic Concurrency dan Stale Decision Handling
 
-Status: **planned**
+Status: **done**
 
 Dependency: 7.1-7.2.
 
@@ -2028,30 +2049,28 @@ Exit criteria:
 
 - No lost update atau double decision.
 
-### 7.4 MP Reservation
+### 7.4 MP Reservation Finalization Integration
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 6.5 dan 7.3.
 
 Execution:
 
-- Create reservation within Man submission transaction.
-- Enforce one active reservation per MP.
-- Enforce one active target-job Man change.
-- Store source/target assignment version.
-- Release on Rejected/Cancelled.
-- Expose reservation state to preflight/read models.
+- Reuse the Phase 6 reservation and source/target assignment versions.
+- Release reservation on Rejected and End Shift cancellation.
+- Integrate reservation verification/release with final approval and movement.
+- Preserve Phase 6 release-on-Withdraw behavior.
 
 Verification:
 
-- Concurrent reservation race leaves one winner.
-- Rejected/Withdraw frees MP.
-- Stale assignment blocks reservation.
+- Rejected and End Shift free the MP.
+- Approval/reject/end races leave one valid reservation outcome.
+- Stale assignment blocks approval finalization.
 
 Data/migration impact:
 
-- MPReservation table and partial unique indexes.
+- Approval/finalization references only; MPReservation table and partial indexes already exist.
 
 Exit criteria:
 
@@ -2059,7 +2078,7 @@ Exit criteria:
 
 ### 7.5 Atomic Approved Man Movement
 
-Status: **planned**
+Status: **done**
 
 Dependency: 7.2 dan 7.4.
 
@@ -2090,7 +2109,7 @@ Exit criteria:
 
 ### 7.6 Cross-line Cascade Vacancy
 
-Status: **planned**
+Status: **done**
 
 Dependency: 7.5 dan Phase 5.5.
 
@@ -2119,7 +2138,7 @@ Exit criteria:
 
 ### 7.7 Assignment Issue Resolution
 
-Status: **planned**
+Status: **done**
 
 Dependency: 7.6.
 
@@ -2146,7 +2165,7 @@ Exit criteria:
 
 ### 7.8 Pre-start Man Resolution
 
-Status: **planned**
+Status: **done**
 
 Dependency: 7.4-7.7 dan Phase 5.6.
 
@@ -2175,7 +2194,7 @@ Exit criteria:
 
 ### 7.9 End Shift Finalization
 
-Status: **planned**
+Status: **done**
 
 Dependency: 7.2-7.8.
 
@@ -2210,7 +2229,7 @@ Exit criteria:
 
 ### 7.10 Race-condition Integration Suite
 
-Status: **planned**
+Status: **done**
 
 Dependency: 7.1-7.9.
 
@@ -2248,7 +2267,7 @@ Phase 7 exit criteria:
 
 ## 16. Phase 8 - Notification, Assignment Board, Dashboard, dan Audit Backend
 
-Status: **planned**
+Status: **done**
 
 Goal: membangun durable notification, realtime board read model, supplier/TMMIN dashboard queries, warning explorer, dan audit read APIs.
 
@@ -2265,7 +2284,7 @@ Unlocks:
 
 ### 8.1 Transactional Notification Generation
 
-Status: **planned**
+Status: **done**
 
 Dependency: outbox dan Phase 7 events.
 
@@ -2294,7 +2313,7 @@ Exit criteria:
 
 ### 8.2 Per-user Read/Unread State
 
-Status: **planned**
+Status: **done**
 
 Dependency: 8.1.
 
@@ -2322,7 +2341,7 @@ Exit criteria:
 
 ### 8.3 Assignment Board Read Model
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 7.
 
@@ -2352,7 +2371,7 @@ Exit criteria:
 
 ### 8.4 SSE Realtime Stream dan Stale Fallback
 
-Status: **planned**
+Status: **done**
 
 Dependency: 8.1-8.3.
 
@@ -2383,7 +2402,7 @@ Exit criteria:
 
 ### 8.5 Supplier Dashboard Aggregations
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 7.
 
@@ -2415,7 +2434,7 @@ Exit criteria:
 
 ### 8.6 TMMIN Warning dan Global Dashboard
 
-Status: **planned**
+Status: **done**
 
 Dependency: 8.5 dan warning Phase 6.
 
@@ -2445,7 +2464,7 @@ Exit criteria:
 
 ### 8.7 Audit Timeline dan Read APIs
 
-Status: **planned**
+Status: **done**
 
 Dependency: audit data dari Phase 2-7.
 
@@ -2474,7 +2493,7 @@ Exit criteria:
 
 ### 8.8 Backend Read-model Hardening
 
-Status: **planned**
+Status: **done**
 
 Dependency: 8.1-8.7.
 
@@ -2508,7 +2527,7 @@ Phase 8 exit criteria:
 
 ## 17. Phase 9 - External REST API Backend
 
-Status: **planned**
+Status: **done**
 
 Goal: menyediakan external client lifecycle dan idempotent monitoring ingestion tanpa memberi supplier External akses ke Hosted workflow.
 
@@ -2524,7 +2543,7 @@ Unlocks:
 
 ### 9.1 External API Client Lifecycle
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 3.7.
 
@@ -2555,7 +2574,7 @@ Exit criteria:
 
 ### 9.2 Client-credentials Token Endpoint
 
-Status: **planned**
+Status: **done**
 
 Dependency: 9.1.
 
@@ -2584,7 +2603,7 @@ Exit criteria:
 
 ### 9.3 OpenAPI dan Zod Event Contracts
 
-Status: **planned**
+Status: **done**
 
 Dependency: shared contracts Phase 1 and PRD API v1.
 
@@ -2614,7 +2633,7 @@ Exit criteria:
 
 ### 9.4 Single-event Ingestion
 
-Status: **planned**
+Status: **done**
 
 Dependency: 9.2-9.3.
 
@@ -2644,7 +2663,7 @@ Exit criteria:
 
 ### 9.5 Idempotency dan Source-version Ordering
 
-Status: **planned**
+Status: **done**
 
 Dependency: 9.4.
 
@@ -2674,7 +2693,7 @@ Exit criteria:
 
 ### 9.6 Batch Ingestion
 
-Status: **planned**
+Status: **done**
 
 Dependency: 9.5.
 
@@ -2703,7 +2722,7 @@ Exit criteria:
 
 ### 9.7 Projection dan TMMIN Warning Integration
 
-Status: **planned**
+Status: **done**
 
 Dependency: 9.4-9.6 dan Phase 8.6.
 
@@ -2732,7 +2751,7 @@ Exit criteria:
 
 ### 9.8 PII, Rate Limit, dan IP Allowlist Enforcement
 
-Status: **planned**
+Status: **done**
 
 Dependency: 9.2-9.7.
 
@@ -2761,7 +2780,7 @@ Exit criteria:
 
 ### 9.9 External Contract dan Security Suite
 
-Status: **planned**
+Status: **done**
 
 Dependency: 9.1-9.8.
 
@@ -2790,11 +2809,24 @@ Phase 9 exit criteria:
 
 - External suppliers can securely push monitoring events; TMMIN receives unified warning/dashboard data without Hosted control or excess PII.
 
+Implementation note:
+
+- Migration 007 menambahkan credential, token digest, immutable raw ingestion, current projection,
+  unified warning source, index, dan append-only trigger.
+- Strict shared Zod schemas dan OpenAPI mencakup lima lifecycle event untuk keempat kategori 4M,
+  single/batch/status endpoint, dan TMMIN client/projection reads.
+- Serializable per-event transaction, canonical hash reconciliation, source-version ordering,
+  terminal freeze, dan per-item batch isolation telah dibuktikan dengan real PostgreSQL.
+- External Open/terminal state memperbarui warning dan mengirim durable notification ke active
+  TMMIN Admin; Assignment Board tetap Hosted-only.
+- Local single-instance rate limiter menerapkan token attempt limit serta ingestion token bucket;
+  horizontal scaling memerlukan coordinated counter sesuai ADR 0018.
+
 ---
 
 ## 18. Phase 10 - Backend Contract Freeze dan Hardening
 
-Status: **planned**
+Status: **done**
 
 Goal: menutup backend implementation gap, mengunci contracts, menguji concurrency/security/performance, dan memastikan frontend dapat dibangun tanpa backend redesign.
 
@@ -2808,7 +2840,7 @@ Unlocks:
 
 ### 10.1 Unit Coverage Completion
 
-Status: **planned**
+Status: **done**
 
 Dependency: all backend phases.
 
@@ -2833,7 +2865,7 @@ Exit criteria:
 
 ### 10.2 Full PostgreSQL Integration Suite
 
-Status: **planned**
+Status: **done**
 
 Dependency: 10.1.
 
@@ -2858,7 +2890,7 @@ Exit criteria:
 
 ### 10.3 Concurrency dan Failure-path Suite
 
-Status: **planned**
+Status: **done**
 
 Dependency: 10.2.
 
@@ -2884,7 +2916,7 @@ Exit criteria:
 
 ### 10.4 OpenAPI dan Shared-contract Reconciliation
 
-Status: **planned**
+Status: **done**
 
 Dependency: 10.1-10.3.
 
@@ -2911,7 +2943,7 @@ Exit criteria:
 
 ### 10.5 Query dan Index Review
 
-Status: **planned**
+Status: **done**
 
 Dependency: 10.2.
 
@@ -2937,7 +2969,7 @@ Exit criteria:
 
 ### 10.6 Backend Performance Baseline
 
-Status: **planned**
+Status: **done**
 
 Dependency: 10.5.
 
@@ -2962,7 +2994,7 @@ Exit criteria:
 
 ### 10.7 Security Negative Tests dan Backend Freeze
 
-Status: **planned**
+Status: **done**
 
 Dependency: 10.1-10.6.
 
@@ -2994,6 +3026,25 @@ Exit criteria:
 Phase 10 exit criteria:
 
 - Backend APIs, contracts, database behavior, security, and preliminary performance stable.
+
+Implementation note:
+
+- Controller metadata dan generated OpenAPI sekarang direkonsiliasi exactly: 124 paths dan 140 HTTP
+  operations. Test ini menemukan dan menutup sebelas undocumented operations serta lima path
+  parameter drift.
+- Direct unit evidence mencakup canonical external hashing, source-version/terminal rules, IP
+  allowlist, token fixed window, ingestion token bucket, dan Retry-After semantics.
+- Full fresh PostgreSQL suite lulus 31 tests; prior concurrency/failure suite tetap aktif dan
+  External coverage menambah allowlist, old epoch, immediate token revoke, dan concurrent identical
+  ingestion.
+- Migration 008 menambahkan deterministic pagination/cursor indexes dan lulus fresh serta 007→008
+  upgrade-path verification.
+- Dedicated `pnpm test:baseline` memakai empty disposable `_test` database dan seed 42 supplier ×
+  20 line × 300 member × 500 job, ditambah 500 projection dan 1.000 audit rows per supplier.
+- Seluruh measured dashboard/read/mutation/ingestion p95 lulus target dengan 0% unexpected error;
+  high-cardinality plan memakai index-only scan.
+- Backend v1 freeze mengizinkan additive read field, pagination/filter/sort, safe error code,
+  read-only route, dan index; breaking change memerlukan migration plan atau version baru.
 
 ---
 
@@ -5096,25 +5147,23 @@ ADR harus dibuat ketika keputusan mulai diimplementasikan, bukan setelah impleme
 
 No acceptance criterion may remain without an owning phase.
 
-## 31. Recommended First Execution Batch
+## 31. Recommended Next Execution Batch
 
 Current recommended batch:
 
-1. Begin Phase 5.1 Shift Run schema dan state machine.
-2. Snapshot validated Default Assignment into Working Assignment at Start Shift.
-3. Build the preflight engine and hard gates before emergency override behavior.
+1. Begin Phase 11.1 supplier/TMMIN Vite workspaces and shared UI package.
+2. Generate the typed API client from the frozen 140-operation backend contract.
+3. Establish session, CSRF mutation, problem mapping, accessibility, and browser-test foundations.
 
 Initial implementation order inside the next coding batch:
 
-1. add `ShiftRun`, `WorkingAssignment`, dan `AssignmentIssue` through an expand-only migration;
-2. implement `NOT_STARTED` → `ACTIVE` → `ENDED` transition ownership;
-3. snapshot Default Assignment set/version atomically into Working Assignment;
-4. implement vacancy, duplicate MP, inactive resource, and carry-over preflight rules;
-5. enforce Start Shift hard gates and optimistic concurrency;
-6. add audited Supplier Admin emergency override with required reason;
-7. expose shift list/detail/current queries and permission-negative tests.
-
-Do not start React frontend, supplier product domains, or deployment scripts before their owning dependencies.
+1. scaffold only the workspaces owned by Phase 11 and preserve strict ESM/TypeScript quality gates;
+2. derive frontend request/response types from shared Zod/OpenAPI rather than duplicating enums;
+3. implement realm-specific session bootstrap, logout, password flow, and CSRF-aware fetch wrapper;
+4. map RFC 9457 problem responses into loading/empty/error/forbidden/conflict/stale UI states;
+5. establish shared accessible desktop tokens/components without moving business policy client-side;
+6. add frontend unit/build checks and a real-API Playwright harness;
+7. keep Phase 12-14 feature screens and Phase 15 deployment files behind their owning dependencies.
 
 ## 32. Deferred dan Explicitly Out-of-scope
 

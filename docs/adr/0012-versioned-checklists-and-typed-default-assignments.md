@@ -80,3 +80,9 @@ must be monitored with other retained domain history.
 
 Shift Run snapshots DefaultAssignmentSet version and current assignments. Henkaten snapshots the
 selected published checklist version and item labels.
+
+A pristine `NOT_STARTED` plan may now be explicitly refreshed from the current Default Assignment
+set; Active Working Assignments never rebuild from later defaults. Start rejects a changed
+assignment-set version. Each Henkaten snapshots the latest selected published version, ordered
+labels, source item IDs, and all-YES answers, with database triggers preventing evidence mutation
+or deletion.
