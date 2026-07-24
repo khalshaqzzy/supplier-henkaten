@@ -63,3 +63,163 @@
   color: var(--hds-text-link);
   font-weight: var(--hds-weight-semibold);
 }
+
+.tmmin-auth {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: white;
+}
+
+.tmmin-auth > section {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(48px, 7vw, 96px);
+  background: linear-gradient(145deg, rgb(255 90 31 / 10%), transparent 60%), #020617;
+  color: white;
+}
+
+.tmmin-auth > section > div {
+  max-width: 600px;
+}
+
+.tmmin-auth h1 {
+  margin: 12px 0;
+  font-size: clamp(2.5rem, 4vw, 4.5rem);
+  line-height: 1;
+  letter-spacing: -0.06em;
+}
+
+.tmmin-auth p,
+.tmmin-shell p {
+  color: var(--hds-text-secondary);
+}
+
+.tmmin-auth > section p {
+  color: var(--hds-color-slate-300);
+}
+
+.tmmin-auth > .hds-card {
+  width: min(520px, calc(100% - 64px));
+  display: grid;
+  align-self: center;
+  gap: 16px;
+  margin: auto;
+  padding: 32px;
+}
+
+.tmmin-auth h2,
+.tmmin-auth p {
+  margin: 0;
+}
+
+.tmmin-auth form,
+.tmmin-compact form {
+  display: grid;
+  gap: 16px;
+}
+
+.tmmin-error {
+  padding: 12px;
+  border: 1px solid var(--hds-state-danger-border);
+  border-radius: 8px;
+  background: var(--hds-state-danger-bg);
+  color: var(--hds-state-danger-fg);
+}
+
+.tmmin-loading,
+.tmmin-compact {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+}
+
+.tmmin-compact > .hds-card {
+  width: min(560px, 100%);
+  display: grid;
+  gap: 18px;
+  padding: 32px;
+}
+
+.tmmin-compact h1 {
+  margin: 0;
+}
+
+.tmmin-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+}
+
+.tmmin-shell aside {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 24px 18px;
+  border-right: 1px solid var(--hds-border-default);
+  background: white;
+}
+
+.tmmin-shell nav {
+  display: grid;
+  gap: 4px;
+}
+
+.tmmin-shell nav a {
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--hds-text-secondary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.tmmin-shell nav a.is-current {
+  background: var(--hds-surface-selected);
+  color: var(--hds-text-link);
+}
+
+.tmmin-shell aside .hds-button {
+  margin-top: auto;
+}
+
+.tmmin-shell header {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--hds-border-default);
+  background: white;
+}
+
+.tmmin-shell main > section {
+  max-width: 1000px;
+  display: grid;
+  gap: 20px;
+  padding: 48px;
+}
+
+.tmmin-shell h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.tmmin-shell .hds-card {
+  padding: 24px;
+}
+
+.capability-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.capability-list code {
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: var(--hds-surface-inset);
+  color: var(--hds-text-secondary);
+  font-size: 11px;
+}

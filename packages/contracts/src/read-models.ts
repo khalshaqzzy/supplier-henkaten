@@ -9,6 +9,8 @@ import {
 } from './common.js';
 import {
   approvalRouteStatusSchema,
+  approvalRouteSchema,
+  assignmentIssueTypeSchema,
   henkatenCategorySchema,
   henkatenStatusSchema,
   sourceModeSchema,
@@ -106,6 +108,24 @@ export const assignmentBoardSchema = z
           lineLeader: z
             .object({ memberId: opaqueIdSchema.nullable(), name: z.string().nullable() })
             .strict(),
+          activeOverride: z
+            .object({
+              reason: z.string().min(1).max(1_000),
+              startedAt: utcTimestampSchema,
+              unresolvedIssueCount: z.number().int().nonnegative(),
+              failedChecks: z.array(
+                z
+                  .object({
+                    code: z.string().min(1).max(100),
+                    message: z.string().min(1).max(500),
+                    resourceType: z.string().max(100).optional(),
+                    resourceId: opaqueIdSchema.optional(),
+                  })
+                  .strict(),
+              ),
+            })
+            .strict()
+            .nullable(),
           jobs: z.array(
             z
               .object({
@@ -141,6 +161,10 @@ export const dashboardQuerySchema = z
     category: henkatenCategorySchema.optional(),
     lineId: opaqueIdSchema.optional(),
     part: z.string().min(1).max(200).optional(),
+    shiftTemplateId: opaqueIdSchema.optional(),
+    approvalRoute: approvalRouteSchema.optional(),
+    approvalStatus: approvalRouteStatusSchema.optional(),
+    granularity: z.enum(['DAY', 'WEEK', 'MONTH']).default('DAY'),
   })
   .strict();
 export type DashboardQuery = z.infer<typeof dashboardQuerySchema>;
@@ -149,9 +173,31 @@ const countByLabelSchema = z.array(
   z.object({ label: z.string(), count: z.number().int().nonnegative() }).strict(),
 );
 
+const dashboardPeriodSchema = z
+  .object({
+    periodStart: utcTimestampSchema,
+    total: z.number().int().nonnegative(),
+    man: z.number().int().nonnegative(),
+    machine: z.number().int().nonnegative(),
+    material: z.number().int().nonnegative(),
+    method: z.number().int().nonnegative(),
+    approved: z.number().int().nonnegative(),
+    rejected: z.number().int().nonnegative(),
+    cancelled: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const supplierDashboardSchema = z
   .object({
     generatedAt: utcTimestampSchema,
+    filterOptions: z
+      .object({
+        lines: z.array(
+          z.object({ id: opaqueIdSchema, code: z.string(), name: z.string() }).strict(),
+        ),
+        shiftTemplates: z.array(z.object({ id: opaqueIdSchema, name: z.string() }).strict()),
+      })
+      .strict(),
     totals: z
       .object({
         all: z.number().int().nonnegative(),
@@ -170,6 +216,35 @@ export const supplierDashboardSchema = z
         qc: z.number().int().nonnegative(),
       })
       .strict(),
+    approvalAging: z.array(
+      z
+        .object({
+          bucket: z.enum([
+            'UNDER_4_HOURS',
+            'FOUR_TO_EIGHT_HOURS',
+            'EIGHT_TO_24_HOURS',
+            'OVER_24_HOURS',
+          ]),
+          count: z.number().int().nonnegative(),
+        })
+        .strict(),
+    ),
+    trend: z.array(dashboardPeriodSchema),
+    assignmentIssues: z.array(
+      z.object({ type: assignmentIssueTypeSchema, count: z.number().int().nonnegative() }).strict(),
+    ),
+    recentOverrides: z.array(
+      z
+        .object({
+          shiftRunId: opaqueIdSchema,
+          lineId: opaqueIdSchema,
+          lineName: z.string().min(1).max(150),
+          businessDate: z.string().date(),
+          reason: z.string().min(1).max(1_000),
+          startedAt: utcTimestampSchema,
+        })
+        .strict(),
+    ),
     byCategory: countByLabelSchema,
     byLine: countByLabelSchema,
     byPart: countByLabelSchema,
@@ -246,6 +321,7 @@ export const auditEntrySchema = z
     action: z.string(),
     resourceType: z.string(),
     resourceId: z.string().nullable(),
+    lineId: opaqueIdSchema.nullable(),
     changeSummary: z.record(z.string(), z.unknown()).nullable(),
     result: z.enum(['SUCCESS', 'FAILURE']),
     correlationId: z.string(),
@@ -258,3 +334,56 @@ export const auditPageSchema = z
 
 export const realtimeQuerySchema = z.object({ lineId: opaqueIdSchema.optional() }).strict();
 export type RealtimeQuery = z.infer<typeof realtimeQuerySchema>;
+
+export const realtimeHeartbeatSchema = z.object({ at: utcTimestampSchema }).strict();
+export const realtimeInvalidationSchema = z
+  .object({
+    eventType: z.string().min(1).max(150),
+    aggregateType: z.string().min(1).max(100),
+    aggregateId: opaqueIdSchema,
+    aggregateVersion: optimisticVersionSchema,
+    occurredAt: utcTimestampSchema,
+    refresh: z.array(z.enum(['assignment-board', 'notifications', 'dashboard'])),
+  })
+  .strict();
+export type RealtimeInvalidation = z.infer<typeof realtimeInvalidationSchema>;
+
+export const supplierSetupAreaSchema = z.enum([
+  'SHIFT_TEMPLATES',
+  'MEMBERS_ACCOUNTS',
+  'LINES_JOBS',
+  'PARTS',
+  'CHECKLISTS',
+  'DEFAULT_ASSIGNMENTS',
+]);
+export type SupplierSetupArea = z.infer<typeof supplierSetupAreaSchema>;
+
+export const supplierSetupReadinessSchema = z
+  .object({
+    generatedAt: utcTimestampSchema,
+    ready: z.boolean(),
+    areas: z.array(
+      z
+        .object({
+          area: supplierSetupAreaSchema,
+          ready: z.boolean(),
+          activeCount: z.number().int().nonnegative(),
+          requiredCount: z.number().int().nonnegative(),
+          blockerCount: z.number().int().nonnegative(),
+        })
+        .strict(),
+    ),
+    blockers: z.array(
+      z
+        .object({
+          area: supplierSetupAreaSchema,
+          code: z.string().min(1).max(100),
+          detail: z.string().min(1).max(500),
+          resourceType: z.string().max(100).optional(),
+          resourceId: opaqueIdSchema.optional(),
+        })
+        .strict(),
+    ),
+    nextArea: supplierSetupAreaSchema.nullable(),
+  })
+  .strict();

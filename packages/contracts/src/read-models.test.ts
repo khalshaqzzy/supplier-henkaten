@@ -35,6 +35,7 @@ describe('read-model contracts', () => {
           businessDate: '2026-07-23',
           supervisor: { memberId: null, name: null },
           lineLeader: { memberId: null, name: null },
+          activeOverride: null,
           jobs: [
             {
               assignmentId: '00000000-0000-4000-8000-000000000003',

@@ -59,6 +59,8 @@ jobs:
         run: pnpm openapi:check
 
       - name: Build
+        env:
+          VITE_API_ORIGIN: https://api.example.invalid
         run: pnpm build
 
   database-integration:
