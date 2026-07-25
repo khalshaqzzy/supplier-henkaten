@@ -224,6 +224,38 @@ describe('External API credential and ingestion boundary', () => {
     expect(dashboard.body.externalIngestion.accepted).toBeGreaterThanOrEqual(3);
     expect(dashboard.body.externalIngestion.recentRejected).toBeGreaterThan(0);
 
+    const explorer = await request(app.getHttpServer())
+      .get(`/api/v1/tmmin/henkatens?supplierId=${supplierId}&sourceMode=EXTERNAL`)
+      .set('Cookie', tmminCookie);
+    expect(explorer.status).toBe(200);
+    expect(explorer.body.items[0]).toMatchObject({
+      kind: 'EXTERNAL',
+      supplierId,
+      sourceMode: 'EXTERNAL',
+    });
+    expect(explorer.body.items[0]).not.toHaveProperty('supervisorStatus');
+
+    const health = await request(app.getHttpServer())
+      .get(`/api/v1/tmmin/external-health?supplierId=${supplierId}`)
+      .set('Cookie', tmminCookie);
+    expect(health.status).toBe(200);
+    expect(health.body.totals).toMatchObject({
+      accepted: expect.any(Number),
+      duplicate: expect.any(Number),
+      rejected: expect.any(Number),
+    });
+    expect(JSON.stringify(health.body)).not.toContain('canonicalPayload');
+    expect(JSON.stringify(health.body)).not.toContain(clientSecret);
+
+    const supplierDetail = await request(app.getHttpServer())
+      .get(`/api/v1/tmmin/suppliers/${supplierId}`)
+      .set('Cookie', tmminCookie);
+    expect(supplierDetail.status).toBe(200);
+    expect(supplierDetail.body.supplier.id).toBe(supplierId);
+    expect(supplierDetail.body.monitoring).toMatchObject({
+      activeWarnings: expect.any(Number),
+    });
+
     const notificationEvent = await prisma.outboxEvent.findFirstOrThrow({
       where: { eventType: 'EXTERNAL_PROJECTION_UPDATED', aggregateId: projectionId },
       orderBy: { createdAt: 'desc' },

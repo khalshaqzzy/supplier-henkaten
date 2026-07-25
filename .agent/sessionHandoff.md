@@ -1,139 +1,113 @@
-# Session Handoff — Phase 11–12 Frontend Foundation dan Hosted Supplier
+# Session Handoff — TMMIN Governance dan Monitoring
 
-Tanggal: 2026-07-24
+Tanggal: 2026-07-25
 
 Branch: `staging`
 
-Status: Phase 11 dan Phase 12 `done`; Phase 13 adalah next
+Status: Phase 13 dan subphase 13.1–13.10 `done`; Phase 14 adalah next
 
 ## 1. Outcome
 
-Shared application foundation dan seluruh workflow production Hosted Supplier telah selesai sesuai
-PRD dan `.agent/PAGES.md`.
+Seluruh TMMIN Admin dan TMMIN Quality workflow telah diimplementasikan pada `tmmin-web`.
+GAP-05–12 dan GAP-14 ditutup melalui kontrak read additive; GAP-01–15 sekarang `AVAILABLE`.
 
-- `packages/api-client` menjadi satu-satunya browser HTTP boundary untuk Supplier dan TMMIN.
-- Supplier dan TMMIN memiliki session-aware application foundation yang terisolasi per realm.
-- Supplier Portal menyediakan authentication, setup, master data, Default Assignment, Shift,
-  Henkaten, approval, Assignment Board, Overview, notifications, audit, account, dan logout.
-- Hosted Preparation dibatasi oleh capability backend dan hanya menampilkan Setup, Master Data,
-  Default Assignment, Account, serta Logout.
-- `/design` tetap public, lazy, `noindex,nofollow`, dan tidak menjalankan bootstrap session/API.
-- Production UI berbahasa Indonesia, light desktop-only, tanpa fixture fallback, Save Draft, export,
-  bulk action, global search, dark mode, atau workflow di luar PRD.
+- TMMIN Admin dapat mengelola Supplier, Supplier Admin, Quality user, source transition/Hosted
+  Preparation, dan External client credential.
+- Global Overview, Active Warnings, unified Henkaten Explorer, Hosted support, External ingestion
+  health, notifications, audit, System Status, dan account tersedia sebagai production pages.
+- TMMIN Quality memakai monitoring dan source-summary presentation yang sama secara read-only.
+  Mutation control tidak dirender dan direct source/user/credential/domain mutation tetap `403`.
+- Hosted dan External memakai discriminated read contracts. Board hanya tersedia untuk current
+  Hosted source; External diagnostics tidak mengekspos raw payload, secret, token, atau Hosted-only
+  identity.
+- Query/cache keys memuat realm dan principal ID. Logout, expiry, identity change, dan forced reset
+  membersihkan cache, CSRF, intended destination, form memory, serta one-time credential.
+- Tidak ada migration baru; sembilan migration yang ada cukup untuk read model dan query baru.
 
-Kontrak backend v1 tetap backward-compatible dan sekarang berisi 126 path/142 operasi. Dua read
-operation additive adalah setup readiness dan Henkaten form options.
+## 2. Contract dan Backend
 
-## 2. Shared Frontend Foundation
+Empat read operation additive:
 
-`packages/api-client` menyediakan:
+- `GET /api/v1/tmmin/suppliers/:supplierId/source`;
+- `GET /api/v1/tmmin/suppliers/:supplierId/assignment-board`;
+- `GET /api/v1/tmmin/henkatens`;
+- `GET /api/v1/tmmin/external-health`.
 
-- generated OpenAPI `paths` dan runtime Zod validation;
-- operation catalog Supplier/TMMIN tanpa URL atau `fetch` ad-hoc di feature code;
-- cookie credentials, in-memory CSRF, correlation ID, JSON/204/blob/multipart, abort signal, dan
-  idempotency key per user intent;
-- typed problem, network, invalid-contract, rate-limit, dan uncertain-mutation errors;
-- Supplier EventSource wrapper dengan connection state, native/manual reconnect, invalidation, dan
-  authoritative refetch.
+Shared Zod, OpenAPI, NestJS controllers, generated client, dan contract-freeze sekarang reconcile
+pada tepat 130 paths/146 operations.
 
-Application providers dan guards menyediakan:
+Perubahan backend utama:
 
-- QueryClient retry policy untuk safe read saja;
-- scoped cache key berisi realm, user, Supplier, dan session purpose;
-- cache/CSRF/intended-path cleanup pada logout, expiry, atau identity change;
-- anonymous/authenticated/forced-reset/capability/preparation/not-found/unsupported-viewport
-  behavior;
-- relative same-realm intended destination sanitization;
-- production API-origin validation;
-- cursor history, server-owned filter state, duplicate-submit lock, optimistic version, dan
-  refresh-only conflict recovery.
+- supplier/Quality-user filtering, sorting, cursor, dan paginated server reads;
+- Supplier detail dengan monitoring timestamps, current Admin, dan active Preparation; identity
+  administration disanitasi dari response Quality;
+- source summary dengan computed preflight dan immutable epoch history;
+- dashboard filters dan Hosted/External aggregates pada read-model service;
+- unified source-aware Henkaten explorer dan source-specific detail;
+- current-Hosted TMMIN Board read;
+- authoritative accepted/duplicate/rejected External health dan safe correlation lookup;
+- duplicate/rejected ingestion audit/notification behavior tanpa payload duplication;
+- role-scoped audit default-deny untuk Quality dan Supplier-aware notification deep links;
+- privacy acknowledgement, exactly-one Preparation admin, IANA timezone, and current-version
+  enforcement.
 
-TMMIN hanya memiliki login, forced password change, account/logout, dan authenticated foundation
-shell. Workflow TMMIN tetap dimiliki Phase 13.
+## 3. Frontend Composition
 
-## 3. Supplier API Resolution
+TMMIN foundation sekarang mempunyai QueryClient, typed browser boundary, session/cache isolation,
+safe intended destination, forced-reset/capability/viewport guards, error boundary, skip link,
+route-title focus, Not Found/Forbidden states, dan role-aware shell.
 
-Gap Supplier yang ditutup:
+Implemented routes mencakup:
 
-- GAP-01: authoritative session capabilities dan Supplier context;
-- GAP-02: `GET /api/v1/supplier/setup-readiness` dengan shared source-governance evaluator;
-- GAP-03: role-scoped dashboard filters, aging, trends, issues, overrides, rankings, activity, dan
-  filter options;
-- GAP-04: immutable audit tenant/line scope;
-- GAP-13: explicit active override/unresolved Board context;
-- GAP-15: immutable Hosted Henkaten `sourceMode` dan `sourceEpoch`.
+- login, forced password reset, logout, account/session;
+- Global Overview dengan stats, filters, aging, trends, rankings, freshness, override, External
+  activity, dan drill-down;
+- Active Warnings list/detail tanpa manual close;
+- Hosted/External Henkaten explorer/detail;
+- Supplier lifecycle, edit, Supplier Admin replace/reset, dan one-time credential;
+- Source Governance preflight/blocker/history/Preparation/cutover;
+- External client issue/rotate/revoke dengan one-time secret;
+- Hosted master data, Shift reads, dan Assignment Board;
+- External Ingestion Health, notifications, Quality-user administration, audit, dan status.
 
-Henkaten form options ditambahkan untuk Line Leader dengan capability
-`SUPPLIER_HENKATEN_SUBMIT`. Response hanya mengekspos:
+`DataTable` mendukung controlled manual server sorting. Forms memakai React Hook Form/Zod,
+optimistic version, duplicate-submit protection, field errors, dan consequence dialogs. Shared
+one-time credential value hanya hidup dalam component memory dan hilang setelah acknowledgement,
+navigation, atau session cleanup.
 
-- current published checklist untuk kategori yang dipilih;
-- active part yang dapat dicari;
-- active MP replacement candidates beserta reservation dan current-assignment context.
+## 4. Visual Evidence
 
-Endpoint ini mencegah Line Leader bergantung pada Admin-only master-data reads dan menyediakan
-version/source assignment yang dibutuhkan cross-line atomic movement.
+Reference yang diinspeksi sebelum implementasi:
 
-Audit persistence sekarang memiliki nullable `lineId`, safe backfill dari resource relations, dan
-cursor index. Supplier Admin/QC membaca tenant scope; Supervisor/Line Leader hanya authorized-line
-scope. CORS mengekspos `X-Correlation-ID` dan `Retry-After`.
+- `.agent/design/tmmin-global-overview.png`;
+- `.agent/design/source-governance.png`.
 
-Migration:
+Manual audit menggunakan API lokal dan disposable PostgreSQL data:
 
-- `apps/api/prisma/migrations/20260724000900_supplier_frontend_audit_scope/migration.sql`
+- login dan Global Overview pada 1440×900;
+- Source Governance blocked state dan Supplier Detail pada 1440×900;
+- one-time Supplier Admin credential pada 1440×900;
+- External Ingestion Health dan Quality read-only Source Governance pada 1280×720;
+- unsupported viewport pada 1100×650.
 
-Tidak ada destructive data operation.
+Semua page yang diaudit memiliki `scrollWidth === clientWidth`; tabel lebar berada dalam scroll
+container. Audit menemukan dan menutup dua visual/interaction defects: privacy acknowledgement
+yang sebelumnya default checked, serta inherited heading line-height yang membuat unsupported
+viewport overlap. Quality Source Governance terbukti tidak mempunyai submit/mutation control.
 
-## 4. Hosted Supplier Workflows
+Visual composition mempertahankan compact sidebar, 60 px topbar, near-white canvas, thin border,
+low elevation, dense table, tabular numbers, selective orange, visible focus, dan contextual rail.
+UI tidak menambah fake live indicator, global search, export, alert configuration, Docs control,
+dark mode, bulk action, mobile workflow, atau manual warning lifecycle.
 
-Implemented production routes:
+## 5. Validation Evidence
 
-- authentication, generic failure, rate-limit feedback, forced reset, account/session, logout;
-- setup readiness dengan ordered next action dan deep link CRUD;
-- member/account/photo lifecycle, one-time password, reset/activate/deactivate, MP tanpa credential;
-- line/job nested management dan reorder, part, cross-midnight Shift Template, checklist
-  draft/publish/history;
-- Default Assignment Supervisor/LL/MP, availability, remove/change, atomic move, active-shift
-  notice;
-- Shift list/current/history, prepare, preflight, resolution, normal/admin emergency Start, End
-  consequence review, terminal summary;
-- Henkaten full-filter list, four-category create/clone, all-Yes gate, reservation/movement,
-  immutable detail, source traceability, Withdraw, reroute, parallel decision/reject-fast refresh;
-- realtime Assignment Board dengan vacancy/reservation/conflict, Open/Approved 4M, override context,
-  scoped filter, SSE invalidation, stale banner, dan accessible status names;
-- Overview dengan server aggregates, URL filters, charts/tables, drill-down, section failures, dan
-  generated time;
-- notification unread/list/read/deep link, role-scoped audit cursor timeline, account/password.
-
-## 5. Visual Evidence
-
-Reference berikut diinspeksi secara visual sebelum implementasi page terkait:
-
-- `.agent/design/supplier-overview.png`;
-- `.agent/design/supplier-assignment-board.png`;
-- `.agent/design/create-henkaten.png`;
-- `.agent/design/henkaten-detail-approval.png`;
-- `.agent/design/blocked-shift.png`;
-- `.agent/design/default-assignments.png`.
-
-Manual in-app browser audit:
-
-- `/design` pada 1440×900: public showcase, `noindex,nofollow`, tanpa page-level horizontal
-  overflow;
-- `/login` pada 1280×720: exact viewport fit, polished focus-visible state, tanpa overflow;
-- `/design#patterns` pada 1280×720: critical patterns tetap terbaca tanpa page-level overflow;
-- viewport di bawah 1280×720 menampilkan unsupported message dengan Logout tetap tersedia.
-
-Visual direction mempertahankan compact sidebar/header, near-white canvas, thin borders, low
-elevation, 36 px controls, dense tables, selective orange, contextual rail, short motion, dan
-icon+labeled status. Official TMMIN logo tidak ditebak atau diunduh.
-
-## 6. Validation Evidence
-
-Runtime lokal memakai Node.js `22.23.1` dan pnpm `11.16.0`.
+Runtime delivery: Node.js `22.23.1`, pnpm `11.16.0`.
 
 Local GitHub Actions parity:
 
 ```text
+pnpm clean
 pnpm install --frozen-lockfile
 pnpm format:check
 pnpm lint
@@ -147,12 +121,14 @@ pnpm db:wait
 pnpm db:verify
 pnpm db:test:reset
 pnpm db:test:migrate
-NODE_ENV=test \
-DATABASE_URL=postgresql://supplier_henkaten:supplier_henkaten_local_only@127.0.0.1:55432/supplier_henkaten_test \
-RELEASE_SHA=ci \
-SESSION_CSRF_SECRET=integration-test-csrf-secret-at-least-32 \
-AUTH_THROTTLE_SECRET=integration-test-throttle-secret-32 \
-OUTBOX_ENABLED=false pnpm test:integration
+NODE_ENV=test DATABASE_URL=<disposable-test-url> RELEASE_SHA=ci \
+  SESSION_CSRF_SECRET=<safe-test-value> AUTH_THROTTLE_SECRET=<safe-test-value> \
+  OUTBOX_ENABLED=false pnpm test:integration
+pnpm db:test:reset
+pnpm db:test:migrate
+NODE_ENV=test DATABASE_URL=<disposable-test-url> RELEASE_SHA=ci \
+  SESSION_CSRF_SECRET=<safe-test-value> AUTH_THROTTLE_SECRET=<safe-test-value> \
+  OUTBOX_ENABLED=false pnpm test:baseline
 pnpm db:down
 docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.24.3 \
   dir /repo --config=/repo/.gitleaks.toml --redact --verbose
@@ -161,57 +137,50 @@ git diff --check
 
 Results:
 
-- contracts: 24 unit tests passed;
-- API client: 7 unit tests passed;
+- contracts: 27 unit tests passed;
+- API client: 8 unit tests passed;
 - shared UI: 14 unit/accessibility tests passed;
 - API: 16 unit/policy/contract tests passed;
-- Supplier foundation: 6 route/session/viewport tests passed;
+- Supplier foundation: 6 tests passed;
+- TMMIN foundation: 5 tests passed;
 - test fixtures: 6 tests passed;
 - PostgreSQL integration: 32/32 passed from a fresh nine-migration database;
-- runtime/OpenAPI reconciliation: 126 paths and 142 operations;
-- Supplier/TMMIN/API production build passed with explicit API origin;
-- format, lint, typecheck, OpenAPI drift, Compose/pgvector, Gitleaks directory/commit scan, and
-  `git diff --check` passed.
+- Compact baseline: 2/2 passed; dashboard p95 89.72 ms against 3,000 ms target, all measured error
+  rates zero, and bounded reads retained index/index-only plans;
+- runtime/OpenAPI reconciliation: 130 paths/146 operations;
+- production builds passed with explicit API origin; the existing non-failing Vite chunk-size
+  advisory remains;
+- format, lint, typecheck, OpenAPI/client drift, Compose/pgvector, Gitleaks directory/commit scan,
+  and `git diff --check` passed.
 
-The generated showcase is a separate lazy production chunk. Vite reports the existing main bundle
-size advisory; it is non-failing and route-level workflow splitting may be addressed as a measured
-performance refinement.
-
-## 7. Documentation and Commits
+## 6. Documentation dan Delivery
 
 Architecture records:
 
-- ADR 0019 and backend contract-freeze architecture updated for 126 paths/142 operations;
-- ADR 0020 updated with additive Supplier gap resolution;
-- ADR 0022: typed browser API boundary;
-- ADR 0023: purpose-aware session and cache boundaries;
-- ADR 0024: Supplier application composition.
+- ADR 0019: executable contract count updated to 130/146;
+- ADR 0020: TMMIN additive gap resolution;
+- ADR 0022: schema-validated accepted `503` browser response;
+- ADR 0023: TMMIN realm/principal cache isolation;
+- ADR 0025: source-aware TMMIN governance and monitoring composition.
 
 Progress records:
 
-- `.agent/PAGES.md`: GAP-01/02/03/04/13/15 `AVAILABLE`;
-- `.agent/implementationPhases.md`: Phase 11–12 and all subphases `done`, Phase 13 next.
+- `.agent/PAGES.md`: GAP-01–15 `AVAILABLE`;
+- `.agent/implementationPhases.md`: Phase 13 and 13.1–13.10 `done`, Phase 14 next.
 
-Delivery commit subjects:
+Delivery uses one behavior-based commit:
 
-1. `d7b1213` — `feat(frontend): add typed session-aware application foundation`
-2. `7d6e42e` — `feat(api): complete supplier frontend read contracts`
-3. `feat(supplier): deliver hosted supplier workflows` — commit containing this handoff.
+`feat(tmmin): deliver governance and monitoring workflows`
 
-The exact self-referential SHA of the third commit is recorded in the delivery response and
-`git log`. Existing `.DS_Store` remains unstaged and belongs to the user.
+The exact self-referential SHA is available in `git log` and the delivery response. Existing
+`.DS_Store` remains unstaged and belongs to the user.
 
-## 8. Open Scope and Next Action
+## 7. Open Scope dan Next Action
 
-No Supplier Phase 11–12 gap remains open. TMMIN GAP-05–12 dan GAP-14 tetap explicit Phase 13
-dependencies and must not be simulated client-side.
+Phase 14 owns full Playwright cross-realm/full-stack E2E, including deterministic fixture bootstrap,
+two-realm cookie isolation, realtime Board/notification propagation, and source transition journeys.
 
-Next action:
+Phase 15 retains deployment automation. This handoff does not claim a staging deployment URL or
+runtime deployment; only the `staging` branch delivery and required GitHub Actions are verified.
 
-1. begin Phase 13 TMMIN capability navigation and route composition;
-2. close only the TMMIN additive API gaps listed in `.agent/PAGES.md`;
-3. preserve Hosted/External traceability and TMMIN Quality read-only boundaries;
-4. retain full cross-realm Playwright ownership for Phase 14.
-
-No production VM/domain/credential was required. No long-running dev process should remain after
-delivery; the local Compose stack is stopped at task completion.
+No long-running local API/web process or Compose stack remains after delivery.

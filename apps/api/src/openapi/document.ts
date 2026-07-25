@@ -18,6 +18,8 @@ import {
   sourceModeSchema,
   startHostedPreparationRequestSchema,
   supplierCredentialResponseSchema,
+  supplierDetailSchema,
+  supplierListQuerySchema,
   supplierLoginRequestSchema,
   supplierPageSchema,
   supplierSummarySchema,
@@ -26,6 +28,7 @@ import {
   userCredentialResponseSchema,
   userPageSchema,
   userSummarySchema,
+  qualityUserListQuerySchema,
   assignmentMoveRequestSchema,
   assignmentMutationRequestSchema,
   assignmentRemoveRequestSchema,
@@ -94,7 +97,13 @@ import {
   notificationUnreadCountSchema,
   supplierDashboardSchema,
   supplierSetupReadinessSchema,
-  tmminDashboardSchema,
+  tmminDashboardExtendedSchema,
+  tmminDashboardQuerySchema,
+  tmminHenkatenPageSchema,
+  tmminHenkatenQuerySchema,
+  sourceGovernanceSummarySchema,
+  externalHealthQuerySchema,
+  externalHealthSchema,
   createExternalClientRequestSchema,
   externalBatchRequestSchema,
   externalBatchResponseSchema,
@@ -177,7 +186,10 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       '/api/v1/auth/supplier/logout': logoutPath(),
       '/api/v1/auth/tmmin/logout': logoutPath(),
       '/api/v1/tmmin/quality-users': {
-        get: { responses: { '200': json('TMMIN Quality users', userPageSchema) } },
+        get: {
+          requestParams: { query: qualityUserListQuerySchema },
+          responses: { '200': json('TMMIN Quality users', userPageSchema) },
+        },
         post: {
           requestBody: body(createTmminQualityRequestSchema),
           responses: { '201': json('Created user and credential', userCredentialResponseSchema) },
@@ -195,7 +207,10 @@ export function buildOpenApiDocument(): Record<string, unknown> {
         userCredentialResponseSchema,
       ),
       '/api/v1/tmmin/suppliers': {
-        get: { responses: { '200': json('Suppliers', supplierPageSchema) } },
+        get: {
+          requestParams: { query: supplierListQuerySchema },
+          responses: { '200': json('Suppliers', supplierPageSchema) },
+        },
         post: {
           requestBody: body(createSupplierRequestSchema),
           responses: {
@@ -207,7 +222,7 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       '/api/v1/tmmin/suppliers/{id}': {
         get: {
           requestParams: idPath,
-          responses: { '200': json('Supplier', supplierSummarySchema), '404': problem },
+          responses: { '200': json('Supplier', supplierDetailSchema), '404': problem },
         },
         patch: {
           requestParams: idPath,
@@ -241,6 +256,15 @@ export function buildOpenApiDocument(): Record<string, unknown> {
           responses: {
             '201': json('Hosted Preparation started', preparationResponseSchema),
             '409': problem,
+          },
+        },
+      },
+      '/api/v1/tmmin/suppliers/{id}/source': {
+        get: {
+          requestParams: idPath,
+          responses: {
+            '200': json('Supplier source governance summary', sourceGovernanceSummarySchema),
+            '404': problem,
           },
         },
       },
@@ -327,6 +351,12 @@ function externalPaths() {
           '200': json('External Henkaten projection detail', externalProjectionDetailSchema),
           '404': problem,
         },
+      },
+    },
+    '/api/v1/tmmin/external-health': {
+      get: {
+        requestParams: { query: externalHealthQuerySchema },
+        responses: { '200': json('Sanitized External ingestion health', externalHealthSchema) },
       },
     },
     '/api/v1/external/auth/token': {
@@ -437,7 +467,30 @@ function readModelPaths() {
       },
     },
     '/api/v1/tmmin/dashboard': {
-      get: { responses: { '200': json('TMMIN global dashboard', tmminDashboardSchema) } },
+      get: {
+        requestParams: { query: tmminDashboardQuerySchema },
+        responses: { '200': json('TMMIN global dashboard', tmminDashboardExtendedSchema) },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/assignment-board': {
+      get: {
+        requestParams: {
+          path: z.object({ supplierId: z.string().uuid() }),
+          query: boardQuerySchema,
+        },
+        responses: {
+          '200': json('Hosted supplier assignment board', assignmentBoardSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/tmmin/henkatens': {
+      get: {
+        requestParams: { query: tmminHenkatenQuerySchema },
+        responses: {
+          '200': json('Global Hosted and External Henkaten explorer', tmminHenkatenPageSchema),
+        },
+      },
     },
     '/api/v1/tmmin/notifications': {
       get: {

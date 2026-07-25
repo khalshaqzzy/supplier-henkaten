@@ -17,6 +17,7 @@ import {
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
+  type OnChangeFn,
   type SortingState,
 } from '@tanstack/react-table';
 import { useState } from 'react';
@@ -186,6 +187,9 @@ export interface DataTableProps<TData extends object> {
   density?: 'compact' | 'comfortable' | 'roomy';
   emptyMessage?: string;
   getRowId?: (row: TData, index: number) => string;
+  sorting?: SortingState;
+  onSortingChange?: OnChangeFn<SortingState>;
+  manualSorting?: boolean;
 }
 
 export function DataTable<TData extends object>({
@@ -195,15 +199,20 @@ export function DataTable<TData extends object>({
   density = 'compact',
   emptyMessage = 'Tidak ada data yang cocok.',
   getRowId,
+  sorting: controlledSorting,
+  onSortingChange,
+  manualSorting = false,
 }: DataTableProps<TData>) {
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [localSorting, setLocalSorting] = useState<SortingState>([]);
+  const sorting = controlledSorting ?? localSorting;
   const table = useReactTable({
     data: [...data],
     columns: [...columns],
     state: { sorting },
-    onSortingChange: setSorting,
+    onSortingChange: onSortingChange ?? setLocalSorting,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    ...(!manualSorting ? { getSortedRowModel: getSortedRowModel() } : {}),
+    manualSorting,
     ...(getRowId ? { getRowId } : {}),
   });
 

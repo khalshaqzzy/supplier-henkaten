@@ -7,13 +7,14 @@ import {
   createSupplierRequestSchema,
   createTmminQualityRequestSchema,
   expectedVersionSchema,
-  listQuerySchema,
   opaqueIdSchema,
   replaceSupplierAdminRequestSchema,
   sourceCutoverRequestSchema,
   sourceModeSchema,
+  supplierListQuerySchema,
   startHostedPreparationRequestSchema,
   updateSupplierRequestSchema,
+  qualityUserListQuerySchema,
   type CancelHostedPreparationRequest,
   type CreateSupplierRequest,
   type CreateTmminQualityRequest,
@@ -21,6 +22,8 @@ import {
   type SourceCutoverRequest,
   type StartHostedPreparationRequest,
   type UpdateSupplierRequest,
+  type SupplierListQuery,
+  type QualityUserListQuery,
 } from '@tmmin-henkaten/contracts';
 
 import { RequireCapabilities } from '../common/policy.js';
@@ -39,8 +42,8 @@ export class TmminQualityAdminController {
 
   @RequireCapabilities('TMMIN_QUALITY_MANAGE')
   @Get()
-  list(@ValidatedQuery(listQuerySchema) query: { cursor?: string; limit: number }) {
-    return this.users.listQuality(query.limit, query.cursor);
+  list(@ValidatedQuery(qualityUserListQuerySchema) query: QualityUserListQuery) {
+    return this.users.listQuality(query);
   }
 
   @RequireCapabilities('TMMIN_QUALITY_MANAGE')
@@ -119,14 +122,26 @@ export class SupplierAdministrationController {
 
   @RequireCapabilities('TMMIN_SUPPLIER_READ')
   @Get()
-  list(@ValidatedQuery(listQuerySchema) query: { cursor?: string; limit: number }) {
-    return this.suppliers.list(query.limit, query.cursor);
+  list(@ValidatedQuery(supplierListQuerySchema) query: SupplierListQuery) {
+    return this.suppliers.list(query);
   }
 
   @RequireCapabilities('TMMIN_SUPPLIER_READ')
   @Get('/:id')
-  get(@Param('id') id: string) {
-    return this.suppliers.get(parseWithSchema(opaqueIdSchema, id));
+  get(@Param('id') id: string, @Req() request: ContextRequest) {
+    return this.suppliers.detail(
+      parseWithSchema(opaqueIdSchema, id),
+      this.principal(request).role === 'TMMIN_ADMIN',
+    );
+  }
+
+  @RequireCapabilities('TMMIN_SUPPLIER_READ')
+  @Get('/:id/source')
+  sourceSummary(@Param('id') id: string, @Req() request: ContextRequest) {
+    return this.source.summary(
+      parseWithSchema(opaqueIdSchema, id),
+      this.principal(request).role === 'TMMIN_ADMIN',
+    );
   }
 
   @RequireCapabilities('TMMIN_SUPPLIER_MANAGE')
@@ -272,5 +287,10 @@ export class SupplierAdministrationController {
     @Req() request: ContextRequest,
   ) {
     return this.source.cutover(parseWithSchema(opaqueIdSchema, id), body, mutationContext(request));
+  }
+
+  private principal(request: ContextRequest) {
+    if (!request.principal) throw new Error('PrincipalMissingAfterGuard');
+    return request.principal;
   }
 }

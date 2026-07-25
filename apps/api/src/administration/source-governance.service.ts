@@ -8,6 +8,7 @@ import { PrismaService } from '../persistence/prisma.service.js';
 import { runSerializable } from '../persistence/transaction.js';
 import type { MutationContext } from './mutation-context.js';
 import { presentSupplier } from './presenters.js';
+import { presentUser } from './presenters.js';
 import { notFound, versionConflict } from './user-admin.service.js';
 import { HostedReadinessService } from './hosted-readiness.service.js';
 
@@ -143,6 +144,87 @@ export class SourceGovernanceService {
       throw new Error(`Duplicate cutover contributor: ${contributor.name}`);
     }
     this.contributors.set(contributor.name, contributor);
+  }
+
+  async summary(supplierId: string, includeSensitiveReason: boolean) {
+    const supplier = await this.prisma.supplier.findUnique({
+      where: { id: supplierId },
+      include: {
+        users: {
+          where: { role: 'SUPPLIER_ADMIN', status: 'ACTIVE' },
+          orderBy: { updatedAt: 'desc' },
+          take: 1,
+        },
+        hostedPreparations: {
+          orderBy: { startedAt: 'desc' },
+          take: 20,
+        },
+        auditEvents: {
+          where: {
+            action: {
+              in: [
+                'SUPPLIER_CREATED',
+                'HOSTED_PREPARATION_STARTED',
+                'HOSTED_PREPARATION_CANCELLED',
+                'SUPPLIER_SOURCE_MODE_CHANGED',
+              ],
+            },
+          },
+          orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+          take: 50,
+        },
+      },
+    });
+    if (!supplier) throw notFound('Supplier');
+    const targetMode = supplier.sourceMode === 'HOSTED' ? 'EXTERNAL' : 'HOSTED';
+    const preflight = await this.preflight(supplierId, targetMode);
+    const activePreparation = supplier.hostedPreparations.find(
+      (preparation) => preparation.status === 'ACTIVE',
+    );
+    return {
+      generatedAt: new Date().toISOString(),
+      supplier: presentSupplier(supplier),
+      currentSupplierAdmin:
+        includeSensitiveReason && supplier.users[0] ? presentUser(supplier.users[0]) : null,
+      activePreparation: activePreparation
+        ? {
+            id: activePreparation.id,
+            adminUserId: includeSensitiveReason ? activePreparation.adminUserId : null,
+            sourceEpoch: activePreparation.sourceEpoch,
+            status: activePreparation.status,
+            startedAt: activePreparation.startedAt.toISOString(),
+            completedAt: activePreparation.completedAt?.toISOString() ?? null,
+            cancelledAt: activePreparation.cancelledAt?.toISOString() ?? null,
+            version: activePreparation.version,
+          }
+        : null,
+      preflight,
+      history: supplier.auditEvents.map((event) => {
+        const summary = asRecord(event.changeSummary);
+        const mode =
+          event.sourceMode ??
+          (typeof summary['to'] === 'string' &&
+          (summary['to'] === 'HOSTED' || summary['to'] === 'EXTERNAL')
+            ? summary['to']
+            : supplier.sourceMode);
+        const previousMode =
+          typeof summary['from'] === 'string' &&
+          (summary['from'] === 'HOSTED' || summary['from'] === 'EXTERNAL')
+            ? summary['from']
+            : null;
+        return {
+          id: event.id,
+          epoch: event.sourceEpoch ?? supplier.sourceEpoch,
+          mode,
+          previousMode,
+          action: event.action,
+          occurredAt: event.occurredAt.toISOString(),
+          actorRole: event.actorRole,
+          reason: includeSensitiveReason ? event.reason : null,
+          correlationId: event.correlationId,
+        };
+      }),
+    };
   }
 
   async preflight(supplierId: string, targetMode: SourceMode) {
@@ -283,4 +365,10 @@ export class SourceGovernanceService {
     }
     return blockers;
   }
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }

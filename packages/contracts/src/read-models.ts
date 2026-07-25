@@ -33,6 +33,7 @@ export const notificationKindSchema = z.enum([
 export const notificationSchema = z
   .object({
     id: opaqueIdSchema,
+    supplierId: opaqueIdSchema,
     kind: notificationKindSchema,
     title: z.string().min(1).max(200),
     body: z.string().min(1).max(1_000),
@@ -308,6 +309,9 @@ export const auditQuerySchema = z
     action: z.string().min(1).max(150).optional(),
     resourceType: z.string().min(1).max(100).optional(),
     resourceId: opaqueIdSchema.optional(),
+    supplierId: opaqueIdSchema.optional(),
+    from: utcTimestampSchema.optional(),
+    to: utcTimestampSchema.optional(),
   })
   .strict();
 export type AuditQuery = z.infer<typeof auditQuerySchema>;
@@ -321,10 +325,16 @@ export const auditEntrySchema = z
     action: z.string(),
     resourceType: z.string(),
     resourceId: z.string().nullable(),
+    supplierId: opaqueIdSchema.nullable(),
+    supplierCode: z.string().nullable(),
+    supplierName: z.string().nullable(),
     lineId: opaqueIdSchema.nullable(),
     changeSummary: z.record(z.string(), z.unknown()).nullable(),
     result: z.enum(['SUCCESS', 'FAILURE']),
     correlationId: z.string(),
+    sourceMode: sourceModeSchema.nullable(),
+    sourceEpoch: optimisticVersionSchema.nullable(),
+    reason: z.string().max(1_000).nullable(),
   })
   .strict();
 

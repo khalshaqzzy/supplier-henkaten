@@ -1210,16 +1210,16 @@ Line Leader/MP:
 | GAP-02 | Setup | Supplier Admin receives authoritative Hosted readiness and blockers. | `GET /api/v1/supplier/setup-readiness` returns ordered areas, counts, blocker evidence, readiness time, and next blocked area using the shared governance evaluator. | `AVAILABLE` | Implemented additively with evaluator parity tests. |
 | GAP-03 | Supplier dashboard | Approval aging, time trend, detailed issues/overrides, full PRD filters. | Dashboard accepts the approved date/status/4M/line/part/Shift Template/approval/granularity filters and returns server-side aging, trends, issues, overrides, rankings, activity, and filter options. | `AVAILABLE` | Implemented additively and role-scoped. |
 | GAP-04 | Supplier audit | Supervisor/LL scoped and QC tenant audit per PRD. | Admin/QC receive tenant scope; Supervisor/Line Leader receive authorized-line scope backed by persisted nullable line evidence. | `AVAILABLE` | Policy, migration/backfill, cursor index, presenter, and negative authorization tests implemented. |
-| GAP-05 | TMMIN board | Read-only current Hosted Assignment Board. | Board endpoint requires Supplier session. | `ADDITIVE API REQUIRED` | Add TMMIN-scoped read-only board endpoint with Hosted-only policy. |
-| GAP-06 | TMMIN dashboard | PRD supplier/source/date/status/4M/line/part/aging/freshness filters and rankings. | Dashboard accepts no query and returns basic aggregates. | `ADDITIVE API REQUIRED` | Add server-side filters and aggregate fields. |
-| GAP-07 | Global explorer | Cross-supplier Hosted+External Henkaten query. | Reads are supplier-scoped and source-specific. | `ADDITIVE API REQUIRED` | Add unified read-only query or source-aware cross-supplier endpoints. |
-| GAP-08 | Administration lists | Search/status/source filters for suppliers and privileged users. | Cursor+limit only. | `ADDITIVE API REQUIRED` | Add backward-compatible server filters/sort. |
-| GAP-09 | Warnings | Filtered/paginated affected parts and richer instance context. | Global affected-parts endpoint has no query contract. | `ADDITIVE API REQUIRED` | Add cursor/filter contract and approval/category/line context as optional fields. |
-| GAP-10 | Supplier detail | Current Supplier Admin and Hosted Preparation recover after reload. | Supplier detail returns only Supplier summary. | `ADDITIVE API REQUIRED` | Add safe nested summaries or dedicated reads. |
-| GAP-11 | External health | Rejected/duplicate history, error aggregates, correlation lookup. | Dashboard freshness and accepted projection events only. | `ADDITIVE API REQUIRED` | Add sanitized ingestion-health read model and event queries. |
-| GAP-12 | Quality external health | Quality sees monitoring health without credential-management permission. | Client list is Admin-only; projection/dashboard data is incomplete for diagnosis. | `ADDITIVE API REQUIRED` | Add Quality-safe health projection excluding client secret and mutation. |
+| GAP-05 | TMMIN board | Read-only current Hosted Assignment Board. | `GET /api/v1/tmmin/suppliers/:supplierId/assignment-board` reuses the authoritative Board projection and rejects current External source. | `AVAILABLE` | Implemented with TMMIN read capability and Hosted-only integration coverage. |
+| GAP-06 | TMMIN dashboard | PRD supplier/source/date/status/4M/line/part/aging/freshness filters and rankings. | Dashboard accepts the monitoring filter contract and returns server-side aging, trends, rankings, overrides, External activity, freshness, and filter options. | `AVAILABLE` | Implemented in the read-model service; browser filters remain URL-authoritative. |
+| GAP-07 | Global explorer | Cross-supplier Hosted+External Henkaten query. | `GET /api/v1/tmmin/henkatens` returns a discriminated Hosted/External cursor page with stable source-aware ordering. | `AVAILABLE` | Implemented with source-specific detail links and no client aggregation. |
+| GAP-08 | Administration lists | Search/status/source filters for suppliers and privileged users. | Supplier and Quality-user lists accept bounded search/status/source/sort/cursor queries. | `AVAILABLE` | Implemented with PostgreSQL filtering and stable cursors. |
+| GAP-09 | Warnings | Filtered/paginated affected parts and richer instance context. | Warning groups and detail provide cursor-page structure, source-specific record identity, source mode, status, and aging timestamps for drill-down. | `AVAILABLE` | Implemented as read-only monitoring; lifecycle remains source-authoritative. |
+| GAP-10 | Supplier detail | Current Supplier Admin and Hosted Preparation recover after reload. | Supplier detail returns safe current Admin, active Preparation, warning count, and Hosted/External data timestamps; source summary provides reloadable governance context. | `AVAILABLE` | Implemented without credential redisplay. |
+| GAP-11 | External health | Rejected/duplicate history, error aggregates, correlation lookup. | `GET /api/v1/tmmin/external-health` returns freshness, authoritative accepted/duplicate/rejected activity, safe error codes, client/epoch context, and event/correlation lookup. | `AVAILABLE` | Implemented with sanitized persistence-backed diagnostics. |
+| GAP-12 | Quality external health | Quality sees monitoring health without credential-management permission. | External health is readable with `TMMIN_DASHBOARD_READ`; client inventory and all credential mutations remain Admin-only. | `AVAILABLE` | Implemented with safe shared page and backend mutation denial. |
 | GAP-13 | Board override | Board exposes critical unresolved override context. | Assignment Board returns explicit nullable active override and unresolved context. | `AVAILABLE` | Implemented additively; UI renders only server-provided context. |
-| GAP-14 | Source traceability | Source preparation/current admin state and dedicated cutover history. | Mutations and generic audit exist; detail state is incomplete. | `ADDITIVE API REQUIRED` | Add source governance summary; retain audit as immutable evidence. |
+| GAP-14 | Source traceability | Source preparation/current admin state and dedicated cutover history. | `GET /api/v1/tmmin/suppliers/:supplierId/source` returns current Supplier, active Preparation, computed preflight, and source/epoch history. | `AVAILABLE` | Implemented with immutable audit evidence and reload-safe presentation. |
 | GAP-15 | Henkaten source traceability | Hosted list/detail exposes immutable source mode/epoch and External projection exposes source epoch. | Hosted list/detail now expose immutable `sourceMode` and `sourceEpoch`; External projection traceability remains a Phase 13 concern. | `AVAILABLE` | Supplier requirement implemented additively without lifecycle changes. |
 
 Gap resolution rules:
@@ -1231,10 +1231,9 @@ Gap resolution rules:
 - no permission may be broadened only in route visibility;
 - External PII minimization and TMMIN read-only boundaries remain unchanged.
 
-Phase 11–12 resolution note (2026-07-24): GAP-01/02/03/04/13/15 are available in shared
-contracts, OpenAPI, PostgreSQL-backed services, authorization tests, and Supplier production pages.
-GAP-05–12 and GAP-14 remain explicit Phase 13 dependencies and must not be simulated in the TMMIN
-frontend.
+Resolution note (2026-07-25): GAP-01–15 are available in shared contracts, OpenAPI,
+PostgreSQL-backed services, authorization tests, and their production pages. Authoritative
+aggregation, filtering, lifecycle, and permission policy remain outside React.
 
 ---
 

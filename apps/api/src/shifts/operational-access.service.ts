@@ -61,6 +61,34 @@ export class OperationalAccessService {
     }
     return new TenantScope(supplierId);
   }
+
+  async assertTmminHostedCurrent(
+    supplierId: string,
+    principal: RequestPrincipal,
+  ): Promise<TenantScope> {
+    if (principal.realm !== 'TMMIN') throw forbidden();
+    const supplier = await this.prisma.supplier.findUnique({
+      where: { id: supplierId },
+      select: { active: true, sourceMode: true },
+    });
+    if (!supplier) {
+      throw new ProblemException({
+        status: 404,
+        code: 'RESOURCE_NOT_FOUND',
+        title: 'Resource not found',
+        detail: 'Supplier was not found.',
+      });
+    }
+    if (!supplier.active || supplier.sourceMode !== 'HOSTED') {
+      throw new ProblemException({
+        status: 409,
+        code: 'SOURCE_MODE_MISMATCH',
+        title: 'Hosted board unavailable',
+        detail: 'Assignment Board is available only for an active supplier using Hosted source.',
+      });
+    }
+    return new TenantScope(supplierId);
+  }
 }
 
 function sourceMismatch(): ProblemException {

@@ -16,8 +16,9 @@ Session responses provide authoritative capabilities, purpose, expiry, and Suppl
 Backend capability derivation denies operational routes during Hosted Preparation; the frontend
 uses the same response only for navigation and early route guards.
 
-All query keys include realm, user ID, Supplier ID where applicable, and session purpose. Logout,
-expiry, principal change, Supplier change, or purpose change clears:
+All query keys include realm, user ID, Supplier ID where applicable, and session purpose. TMMIN
+global-monitoring keys always include its realm and principal ID even when no Supplier filter is
+selected. Logout, expiry, principal change, Supplier change, or purpose change clears:
 
 - React Query caches;
 - CSRF memory;
@@ -40,4 +41,5 @@ contain credentials. `/design` stays outside session and API bootstrap.
 
 Foundation tests cover public `/design`, intended-path sanitization, forced reset, capability
 navigation, purpose restriction, realm isolation, cache clearing, and unsupported viewport logout.
-Backend policy and integration tests verify preparation denial independently of React.
+Backend policy and integration tests verify preparation and TMMIN Quality mutation denial
+independently of React.

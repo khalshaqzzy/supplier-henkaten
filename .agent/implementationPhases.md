@@ -60,19 +60,19 @@ Kondisi repository setelah Phase 0-10:
 - epoch-bound external client/secret lifecycle, opaque 15-minute token, strict public event
   contracts, immutable ordered ingestion, per-item batch processing, External projection/warning,
   TMMIN notification, dan unified dashboard/freshness telah tersedia;
-- executable 140-operation NestJS/OpenAPI reconciliation, direct external policy/rate-limit tests,
+- executable 146-operation NestJS/OpenAPI reconciliation, direct external policy/rate-limit tests,
   migration upgrade evidence, additive cursor indexes, dan repeatable Compact HTTP/query-plan
   baseline telah tersedia;
 - role-scoped route, page-state, user-flow, dan frontend contract-gap specification tersedia di
   `.agent/PAGES.md`;
 - dua React/Vite frontend workspace, shared Henkaten Design System, typed browser API boundary,
-  session-aware shells, dan seluruh Hosted Supplier production workflow tersedia; TMMIN feature
-  workflow, full Playwright E2E, dan remote deployment belum ada;
+  session-aware shells, seluruh Hosted Supplier workflow, dan seluruh TMMIN governance/monitoring
+  workflow tersedia; full Playwright E2E dan remote deployment belum ada;
 - materi slide tersedia sebagai reference-only input.
 
-Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8, Phase 9, Phase 10, Phase 11, dan Phase 12**
-Current phase: **Phase 13 - TMMIN-facing Frontend (`planned`)**
-Next subphase: **13.1 TMMIN Login dan Shell (`planned`)**
+Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8, Phase 9, Phase 10, Phase 11, Phase 12, dan Phase 13**
+Current phase: **Phase 14 - Frontend/Backend Integration dan Full E2E (`planned`)**
+Next subphase: **14.1 Local full-stack harness (`planned`)**
 
 Tidak ada application behavior yang boleh ditandai implemented sampai source code dan acceptance checks terkait benar-benar tersedia di repository.
 
@@ -3778,7 +3778,7 @@ Completion evidence (2026-07-24):
 
 ## 21. Phase 13 - TMMIN-facing Frontend
 
-Status: **planned**
+Status: **done**
 
 Goal: mengimplementasikan TMMIN tenant administration, warnings, global monitoring, External integration health, audit, dan system status.
 
@@ -3796,7 +3796,7 @@ Unlocks:
 
 ### 13.1 TMMIN Login dan App Shell
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 11.
 
@@ -3822,7 +3822,7 @@ Exit criteria:
 
 ### 13.2 Supplier dan Privileged-user Administration
 
-Status: **planned**
+Status: **done**
 
 Dependency: 13.1.
 
@@ -3849,7 +3849,7 @@ Exit criteria:
 
 ### 13.3 Source Mode dan Cutover UI
 
-Status: **planned**
+Status: **done**
 
 Dependency: 13.2.
 
@@ -3877,7 +3877,7 @@ Exit criteria:
 
 ### 13.4 External Credential Management
 
-Status: **planned**
+Status: **done**
 
 Dependency: 13.3.
 
@@ -3904,7 +3904,7 @@ Exit criteria:
 
 ### 13.5 Global Dashboard
 
-Status: **planned**
+Status: **done**
 
 Dependency: 13.1.
 
@@ -3933,7 +3933,7 @@ Exit criteria:
 
 ### 13.6 Warning Explorer
 
-Status: **planned**
+Status: **done**
 
 Dependency: 13.5.
 
@@ -3961,7 +3961,7 @@ Exit criteria:
 
 ### 13.7 Henkaten Explorer dan Drill-down
 
-Status: **planned**
+Status: **done**
 
 Dependency: 13.5.
 
@@ -3988,7 +3988,7 @@ Exit criteria:
 
 ### 13.8 External Ingestion Health
 
-Status: **planned**
+Status: **done**
 
 Dependency: 13.4 dan 13.7.
 
@@ -4015,7 +4015,7 @@ Exit criteria:
 
 ### 13.9 Audit dan System Status
 
-Status: **planned**
+Status: **done**
 
 Dependency: backend audit/health.
 
@@ -4041,7 +4041,7 @@ Exit criteria:
 
 ### 13.10 TMMIN Read-only Enforcement Tests
 
-Status: **planned**
+Status: **done**
 
 Dependency: 13.1-13.9.
 
@@ -5216,22 +5216,20 @@ No acceptance criterion may remain without an owning phase.
 
 Current recommended batch:
 
-1. Begin Phase 13 with the TMMIN login, authenticated shell, and capability navigation built on the
-   completed shared foundation.
-2. Close only the TMMIN additive contract gaps still marked in `.agent/PAGES.md`, preserving Hosted
-   and External source boundaries.
-3. Implement tenant administration, source governance, warnings, monitoring, audit, and system
-   status in the approved Phase 13 order.
+1. Begin Phase 14 with a deterministic local full-stack harness for both identity realms.
+2. Add Playwright ownership for cross-realm authentication, Hosted operations, TMMIN monitoring,
+   source transitions, External ingestion, and realtime propagation.
+3. Permit only backward-compatible backend adjustments discovered through executable full-stack
+   evidence.
 
 Initial implementation order inside the next coding batch:
 
-1. reconcile each TMMIN page against the remaining `ADDITIVE API REQUIRED` entries;
-2. add the smallest backward-compatible contracts and authorization evidence needed by TMMIN;
-3. implement TMMIN Admin mutations and TMMIN Quality read-only routes without sharing Supplier
-   tenant cache state;
-4. retain current Supplier behavior and generated API-client contract while Phase 13 evolves;
-5. defer full cross-realm Playwright ownership to Phase 14;
-6. keep Phase 15 deployment files behind the completed application and E2E dependencies.
+1. create isolated full-stack fixture/bootstrap and cleanup automation;
+2. exercise Supplier and TMMIN sessions without sharing cookie or cache state;
+3. cover Hosted/External drill-down, cutover, warning, Board, and notification propagation;
+4. retain the frozen 130-path/146-operation contract unless an explicit additive correction is
+   proven;
+5. keep Phase 15 deployment files behind completed full-stack acceptance.
 
 ## 32. Deferred dan Explicitly Out-of-scope
 

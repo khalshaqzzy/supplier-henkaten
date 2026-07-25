@@ -11,9 +11,9 @@ while TMMIN users administer tenants and monitor Hosted and External records acr
 
 The approved PRD defines the complete product behavior. The original backend freeze provided 140
 HTTP operations and stable shared schemas. Supplier frontend resolution added two backward-
-compatible reads, producing 142 operations; TMMIN requirements such as cross-supplier Henkaten
-search, reloadable Hosted Preparation state, read-only Assignment Board access, and sanitized
-External ingestion diagnostics remain broader than the current read models.
+compatible reads, producing 142 operations. TMMIN resolution then added source summary, unified
+cross-supplier Henkaten, current-Hosted Assignment Board, and sanitized External ingestion health,
+producing 146 operations.
 
 Without one route and behavior specification, feature implementation could duplicate navigation
 decisions, conflate Hosted and External data, hide unsupported requirements, or move authorization
@@ -137,8 +137,28 @@ The Supplier gaps identified while defining this architecture were resolved addi
 - audit events retain nullable line-scope evidence, allowing Admin/QC tenant scope and
   Supervisor/Line Leader allowed-line scope.
 
-These changes preserve the decision that React is not a policy or aggregation authority. TMMIN
-contract gaps remain owned by Phase 13.
+These changes preserve the decision that React is not a policy or aggregation authority.
+
+## TMMIN Additive Contract Resolution
+
+The TMMIN gap register is resolved through backward-compatible contracts and backend policy:
+
+- supplier and Quality-user lists have server search/status/source/sort/cursor behavior;
+- Supplier detail includes the current Supplier Admin, active Hosted Preparation, warning count,
+  and source-specific data timestamps;
+- source governance has a reloadable current/preparation/preflight/history summary;
+- dashboard aggregates and filters reconcile Hosted and External data server-side;
+- a discriminated cross-supplier explorer preserves source-specific identity and lineage;
+- warning reads expose source-aware operational context without lifecycle mutation;
+- current Hosted Assignment Board has a TMMIN read-only endpoint;
+- External health exposes authoritative freshness and accepted/duplicate/rejected activity through
+  safe error and correlation fields;
+- Quality receives a default-deny operational audit projection and no credential administration
+  evidence;
+- notification context contains Supplier identity for safe TMMIN deep links.
+
+The resulting application keeps Quality controls absent and retains backend `403` denial as the
+authorization boundary.
 
 ## Risks
 
@@ -154,5 +174,4 @@ contract gaps remain owned by Phase 13.
 - Use `.agent/PAGES.md` as the route and behavior input for frontend Phases 11–14.
 - Resolve contract gaps through backward-compatible contract changes with authorization and
   reconciliation tests.
-- Add route-guard, role visibility, source-specific detail, failure-state, and full-stack E2E tests
-  as the corresponding frontend phases are implemented.
+- Add cross-realm full-stack E2E and realtime propagation tests during release integration.

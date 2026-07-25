@@ -24,6 +24,10 @@ Every request:
 - accepts an abort signal;
 - accepts an idempotency key created once per user intent for non-replay-safe mutations.
 
+An operation may also declare schema-validated accepted status codes. This is used by readiness so
+`503 not_ready` remains a typed success alternative for status presentation while other non-2xx
+responses continue through the problem boundary.
+
 Safe reads may be retried by the query layer. Mutations and 401/403/409/422/429 responses are not
 automatically replayed. A transport failure after dispatching a mutation is reported as an
 uncertain outcome and requires authoritative refresh.
@@ -42,4 +46,4 @@ a fragment are rejected.
 
 Unit coverage exercises cookies, CSRF, correlation IDs, URL encoding, JSON/204/blob/multipart,
 malformed success payloads, problem details, rate limits, aborts, uncertain mutations, session
-expiry, and EventSource connect/reconnect/malformed-event behavior.
+expiry, accepted `503` readiness, and EventSource connect/reconnect/malformed-event behavior.

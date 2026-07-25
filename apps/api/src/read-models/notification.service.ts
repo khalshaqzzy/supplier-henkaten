@@ -21,6 +21,7 @@ const NOTIFICATION_EVENTS = [
   'NOTIFICATION_REQUESTED',
   'SHIFT_STARTED_WITH_OVERRIDE',
   'EXTERNAL_PROJECTION_UPDATED',
+  'EXTERNAL_INGEST_REJECTED',
 ] as const;
 
 @Injectable()
@@ -139,6 +140,17 @@ export class NotificationService implements OnModuleInit {
   private async recipients(event: ClaimedOutboxEvent): Promise<string[]> {
     const supplierId = event.supplierId!;
     if (event.eventType === 'EXTERNAL_PROJECTION_UPDATED') {
+      const users = await this.prisma.user.findMany({
+        where: {
+          realm: 'TMMIN',
+          role: { in: ['TMMIN_ADMIN', 'TMMIN_QUALITY'] },
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+      return users.map(({ id }) => id);
+    }
+    if (event.eventType === 'EXTERNAL_INGEST_REJECTED') {
       const users = await this.prisma.user.findMany({
         where: { realm: 'TMMIN', role: 'TMMIN_ADMIN', status: 'ACTIVE' },
         select: { id: true },
@@ -266,7 +278,17 @@ export class NotificationService implements OnModuleInit {
           body: opened
             ? 'An External supplier reported an open Henkaten warning.'
             : `An External Henkaten warning moved to ${status.toLowerCase()}.`,
-          ...link(`/external-projections/${event.aggregateId}`),
+          ...link(`/suppliers/${event.supplierId}/external/${event.aggregateId}`),
+        };
+      }
+      case 'EXTERNAL_INGEST_REJECTED': {
+        const payload = asRecord(event.payload);
+        const safeCode = typeof payload.safeCode === 'string' ? payload.safeCode : 'REJECTED';
+        return {
+          kind: 'EXTERNAL_INGESTION_ERROR',
+          title: 'External ingestion rejected',
+          body: `An External ingestion attempt was rejected (${safeCode}).`,
+          ...link(`/external-health?supplierId=${event.supplierId}`),
         };
       }
       default:
@@ -283,6 +305,7 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function presentNotification(row: {
   id: string;
+  supplierId: string;
   kind: string;
   title: string;
   body: string;
@@ -295,6 +318,7 @@ function presentNotification(row: {
 }) {
   return {
     id: row.id,
+    supplierId: row.supplierId,
     kind: row.kind,
     title: row.title,
     body: row.body,

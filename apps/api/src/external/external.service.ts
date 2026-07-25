@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
 
 import type {
   CreateExternalClientRequest,
+  ExternalHealthQuery,
   ExternalHenkatenEvent,
   ExternalTokenRequest,
 } from '@tmmin-henkaten/contracts';
@@ -340,6 +341,10 @@ export class ExternalService {
         });
         if (duplicate) {
           if (duplicate.payloadHash !== payloadHash) throw idempotencyConflict();
+          await this.audit.write(
+            duplicateAudit(principal, duplicate.id, event.eventId, correlationId, ip),
+            tx,
+          );
           return result(duplicate.id, event.eventId, 'DUPLICATE', correlationId);
         }
         await tx.$queryRaw`
@@ -443,6 +448,9 @@ export class ExternalService {
       });
       if (duplicate) {
         if (duplicate.payloadHash !== payloadHash) throw idempotencyConflict();
+        await this.audit.write(
+          duplicateAudit(principal, duplicate.id, event.eventId, correlationId, ip),
+        );
         return result(duplicate.id, event.eventId, 'DUPLICATE', correlationId);
       }
       throw error;
@@ -501,6 +509,9 @@ export class ExternalService {
     if (!row) throw notFound('External Henkaten projection');
     return {
       ...presentProjection(row),
+      change: row.changeSnapshot,
+      checklist: row.checklistSnapshot,
+      decisions: row.decisionsSnapshot,
       events: row.ingestionEvents.map((event) => ({
         ingestionId: event.id,
         eventId: event.eventId,
@@ -521,19 +532,213 @@ export class ExternalService {
     correlationId: string,
     ip: string,
   ) {
-    await this.audit.write({
-      actorKind: 'EXTERNAL_CLIENT',
-      supplierId: principal.supplierId,
-      action: 'EXTERNAL_INGEST_REJECTED',
-      resourceType: 'ExternalApiClient',
-      resourceId: principal.clientId,
-      changeSummary: { eventId, safeCode: code },
-      correlationId,
-      sourceIp: ip,
-      result: 'FAILURE',
-      sourceMode: 'EXTERNAL',
-      sourceEpoch: principal.sourceEpoch,
+    await this.prisma.$transaction(async (tx) => {
+      await this.audit.write(
+        {
+          actorKind: 'EXTERNAL_CLIENT',
+          supplierId: principal.supplierId,
+          action: 'EXTERNAL_INGEST_REJECTED',
+          resourceType: 'ExternalApiClient',
+          resourceId: principal.clientId,
+          changeSummary: { eventId, safeCode: code },
+          correlationId,
+          sourceIp: ip,
+          result: 'FAILURE',
+          sourceMode: 'EXTERNAL',
+          sourceEpoch: principal.sourceEpoch,
+        },
+        tx,
+      );
+      await this.outbox.enqueue(
+        {
+          eventType: 'EXTERNAL_INGEST_REJECTED',
+          aggregateType: 'ExternalApiClient',
+          aggregateId: principal.clientId,
+          aggregateVersion: principal.sourceEpoch,
+          supplierId: principal.supplierId,
+          actor: { kind: 'EXTERNAL_CLIENT', id: principal.clientId },
+          correlationId,
+          payload: { safeCode: code },
+        },
+        tx,
+      );
     });
+  }
+
+  async health(query: ExternalHealthQuery) {
+    const range = {
+      ...(query.from ? { gte: new Date(query.from) } : {}),
+      ...(query.to ? { lte: new Date(query.to) } : {}),
+    };
+    const acceptedWhere: Prisma.ExternalIngestionEventWhereInput = {
+      ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+      ...(query.sourceEpoch ? { sourceEpoch: query.sourceEpoch } : {}),
+      ...(query.from || query.to ? { receivedAt: range } : {}),
+      ...(query.lookup
+        ? {
+            OR: [
+              { eventId: { contains: query.lookup, mode: 'insensitive' } },
+              { sourceHenkatenId: { contains: query.lookup, mode: 'insensitive' } },
+              { correlationId: { contains: query.lookup, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+    const diagnosticWhere: Prisma.AuditEventWhereInput = {
+      action: { in: ['EXTERNAL_INGEST_DUPLICATE', 'EXTERNAL_INGEST_REJECTED'] },
+      ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+      ...(query.sourceEpoch ? { sourceEpoch: query.sourceEpoch } : {}),
+      ...(query.from || query.to ? { occurredAt: range } : {}),
+      ...(query.code ? { changeSummary: { path: ['safeCode'], equals: query.code } } : {}),
+      ...(query.lookup
+        ? {
+            OR: [
+              { correlationId: { contains: query.lookup, mode: 'insensitive' } },
+              { changeSummary: { path: ['eventId'], string_contains: query.lookup } },
+            ],
+          }
+        : {}),
+    };
+    const [suppliers, acceptedRows, diagnosticRows, acceptedCount, diagnosticCounts] =
+      await Promise.all([
+        this.prisma.supplier.findMany({
+          where: {
+            active: true,
+            sourceMode: 'EXTERNAL',
+            ...(query.supplierId ? { id: query.supplierId } : {}),
+          },
+          include: {
+            externalApiClients: {
+              where: {
+                ...(query.sourceEpoch ? { sourceEpoch: query.sourceEpoch } : {}),
+              },
+              orderBy: [{ lastSuccessfulIngestionAt: 'desc' }, { createdAt: 'desc' }],
+              take: 1,
+            },
+          },
+          orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        }),
+        query.outcome && query.outcome !== 'ACCEPTED'
+          ? Promise.resolve([])
+          : this.prisma.externalIngestionEvent.findMany({
+              where: acceptedWhere,
+              include: { supplier: true },
+              orderBy: [{ receivedAt: 'desc' }, { id: 'desc' }],
+              take: 500,
+            }),
+        query.outcome === 'ACCEPTED'
+          ? Promise.resolve([])
+          : this.prisma.auditEvent.findMany({
+              where: {
+                ...diagnosticWhere,
+                ...(query.outcome
+                  ? {
+                      action:
+                        query.outcome === 'DUPLICATE'
+                          ? 'EXTERNAL_INGEST_DUPLICATE'
+                          : 'EXTERNAL_INGEST_REJECTED',
+                    }
+                  : {}),
+              },
+              include: { supplier: true },
+              orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+              take: 500,
+            }),
+        this.prisma.externalIngestionEvent.count({ where: acceptedWhere }),
+        this.prisma.auditEvent.groupBy({
+          by: ['action'],
+          where: diagnosticWhere,
+          _count: { _all: true },
+        }),
+      ]);
+    const merged = [
+      ...acceptedRows.map((row) => ({
+        id: row.id,
+        supplierId: row.supplierId,
+        supplierName: row.supplier.name,
+        sourceEpoch: row.sourceEpoch,
+        outcome: 'ACCEPTED' as const,
+        eventId: row.eventId,
+        sourceHenkatenId: row.sourceHenkatenId,
+        projectionId: row.projectionId,
+        code: null,
+        correlationId: row.correlationId,
+        occurredAt: row.receivedAt,
+      })),
+      ...diagnosticRows.map((row) => {
+        const summary = jsonRecord(row.changeSummary);
+        return {
+          id: row.id,
+          supplierId: row.supplierId!,
+          supplierName: row.supplier?.name ?? 'Unknown supplier',
+          sourceEpoch: row.sourceEpoch!,
+          outcome:
+            row.action === 'EXTERNAL_INGEST_DUPLICATE'
+              ? ('DUPLICATE' as const)
+              : ('REJECTED' as const),
+          eventId: textValue(summary.eventId),
+          sourceHenkatenId: null,
+          projectionId: row.action === 'EXTERNAL_INGEST_DUPLICATE' ? row.resourceId : null,
+          code: textValue(summary.safeCode),
+          correlationId: row.correlationId,
+          occurredAt: row.occurredAt,
+        };
+      }),
+    ].sort(
+      (left, right) =>
+        right.occurredAt.getTime() - left.occurredAt.getTime() || right.id.localeCompare(left.id),
+    );
+    const cursor = decodeHealthCursor(query.cursor);
+    const afterCursor = cursor
+      ? merged.filter(
+          (row) =>
+            row.occurredAt.getTime() < cursor.occurredAt ||
+            (row.occurredAt.getTime() === cursor.occurredAt && row.id < cursor.id),
+        )
+      : merged;
+    const page = afterCursor.slice(0, query.limit);
+    const duplicate =
+      diagnosticCounts.find(({ action }) => action === 'EXTERNAL_INGEST_DUPLICATE')?._count._all ??
+      0;
+    const rejected =
+      diagnosticCounts.find(({ action }) => action === 'EXTERNAL_INGEST_REJECTED')?._count._all ??
+      0;
+    const supplierHealth = suppliers.map((supplier) => {
+      const client = supplier.externalApiClients[0] ?? null;
+      const lastAt = client?.lastSuccessfulIngestionAt ?? null;
+      return {
+        supplierId: supplier.id,
+        supplierCode: supplier.code,
+        supplierName: supplier.name,
+        sourceEpoch: supplier.sourceEpoch,
+        clientId: client?.id ?? null,
+        clientName: client?.name ?? null,
+        clientActive: client ? client.status === 'ACTIVE' : null,
+        lastSuccessfulIngestionAt: lastAt?.toISOString() ?? null,
+        freshness: freshnessState(lastAt),
+      };
+    });
+    return {
+      generatedAt: new Date().toISOString(),
+      totals: {
+        accepted: acceptedCount,
+        duplicate,
+        rejected,
+        fresh: supplierHealth.filter(({ freshness }) => freshness === 'FRESH').length,
+        warning: supplierHealth.filter(({ freshness }) => freshness === 'WARNING').length,
+        stale: supplierHealth.filter(({ freshness }) => freshness === 'STALE').length,
+        noData: supplierHealth.filter(({ freshness }) => freshness === 'NO_DATA').length,
+      },
+      suppliers: supplierHealth,
+      events: page.map((row) => ({ ...row, occurredAt: row.occurredAt.toISOString() })),
+      pageInfo: {
+        hasNextPage: afterCursor.length > query.limit,
+        nextCursor:
+          afterCursor.length > query.limit && page.at(-1)
+            ? encodeHealthCursor(page.at(-1)!.occurredAt, page.at(-1)!.id)
+            : null,
+      },
+    };
   }
 
   private async applyWarning(
@@ -652,6 +857,7 @@ function presentClient(row: {
 function presentProjection(row: {
   id: string;
   supplierId: string;
+  sourceEpoch: number;
   sourceHenkatenId: string;
   sourceVersion: number;
   status: 'OPEN' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
@@ -666,6 +872,7 @@ function presentProjection(row: {
   return {
     id: row.id,
     supplierId: row.supplierId,
+    sourceEpoch: row.sourceEpoch,
     sourceHenkatenId: row.sourceHenkatenId,
     sourceVersion: row.sourceVersion,
     status: row.status,
@@ -678,6 +885,58 @@ function presentProjection(row: {
     occurredAt: row.occurredAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+function duplicateAudit(
+  principal: ExternalPrincipal,
+  ingestionId: string,
+  eventId: string,
+  correlationId: string,
+  ip: string,
+) {
+  return {
+    actorKind: 'EXTERNAL_CLIENT' as const,
+    supplierId: principal.supplierId,
+    action: 'EXTERNAL_INGEST_DUPLICATE',
+    resourceType: 'ExternalIngestionEvent',
+    resourceId: ingestionId,
+    changeSummary: { eventId, safeCode: 'DUPLICATE' },
+    correlationId,
+    sourceIp: ip,
+    sourceMode: 'EXTERNAL' as const,
+    sourceEpoch: principal.sourceEpoch,
+  };
+}
+
+function freshnessState(value: Date | null): 'FRESH' | 'WARNING' | 'STALE' | 'NO_DATA' {
+  if (!value) return 'NO_DATA';
+  const age = Date.now() - value.getTime();
+  if (age <= 4 * 60 * 60_000) return 'FRESH';
+  if (age <= 24 * 60 * 60_000) return 'WARNING';
+  return 'STALE';
+}
+
+function encodeHealthCursor(occurredAt: Date, id: string): string {
+  return Buffer.from(`${occurredAt.getTime()}:${id}`).toString('base64url');
+}
+
+function decodeHealthCursor(cursor?: string): { occurredAt: number; id: string } | null {
+  if (!cursor) return null;
+  try {
+    const [occurredAt, id] = Buffer.from(cursor, 'base64url').toString('utf8').split(':');
+    const parsed = Number(occurredAt);
+    return Number.isFinite(parsed) && id ? { occurredAt: parsed, id } : null;
+  } catch {
+    return null;
+  }
+}
+
+function jsonRecord(value: Prisma.JsonValue | null): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function textValue(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
 }
 
 function externalAudit(

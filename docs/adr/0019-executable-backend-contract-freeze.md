@@ -81,8 +81,9 @@ are available for the high-cardinality tenant lists.
 
 ## Validation
 
-- Runtime/OpenAPI reconciliation passes with 126 paths and 142 HTTP operations after the additive
-  Supplier readiness and Henkaten form-option reads.
+- Runtime/OpenAPI reconciliation passes with 130 paths and 146 HTTP operations after the additive
+  Supplier readiness, Henkaten form-option, TMMIN source summary, global Henkaten, current-Hosted
+  Board, and sanitized External-health reads.
 - The Compact baseline passes with 42 suppliers, 20 lines, 300 members, and 500 jobs per supplier,
   plus 500 External projections and 1,000 audit rows per supplier.
 - Dashboard, projection, audit, notification, standard mutation, and External ingestion p95 values
@@ -94,7 +95,8 @@ are available for the high-cardinality tenant lists.
 
 ## Follow-up Work
 
-- Generate frontend typed clients from the frozen artifact.
+- Keep the generated browser client and shared runtime schemas synchronized with every additive
+  operation or response field.
 - Run the release-level concurrent staging load profile, including 30 users per supplier and
   approval/board propagation, before production readiness.
 - Version public External schema changes rather than changing `1.0` in place.

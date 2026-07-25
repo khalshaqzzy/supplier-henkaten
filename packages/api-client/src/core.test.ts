@@ -161,6 +161,23 @@ describe('ApiClient', () => {
     );
     expect(expired).toHaveBeenCalledOnce();
   });
+
+  it('schema-validates an explicitly accepted 503 readiness response', async () => {
+    const notReadySchema = z.object({ status: z.literal('not_ready') }).strict();
+    const client = new ApiClient({
+      baseUrl: 'https://api.example.test',
+      realm: 'TMMIN',
+      fetch: vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response(JSON.stringify({ status: 'not_ready' }), { status: 503 })),
+    });
+    await expect(
+      client.request('/ready', {
+        responseSchema: notReadySchema,
+        acceptedStatuses: [503],
+      }),
+    ).resolves.toEqual({ status: 'not_ready' });
+  });
 });
 
 describe('normalizeApiBaseUrl', () => {

@@ -160,7 +160,7 @@ export const sourceCutoverRequestSchema = z
     expectedVersion: optimisticVersionSchema,
     targetMode: sourceModeSchema,
     reason: z.string().trim().min(10).max(1_000),
-    privacyAcknowledged: z.boolean(),
+    privacyAcknowledged: z.literal(true),
   })
   .strict();
 export type SourceCutoverRequest = z.infer<typeof sourceCutoverRequestSchema>;

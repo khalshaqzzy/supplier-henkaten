@@ -329,10 +329,18 @@ export function OneTimeSecretPanel({
   clientId,
   secret,
   onAcknowledged,
+  identifierLabel = 'Client ID',
+  secretLabel = 'Client secret',
+  title = 'Simpan credential sekarang',
+  description = 'Secret tidak dapat dipulihkan setelah panel ini ditutup. Rotasi credential bila salinan hilang.',
 }: {
   clientId: string;
   secret: string;
   onAcknowledged?: () => void;
+  identifierLabel?: string;
+  secretLabel?: string;
+  title?: string;
+  description?: string;
 }) {
   const [acknowledged, setAcknowledged] = useState(false);
   const copy = async (value: string) => {
@@ -340,19 +348,14 @@ export function OneTimeSecretPanel({
   };
   return (
     <div className="hds-secret">
-      <Alert
-        tone="warning"
-        title="Simpan credential sekarang"
-        action={<Badge tone="warning">Ditampilkan sekali</Badge>}
-      >
-        Secret tidak dapat dipulihkan setelah panel ini ditutup. Rotasi credential bila salinan
-        hilang.
+      <Alert tone="warning" title={title} action={<Badge tone="warning">Ditampilkan sekali</Badge>}>
+        {description}
       </Alert>
       <KeyValueGrid
         columns={1}
         items={[
           {
-            label: 'Client ID',
+            label: identifierLabel,
             value: (
               <code>
                 {clientId}
@@ -363,7 +366,7 @@ export function OneTimeSecretPanel({
             ),
           },
           {
-            label: 'Client secret',
+            label: secretLabel,
             value: (
               <code>
                 {secret}
@@ -389,6 +392,8 @@ export function OneTimeSecretPanel({
     </div>
   );
 }
+
+export const OneTimeCredentialPanel = OneTimeSecretPanel;
 
 export function FormErrorSummary({
   errors,

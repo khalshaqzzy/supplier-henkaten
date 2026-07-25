@@ -61,6 +61,7 @@ export interface RequestOptions<TSchema extends z.ZodType = z.ZodType> {
   signal?: AbortSignal;
   idempotencyKey?: string;
   authenticated?: boolean;
+  acceptedStatuses?: readonly number[];
 }
 
 export class ApiClient {
@@ -125,7 +126,7 @@ export class ApiClient {
     }
 
     const correlationId = response.headers.get('X-Correlation-ID');
-    if (!response.ok) {
+    if (!response.ok && !options.acceptedStatuses?.includes(response.status)) {
       const problem = await parseProblem(response, correlationId);
       if (problem.code === 'SESSION_EXPIRED') this.onSessionExpired();
       throw new ApiProblemError(problem, parseRetryAfter(response.headers.get('Retry-After')));

@@ -1153,7 +1153,13 @@ export interface paths {
     };
     get: {
       parameters: {
-        query?: never;
+        query?: {
+          cursor?: string;
+          limit?: number;
+          search?: string;
+          status?: 'ACTIVE' | 'INACTIVE';
+          sort?: 'USERNAME_ASC' | 'UPDATED_DESC';
+        };
         header?: never;
         path?: never;
         cookie?: never;
@@ -1712,7 +1718,14 @@ export interface paths {
     };
     get: {
       parameters: {
-        query?: never;
+        query?: {
+          cursor?: string;
+          limit?: number;
+          search?: string;
+          status?: 'ALL' | 'ACTIVE' | 'INACTIVE';
+          sourceMode?: 'HOSTED' | 'EXTERNAL';
+          sort?: 'NAME_ASC' | 'UPDATED_DESC';
+        };
         header?: never;
         path?: never;
         cookie?: never;
@@ -1914,20 +1927,64 @@ export interface paths {
           };
           content: {
             'application/json': {
-              /** Format: uuid */
-              id: string;
-              code: string;
-              name: string;
-              timezone: string;
-              /** @enum {string} */
-              sourceMode: 'HOSTED' | 'EXTERNAL';
-              sourceEpoch: number;
-              active: boolean;
-              version: number;
-              /** Format: date-time */
-              createdAt: string;
-              /** Format: date-time */
-              updatedAt: string;
+              supplier: {
+                /** Format: uuid */
+                id: string;
+                code: string;
+                name: string;
+                timezone: string;
+                /** @enum {string} */
+                sourceMode: 'HOSTED' | 'EXTERNAL';
+                sourceEpoch: number;
+                active: boolean;
+                version: number;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+              };
+              currentSupplierAdmin: {
+                /** Format: uuid */
+                id: string;
+                supplierId: string | null;
+                /** @enum {string} */
+                role:
+                  | 'TMMIN_ADMIN'
+                  | 'TMMIN_QUALITY'
+                  | 'SUPPLIER_ADMIN'
+                  | 'SUPERVISOR'
+                  | 'LINE_LEADER'
+                  | 'QC';
+                username: string;
+                displayName: string;
+                /** @enum {string} */
+                status: 'ACTIVE' | 'INACTIVE';
+                mustChangePassword: boolean;
+                protectedBootstrapAdmin: boolean;
+                version: number;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+              } | null;
+              activePreparation: {
+                /** Format: uuid */
+                id: string;
+                adminUserId: string | null;
+                sourceEpoch: number;
+                /** @enum {string} */
+                status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+                /** Format: date-time */
+                startedAt: string;
+                completedAt: string | null;
+                cancelledAt: string | null;
+                version: number;
+              } | null;
+              monitoring: {
+                activeWarnings: number;
+                lastHostedDataAt: string | null;
+                lastExternalIngestionAt: string | null;
+              };
             };
           };
         };
@@ -2827,6 +2884,176 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/tmmin/suppliers/{id}/source': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Supplier source governance summary */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: date-time */
+              generatedAt: string;
+              supplier: {
+                /** Format: uuid */
+                id: string;
+                code: string;
+                name: string;
+                timezone: string;
+                /** @enum {string} */
+                sourceMode: 'HOSTED' | 'EXTERNAL';
+                sourceEpoch: number;
+                active: boolean;
+                version: number;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+              };
+              currentSupplierAdmin: {
+                /** Format: uuid */
+                id: string;
+                supplierId: string | null;
+                /** @enum {string} */
+                role:
+                  | 'TMMIN_ADMIN'
+                  | 'TMMIN_QUALITY'
+                  | 'SUPPLIER_ADMIN'
+                  | 'SUPERVISOR'
+                  | 'LINE_LEADER'
+                  | 'QC';
+                username: string;
+                displayName: string;
+                /** @enum {string} */
+                status: 'ACTIVE' | 'INACTIVE';
+                mustChangePassword: boolean;
+                protectedBootstrapAdmin: boolean;
+                version: number;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+              } | null;
+              activePreparation: {
+                /** Format: uuid */
+                id: string;
+                adminUserId: string | null;
+                sourceEpoch: number;
+                /** @enum {string} */
+                status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+                /** Format: date-time */
+                startedAt: string;
+                completedAt: string | null;
+                cancelledAt: string | null;
+                version: number;
+              } | null;
+              preflight: {
+                /** Format: uuid */
+                supplierId: string;
+                /** @enum {string} */
+                currentMode: 'HOSTED' | 'EXTERNAL';
+                /** @enum {string} */
+                targetMode: 'HOSTED' | 'EXTERNAL';
+                eligible: boolean;
+                blockers: {
+                  contributor: string;
+                  code: string;
+                  detail: string;
+                }[];
+              };
+              history: {
+                /** Format: uuid */
+                id: string;
+                epoch: number;
+                /** @enum {string} */
+                mode: 'HOSTED' | 'EXTERNAL';
+                previousMode: ('HOSTED' | 'EXTERNAL') | null;
+                /** @enum {string} */
+                action:
+                  | 'SUPPLIER_CREATED'
+                  | 'HOSTED_PREPARATION_STARTED'
+                  | 'HOSTED_PREPARATION_CANCELLED'
+                  | 'SUPPLIER_SOURCE_MODE_CHANGED';
+                /** Format: date-time */
+                occurredAt: string;
+                actorRole: string | null;
+                reason: string | null;
+                correlationId: string;
+              }[];
+            };
+          };
+        };
+        /** @description Problem Details */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/tmmin/suppliers/{id}/source/preparation/cancel': {
     parameters: {
       query?: never;
@@ -3100,7 +3327,8 @@ export interface paths {
             /** @enum {string} */
             targetMode: 'HOSTED' | 'EXTERNAL';
             reason: string;
-            privacyAcknowledged: boolean;
+            /** @constant */
+            privacyAcknowledged: true;
           };
         };
       };
@@ -13542,6 +13770,8 @@ export interface paths {
               items: {
                 /** Format: uuid */
                 id: string;
+                /** Format: uuid */
+                supplierId: string;
                 /** @enum {string} */
                 kind:
                   | 'APPROVAL_PENDING'
@@ -13658,6 +13888,8 @@ export interface paths {
             'application/json': {
               /** Format: uuid */
               id: string;
+              /** Format: uuid */
+              supplierId: string;
               /** @enum {string} */
               kind:
                 | 'APPROVAL_PENDING'
@@ -14064,6 +14296,9 @@ export interface paths {
           action?: string;
           resourceType?: string;
           resourceId?: string;
+          supplierId?: string;
+          from?: string;
+          to?: string;
         };
         header?: never;
         path?: never;
@@ -14088,6 +14323,9 @@ export interface paths {
                 action: string;
                 resourceType: string;
                 resourceId: string | null;
+                supplierId: string | null;
+                supplierCode: string | null;
+                supplierName: string | null;
                 lineId: string | null;
                 changeSummary: {
                   [key: string]: unknown;
@@ -14095,6 +14333,9 @@ export interface paths {
                 /** @enum {string} */
                 result: 'SUCCESS' | 'FAILURE';
                 correlationId: string;
+                sourceMode: ('HOSTED' | 'EXTERNAL') | null;
+                sourceEpoch: number | null;
+                reason: string | null;
               }[];
               pageInfo: {
                 nextCursor: string | null;
@@ -14159,7 +14400,19 @@ export interface paths {
     };
     get: {
       parameters: {
-        query?: never;
+        query?: {
+          supplierId?: string;
+          sourceMode?: 'HOSTED' | 'EXTERNAL';
+          from?: string;
+          to?: string;
+          status?: 'OPEN' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+          category?: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
+          line?: string;
+          part?: string;
+          aging?: 'UNDER_4_HOURS' | 'FOUR_TO_EIGHT_HOURS' | 'EIGHT_TO_24_HOURS' | 'OVER_24_HOURS';
+          freshness?: 'FRESH' | 'WARNING' | 'STALE' | 'NO_DATA';
+          granularity?: 'DAY' | 'WEEK' | 'MONTH';
+        };
         header?: never;
         path?: never;
         cookie?: never;
@@ -14175,6 +14428,16 @@ export interface paths {
             'application/json': {
               /** Format: date-time */
               generatedAt: string;
+              filterOptions: {
+                suppliers: {
+                  /** Format: uuid */
+                  id: string;
+                  code: string;
+                  name: string;
+                  /** @enum {string} */
+                  sourceMode: 'HOSTED' | 'EXTERNAL';
+                }[];
+              };
               suppliers: {
                 active: number;
                 hosted: number;
@@ -14186,8 +14449,16 @@ export interface paths {
               emergencyOverrides: number;
               externalIngestion: {
                 accepted: number;
+                duplicate: number;
+                rejected: number;
                 recentRejected: number;
               };
+              aging: {
+                /** @enum {string} */
+                bucket:
+                  'UNDER_4_HOURS' | 'FOUR_TO_EIGHT_HOURS' | 'EIGHT_TO_24_HOURS' | 'OVER_24_HOURS';
+                count: number;
+              }[];
               bySourceMode: {
                 label: string;
                 count: number;
@@ -14200,16 +14471,307 @@ export interface paths {
                 label: string;
                 count: number;
               }[];
+              rankings: {
+                suppliers: {
+                  label: string;
+                  count: number;
+                }[];
+                lines: {
+                  label: string;
+                  count: number;
+                }[];
+                parts: {
+                  label: string;
+                  count: number;
+                }[];
+              };
               freshness: {
                 /** Format: uuid */
                 supplierId: string;
+                supplierCode: string;
                 supplierName: string;
                 /** @enum {string} */
                 sourceMode: 'HOSTED' | 'EXTERNAL';
                 lastDataAt: string | null;
-                activeWarnings: number;
                 lastIngestionAt: string | null;
+                activeWarnings: number;
+                /** @enum {string} */
+                state: 'FRESH' | 'WARNING' | 'STALE' | 'NO_DATA';
               }[];
+              recentOverrides: {
+                /** Format: uuid */
+                shiftRunId: string;
+                /** Format: uuid */
+                supplierId: string;
+                supplierName: string;
+                lineName: string;
+                /** Format: date */
+                businessDate: string;
+                reason: string;
+                /** Format: date-time */
+                startedAt: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tmmin/suppliers/{supplierId}/assignment-board': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          lineId?: string;
+        };
+        header?: never;
+        path: {
+          supplierId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Hosted supplier assignment board */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              version: string;
+              /** Format: date-time */
+              lastUpdatedAt: string;
+              lines: {
+                /** Format: uuid */
+                shiftRunId: string;
+                /** Format: uuid */
+                lineId: string;
+                lineCode: string;
+                lineName: string;
+                shiftName: string;
+                /** Format: date */
+                businessDate: string;
+                supervisor: {
+                  memberId: string | null;
+                  name: string | null;
+                };
+                lineLeader: {
+                  memberId: string | null;
+                  name: string | null;
+                };
+                activeOverride: {
+                  reason: string;
+                  /** Format: date-time */
+                  startedAt: string;
+                  unresolvedIssueCount: number;
+                  failedChecks: {
+                    code: string;
+                    message: string;
+                    resourceType?: string;
+                    /** Format: uuid */
+                    resourceId?: string;
+                  }[];
+                } | null;
+                jobs: {
+                  /** Format: uuid */
+                  assignmentId: string;
+                  /** Format: uuid */
+                  jobId: string;
+                  jobName: string;
+                  displayOrder: number;
+                  /** @enum {string} */
+                  state: 'ASSIGNED' | 'VACANT' | 'CONFLICTED' | 'RESERVED';
+                  mp: {
+                    memberId: string | null;
+                    name: string | null;
+                    registrationNumber: string | null;
+                    photoThumbnailUrl: string | null;
+                    initials: string | null;
+                  };
+                  indicators: {
+                    /** Format: uuid */
+                    henkatenId: string;
+                    identifier: string;
+                    /** @enum {string} */
+                    category: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
+                    /** @enum {string} */
+                    status: 'OPEN' | 'APPROVED';
+                    approval: {
+                      /** @enum {string} */
+                      supervisor: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NOT_REQUIRED';
+                      /** @enum {string} */
+                      qc: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NOT_REQUIRED';
+                    };
+                  }[];
+                }[];
+              }[];
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tmmin/henkatens': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          cursor?: string;
+          limit?: number;
+          supplierId?: string;
+          sourceMode?: 'HOSTED' | 'EXTERNAL';
+          from?: string;
+          to?: string;
+          status?: 'OPEN' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+          category?: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
+          line?: string;
+          part?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Global Hosted and External Henkaten explorer */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              items: (
+                | {
+                    /** Format: uuid */
+                    recordId: string;
+                    /** Format: uuid */
+                    supplierId: string;
+                    supplierCode: string;
+                    supplierName: string;
+                    /** @enum {string} */
+                    sourceMode: 'HOSTED' | 'EXTERNAL';
+                    sourceEpoch: number;
+                    /** @enum {string} */
+                    status: 'OPEN' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+                    /** @enum {string} */
+                    category: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
+                    lineName: string;
+                    jobName: string;
+                    partNumber: string;
+                    partName: string;
+                    /** Format: date-time */
+                    occurredAt: string;
+                    /** Format: date-time */
+                    updatedAt: string;
+                    /** @constant */
+                    kind: 'HOSTED';
+                    displayId: string;
+                    /** @enum {string} */
+                    supervisorStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NOT_REQUIRED';
+                    /** @enum {string} */
+                    qcStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NOT_REQUIRED';
+                  }
+                | {
+                    /** Format: uuid */
+                    recordId: string;
+                    /** Format: uuid */
+                    supplierId: string;
+                    supplierCode: string;
+                    supplierName: string;
+                    /** @enum {string} */
+                    sourceMode: 'HOSTED' | 'EXTERNAL';
+                    sourceEpoch: number;
+                    /** @enum {string} */
+                    status: 'OPEN' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+                    /** @enum {string} */
+                    category: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
+                    lineName: string;
+                    jobName: string;
+                    partNumber: string;
+                    partName: string;
+                    /** Format: date-time */
+                    occurredAt: string;
+                    /** Format: date-time */
+                    updatedAt: string;
+                    /** @constant */
+                    kind: 'EXTERNAL';
+                    displayId: string;
+                    sourceVersion: number;
+                  }
+              )[];
+              pageInfo: {
+                nextCursor: string | null;
+                hasNextPage: boolean;
+              };
             };
           };
         };
@@ -14253,6 +14815,8 @@ export interface paths {
               items: {
                 /** Format: uuid */
                 id: string;
+                /** Format: uuid */
+                supplierId: string;
                 /** @enum {string} */
                 kind:
                   | 'APPROVAL_PENDING'
@@ -14369,6 +14933,8 @@ export interface paths {
             'application/json': {
               /** Format: uuid */
               id: string;
+              /** Format: uuid */
+              supplierId: string;
               /** @enum {string} */
               kind:
                 | 'APPROVAL_PENDING'
@@ -14456,6 +15022,9 @@ export interface paths {
           action?: string;
           resourceType?: string;
           resourceId?: string;
+          supplierId?: string;
+          from?: string;
+          to?: string;
         };
         header?: never;
         path?: never;
@@ -14480,6 +15049,9 @@ export interface paths {
                 action: string;
                 resourceType: string;
                 resourceId: string | null;
+                supplierId: string | null;
+                supplierCode: string | null;
+                supplierName: string | null;
                 lineId: string | null;
                 changeSummary: {
                   [key: string]: unknown;
@@ -14487,6 +15059,9 @@ export interface paths {
                 /** @enum {string} */
                 result: 'SUCCESS' | 'FAILURE';
                 correlationId: string;
+                sourceMode: ('HOSTED' | 'EXTERNAL') | null;
+                sourceEpoch: number | null;
+                reason: string | null;
               }[];
               pageInfo: {
                 nextCursor: string | null;
@@ -14905,6 +15480,7 @@ export interface paths {
                 id: string;
                 /** Format: uuid */
                 supplierId: string;
+                sourceEpoch: number;
                 sourceHenkatenId: string;
                 sourceVersion: number;
                 /** @enum {string} */
@@ -14984,6 +15560,7 @@ export interface paths {
               id: string;
               /** Format: uuid */
               supplierId: string;
+              sourceEpoch: number;
               sourceHenkatenId: string;
               sourceVersion: number;
               /** @enum {string} */
@@ -15015,6 +15592,15 @@ export interface paths {
               occurredAt: string;
               /** Format: date-time */
               updatedAt: string;
+              change: {
+                [key: string]: unknown;
+              };
+              checklist: {
+                [key: string]: unknown;
+              };
+              decisions: {
+                [key: string]: unknown;
+              }[];
               events: {
                 /** Format: uuid */
                 ingestionId: string;
@@ -15078,6 +15664,97 @@ export interface paths {
                 code: string;
                 message: string;
               }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tmmin/external-health': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          cursor?: string;
+          limit?: number;
+          supplierId?: string;
+          sourceEpoch?: number;
+          outcome?: 'ACCEPTED' | 'DUPLICATE' | 'REJECTED';
+          code?: string;
+          from?: string;
+          to?: string;
+          lookup?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Sanitized External ingestion health */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: date-time */
+              generatedAt: string;
+              totals: {
+                accepted: number;
+                duplicate: number;
+                rejected: number;
+                fresh: number;
+                warning: number;
+                stale: number;
+                noData: number;
+              };
+              suppliers: {
+                /** Format: uuid */
+                supplierId: string;
+                supplierCode: string;
+                supplierName: string;
+                sourceEpoch: number;
+                clientId: string | null;
+                clientName: string | null;
+                clientActive: boolean | null;
+                lastSuccessfulIngestionAt: string | null;
+                /** @enum {string} */
+                freshness: 'FRESH' | 'WARNING' | 'STALE' | 'NO_DATA';
+              }[];
+              events: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                supplierId: string;
+                supplierName: string;
+                sourceEpoch: number;
+                /** @enum {string} */
+                outcome: 'ACCEPTED' | 'DUPLICATE' | 'REJECTED';
+                eventId: string | null;
+                sourceHenkatenId: string | null;
+                projectionId: string | null;
+                code: string | null;
+                correlationId: string;
+                /** Format: date-time */
+                occurredAt: string;
+              }[];
+              pageInfo: {
+                nextCursor: string | null;
+                hasNextPage: boolean;
+              };
             };
           };
         };

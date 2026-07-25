@@ -1,10 +1,34 @@
-import { lazy, Suspense, useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { Component, lazy, Suspense, useEffect, type ErrorInfo, type ReactNode } from 'react';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
-import { ApiProblemError } from '@tmmin-henkaten/api-client';
-import { BrandLockup, Button, Card, Field, Input, KeyValueGrid, Spinner } from '@tmmin-henkaten/ui';
+import type { Capability } from '@tmmin-henkaten/contracts';
 
-import { TmminSessionProvider, useTmminSession } from './app/session';
+import { queryClient } from './app/query';
+import { rememberIntendedPath, TmminSessionProvider, useTmminSession } from './app/session';
+import { TmminLayout } from './components/layout';
+import {
+  ExternalCredentialsPage,
+  QualityUsersPage,
+  SourceGovernancePage,
+  SupplierCreatePage,
+  SupplierDetailPage,
+  SuppliersPage,
+} from './pages/AdminPages';
+import { AccountPage, ChangePasswordPage, LoginPage } from './pages/AuthPages';
+import {
+  AuditPage,
+  ExternalHealthPage,
+  HenkatenDetailPage,
+  HenkatenExplorerPage,
+  NotificationsPage,
+  OverviewPage,
+  SystemStatusPage,
+  WarningDetailPage,
+  WarningsPage,
+} from './pages/MonitoringPages';
+import { AppLoading, ForbiddenPage, NotFoundPage, RouteErrorPage } from './pages/StatePages';
+import { AssignmentBoardPage, HostedSupportPage, ShiftDetailPage } from './pages/SupportPages';
 
 const DesignSystemShowcase = lazy(() =>
   import('@tmmin-henkaten/ui/showcase').then((module) => ({
@@ -15,246 +39,202 @@ const DesignSystemShowcase = lazy(() =>
 export function App() {
   if (window.location.pathname === '/design') return <DesignRoute />;
   return (
-    <TmminSessionProvider>
-      <Routes>
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TmminSessionProvider>
+          <ProductRoutes />
+        </TmminSessionProvider>
+      </QueryClientProvider>
+    </AppErrorBoundary>
+  );
+}
+
+function ProductRoutes() {
+  return (
+    <Routes>
+      <Route
+        path="/login"
+        element={
+          <AnonymousRoute>
+            <LoginPage />
+          </AnonymousRoute>
+        }
+      />
+      <Route
+        path="/change-password"
+        element={
+          <AuthenticatedRoute allowForced>
+            <ChangePasswordPage />
+          </AuthenticatedRoute>
+        }
+      />
+      <Route
+        element={
+          <AuthenticatedRoute>
+            <TmminLayout />
+          </AuthenticatedRoute>
+        }
+      >
         <Route
-          path="/login"
+          index
           element={
-            <Anonymous>
-              <Login />
-            </Anonymous>
+            <CapabilityRoute capability="TMMIN_DASHBOARD_READ">
+              <OverviewPage />
+            </CapabilityRoute>
           }
         />
         <Route
-          path="/change-password"
+          path="warnings"
           element={
-            <Authenticated allowForced>
-              <ChangePassword />
-            </Authenticated>
+            <CapabilityRoute capability="TMMIN_HENKATEN_READ">
+              <WarningsPage />
+            </CapabilityRoute>
           }
         />
         <Route
-          path="/"
+          path="warnings/:supplierId/:partNumber"
           element={
-            <Authenticated>
-              <Foundation />
-            </Authenticated>
+            <CapabilityRoute capability="TMMIN_HENKATEN_READ">
+              <WarningDetailPage />
+            </CapabilityRoute>
           }
         />
         <Route
-          path="/account"
+          path="henkatens"
           element={
-            <Authenticated>
-              <Account />
-            </Authenticated>
+            <CapabilityRoute capability="TMMIN_HENKATEN_READ">
+              <HenkatenExplorerPage />
+            </CapabilityRoute>
           }
         />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </TmminSessionProvider>
-  );
-}
-
-function Login() {
-  const { login } = useTmminSession();
-  const navigate = useNavigate();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [problem, setProblem] = useState('');
-  const [busy, setBusy] = useState(false);
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setProblem('');
-    try {
-      const session = await login({ username, password });
-      void navigate(session.principal.mustChangePassword ? '/change-password' : '/', {
-        replace: true,
-      });
-    } catch (error) {
-      setProblem(
-        error instanceof ApiProblemError && error.problem.status === 429
-          ? `Terlalu banyak percobaan. Coba kembali dalam ${error.retryAfterSeconds ?? 60} detik.`
-          : 'Username atau password tidak valid.',
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <main className="tmmin-auth">
-      <section>
-        <BrandLockup context="TMMIN Portal" />
-        <div>
-          <span>Enterprise Digital Henkaten</span>
-          <h1>Governance lintas supplier yang dapat ditelusuri.</h1>
-          <p>Administration dan quality workflow tersedia pada Phase 13.</p>
-        </div>
-      </section>
-      <Card>
-        <h2>Masuk ke TMMIN Portal</h2>
-        <p>Gunakan identitas internal TMMIN.</p>
-        {problem && (
-          <div className="tmmin-error" role="alert">
-            {problem}
-          </div>
-        )}
-        <form onSubmit={(event) => void submit(event)}>
-          <Field label="Username" htmlFor="username" required>
-            <Input
-              id="username"
-              autoComplete="username"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-            />
-          </Field>
-          <Field label="Password" htmlFor="password" required>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </Field>
-          <Button type="submit" loading={busy}>
-            Masuk
-          </Button>
-        </form>
-      </Card>
-    </main>
-  );
-}
-
-function ChangePassword() {
-  const { session, changePassword, logout } = useTmminSession();
-  const [currentPassword, setCurrent] = useState('');
-  const [newPassword, setNext] = useState('');
-  const [confirmation, setConfirmation] = useState('');
-  const [problem, setProblem] = useState('');
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (newPassword !== confirmation) return setProblem('Konfirmasi password tidak sama.');
-    try {
-      await changePassword({ currentPassword, newPassword });
-    } catch {
-      setProblem('Password tidak dapat diubah.');
-    }
-  };
-  return (
-    <main className="tmmin-compact">
-      <Card>
-        <BrandLockup context="TMMIN Portal" />
-        <h1>
-          {session?.principal.mustChangePassword ? 'Ganti temporary password' : 'Ganti password'}
-        </h1>
-        {problem && <div className="tmmin-error">{problem}</div>}
-        <form onSubmit={(event) => void submit(event)}>
-          <Field label="Password sekarang">
-            <Input
-              type="password"
-              value={currentPassword}
-              onChange={(event) => setCurrent(event.target.value)}
-            />
-          </Field>
-          <Field label="Password baru">
-            <Input
-              type="password"
-              value={newPassword}
-              onChange={(event) => setNext(event.target.value)}
-            />
-          </Field>
-          <Field label="Konfirmasi">
-            <Input
-              type="password"
-              value={confirmation}
-              onChange={(event) => setConfirmation(event.target.value)}
-            />
-          </Field>
-          <Button type="submit">Simpan dan masuk ulang</Button>
-          <Button variant="ghost" onClick={() => void logout()}>
-            Keluar
-          </Button>
-        </form>
-      </Card>
-    </main>
-  );
-}
-
-function Foundation() {
-  const { session, logout } = useTmminSession();
-  return (
-    <div className="tmmin-shell">
-      <aside>
-        <BrandLockup context="TMMIN Portal" />
-        <nav>
-          <a className="is-current" href="/">
-            Foundation
-          </a>
-          <a href="/account">Akun</a>
-        </nav>
-        <Button variant="ghost" onClick={() => void logout()}>
-          Keluar
-        </Button>
-      </aside>
-      <main>
-        <header>
-          <span>TMMIN application foundation</span>
-          <strong>{session!.principal.displayName}</strong>
-        </header>
-        <section>
-          <span>Phase 11 selesai · Phase 13 berikutnya</span>
-          <h1>Authenticated TMMIN shell siap.</h1>
-          <p>
-            Session realm, forced reset, account, logout, capability context, dan design utility
-            tersedia. Workflow TMMIN sengaja tetap ditutup sampai Phase 13.
-          </p>
-          <Card>
-            <h2>Capability session</h2>
-            <div className="capability-list">
-              {session!.capabilities.map((capability) => (
-                <code key={capability}>{capability}</code>
-              ))}
-            </div>
-          </Card>
-        </section>
-      </main>
-    </div>
-  );
-}
-
-function Account() {
-  const { session, logout } = useTmminSession();
-  const navigate = useNavigate();
-  return (
-    <div className="tmmin-compact">
-      <Card>
-        <BrandLockup context="TMMIN Portal" />
-        <h1>Akun</h1>
-        <KeyValueGrid
-          items={[
-            { label: 'Nama', value: session!.principal.displayName },
-            { label: 'Role', value: session!.principal.role },
-            {
-              label: 'Idle expiry',
-              value: new Date(session!.idleExpiresAt).toLocaleString('id-ID'),
-            },
-            {
-              label: 'Absolute expiry',
-              value: new Date(session!.absoluteExpiresAt).toLocaleString('id-ID'),
-            },
-          ]}
+        <Route
+          path="henkatens/:kind/:supplierId/:recordId"
+          element={
+            <CapabilityRoute capability="TMMIN_HENKATEN_READ">
+              <HenkatenDetailPage />
+            </CapabilityRoute>
+          }
         />
-        <Button onClick={() => void navigate('/change-password')}>Ganti password</Button>
-        <Button variant="danger" onClick={() => void logout()}>
-          Keluar
-        </Button>
-      </Card>
-    </div>
+        <Route
+          path="suppliers"
+          element={
+            <CapabilityRoute capability="TMMIN_SUPPLIER_READ">
+              <SuppliersPage />
+            </CapabilityRoute>
+          }
+        />
+        <Route
+          path="suppliers/new"
+          element={
+            <CapabilityRoute capability="TMMIN_SUPPLIER_MANAGE">
+              <SupplierCreatePage />
+            </CapabilityRoute>
+          }
+        />
+        <Route
+          path="suppliers/:supplierId"
+          element={
+            <CapabilityRoute capability="TMMIN_SUPPLIER_READ">
+              <SupplierDetailPage />
+            </CapabilityRoute>
+          }
+        />
+        <Route
+          path="suppliers/:supplierId/credentials"
+          element={
+            <CapabilityRoute capability="TMMIN_EXTERNAL_CLIENT_MANAGE">
+              <ExternalCredentialsPage />
+            </CapabilityRoute>
+          }
+        />
+        <Route
+          path="source-governance"
+          element={
+            <CapabilityRoute capability="TMMIN_SUPPLIER_READ">
+              <SourceGovernancePage />
+            </CapabilityRoute>
+          }
+        />
+        <Route
+          path="external-health"
+          element={
+            <CapabilityRoute capability="TMMIN_HENKATEN_READ">
+              <ExternalHealthPage />
+            </CapabilityRoute>
+          }
+        />
+        <Route
+          path="hosted-support"
+          element={
+            <CapabilityRoute capability="TMMIN_MASTER_DATA_READ">
+              <HostedSupportPage />
+            </CapabilityRoute>
+          }
+        />
+        <Route
+          path="hosted-support/:supplierId/board"
+          element={
+            <CapabilityRoute capability="TMMIN_SHIFT_READ">
+              <AssignmentBoardPage />
+            </CapabilityRoute>
+          }
+        />
+        <Route
+          path="hosted-support/:supplierId/shifts/:shiftId"
+          element={
+            <CapabilityRoute capability="TMMIN_SHIFT_READ">
+              <ShiftDetailPage />
+            </CapabilityRoute>
+          }
+        />
+        <Route
+          path="quality-users"
+          element={
+            <CapabilityRoute capability="TMMIN_QUALITY_MANAGE">
+              <QualityUsersPage />
+            </CapabilityRoute>
+          }
+        />
+        <Route
+          path="notifications"
+          element={
+            <CapabilityRoute capability="TMMIN_DASHBOARD_READ">
+              <NotificationsPage />
+            </CapabilityRoute>
+          }
+        />
+        <Route
+          path="audit"
+          element={
+            <CapabilityRoute capability="TMMIN_AUDIT_READ">
+              <AuditPage />
+            </CapabilityRoute>
+          }
+        />
+        <Route
+          path="system-status"
+          element={
+            <CapabilityRoute capability="TMMIN_DASHBOARD_READ">
+              <SystemStatusPage />
+            </CapabilityRoute>
+          }
+        />
+        <Route
+          path="account"
+          element={
+            <CapabilityRoute capability="TMMIN_SUPPLIER_READ">
+              <AccountPage />
+            </CapabilityRoute>
+          }
+        />
+        <Route path="forbidden" element={<ForbiddenPage />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+    </Routes>
   );
 }
 
-function Authenticated({
+function AuthenticatedRoute({
   children,
   allowForced = false,
 }: {
@@ -263,17 +243,9 @@ function Authenticated({
 }) {
   const { status, session } = useTmminSession();
   const location = useLocation();
-  if (status === 'loading')
-    return (
-      <main className="tmmin-loading">
-        <Spinner label="Memuat session TMMIN" />
-      </main>
-    );
+  if (status === 'loading') return <AppLoading />;
   if (!session) {
-    sessionStorage.setItem(
-      'tmmin-henkaten:intended-path',
-      `${location.pathname}${location.search}`,
-    );
+    rememberIntendedPath(`${location.pathname}${location.search}`);
     return <Navigate to="/login" replace />;
   }
   if (session.principal.mustChangePassword && !allowForced)
@@ -281,18 +253,25 @@ function Authenticated({
   return children;
 }
 
-function Anonymous({ children }: { children: ReactNode }) {
+function AnonymousRoute({ children }: { children: ReactNode }) {
   const { status, session } = useTmminSession();
-  if (status === 'loading')
-    return (
-      <main className="tmmin-loading">
-        <Spinner label="Memuat session TMMIN" />
-      </main>
-    );
+  if (status === 'loading') return <AppLoading />;
   if (session)
     return (
       <Navigate to={session.principal.mustChangePassword ? '/change-password' : '/'} replace />
     );
+  return children;
+}
+
+function CapabilityRoute({
+  capability,
+  children,
+}: {
+  capability: Capability;
+  children: ReactNode;
+}) {
+  const { session, hasCapability } = useTmminSession();
+  if (!session || !hasCapability(capability)) return <ForbiddenPage />;
   return children;
 }
 
@@ -302,6 +281,7 @@ function DesignRoute() {
     robots.name = 'robots';
     robots.content = 'noindex,nofollow';
     document.head.append(robots);
+    document.title = 'Henkaten Design System · Sample data';
     return () => robots.remove();
   }, []);
   return (
@@ -309,11 +289,24 @@ function DesignRoute() {
       fallback={
         <main className="design-loading">
           <span />
-          <p>Memuat design system…</p>
+          <p role="status">Memuat Henkaten Design System…</p>
         </main>
       }
     >
       <DesignSystemShowcase />
     </Suspense>
   );
+}
+
+class AppErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  override state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  override componentDidCatch(error: Error, info: ErrorInfo) {
+    if (import.meta.env.DEV) console.error(error, info);
+  }
+  override render() {
+    return this.state.failed ? <RouteErrorPage /> : this.props.children;
+  }
 }

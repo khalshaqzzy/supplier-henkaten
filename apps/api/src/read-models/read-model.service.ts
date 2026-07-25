@@ -2,17 +2,21 @@ import { createHash } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
 
-import type { AuditQuery, DashboardQuery } from '@tmmin-henkaten/contracts';
+import type { AuditQuery, DashboardQuery, TmminDashboardQuery } from '@tmmin-henkaten/contracts';
 import type { Prisma } from '../generated/prisma/client.js';
 
 import { decodeCursor, encodeCursor } from '../administration/presenters.js';
 import type { RequestPrincipal } from '../common/request-context.js';
 import { TenantScope } from '../common/scope.js';
+import { AuditWriter } from '../persistence/audit-writer.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 
 @Injectable()
 export class ReadModelService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditWriter,
+  ) {}
 
   async board(scope: TenantScope, principal: RequestPrincipal, requestedLineId?: string) {
     const shifts = await this.prisma.shiftRun.findMany({
@@ -362,62 +366,140 @@ export class ReadModelService {
     };
   }
 
-  async tmminDashboard() {
+  async tmminDashboard(query: TmminDashboardQuery) {
+    const supplierWhere: Prisma.SupplierWhereInput = {
+      active: true,
+      ...(query.supplierId ? { id: query.supplierId } : {}),
+      ...(query.sourceMode ? { sourceMode: query.sourceMode } : {}),
+    };
+    const occurredAt = {
+      ...(query.from ? { gte: new Date(query.from) } : {}),
+      ...(query.to ? { lte: new Date(query.to) } : {}),
+    };
+    const hostedWhere: Prisma.HenkatenWhereInput = {
+      supplier: supplierWhere,
+      ...(query.from || query.to ? { occurredAt } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.category ? { category: query.category } : {}),
+      ...(query.line ? { lineNameSnapshot: { contains: query.line, mode: 'insensitive' } } : {}),
+      ...(query.part
+        ? {
+            OR: [
+              { partNumberSnapshot: { contains: query.part, mode: 'insensitive' } },
+              { partNameSnapshot: { contains: query.part, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+    const externalWhere: Prisma.ExternalHenkatenProjectionWhereInput = {
+      supplier: supplierWhere,
+      ...(query.from || query.to ? { occurredAt } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.category ? { category: query.category } : {}),
+      ...(query.line ? { lineSnapshot: { string_contains: query.line, mode: 'insensitive' } } : {}),
+      ...(query.part ? { partSnapshot: { string_contains: query.part, mode: 'insensitive' } } : {}),
+    };
     const [
       suppliers,
-      hostedOpen,
-      externalOpen,
-      affected,
-      overrides,
-      hostedCategories,
-      externalCategories,
-      hostedOutcomes,
-      externalOutcomes,
+      hostedRows,
+      externalRows,
+      warningRows,
+      overrideRows,
       accepted,
-      recentRejected,
+      externalAttempts,
       freshness,
     ] = await Promise.all([
       this.prisma.supplier.groupBy({
         by: ['sourceMode'],
-        where: { active: true },
+        where: supplierWhere,
         _count: { _all: true },
       }),
-      this.prisma.henkaten.count({ where: { status: 'OPEN' } }),
-      this.prisma.externalHenkatenProjection.count({ where: { status: 'OPEN' } }),
-      this.prisma.warningInstance.groupBy({
-        by: ['supplierId', 'normalizedPartNumberSnapshot'],
-        where: { status: 'OPEN' },
-      }),
-      this.prisma.shiftRun.count({ where: { startedWithOverride: true } }),
-      this.prisma.henkaten.groupBy({
-        by: ['category'],
-        _count: { _all: true },
-      }),
-      this.prisma.externalHenkatenProjection.groupBy({
-        by: ['category'],
-        _count: { _all: true },
-      }),
-      this.prisma.henkaten.groupBy({
-        by: ['status'],
-        where: { status: { not: 'OPEN' } },
-        _count: { _all: true },
-      }),
-      this.prisma.externalHenkatenProjection.groupBy({
-        by: ['status'],
-        where: { status: { not: 'OPEN' } },
-        _count: { _all: true },
-      }),
-      this.prisma.externalIngestionEvent.count(),
-      this.prisma.auditEvent.count({
+      query.sourceMode === 'EXTERNAL'
+        ? Promise.resolve([])
+        : this.prisma.henkaten.findMany({
+            where: hostedWhere,
+            select: {
+              id: true,
+              supplierId: true,
+              status: true,
+              category: true,
+              lineNameSnapshot: true,
+              partNumberSnapshot: true,
+              occurredAt: true,
+              supplier: { select: { name: true } },
+            },
+          }),
+      query.sourceMode === 'HOSTED'
+        ? Promise.resolve([])
+        : this.prisma.externalHenkatenProjection.findMany({
+            where: externalWhere,
+            select: {
+              id: true,
+              supplierId: true,
+              status: true,
+              category: true,
+              lineSnapshot: true,
+              partSnapshot: true,
+              occurredAt: true,
+              supplier: { select: { name: true } },
+            },
+          }),
+      this.prisma.warningInstance.findMany({
         where: {
-          action: 'EXTERNAL_INGEST_REJECTED',
-          occurredAt: { gte: new Date(Date.now() - 24 * 60 * 60_000) },
+          status: 'OPEN',
+          supplier: supplierWhere,
+          ...(query.from || query.to ? { openedAt: occurredAt } : {}),
+        },
+        select: {
+          supplierId: true,
+          normalizedPartNumberSnapshot: true,
+          partNumberSnapshot: true,
+          openedAt: true,
         },
       }),
+      query.sourceMode === 'EXTERNAL'
+        ? Promise.resolve([])
+        : this.prisma.shiftRun.findMany({
+            where: {
+              startedWithOverride: true,
+              supplier: supplierWhere,
+              ...(query.from || query.to ? { startedAt: occurredAt } : {}),
+              ...(query.line
+                ? { lineNameSnapshot: { contains: query.line, mode: 'insensitive' } }
+                : {}),
+            },
+            orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
+            take: 10,
+            select: {
+              id: true,
+              supplierId: true,
+              lineNameSnapshot: true,
+              businessDate: true,
+              overrideReason: true,
+              startedAt: true,
+              supplier: { select: { name: true } },
+            },
+          }),
+      this.prisma.externalIngestionEvent.count({
+        where: {
+          supplier: supplierWhere,
+          ...(query.from || query.to ? { receivedAt: occurredAt } : {}),
+        },
+      }),
+      this.prisma.auditEvent.groupBy({
+        by: ['action'],
+        where: {
+          action: { in: ['EXTERNAL_INGEST_DUPLICATE', 'EXTERNAL_INGEST_REJECTED'] },
+          supplier: supplierWhere,
+          ...(query.from || query.to ? { occurredAt } : {}),
+        },
+        _count: { _all: true },
+      }),
       this.prisma.supplier.findMany({
-        where: { active: true },
+        where: supplierWhere,
         select: {
           id: true,
+          code: true,
           name: true,
           sourceMode: true,
           henkatens: { orderBy: { updatedAt: 'desc' }, take: 1, select: { updatedAt: true } },
@@ -437,38 +519,114 @@ export class ReadModelService {
       }),
     ]);
     const source = new Map(suppliers.map((item) => [item.sourceMode, item._count._all]));
+    const records = [
+      ...hostedRows.map((row) => ({
+        supplierId: row.supplierId,
+        supplierName: row.supplier.name,
+        status: row.status,
+        category: row.category,
+        line: row.lineNameSnapshot,
+        part: row.partNumberSnapshot,
+        occurredAt: row.occurredAt,
+      })),
+      ...externalRows.map((row) => ({
+        supplierId: row.supplierId,
+        supplierName: row.supplier.name,
+        status: row.status,
+        category: row.category,
+        line: snapshotLabel(row.lineSnapshot),
+        part: snapshotLabel(row.partSnapshot, 'number'),
+        occurredAt: row.occurredAt,
+      })),
+    ];
+    const filteredWarnings = warningRows.filter(({ openedAt }) =>
+      query.aging ? ageBucket(openedAt) === query.aging : true,
+    );
+    const freshnessRows = freshness
+      .map((supplier) => {
+        const lastDataAt =
+          supplier.sourceMode === 'EXTERNAL'
+            ? supplier.externalProjections[0]?.updatedAt
+            : supplier.henkatens[0]?.updatedAt;
+        return {
+          supplierId: supplier.id,
+          supplierCode: supplier.code,
+          supplierName: supplier.name,
+          sourceMode: supplier.sourceMode,
+          lastDataAt: lastDataAt?.toISOString() ?? null,
+          activeWarnings: supplier.warningInstances.length,
+          lastIngestionAt:
+            supplier.externalApiClients[0]?.lastSuccessfulIngestionAt?.toISOString() ?? null,
+          state: freshnessState(lastDataAt ?? null),
+        };
+      })
+      .filter(({ state }) => (query.freshness ? state === query.freshness : true));
+    const duplicate =
+      externalAttempts.find(({ action }) => action === 'EXTERNAL_INGEST_DUPLICATE')?._count._all ??
+      0;
+    const rejected =
+      externalAttempts.find(({ action }) => action === 'EXTERNAL_INGEST_REJECTED')?._count._all ??
+      0;
     return {
       generatedAt: new Date().toISOString(),
+      filterOptions: {
+        suppliers: freshness.map((supplier) => ({
+          id: supplier.id,
+          code: supplier.code,
+          name: supplier.name,
+          sourceMode: supplier.sourceMode,
+        })),
+      },
       suppliers: {
         active: suppliers.reduce((sum, item) => sum + item._count._all, 0),
         hosted: source.get('HOSTED') ?? 0,
         external: source.get('EXTERNAL') ?? 0,
-        withWarnings: freshness.filter(({ warningInstances }) => warningInstances.length > 0)
-          .length,
+        withWarnings: freshnessRows.filter(({ activeWarnings }) => activeWarnings > 0).length,
       },
-      openHenkatens: hostedOpen + externalOpen,
-      affectedParts: affected.length,
-      emergencyOverrides: overrides,
-      externalIngestion: { accepted, recentRejected },
+      openHenkatens: records.filter(({ status }) => status === 'OPEN').length,
+      affectedParts: new Set(
+        filteredWarnings.map(
+          ({ supplierId, normalizedPartNumberSnapshot }) =>
+            `${supplierId}:${normalizedPartNumberSnapshot}`,
+        ),
+      ).size,
+      emergencyOverrides: overrideRows.length,
+      externalIngestion: { accepted, duplicate, rejected, recentRejected: rejected },
+      aging: ['UNDER_4_HOURS', 'FOUR_TO_EIGHT_HOURS', 'EIGHT_TO_24_HOURS', 'OVER_24_HOURS'].map(
+        (bucket) => ({
+          bucket,
+          count: warningRows.filter(({ openedAt }) => ageBucket(openedAt) === bucket).length,
+        }),
+      ),
       bySourceMode: suppliers.map((item) => ({
         label: item.sourceMode,
         count: item._count._all,
       })),
-      byCategory: mergeCounts(hostedCategories, externalCategories, 'category'),
-      outcomes: mergeCounts(hostedOutcomes, externalOutcomes, 'status'),
-      freshness: freshness.map((supplier) => ({
-        supplierId: supplier.id,
-        supplierName: supplier.name,
-        sourceMode: supplier.sourceMode,
-        lastDataAt:
-          (supplier.sourceMode === 'EXTERNAL'
-            ? supplier.externalProjections[0]?.updatedAt
-            : supplier.henkatens[0]?.updatedAt
-          )?.toISOString() ?? null,
-        activeWarnings: supplier.warningInstances.length,
-        lastIngestionAt:
-          supplier.externalApiClients[0]?.lastSuccessfulIngestionAt?.toISOString() ?? null,
-      })),
+      byCategory: countLabels(records.map(({ category }) => category)),
+      outcomes: countLabels(
+        records.filter(({ status }) => status !== 'OPEN').map(({ status }) => status),
+      ),
+      rankings: {
+        suppliers: rankLabels(records.map(({ supplierName }) => supplierName)),
+        lines: rankLabels(records.map(({ line }) => line)),
+        parts: rankLabels(records.map(({ part }) => part)),
+      },
+      freshness: freshnessRows,
+      recentOverrides: overrideRows.flatMap((row) =>
+        row.startedAt && row.overrideReason
+          ? [
+              {
+                shiftRunId: row.id,
+                supplierId: row.supplierId,
+                supplierName: row.supplier.name,
+                lineName: row.lineNameSnapshot,
+                businessDate: row.businessDate.toISOString().slice(0, 10),
+                reason: row.overrideReason,
+                startedAt: row.startedAt.toISOString(),
+              },
+            ]
+          : [],
+      ),
     };
   }
 
@@ -483,11 +641,43 @@ export class ReadModelService {
     );
   }
 
-  async tmminAudit(query: AuditQuery) {
-    return this.auditPage({}, query);
+  async tmminAudit(principal: RequestPrincipal, query: AuditQuery, correlationId: string) {
+    const qualityActions =
+      principal.role === 'TMMIN_QUALITY'
+        ? {
+            OR: [
+              { action: { startsWith: 'HENKATEN_' } },
+              { action: { startsWith: 'WARNING_' } },
+              { action: { startsWith: 'SHIFT_' } },
+              { action: { startsWith: 'ASSIGNMENT_' } },
+              { action: { startsWith: 'SOURCE_' } },
+              { action: { startsWith: 'SUPPLIER_SOURCE_' } },
+              { action: { startsWith: 'NOTIFICATION_' } },
+              { action: { startsWith: 'EXTERNAL_INGEST_' } },
+            ],
+          }
+        : {};
+    const page = await this.auditPage(qualityActions, query, principal.role === 'TMMIN_ADMIN');
+    await this.audit.write({
+      actorKind: 'USER',
+      actorUserId: principal.userId,
+      actorRole: principal.role,
+      action: 'AUDIT_VIEWED',
+      resourceType: 'AuditEvent',
+      changeSummary: {
+        resultCount: page.items.length,
+        supplierFiltered: Boolean(query.supplierId),
+      },
+      correlationId,
+    });
+    return page;
   }
 
-  private async auditPage(where: Prisma.AuditEventWhereInput, query: AuditQuery) {
+  private async auditPage(
+    where: Prisma.AuditEventWhereInput,
+    query: AuditQuery,
+    includeReason = true,
+  ) {
     const cursor = decodeCursor(query.cursor);
     const rows = await this.prisma.auditEvent.findMany({
       where: {
@@ -495,7 +685,17 @@ export class ReadModelService {
         ...(query.action ? { action: query.action } : {}),
         ...(query.resourceType ? { resourceType: query.resourceType } : {}),
         ...(query.resourceId ? { resourceId: query.resourceId } : {}),
+        ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+        ...(query.from || query.to
+          ? {
+              occurredAt: {
+                ...(query.from ? { gte: new Date(query.from) } : {}),
+                ...(query.to ? { lte: new Date(query.to) } : {}),
+              },
+            }
+          : {}),
       },
+      include: { supplier: true },
       orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
       take: query.limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -511,10 +711,16 @@ export class ReadModelService {
         action: row.action,
         resourceType: row.resourceType,
         resourceId: row.resourceId,
+        supplierId: row.supplierId,
+        supplierCode: row.supplier?.code ?? null,
+        supplierName: row.supplier?.name ?? null,
         lineId: row.lineId,
         changeSummary: redact(row.changeSummary),
         result: row.result,
         correlationId: row.correlationId,
+        sourceMode: row.sourceMode,
+        sourceEpoch: row.sourceEpoch,
+        reason: includeReason ? row.reason : null,
       })),
       pageInfo: {
         hasNextPage,
@@ -543,17 +749,46 @@ export class ReadModelService {
   }
 }
 
-function mergeCounts<T extends Record<K, string>, K extends keyof T>(
-  left: Array<T & { _count: { _all: number } }>,
-  right: Array<T & { _count: { _all: number } }>,
-  key: K,
-) {
+function countLabels(values: string[]) {
   const counts = new Map<string, number>();
-  for (const item of [...left, ...right]) {
-    const label = item[key];
-    counts.set(label, (counts.get(label) ?? 0) + item._count._all);
-  }
+  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
   return [...counts].map(([label, count]) => ({ label, count }));
+}
+
+function rankLabels(values: string[]) {
+  return countLabels(values)
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))
+    .slice(0, 10);
+}
+
+function snapshotLabel(value: Prisma.JsonValue, preferredKey = 'name'): string {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return 'Unknown';
+  const record = value as Record<string, unknown>;
+  const preferred = record[preferredKey];
+  if (typeof preferred === 'string' && preferred.trim()) return preferred;
+  for (const key of ['name', 'code', 'number', 'externalId']) {
+    const candidate = record[key];
+    if (typeof candidate === 'string' && candidate.trim()) return candidate;
+  }
+  return 'Unknown';
+}
+
+function freshnessState(value: Date | null): 'FRESH' | 'WARNING' | 'STALE' | 'NO_DATA' {
+  if (!value) return 'NO_DATA';
+  const age = Date.now() - value.getTime();
+  if (age <= 4 * 60 * 60_000) return 'FRESH';
+  if (age <= 24 * 60 * 60_000) return 'WARNING';
+  return 'STALE';
+}
+
+function ageBucket(
+  openedAt: Date,
+): 'UNDER_4_HOURS' | 'FOUR_TO_EIGHT_HOURS' | 'EIGHT_TO_24_HOURS' | 'OVER_24_HOURS' {
+  const age = (Date.now() - openedAt.getTime()) / 3_600_000;
+  if (age < 4) return 'UNDER_4_HOURS';
+  if (age < 8) return 'FOUR_TO_EIGHT_HOURS';
+  if (age < 24) return 'EIGHT_TO_24_HOURS';
+  return 'OVER_24_HOURS';
 }
 
 function shiftScope(principal: RequestPrincipal): Prisma.ShiftRunWhereInput {

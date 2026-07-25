@@ -25,7 +25,8 @@ describe('backend contract freeze', () => {
 
     expect(document.openapi).toBe('3.1.0');
     expect(document.info.version).toBe('1.0.0');
-    expect(Object.keys(document.paths).length).toBeGreaterThan(50);
+    expect(Object.keys(document.paths).length).toBe(130);
+    expect(openApiOperations(document).size).toBe(146);
   });
 });
 
