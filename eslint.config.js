@@ -40,10 +40,10 @@ export default tseslint.config(
   },
   ...tseslint.configs.recommendedTypeChecked.map((config) => ({
     ...config,
-    files: ['**/*.ts'],
+    files: ['**/*.{ts,tsx}'],
   })),
   {
-    files: ['**/*.ts'],
+    files: ['**/*.{ts,tsx}'],
     languageOptions: {
       parserOptions: {
         projectService: true,

@@ -5,13 +5,19 @@ import {
   SupplierHenkatenController,
   TmminHenkatenController,
   TmminWarningController,
+  TmminGlobalHenkatenController,
 } from './henkaten.controller.js';
 import { HenkatenService } from './henkaten.service.js';
 import { ApprovalService } from './approval.service.js';
 
 @Module({
   imports: [OperationsModule],
-  controllers: [SupplierHenkatenController, TmminHenkatenController, TmminWarningController],
+  controllers: [
+    SupplierHenkatenController,
+    TmminHenkatenController,
+    TmminWarningController,
+    TmminGlobalHenkatenController,
+  ],
   providers: [HenkatenService, ApprovalService],
   exports: [HenkatenService],
 })

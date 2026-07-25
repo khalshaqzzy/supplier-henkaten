@@ -2,7 +2,7 @@
 
 Document status: Active implementation roadmap
 Created: 2026-07-23
-Last updated: 2026-07-23
+Last updated: 2026-07-24
 Source of truth: `.agent/PRD.md`
 Implementation approach: Backend-first
 Workspace tooling: Node.js 22 + pnpm workspaces, tanpa Turborepo
@@ -30,7 +30,7 @@ Kondisi repository setelah Phase 0-10:
 
 - branch aktif: `staging`;
 - `.agent/PRD.md` tersedia dan menjadi product contract;
-- sembilan belas ADR dan delapan architecture/security baseline tersedia;
+- dua puluh ADR dan delapan architecture/security baseline tersedia;
 - Node.js 22.23.1 + pnpm 11.16.0 ESM workspace tersedia;
 - active workspace: NestJS API, shared contracts, dan deterministic test fixtures;
 - strict TypeScript, ESLint, Prettier, Vitest, root validation, dan lockfile tersedia;
@@ -60,15 +60,19 @@ Kondisi repository setelah Phase 0-10:
 - epoch-bound external client/secret lifecycle, opaque 15-minute token, strict public event
   contracts, immutable ordered ingestion, per-item batch processing, External projection/warning,
   TMMIN notification, dan unified dashboard/freshness telah tersedia;
-- executable 140-operation NestJS/OpenAPI reconciliation, direct external policy/rate-limit tests,
+- executable 146-operation NestJS/OpenAPI reconciliation, direct external policy/rate-limit tests,
   migration upgrade evidence, additive cursor indexes, dan repeatable Compact HTTP/query-plan
   baseline telah tersedia;
-- belum ada frontend, Playwright E2E, atau remote deployment files;
+- role-scoped route, page-state, user-flow, dan frontend contract-gap specification tersedia di
+  `.agent/PAGES.md`;
+- dua React/Vite frontend workspace, shared Henkaten Design System, typed browser API boundary,
+  session-aware shells, seluruh Hosted Supplier workflow, dan seluruh TMMIN governance/monitoring
+  workflow tersedia; full Playwright E2E dan remote deployment belum ada;
 - materi slide tersedia sebagai reference-only input.
 
-Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8, Phase 9, dan Phase 10**
-Current phase: **tidak ada**
-Next phase: **Phase 11 - Frontend dan Shared UI Foundation (`planned`)**
+Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8, Phase 9, Phase 10, Phase 11, Phase 12, dan Phase 13**
+Current phase: **Phase 14 - Frontend/Backend Integration dan Full E2E (`planned`)**
+Next subphase: **14.1 Local full-stack harness (`planned`)**
 
 Tidak ada application behavior yang boleh ditandai implemented sampai source code dan acceptance checks terkait benar-benar tersedia di repository.
 
@@ -3050,9 +3054,12 @@ Implementation note:
 
 ## 19. Phase 11 - Frontend dan Shared UI Foundation
 
-Status: **planned**
+Status: **done**
 
 Goal: membuat dua React Vite applications, shared design primitives, typed API client, session handling, dan common UX states setelah backend contract freeze.
+
+Frontend route, permission, page-state, dan cross-app behavior wajib mengikuti `.agent/PAGES.md`.
+Contract gap di dokumen tersebut tidak boleh ditutup dengan client-only business policy.
 
 Depends on:
 
@@ -3064,7 +3071,7 @@ Unlocks:
 
 ### 11.1 Frontend Workspace Scaffold
 
-Status: **planned**
+Status: **completed**
 
 Dependency: Phase 10.
 
@@ -3093,9 +3100,17 @@ Exit criteria:
 
 - Dua frontend shells tersedia di workspace.
 
+Completion evidence (2026-07-24):
+
+- `apps/supplier-web` dan `apps/tmmin-web` tersedia sebagai React/Vite/TypeScript app terpisah.
+- `packages/ui` menjadi shared package tanpa direct database/backend dependency.
+- dev port `5173`/`5174` dan preview port `4173`/`4174` deterministic.
+- root product routes menyatakan Phase 11 foundation; public `/design` dipasang sebelum future
+  session/bootstrap boundary.
+
 ### 11.2 Shared Tailwind/shadcn UI Foundation
 
-Status: **planned**
+Status: **completed**
 
 Dependency: 11.1.
 
@@ -3131,9 +3146,22 @@ Exit criteria:
 
 - Feature pages dapat dibangun tanpa duplicated primitive components.
 
+Completion evidence (2026-07-24):
+
+- CSS-first Tailwind v4, shadcn-compatible workspace aliases, Radix behavior, Lucide, Inter Variable,
+  TanStack Table, dan Recharts terpasang.
+- `--hds-*` raw, semantic, state, domain, typography, spacing, shape, elevation, motion, density,
+  layer, breakpoint, focus, chart, dan component tokens tersedia dalam CSS dan typed registry.
+- shared catalog mencakup actions, inputs, navigation, feedback, overlays, data display, dan domain
+  components dengan controlled/uncontrolled API yang relevan.
+- `/design` pada kedua app merender token specimens, component state matrices, domain semantics,
+  accessibility contract, guidelines, dan delapan product patterns berdasarkan reference images.
+- unit/API, token contract, lint, typecheck, build, dan browser verification menjadi evidence
+  completion; detail command/result dicatat pada session handoff.
+
 ### 11.3 Typed API Client
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 10 contracts and 11.1.
 
@@ -3162,7 +3190,7 @@ Exit criteria:
 
 ### 11.4 React Router dan Route Guards
 
-Status: **planned**
+Status: **done**
 
 Dependency: 11.1 dan 11.3.
 
@@ -3189,7 +3217,7 @@ Exit criteria:
 
 ### 11.5 TanStack Query dan Table Foundation
 
-Status: **planned**
+Status: **done**
 
 Dependency: 11.3.
 
@@ -3217,7 +3245,7 @@ Exit criteria:
 
 ### 11.6 React Hook Form dan Zod
 
-Status: **planned**
+Status: **done**
 
 Dependency: shared contracts and UI foundation.
 
@@ -3244,7 +3272,7 @@ Exit criteria:
 
 ### 11.7 Authentication dan Session Shells
 
-Status: **planned**
+Status: **done**
 
 Dependency: 11.3-11.6.
 
@@ -3273,7 +3301,7 @@ Exit criteria:
 
 ### 11.8 Common Loading, Error, Conflict, dan Stale States
 
-Status: **planned**
+Status: **done**
 
 Dependency: 11.2-11.7.
 
@@ -3300,7 +3328,7 @@ Exit criteria:
 
 ### 11.9 Accessibility Baseline
 
-Status: **planned**
+Status: **done**
 
 Dependency: 11.2-11.8.
 
@@ -3331,13 +3359,29 @@ Phase 11 exit criteria:
 
 - Both frontend shells authenticate, call real API, and share stable contracts/UI primitives.
 
+Completion evidence (2026-07-24):
+
+- `packages/api-client` provides generated OpenAPI paths, runtime Zod validation, realm operation
+  catalogs, typed problem/network/contract/uncertain errors, upload/blob/204 handling, correlation,
+  CSRF, idempotency, abort, and Supplier EventSource lifecycle.
+- Supplier and TMMIN foundations implement public `/design`, session bootstrap, forced reset,
+  capability/purpose guards, safe intended paths, scoped QueryClient keys, cache clearing,
+  unsupported viewport handling, and account/logout.
+- Supplier production pages use URL-owned server query state, cursor history, expected versions,
+  duplicate-submit locking, refresh-only conflict recovery, realtime invalidation, and shared
+  polished loading/empty/error/stale states.
+- ADR 0022–0024 record the browser boundary, session/cache boundary, and application composition.
+
 ---
 
 ## 20. Phase 12 - Supplier-facing Frontend
 
-Status: **planned**
+Status: **done**
 
 Goal: mengimplementasikan seluruh Hosted supplier workflows untuk Supplier Admin, Supervisor, LL, dan QC.
+
+Supplier route catalog, role visibility, page behavior, dan user-flow acceptance mengikuti
+`.agent/PAGES.md`.
 
 Depends on:
 
@@ -3350,7 +3394,7 @@ Unlocks:
 
 ### 12.1 Supplier Login dan Forced Reset
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 11.
 
@@ -3376,7 +3420,7 @@ Exit criteria:
 
 ### 12.2 Supplier Admin Onboarding
 
-Status: **planned**
+Status: **done**
 
 Dependency: 12.1.
 
@@ -3402,7 +3446,7 @@ Exit criteria:
 
 ### 12.3 Member, Photo, dan Account Management
 
-Status: **planned**
+Status: **done**
 
 Dependency: 12.2.
 
@@ -3432,7 +3476,7 @@ Exit criteria:
 
 ### 12.4 Line, Job, Part, Shift, dan Checklist CRUD
 
-Status: **planned**
+Status: **done**
 
 Dependency: 12.2.
 
@@ -3460,7 +3504,7 @@ Exit criteria:
 
 ### 12.5 Default Assignment Management
 
-Status: **planned**
+Status: **done**
 
 Dependency: 12.3-12.4.
 
@@ -3488,7 +3532,7 @@ Exit criteria:
 
 ### 12.6 Start Shift, Preflight, Resolution, dan Override
 
-Status: **planned**
+Status: **done**
 
 Dependency: 12.5.
 
@@ -3517,7 +3561,7 @@ Exit criteria:
 
 ### 12.7 Henkaten 4M Input
 
-Status: **planned**
+Status: **done**
 
 Dependency: active/planned shift UI.
 
@@ -3548,7 +3592,7 @@ Exit criteria:
 
 ### 12.8 Approval Queues dan Decision History
 
-Status: **planned**
+Status: **done**
 
 Dependency: 12.7.
 
@@ -3577,7 +3621,7 @@ Exit criteria:
 
 ### 12.9 Withdraw + Clone
 
-Status: **planned**
+Status: **done**
 
 Dependency: 12.7-12.8.
 
@@ -3604,7 +3648,7 @@ Exit criteria:
 
 ### 12.10 Assignment Board Realtime
 
-Status: **planned**
+Status: **done**
 
 Dependency: 12.6-12.8 dan SSE foundation.
 
@@ -3634,7 +3678,7 @@ Exit criteria:
 
 ### 12.11 Supplier Dashboard
 
-Status: **planned**
+Status: **done**
 
 Dependency: backend dashboard APIs.
 
@@ -3662,7 +3706,7 @@ Exit criteria:
 
 ### 12.12 Notification Center dan Audit Views
 
-Status: **planned**
+Status: **done**
 
 Dependency: backend notification/audit APIs.
 
@@ -3688,7 +3732,7 @@ Exit criteria:
 
 ### 12.13 Supplier Role-scoped UX Tests
 
-Status: **planned**
+Status: **done**
 
 Dependency: 12.1-12.12.
 
@@ -3715,13 +3759,31 @@ Phase 12 exit criteria:
 
 - Supplier Admin, Supervisor, LL, and QC workflows complete against real backend.
 
+Completion evidence (2026-07-24):
+
+- Supplier session capability/context, setup readiness, dashboard aggregates/filters, board override
+  context, Henkaten source traceability, and role-scoped audit contracts close
+  GAP-01/02/03/04/13/15 additively.
+- Migration `20260724000900_supplier_frontend_audit_scope` adds nullable line evidence, safe
+  backfill, and cursor index without destructive data operations.
+- Supplier UI implements authentication/setup, individual master-data lifecycle, versioned
+  checklists, default assignment/atomic move, Shift preflight/start/override/end, four-category
+  Henkaten/approval/withdraw/clone, realtime Board, dashboard, notifications, audit, and account.
+- Production pages were implemented after visual inspection of the matching approved references;
+  prohibited Save Draft, export, bulk, global search, dark/mobile, and non-PRD workflows are absent.
+- Contract, policy, API client, frontend foundation, PostgreSQL integration, OpenAPI, build,
+  formatting, lint, typecheck, secret, and diff checks are recorded in the session handoff.
+
 ---
 
 ## 21. Phase 13 - TMMIN-facing Frontend
 
-Status: **planned**
+Status: **done**
 
 Goal: mengimplementasikan TMMIN tenant administration, warnings, global monitoring, External integration health, audit, dan system status.
+
+TMMIN route catalog, Admin/Quality permission boundary, dan Hosted/External detail treatment
+mengikuti `.agent/PAGES.md`.
 
 Depends on:
 
@@ -3734,7 +3796,7 @@ Unlocks:
 
 ### 13.1 TMMIN Login dan App Shell
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 11.
 
@@ -3760,7 +3822,7 @@ Exit criteria:
 
 ### 13.2 Supplier dan Privileged-user Administration
 
-Status: **planned**
+Status: **done**
 
 Dependency: 13.1.
 
@@ -3787,7 +3849,7 @@ Exit criteria:
 
 ### 13.3 Source Mode dan Cutover UI
 
-Status: **planned**
+Status: **done**
 
 Dependency: 13.2.
 
@@ -3815,7 +3877,7 @@ Exit criteria:
 
 ### 13.4 External Credential Management
 
-Status: **planned**
+Status: **done**
 
 Dependency: 13.3.
 
@@ -3842,7 +3904,7 @@ Exit criteria:
 
 ### 13.5 Global Dashboard
 
-Status: **planned**
+Status: **done**
 
 Dependency: 13.1.
 
@@ -3871,7 +3933,7 @@ Exit criteria:
 
 ### 13.6 Warning Explorer
 
-Status: **planned**
+Status: **done**
 
 Dependency: 13.5.
 
@@ -3899,7 +3961,7 @@ Exit criteria:
 
 ### 13.7 Henkaten Explorer dan Drill-down
 
-Status: **planned**
+Status: **done**
 
 Dependency: 13.5.
 
@@ -3926,7 +3988,7 @@ Exit criteria:
 
 ### 13.8 External Ingestion Health
 
-Status: **planned**
+Status: **done**
 
 Dependency: 13.4 dan 13.7.
 
@@ -3953,7 +4015,7 @@ Exit criteria:
 
 ### 13.9 Audit dan System Status
 
-Status: **planned**
+Status: **done**
 
 Dependency: backend audit/health.
 
@@ -3979,7 +4041,7 @@ Exit criteria:
 
 ### 13.10 TMMIN Read-only Enforcement Tests
 
-Status: **planned**
+Status: **done**
 
 Dependency: 13.1-13.9.
 
@@ -4013,6 +4075,9 @@ Phase 13 exit criteria:
 Status: **planned**
 
 Goal: menguji seluruh application sebagai satu local full stack dan melakukan hanya backend adjustments yang diizinkan setelah contract freeze.
+
+Integration pass wajib merekonsiliasi seluruh `ADDITIVE API REQUIRED` dan `POLICY MISMATCH` pada
+`.agent/PAGES.md`; unresolved release-critical gap tidak boleh disamarkan oleh frontend.
 
 Depends on:
 
@@ -5151,19 +5216,20 @@ No acceptance criterion may remain without an owning phase.
 
 Current recommended batch:
 
-1. Begin Phase 11.1 supplier/TMMIN Vite workspaces and shared UI package.
-2. Generate the typed API client from the frozen 140-operation backend contract.
-3. Establish session, CSRF mutation, problem mapping, accessibility, and browser-test foundations.
+1. Begin Phase 14 with a deterministic local full-stack harness for both identity realms.
+2. Add Playwright ownership for cross-realm authentication, Hosted operations, TMMIN monitoring,
+   source transitions, External ingestion, and realtime propagation.
+3. Permit only backward-compatible backend adjustments discovered through executable full-stack
+   evidence.
 
 Initial implementation order inside the next coding batch:
 
-1. scaffold only the workspaces owned by Phase 11 and preserve strict ESM/TypeScript quality gates;
-2. derive frontend request/response types from shared Zod/OpenAPI rather than duplicating enums;
-3. implement realm-specific session bootstrap, logout, password flow, and CSRF-aware fetch wrapper;
-4. map RFC 9457 problem responses into loading/empty/error/forbidden/conflict/stale UI states;
-5. establish shared accessible desktop tokens/components without moving business policy client-side;
-6. add frontend unit/build checks and a real-API Playwright harness;
-7. keep Phase 12-14 feature screens and Phase 15 deployment files behind their owning dependencies.
+1. create isolated full-stack fixture/bootstrap and cleanup automation;
+2. exercise Supplier and TMMIN sessions without sharing cookie or cache state;
+3. cover Hosted/External drill-down, cutover, warning, Board, and notification propagation;
+4. retain the frozen 130-path/146-operation contract unless an explicit additive correction is
+   proven;
+5. keep Phase 15 deployment files behind completed full-stack acceptance.
 
 ## 32. Deferred dan Explicitly Out-of-scope
 

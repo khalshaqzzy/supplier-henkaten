@@ -1,12 +1,20 @@
 packages:
   - apps/api
+  - apps/supplier-web
+  - apps/tmmin-web
+  - packages/api-client
   - packages/contracts
   - packages/test-fixtures
+  - packages/ui
 
 allowBuilds:
   '@prisma/engines': true
   '@swc/core': true
   argon2: true
+  msw: true
   prisma: true
+
+minimumReleaseAgeExclude:
+  - lucide-react@1.26.0
 
 sharedWorkspaceLockfile: true

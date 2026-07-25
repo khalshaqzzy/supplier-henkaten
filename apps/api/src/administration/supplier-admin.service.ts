@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import type { Prisma, Supplier, User } from '../generated/prisma/client.js';
-import type { CreateSupplierRequest } from '@tmmin-henkaten/contracts';
+import type { CreateSupplierRequest, SupplierListQuery } from '@tmmin-henkaten/contracts';
 
 import { normalizeLookup } from '../auth/auth.service.js';
 import { PasswordService } from '../auth/password.service.js';
@@ -10,6 +10,7 @@ import { AuditWriter } from '../persistence/audit-writer.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 import { runSerializable } from '../persistence/transaction.js';
 import type { MutationContext } from './mutation-context.js';
+import { assertIanaTimezone } from '../master-data/shift-time.js';
 import { decodeCursor, encodeCursor, presentSupplier, presentUser } from './presenters.js';
 import {
   auditInput,
@@ -28,15 +29,30 @@ export class SupplierAdminService {
     private readonly audit: AuditWriter,
   ) {}
 
-  async list(limit: number, cursor?: string) {
-    const cursorId = decodeCursor(cursor);
+  async list(query: SupplierListQuery) {
+    const cursorId = decodeCursor(query.cursor);
     const suppliers = await this.prisma.supplier.findMany({
-      orderBy: { id: 'asc' },
-      take: limit + 1,
+      where: {
+        ...(query.search
+          ? {
+              OR: [
+                { code: { contains: query.search, mode: 'insensitive' as const } },
+                { name: { contains: query.search, mode: 'insensitive' as const } },
+              ],
+            }
+          : {}),
+        ...(query.status === 'ALL' ? {} : { active: query.status === 'ACTIVE' }),
+        ...(query.sourceMode ? { sourceMode: query.sourceMode } : {}),
+      },
+      orderBy:
+        query.sort === 'UPDATED_DESC'
+          ? [{ updatedAt: 'desc' }, { id: 'desc' }]
+          : [{ name: 'asc' }, { id: 'asc' }],
+      take: query.limit + 1,
       ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
     });
-    const hasNextPage = suppliers.length > limit;
-    const items = hasNextPage ? suppliers.slice(0, limit) : suppliers;
+    const hasNextPage = suppliers.length > query.limit;
+    const items = hasNextPage ? suppliers.slice(0, query.limit) : suppliers;
     return {
       items: items.map(presentSupplier),
       pageInfo: {
@@ -50,7 +66,52 @@ export class SupplierAdminService {
     return presentSupplier(await this.requireSupplier(id));
   }
 
+  async detail(id: string, includeAdministrationContext = true) {
+    const supplier = await this.prisma.supplier.findUnique({
+      where: { id },
+      include: {
+        users: {
+          where: { role: 'SUPPLIER_ADMIN', status: 'ACTIVE' },
+          orderBy: { updatedAt: 'desc' },
+          take: 1,
+        },
+        hostedPreparations: {
+          where: { status: 'ACTIVE' },
+          orderBy: { startedAt: 'desc' },
+          take: 1,
+        },
+        warningInstances: { where: { status: 'OPEN' }, select: { id: true } },
+        henkatens: { orderBy: { updatedAt: 'desc' }, take: 1, select: { updatedAt: true } },
+        externalApiClients: {
+          orderBy: { lastSuccessfulIngestionAt: 'desc' },
+          take: 1,
+          select: { lastSuccessfulIngestionAt: true },
+        },
+      },
+    });
+    if (!supplier) throw notFound('Supplier');
+    const preparation = supplier.hostedPreparations[0];
+    return {
+      supplier: presentSupplier(supplier),
+      currentSupplierAdmin:
+        includeAdministrationContext && supplier.users[0] ? presentUser(supplier.users[0]) : null,
+      activePreparation: preparation
+        ? {
+            ...presentPreparation(preparation),
+            adminUserId: includeAdministrationContext ? preparation.adminUserId : null,
+          }
+        : null,
+      monitoring: {
+        activeWarnings: supplier.warningInstances.length,
+        lastHostedDataAt: supplier.henkatens[0]?.updatedAt.toISOString() ?? null,
+        lastExternalIngestionAt:
+          supplier.externalApiClients[0]?.lastSuccessfulIngestionAt?.toISOString() ?? null,
+      },
+    };
+  }
+
   async create(input: CreateSupplierRequest, context: MutationContext) {
+    validateTimezone(input.timezone);
     const credential =
       input.sourceMode === 'HOSTED' ? await this.prepareCredential(input.supplierAdmin) : undefined;
     const result = await this.prisma.$transaction(async (transaction) => {
@@ -116,6 +177,7 @@ export class SupplierAdminService {
     },
     context: MutationContext,
   ) {
+    if (input.timezone) validateTimezone(input.timezone);
     return this.prisma.$transaction(async (transaction) => {
       const supplier = await transaction.supplier.findUnique({ where: { id } });
       if (!supplier) throw notFound('Supplier');
@@ -303,6 +365,18 @@ export class SupplierAdminService {
       if (!supplier) throw notFound('Supplier');
       if (supplier.version !== input.expectedVersion) throw versionConflict();
       if (supplier.sourceMode !== 'EXTERNAL') throw sourceModeMismatch();
+      const existing = await transaction.hostedPreparation.findFirst({
+        where: { supplierId, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (existing) {
+        throw new ProblemException({
+          status: 409,
+          code: 'STATE_CONFLICT',
+          title: 'Hosted Preparation already active',
+          detail: 'Cancel or complete the active preparation before starting another.',
+        });
+      }
       const admin = await this.createSupplierAdmin(
         transaction,
         supplier,
@@ -443,6 +517,41 @@ export class SupplierAdminService {
     const supplier = await this.prisma.supplier.findUnique({ where: { id } });
     if (!supplier) throw notFound('Supplier');
     return supplier;
+  }
+}
+
+function presentPreparation(preparation: {
+  id: string;
+  adminUserId: string;
+  sourceEpoch: number;
+  status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  startedAt: Date;
+  completedAt: Date | null;
+  cancelledAt: Date | null;
+  version: number;
+}) {
+  return {
+    id: preparation.id,
+    adminUserId: preparation.adminUserId,
+    sourceEpoch: preparation.sourceEpoch,
+    status: preparation.status,
+    startedAt: preparation.startedAt.toISOString(),
+    completedAt: preparation.completedAt?.toISOString() ?? null,
+    cancelledAt: preparation.cancelledAt?.toISOString() ?? null,
+    version: preparation.version,
+  };
+}
+
+function validateTimezone(value: string) {
+  try {
+    assertIanaTimezone(value);
+  } catch {
+    throw new ProblemException({
+      status: 400,
+      code: 'VALIDATION_FAILED',
+      title: 'Invalid timezone',
+      detail: 'Timezone must be a valid IANA timezone.',
+    });
   }
 }
 

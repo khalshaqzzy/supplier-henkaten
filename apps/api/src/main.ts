@@ -34,6 +34,7 @@ async function bootstrap(): Promise<void> {
     credentials: true,
     origin: [...config.corsAllowedOrigins],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Correlation-ID', 'X-CSRF-Token'],
+    exposedHeaders: ['X-Correlation-ID', 'Retry-After'],
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
   app.enableShutdownHooks(['SIGINT', 'SIGTERM']);

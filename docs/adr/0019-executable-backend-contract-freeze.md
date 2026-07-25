@@ -42,7 +42,7 @@ metadata to OpenAPI proves that every registered HTTP operation has a documented
 that obsolete documented operations cannot survive unnoticed.
 
 Keeping the capacity fixture in an explicit project makes destructive seeding intentional and keeps
-the normal 31-test PostgreSQL suite fast. HTTP-boundary percentiles include routing, guards,
+the normal PostgreSQL suite fast. HTTP-boundary percentiles include routing, guards,
 serialization, and database work while remaining deterministic enough for a preliminary frontend
 gate.
 
@@ -81,7 +81,9 @@ are available for the high-cardinality tenant lists.
 
 ## Validation
 
-- Runtime/OpenAPI reconciliation passes with 124 paths and 140 HTTP operations.
+- Runtime/OpenAPI reconciliation passes with 130 paths and 146 HTTP operations after the additive
+  Supplier readiness, Henkaten form-option, TMMIN source summary, global Henkaten, current-Hosted
+  Board, and sanitized External-health reads.
 - The Compact baseline passes with 42 suppliers, 20 lines, 300 members, and 500 jobs per supplier,
   plus 500 External projections and 1,000 audit rows per supplier.
 - Dashboard, projection, audit, notification, standard mutation, and External ingestion p95 values
@@ -93,7 +95,8 @@ are available for the high-cardinality tenant lists.
 
 ## Follow-up Work
 
-- Generate frontend typed clients from the frozen artifact.
+- Keep the generated browser client and shared runtime schemas synchronized with every additive
+  operation or response field.
 - Run the release-level concurrent staging load profile, including 30 users per supplier and
   approval/board propagation, before production readiness.
 - Version public External schema changes rather than changing `1.0` in place.

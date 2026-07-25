@@ -7,6 +7,8 @@ import {
   decideHenkatenRequestSchema,
   endShiftRequestSchema,
   emergencyStartShiftRequestSchema,
+  henkatenFormOptionsQuerySchema,
+  henkatenFormOptionsSchema,
   henkatenListQuerySchema,
   prepareShiftRequestSchema,
   rerouteSupervisorRequestSchema,
@@ -132,5 +134,34 @@ describe('operational contracts', () => {
     expect(endShiftRequestSchema.parse({ expectedVersion: 3 })).toEqual({
       expectedVersion: 3,
     });
+  });
+
+  it('validates operational Henkaten form options without exposing account data', () => {
+    expect(henkatenFormOptionsQuerySchema.parse({ category: 'MAN', part: 'door' })).toEqual({
+      category: 'MAN',
+      part: 'door',
+    });
+    expect(
+      henkatenFormOptionsSchema.parse({
+        generatedAt: '2026-07-24T00:00:00.000Z',
+        checklist: {
+          id: id(),
+          category: 'MAN',
+          versionNumber: 2,
+          publishedAt: '2026-07-23T00:00:00.000Z',
+          items: [{ id: id(), label: 'Replacement qualified', displayOrder: 1 }],
+        },
+        parts: [{ id: id(), partNumber: 'P-01', partName: 'Door trim' }],
+        replacementMembers: [
+          {
+            id: id(),
+            fullName: 'Operator Satu',
+            registrationNumber: 'MP-001',
+            reserved: false,
+            currentAssignment: null,
+          },
+        ],
+      }).replacementMembers,
+    ).toHaveLength(1);
   });
 });

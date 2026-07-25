@@ -81,6 +81,7 @@ describe('authentication contracts', () => {
         purpose: 'NORMAL',
         mustChangePassword: false,
       },
+      capabilities: ['TMMIN_DASHBOARD_READ'],
       idleExpiresAt: '2026-07-23T03:00:00.000Z',
       absoluteExpiresAt: '2026-07-23T14:00:00.000Z',
       csrfToken: 'csrf-token-value-with-more-than-32-characters',

@@ -6,6 +6,7 @@ import {
   externalBatchRequestSchema,
   externalClientActionRequestSchema,
   externalEventIdSchema,
+  externalHealthQuerySchema,
   externalHenkatenEventSchema,
   externalTokenRequestSchema,
   listQuerySchema,
@@ -13,6 +14,7 @@ import {
   type CreateExternalClientRequest,
   type ExternalBatchRequest,
   type ExternalTokenRequest,
+  type ExternalHealthQuery,
 } from '@tmmin-henkaten/contracts';
 
 import { mutationContext } from '../administration/mutation-context.js';
@@ -115,6 +117,17 @@ export class ExternalProjectionController {
       parseWithSchema(opaqueIdSchema, supplierId),
       parseWithSchema(opaqueIdSchema, id),
     );
+  }
+}
+
+@Controller('/api/v1/tmmin/external-health')
+export class TmminExternalHealthController {
+  constructor(private readonly external: ExternalService) {}
+
+  @RequireCapabilities('TMMIN_HENKATEN_READ')
+  @Get()
+  health(@ValidatedQuery(externalHealthQuerySchema) query: ExternalHealthQuery) {
+    return this.external.health(query);
   }
 }
 

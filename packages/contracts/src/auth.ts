@@ -1,7 +1,13 @@
 import { z } from 'zod';
 
-import { identityRealmSchema, sessionPurposeSchema, userRoleSchema } from './enums.js';
-import { opaqueIdSchema, utcTimestampSchema } from './common.js';
+import {
+  capabilitySchema,
+  identityRealmSchema,
+  sessionPurposeSchema,
+  sourceModeSchema,
+  userRoleSchema,
+} from './enums.js';
+import { opaqueIdSchema, optimisticVersionSchema, utcTimestampSchema } from './common.js';
 
 const usernameSchema = z.string().trim().min(1).max(100);
 const loginPasswordSchema = z.string().min(1).max(128);
@@ -54,14 +60,43 @@ export const sessionPrincipalSchema = z
   });
 export type SessionPrincipal = z.infer<typeof sessionPrincipalSchema>;
 
+export const supplierSessionContextSchema = z
+  .object({
+    id: opaqueIdSchema,
+    code: z.string().min(1).max(50),
+    name: z.string().min(1).max(200),
+    timezone: z.string().min(1).max(100),
+    sourceMode: sourceModeSchema,
+    sourceEpoch: optimisticVersionSchema,
+  })
+  .strict();
+
 export const sessionResponseSchema = z
   .object({
     principal: sessionPrincipalSchema,
+    capabilities: z.array(capabilitySchema),
+    supplier: supplierSessionContextSchema.optional(),
     idleExpiresAt: utcTimestampSchema,
     absoluteExpiresAt: utcTimestampSchema,
     csrfToken: z.string().min(32).max(512),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.principal.realm === 'SUPPLIER' && !value.supplier) {
+      context.addIssue({
+        code: 'custom',
+        path: ['supplier'],
+        message: 'Supplier context is required.',
+      });
+    }
+    if (value.principal.realm === 'TMMIN' && value.supplier) {
+      context.addIssue({
+        code: 'custom',
+        path: ['supplier'],
+        message: 'TMMIN session cannot include supplier context.',
+      });
+    }
+  });
 export type SessionResponse = z.infer<typeof sessionResponseSchema>;
 
 export const passwordChangeRequestSchema = z

@@ -4,12 +4,16 @@ import {
   createHenkatenRequestSchema,
   decideHenkatenRequestSchema,
   henkatenListQuerySchema,
+  henkatenFormOptionsQuerySchema,
+  tmminHenkatenQuerySchema,
   opaqueIdSchema,
   rerouteSupervisorRequestSchema,
   withdrawHenkatenRequestSchema,
   type CreateHenkatenRequest,
   type DecideHenkatenRequest,
   type HenkatenListQuery,
+  type HenkatenFormOptionsQuery,
+  type TmminHenkatenQuery,
   type RerouteSupervisorRequest,
 } from '@tmmin-henkaten/contracts';
 
@@ -58,6 +62,15 @@ export class SupplierHenkatenController {
       principal,
       mutationContext(request),
     );
+  }
+
+  @RequireCapabilities('SUPPLIER_HENKATEN_SUBMIT')
+  @Get('/form-options')
+  formOptions(
+    @ValidatedQuery(henkatenFormOptionsQuerySchema) query: HenkatenFormOptionsQuery,
+    @Req() request: ContextRequest,
+  ) {
+    return this.henkatens.formOptions(this.access.supplierScope(request), query);
   }
 
   @RequireCapabilities('SUPPLIER_HENKATEN_DECIDE')
@@ -224,5 +237,16 @@ export class TmminWarningController {
       });
     }
     return this.henkatens.affectedPart(parsedSupplier, partNumber);
+  }
+}
+
+@Controller('/api/v1/tmmin/henkatens')
+export class TmminGlobalHenkatenController {
+  constructor(private readonly henkatens: HenkatenService) {}
+
+  @RequireCapabilities('TMMIN_HENKATEN_READ')
+  @Get()
+  list(@ValidatedQuery(tmminHenkatenQuerySchema) query: TmminHenkatenQuery) {
+    return this.henkatens.globalList(query);
   }
 }

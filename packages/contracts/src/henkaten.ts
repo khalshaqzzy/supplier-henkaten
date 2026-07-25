@@ -7,6 +7,7 @@ import {
   checklistAnswerSchema,
   henkatenCategorySchema,
   henkatenStatusSchema,
+  sourceModeSchema,
   warningStatusSchema,
 } from './enums.js';
 import {
@@ -107,6 +108,8 @@ export const henkatenSummarySchema = z
     jobId: opaqueIdSchema,
     partId: opaqueIdSchema,
     status: henkatenStatusSchema,
+    sourceMode: sourceModeSchema,
+    sourceEpoch: optimisticVersionSchema,
     category: henkatenCategorySchema,
     businessDate: businessDateSchema,
     occurredAt: utcTimestampSchema,
@@ -219,6 +222,69 @@ export type HenkatenListQuery = z.infer<typeof henkatenListQuerySchema>;
 
 export const henkatenPageSchema = z
   .object({ items: z.array(henkatenSummarySchema), pageInfo: pageInfoSchema })
+  .strict();
+
+export const henkatenFormOptionsQuerySchema = z
+  .object({
+    category: henkatenCategorySchema,
+    part: z.string().trim().min(1).max(200).optional(),
+  })
+  .strict();
+export type HenkatenFormOptionsQuery = z.infer<typeof henkatenFormOptionsQuerySchema>;
+
+export const henkatenFormOptionsSchema = z
+  .object({
+    generatedAt: utcTimestampSchema,
+    checklist: z
+      .object({
+        id: opaqueIdSchema,
+        category: henkatenCategorySchema,
+        versionNumber: optimisticVersionSchema,
+        publishedAt: utcTimestampSchema,
+        items: z.array(
+          z
+            .object({
+              id: opaqueIdSchema,
+              label: z.string().min(1).max(500),
+              displayOrder: z.number().int().positive(),
+            })
+            .strict(),
+        ),
+      })
+      .strict()
+      .nullable(),
+    parts: z.array(
+      z
+        .object({
+          id: opaqueIdSchema,
+          partNumber: z.string().min(1).max(100),
+          partName: z.string().min(1).max(200),
+        })
+        .strict(),
+    ),
+    replacementMembers: z.array(
+      z
+        .object({
+          id: opaqueIdSchema,
+          fullName: z.string().min(1).max(150),
+          registrationNumber: z.string().min(1).max(100),
+          reserved: z.boolean(),
+          currentAssignment: z
+            .object({
+              id: opaqueIdSchema,
+              version: optimisticVersionSchema,
+              shiftRunId: opaqueIdSchema,
+              lineId: opaqueIdSchema,
+              lineName: z.string().min(1).max(150),
+              jobId: opaqueIdSchema,
+              jobName: z.string().min(1).max(150),
+            })
+            .strict()
+            .nullable(),
+        })
+        .strict(),
+    ),
+  })
   .strict();
 
 export const withdrawHenkatenRequestSchema = z

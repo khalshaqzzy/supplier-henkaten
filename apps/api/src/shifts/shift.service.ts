@@ -234,6 +234,7 @@ export class ShiftService {
       await this.audit.write(
         auditInput(context, scope.supplierId, 'SHIFT_PREFLIGHT_COMPLETED', 'ShiftRun', plan.id, {
           blockerCodes: finalChecks.filter(({ blocking }) => blocking).map(({ code }) => code),
+          lineId: plan.lineId,
         }),
         tx,
       );
@@ -475,7 +476,10 @@ export class ShiftService {
         },
       });
       await this.audit.write(
-        auditInput(context, scope.supplierId, 'SHIFT_ENDED', 'ShiftRun', shift.id, summary),
+        auditInput(context, scope.supplierId, 'SHIFT_ENDED', 'ShiftRun', shift.id, {
+          ...summary,
+          lineId: shift.lineId,
+        }),
         tx,
       );
       await this.outbox.enqueue(
@@ -595,6 +599,7 @@ export class ShiftService {
         await this.audit.write(
           auditInput(context, scope.supplierId, 'SHIFT_START_BLOCKED', 'ShiftRun', plan.id, {
             blockerCodes: blockers.map(({ code }) => code),
+            lineId: plan.lineId,
           }),
           tx,
         );
@@ -656,6 +661,7 @@ export class ShiftService {
           ...auditInput(context, scope.supplierId, action, 'ShiftRun', plan.id, {
             blockerCodes: recordedBlockers.map(({ code }) => code),
             substituteLineLeader: leaderId !== plan.lineLeaderMemberId,
+            lineId: plan.lineId,
           }),
           ...(overrideReason ? { reason: overrideReason } : {}),
         },

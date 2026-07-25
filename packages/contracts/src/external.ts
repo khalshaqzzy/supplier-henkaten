@@ -266,6 +266,7 @@ export const externalProjectionSchema = z
   .object({
     id: opaqueIdSchema,
     supplierId: opaqueIdSchema,
+    sourceEpoch: z.number().int().positive(),
     sourceHenkatenId: externalRefSchema,
     sourceVersion: z.number().int().positive(),
     status: henkatenStatusSchema,
@@ -285,5 +286,10 @@ export const externalProjectionPageSchema = z
   .strict();
 
 export const externalProjectionDetailSchema = externalProjectionSchema
-  .extend({ events: z.array(ingestionStatusSchema) })
+  .extend({
+    change: z.record(z.string(), z.unknown()),
+    checklist: z.record(z.string(), z.unknown()),
+    decisions: z.array(z.record(z.string(), z.unknown())),
+    events: z.array(ingestionStatusSchema),
+  })
   .strict();

@@ -2,7 +2,12 @@ import { createHash } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
 
-import type { CreateHenkatenRequest, HenkatenListQuery } from '@tmmin-henkaten/contracts';
+import type {
+  CreateHenkatenRequest,
+  HenkatenFormOptionsQuery,
+  HenkatenListQuery,
+  TmminHenkatenQuery,
+} from '@tmmin-henkaten/contracts';
 
 import type { Prisma } from '../generated/prisma/client.js';
 import type { MutationContext } from '../administration/mutation-context.js';
@@ -409,6 +414,7 @@ export class HenkatenService {
         {
           ...auditInput(context, scope.supplierId, 'HENKATEN_WITHDRAWN', id, {
             identifier: current.identifier,
+            lineId: current.lineId,
           }),
           reason: input.reason,
         },
@@ -480,6 +486,103 @@ export class HenkatenService {
     });
     if (!row) throw missing('Henkaten');
     return presentHenkatenDetail(row);
+  }
+
+  async formOptions(scope: TenantScope, query: HenkatenFormOptionsQuery) {
+    const partSearch = query.part ? normalizeLookup(query.part) : null;
+    const [checklist, parts, members] = await Promise.all([
+      this.prisma.checklistVersion.findFirst({
+        where: {
+          supplierId: scope.supplierId,
+          category: query.category,
+          template: { active: true },
+        },
+        include: { items: { orderBy: { displayOrder: 'asc' } } },
+        orderBy: { versionNumber: 'desc' },
+      }),
+      this.prisma.part.findMany({
+        where: {
+          supplierId: scope.supplierId,
+          active: true,
+          ...(partSearch
+            ? {
+                OR: [
+                  { normalizedPartNumber: { contains: partSearch } },
+                  { normalizedPartName: { contains: partSearch } },
+                ],
+              }
+            : {}),
+        },
+        orderBy: [{ normalizedPartNumber: 'asc' }, { id: 'asc' }],
+        take: 50,
+      }),
+      this.prisma.member.findMany({
+        where: { supplierId: scope.supplierId, active: true, role: 'MP' },
+        select: {
+          id: true,
+          fullName: true,
+          registrationNumber: true,
+          reservations: { where: { releasedAt: null }, select: { id: true }, take: 1 },
+          effectiveWorkingAssignments: {
+            where: { active: true },
+            orderBy: { updatedAt: 'desc' },
+            take: 1,
+            select: {
+              id: true,
+              version: true,
+              shiftRunId: true,
+              lineId: true,
+              jobId: true,
+              line: { select: { name: true } },
+              job: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
+        take: 500,
+      }),
+    ]);
+    return {
+      generatedAt: new Date().toISOString(),
+      checklist: checklist
+        ? {
+            id: checklist.id,
+            category: checklist.category,
+            versionNumber: checklist.versionNumber,
+            publishedAt: checklist.publishedAt.toISOString(),
+            items: checklist.items.map((item) => ({
+              id: item.id,
+              label: item.label,
+              displayOrder: item.displayOrder,
+            })),
+          }
+        : null,
+      parts: parts.map((part) => ({
+        id: part.id,
+        partNumber: part.partNumber,
+        partName: part.partName,
+      })),
+      replacementMembers: members.map((member) => {
+        const assignment = member.effectiveWorkingAssignments[0];
+        return {
+          id: member.id,
+          fullName: member.fullName,
+          registrationNumber: member.registrationNumber,
+          reserved: member.reservations.length > 0,
+          currentAssignment: assignment
+            ? {
+                id: assignment.id,
+                version: assignment.version,
+                shiftRunId: assignment.shiftRunId,
+                lineId: assignment.lineId,
+                lineName: assignment.line.name,
+                jobId: assignment.jobId,
+                jobName: assignment.job.name,
+              }
+            : null,
+        };
+      }),
+    };
   }
 
   async clonePrefill(scope: TenantScope, id: string, principal: RequestPrincipal) {
@@ -645,6 +748,157 @@ export class HenkatenService {
       openWarningCount: rows.length,
       oldestOpenedAt: rows[0]!.openedAt.toISOString(),
       warnings: rows.map(presentWarning),
+    };
+  }
+
+  async globalList(query: TmminHenkatenQuery) {
+    const cursor = decodeGlobalCursor(query.cursor);
+    const cursorWhere = cursor
+      ? {
+          OR: [
+            { updatedAt: { lt: cursor.updatedAt } },
+            { updatedAt: cursor.updatedAt, id: { lt: cursor.id } },
+          ],
+        }
+      : {};
+    const commonDate =
+      query.from || query.to
+        ? {
+            occurredAt: {
+              ...(query.from ? { gte: new Date(query.from) } : {}),
+              ...(query.to ? { lte: new Date(query.to) } : {}),
+            },
+          }
+        : {};
+    const [hosted, external] = await Promise.all([
+      query.sourceMode === 'EXTERNAL'
+        ? Promise.resolve([])
+        : this.prisma.henkaten.findMany({
+            where: {
+              ...cursorWhere,
+              ...commonDate,
+              ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+              ...(query.status ? { status: query.status } : {}),
+              ...(query.category ? { category: query.category } : {}),
+              ...(query.line
+                ? { lineNameSnapshot: { contains: query.line, mode: 'insensitive' as const } }
+                : {}),
+              ...(query.part
+                ? {
+                    OR: [
+                      {
+                        partNumberSnapshot: {
+                          contains: query.part,
+                          mode: 'insensitive' as const,
+                        },
+                      },
+                      {
+                        partNameSnapshot: {
+                          contains: query.part,
+                          mode: 'insensitive' as const,
+                        },
+                      },
+                    ],
+                  }
+                : {}),
+            },
+            include: {
+              supplier: { select: { code: true, name: true } },
+              approvalRoutes: true,
+            },
+            orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+            take: query.limit + 1,
+          }),
+      query.sourceMode === 'HOSTED'
+        ? Promise.resolve([])
+        : this.prisma.externalHenkatenProjection.findMany({
+            where: {
+              ...cursorWhere,
+              ...commonDate,
+              ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+              ...(query.status ? { status: query.status } : {}),
+              ...(query.category ? { category: query.category } : {}),
+            },
+            include: { supplier: { select: { code: true, name: true } } },
+            orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+            take: query.limit + 1,
+          }),
+    ]);
+    const mapped = [
+      ...hosted.map((row) => ({
+        kind: 'HOSTED' as const,
+        recordId: row.id,
+        supplierId: row.supplierId,
+        supplierCode: row.supplier.code,
+        supplierName: row.supplier.name,
+        sourceMode: row.sourceMode,
+        sourceEpoch: row.sourceEpoch,
+        displayId: row.identifier,
+        status: row.status,
+        category: row.category,
+        lineName: row.lineNameSnapshot,
+        jobName: row.jobNameSnapshot,
+        partNumber: row.partNumberSnapshot,
+        partName: row.partNameSnapshot,
+        occurredAt: row.occurredAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+        supervisorStatus:
+          row.approvalRoutes.find((route) => route.route === 'SUPERVISOR')?.status ??
+          'NOT_REQUIRED',
+        qcStatus:
+          row.approvalRoutes.find((route) => route.route === 'QC')?.status ?? 'NOT_REQUIRED',
+      })),
+      ...external.map((row) => {
+        const line = objectRecord(row.lineSnapshot);
+        const job = objectRecord(row.jobSnapshot);
+        const part = objectRecord(row.partSnapshot);
+        return {
+          kind: 'EXTERNAL' as const,
+          recordId: row.id,
+          supplierId: row.supplierId,
+          supplierCode: row.supplier.code,
+          supplierName: row.supplier.name,
+          sourceMode: 'EXTERNAL' as const,
+          sourceEpoch: row.sourceEpoch,
+          displayId: row.sourceHenkatenId,
+          sourceVersion: row.sourceVersion,
+          status: row.status,
+          category: row.category,
+          lineName: safeText(line['name']),
+          jobName: safeText(job['name']),
+          partNumber: safeText(part['number']),
+          partName: safeText(part['name']),
+          occurredAt: row.occurredAt.toISOString(),
+          updatedAt: row.updatedAt.toISOString(),
+        };
+      }),
+    ]
+      .filter((row) => {
+        if (row.kind !== 'EXTERNAL') return true;
+        const lineMatches =
+          !query.line || row.lineName.toLowerCase().includes(query.line.toLowerCase());
+        const partMatches =
+          !query.part ||
+          `${row.partNumber} ${row.partName}`.toLowerCase().includes(query.part.toLowerCase());
+        return lineMatches && partMatches;
+      })
+      .sort(
+        (left, right) =>
+          right.updatedAt.localeCompare(left.updatedAt) ||
+          right.recordId.localeCompare(left.recordId),
+      );
+    const hasNextPage = mapped.length > query.limit;
+    const items = mapped.slice(0, query.limit);
+    const last = items.at(-1);
+    return {
+      items,
+      pageInfo: {
+        hasNextPage,
+        nextCursor:
+          hasNextPage && last
+            ? encodeGlobalCursor({ updatedAt: last.updatedAt, id: last.recordId })
+            : null,
+      },
     };
   }
 
@@ -919,4 +1173,32 @@ function assignmentConflict() {
     title: 'Assignment conflict',
     detail: 'The submitted Man assignment no longer matches current Working Assignment.',
   });
+}
+
+function encodeGlobalCursor(value: { updatedAt: string; id: string }): string {
+  return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
+}
+
+function decodeGlobalCursor(value?: string): { updatedAt: Date; id: string } | undefined {
+  if (!value) return undefined;
+  try {
+    const decoded = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as {
+      updatedAt?: unknown;
+      id?: unknown;
+    };
+    if (typeof decoded.updatedAt !== 'string' || typeof decoded.id !== 'string') return undefined;
+    return { updatedAt: new Date(decoded.updatedAt), id: decoded.id };
+  } catch {
+    return undefined;
+  }
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function safeText(value: unknown): string {
+  return typeof value === 'string' ? value : 'Tidak tersedia';
 }

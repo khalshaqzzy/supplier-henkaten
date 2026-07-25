@@ -162,6 +162,20 @@ describe('Phase 3 administration flows', () => {
     expect(external.body).not.toHaveProperty('supplierAdmin');
     expect(external.body).not.toHaveProperty('credential');
 
+    const invalidTimezone = await request(app.getHttpServer())
+      .post('/api/v1/tmmin/suppliers')
+      .set('Origin', tmminOrigin)
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', csrf)
+      .send({
+        sourceMode: 'EXTERNAL',
+        code: `INVALID-TZ-${randomUUID()}`,
+        name: 'Invalid Timezone Supplier',
+        timezone: 'Asia/Not-A-Real-Timezone',
+      });
+    expect(invalidTimezone.status).toBe(400);
+    expect(invalidTimezone.body.code).toBe('VALIDATION_FAILED');
+
     const preparationUsername = `preparation-${randomUUID()}`;
     const preparation = await request(app.getHttpServer())
       .post(`/api/v1/tmmin/suppliers/${external.body.supplier.id}/source/preparation`)
@@ -179,6 +193,13 @@ describe('Phase 3 administration flows', () => {
       });
     expect(preparation.status).toBe(201);
     expect(preparation.body.preparation.status).toBe('ACTIVE');
+    const sourceSummary = await request(app.getHttpServer())
+      .get(`/api/v1/tmmin/suppliers/${external.body.supplier.id}/source`)
+      .set('Cookie', cookie);
+    expect(sourceSummary.status).toBe(200);
+    expect(sourceSummary.body.activePreparation.id).toBe(preparation.body.preparation.id);
+    expect(sourceSummary.body.preflight.targetMode).toBe('HOSTED');
+    expect(sourceSummary.body.history).toEqual(expect.any(Array));
 
     const preparationLogin = await request(app.getHttpServer())
       .post('/api/v1/auth/supplier/login')
@@ -191,6 +212,46 @@ describe('Phase 3 administration flows', () => {
       });
     expect(preparationLogin.status).toBe(200);
     expect(preparationLogin.body.principal.purpose).toBe('HOSTED_PREPARATION');
+    expect(preparationLogin.body.capabilities).toEqual(
+      expect.arrayContaining([
+        'SUPPLIER_SELF_SERVICE',
+        'SUPPLIER_MASTER_DATA_READ',
+        'SUPPLIER_MASTER_DATA_MANAGE',
+      ]),
+    );
+    expect(preparationLogin.body.capabilities).not.toContain('SUPPLIER_DASHBOARD_READ');
+    const preparationTemporaryPassword = preparation.body.credential.temporaryPassword as string;
+    const preparationPassword = 'Preparation-Integration-Password-456';
+    const preparationPasswordChange = await request(app.getHttpServer())
+      .post('/api/v1/auth/supplier/change-password')
+      .set('Origin', supplierOrigin)
+      .set('Cookie', preparationLogin.headers['set-cookie'] ?? '')
+      .set('X-CSRF-Token', preparationLogin.body.csrfToken)
+      .send({
+        currentPassword: preparationTemporaryPassword,
+        newPassword: preparationPassword,
+      });
+    expect(preparationPasswordChange.status).toBe(204);
+    const preparationRelogin = await request(app.getHttpServer())
+      .post('/api/v1/auth/supplier/login')
+      .set('Origin', supplierOrigin)
+      .set('Content-Type', 'application/json')
+      .send({
+        supplierCode: externalCode,
+        username: preparationUsername,
+        password: preparationPassword,
+      });
+    expect(preparationRelogin.status).toBe(200);
+    const preparationCookie = preparationRelogin.headers['set-cookie'] ?? '';
+    const setupReadiness = await request(app.getHttpServer())
+      .get('/api/v1/supplier/setup-readiness')
+      .set('Cookie', preparationCookie);
+    expect(setupReadiness.status).toBe(200);
+    const operationalDenied = await request(app.getHttpServer())
+      .get('/api/v1/supplier/dashboard')
+      .set('Cookie', preparationCookie);
+    expect(operationalDenied.status).toBe(403);
+    expect(operationalDenied.body.code).toBe('FORBIDDEN');
 
     const preflight = await request(app.getHttpServer())
       .post(`/api/v1/tmmin/suppliers/${external.body.supplier.id}/source/preflight`)
@@ -257,6 +318,28 @@ describe('Phase 3 administration flows', () => {
       .set('Cookie', cookie);
     expect(crossRealm.status).toBe(401);
 
+    const supplier = await prisma.supplier.findFirstOrThrow({
+      select: { id: true, sourceMode: true, version: true },
+    });
+    const sourceSummary = await request(app.getHttpServer())
+      .get(`/api/v1/tmmin/suppliers/${supplier.id}/source`)
+      .set('Cookie', cookie);
+    expect(sourceSummary.status).toBe(200);
+    expect(sourceSummary.body).not.toHaveProperty('currentSupplierAdmin.username');
+
+    const sourceMutation = await request(app.getHttpServer())
+      .post(`/api/v1/tmmin/suppliers/${supplier.id}/source/cutover`)
+      .set('Origin', tmminOrigin)
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', login.body.csrfToken)
+      .send({
+        targetMode: supplier.sourceMode === 'HOSTED' ? 'EXTERNAL' : 'HOSTED',
+        expectedVersion: supplier.version,
+        reason: 'Quality must never change supplier source state.',
+        privacyAcknowledged: true,
+      });
+    expect(sourceMutation.status).toBe(403);
+
     const forbidden = await request(app.getHttpServer())
       .post('/api/v1/tmmin/quality-users')
       .set('Origin', tmminOrigin)
@@ -283,6 +366,10 @@ describe('Phase 3 administration flows', () => {
       actor: { kind: 'SYSTEM' },
       correlationId: randomUUID(),
       payload: {},
+    });
+    await prisma.outboxEvent.update({
+      where: { id: onceId },
+      data: { availableAt: new Date(0) },
     });
     await Promise.all([outbox.processBatch(), outbox.processBatch()]);
     expect(handled).toBe(1);

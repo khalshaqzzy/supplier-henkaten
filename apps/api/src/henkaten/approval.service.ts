@@ -175,6 +175,7 @@ export class ApprovalService {
             route,
             decision: input.decision,
             terminalStatus: terminal,
+            lineId: current.lineId,
           }),
           tx,
         );
@@ -289,6 +290,7 @@ export class ApprovalService {
         auditInput(context, scope.supplierId, 'HENKATEN_SUPERVISOR_REROUTED', current.id, {
           fromMemberId: route.currentResponsibleMemberId,
           toMemberId: supervisor.id,
+          lineId: current.lineId,
         }),
         tx,
       );

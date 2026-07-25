@@ -8,6 +8,7 @@ import { PrismaService } from '../persistence/prisma.service.js';
 import { AuditWriter } from '../persistence/audit-writer.js';
 import type { MutationContext } from './mutation-context.js';
 import { decodeCursor, encodeCursor, presentUser } from './presenters.js';
+import type { QualityUserListQuery } from '@tmmin-henkaten/contracts';
 
 @Injectable()
 export class UserAdminService {
@@ -17,16 +18,31 @@ export class UserAdminService {
     private readonly audit: AuditWriter,
   ) {}
 
-  async listQuality(limit: number, cursor?: string) {
-    const cursorId = decodeCursor(cursor);
+  async listQuality(query: QualityUserListQuery) {
+    const cursorId = decodeCursor(query.cursor);
     const users = await this.prisma.user.findMany({
-      where: { realm: 'TMMIN', role: 'TMMIN_QUALITY' },
-      orderBy: { id: 'asc' },
-      take: limit + 1,
+      where: {
+        realm: 'TMMIN',
+        role: 'TMMIN_QUALITY',
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.search
+          ? {
+              OR: [
+                { username: { contains: query.search, mode: 'insensitive' as const } },
+                { displayName: { contains: query.search, mode: 'insensitive' as const } },
+              ],
+            }
+          : {}),
+      },
+      orderBy:
+        query.sort === 'UPDATED_DESC'
+          ? [{ updatedAt: 'desc' }, { id: 'desc' }]
+          : [{ username: 'asc' }, { id: 'asc' }],
+      take: query.limit + 1,
       ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
     });
-    const hasNextPage = users.length > limit;
-    const items = hasNextPage ? users.slice(0, limit) : users;
+    const hasNextPage = users.length > query.limit;
+    const items = hasNextPage ? users.slice(0, query.limit) : users;
     return {
       items: items.map(presentUser),
       pageInfo: {
