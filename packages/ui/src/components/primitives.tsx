@@ -13,13 +13,16 @@ import {
   X,
 } from 'lucide-react';
 import {
+  cloneElement,
   forwardRef,
+  isValidElement,
   useId,
   useState,
   type AnchorHTMLAttributes,
   type ButtonHTMLAttributes,
   type HTMLAttributes,
   type InputHTMLAttributes,
+  type ReactElement,
   type ReactNode,
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
@@ -144,15 +147,35 @@ export function Field({
   children,
   className,
 }: FieldProps) {
+  const generatedId = useId();
+  const messageId = `${generatedId}-message`;
+  const child = isValidElement(children)
+    ? (children as ReactElement<{ id?: string; 'aria-describedby'?: string }>)
+    : undefined;
+  const controlId = htmlFor ?? child?.props.id ?? generatedId;
+  const describedBy = [child?.props['aria-describedby'], errorText || helperText ? messageId : null]
+    .filter(Boolean)
+    .join(' ');
+  const control = child
+    ? cloneElement(child, {
+        id: controlId,
+        ...(describedBy ? { 'aria-describedby': describedBy } : {}),
+      })
+    : children;
+
   return (
     <div className={cn('hds-field', className)}>
-      <label className="hds-field__label" htmlFor={htmlFor}>
+      <label className="hds-field__label" htmlFor={controlId}>
         {label}
         {required && <span aria-hidden="true"> *</span>}
       </label>
-      {children}
+      {control}
       {(errorText || helperText) && (
-        <div className={cn('hds-field__message', errorText && 'is-error')}>
+        <div
+          id={messageId}
+          className={cn('hds-field__message', errorText && 'is-error')}
+          {...(errorText ? { role: 'alert' } : {})}
+        >
           {errorText ? <AlertCircle aria-hidden="true" /> : null}
           <span>{errorText ?? helperText}</span>
         </div>

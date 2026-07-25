@@ -1259,3 +1259,41 @@ Frontend implementation is complete only when:
 - Chrome/Edge desktop keyboard flows and accessible names pass critical-path verification;
 - no process difficulty, skill, health, attendance, schedule outside Shift Run, bulk import/export,
   email/SMS/push/webhook, mobile, or other out-of-scope feature is added.
+
+---
+
+## 8. Phase 14 Executable Full-stack Evidence
+
+Status: `AVAILABLE` and verified on 25 July 2026.
+
+The production pages and their real API dependencies were exercised from fresh PostgreSQL 18 +
+pgvector 0.8.5 journey databases. The browser harness used dynamic loopback ports and created the
+protected TMMIN bootstrap identity only through the operator CLI. It did not use test-only HTTP
+routes, direct database domain fixtures, or production fallback data.
+
+Executable coverage:
+
+- Chromium: onboarding, Hosted lifecycle, Man/concurrency, TMMIN governance/monitoring, External
+  ingestion, realtime Board propagation, and desktop/accessibility checks;
+- Microsoft Edge: protected onboarding/authentication and governance/External/accessibility smoke
+  journeys tagged `@edge`;
+- role and realm isolation: distinct browser contexts plus an intentional shared-context proof that
+  Supplier and TMMIN session cookies do not overwrite each other;
+- permission boundaries: TMMIN Quality read-only controls and direct `403` mutation probes;
+- browser quality: route console/network diagnostics, 1280×720 overflow checks, keyboard/focus
+  behavior, labels/error associations, non-color status semantics, disconnected/resync SSE state,
+  and axe scans;
+- failure behavior: intentional nonzero execution produced trace, screenshot/video, console/network,
+  HTML, and blob artifacts while signal/finally cleanup removed the disposable PostgreSQL
+  container, network, volume, photo directory, API, and both Vite processes.
+
+The developer Compose topology is separately verified at the canonical origins
+`http://localhost:5173`, `http://localhost:5174`, and `http://localhost:3000`, with PostgreSQL on
+`127.0.0.1:55432`. Migrations gate API startup and API readiness gates both web services. Normal
+`local:down` preserves the database and private-photo volumes; only the explicit `local:destroy`
+command removes them.
+
+The executable HTTP contract remains exactly 130 paths and 146 operations. Phase 14 required no
+schema migration or breaking API operation. Its integration repairs are limited to browser
+accessibility/default-origin corrections, Man invalidation evidence, and the additive centralized
+outbox replay/resync behavior recorded in ADR 0006 and ADR 0026.

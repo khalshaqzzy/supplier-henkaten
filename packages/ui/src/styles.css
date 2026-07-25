@@ -39,7 +39,7 @@
   --hds-text-tertiary: var(--hds-color-slate-500);
   --hds-text-inverse: #fff;
   --hds-text-disabled: var(--hds-color-slate-400);
-  --hds-text-link: #d63f07;
+  --hds-text-link: var(--hds-color-orange-700);
   --hds-border-subtle: var(--hds-color-slate-100);
   --hds-border-default: var(--hds-color-slate-200);
   --hds-border-strong: var(--hds-color-slate-300);
@@ -1557,7 +1557,7 @@ textarea {
   border-bottom: 1px solid var(--hds-border-subtle);
 }
 
-.hds-panel__header h3,
+.hds-panel__header h2,
 .hds-chart__header h3 {
   margin: var(--hds-space-0);
   font-size: var(--hds-type-14-size);
@@ -2375,7 +2375,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: var(--hds-space-1);
-  color: var(--hds-text-tertiary);
+  color: var(--hds-text-secondary);
   font-size: var(--hds-type-11-size);
   white-space: nowrap;
 }

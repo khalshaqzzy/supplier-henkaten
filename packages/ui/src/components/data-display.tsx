@@ -74,7 +74,7 @@ export function Panel({
       {(title || description || action) && (
         <header className="hds-panel__header">
           <div>
-            {title && <h3>{title}</h3>}
+            {title && <h2>{title}</h2>}
             {description && <p>{description}</p>}
           </div>
           {action}
@@ -297,10 +297,12 @@ export function ChartFrame({
     <ChartContext.Provider value={{ kind }}>
       <div className="hds-chart">
         <div className="hds-chart__header">
-          <div>
-            <h3>{title}</h3>
-            {description && <p>{description}</p>}
-          </div>
+          {(title || description) && (
+            <div>
+              {title && <h3>{title}</h3>}
+              {description && <p>{description}</p>}
+            </div>
+          )}
           <ChartLegend series={series} />
         </div>
         <div className="hds-chart__plot">

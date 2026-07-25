@@ -29,10 +29,11 @@ export default tseslint.config(
   },
   eslint.configs.recommended,
   {
-    files: ['scripts/**/*.mjs'],
+    files: ['scripts/**/*.mjs', 'apps/e2e/scripts/**/*.mjs'],
     languageOptions: {
       globals: {
         console: 'readonly',
+        fetch: 'readonly',
         process: 'readonly',
         setTimeout: 'readonly',
       },

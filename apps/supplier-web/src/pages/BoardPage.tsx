@@ -58,6 +58,7 @@ export function BoardPage() {
             void queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'dashboard') });
         },
         onReconnect: () => void queryClient.invalidateQueries({ queryKey: boardKey }),
+        onResync: () => queryClient.invalidateQueries({ queryKey: boardKey }),
       }),
     [boardKey, lineId, queryClient, scope.purpose, scope.supplierId, scope.userId],
   );
@@ -90,11 +91,19 @@ export function BoardPage() {
       {connection !== 'connected' && (
         <Alert
           tone="warning"
-          title={connection === 'connecting' ? 'Menyambungkan realtime' : 'Data mungkin stale'}
+          title={
+            connection === 'connecting'
+              ? 'Menyambungkan realtime'
+              : connection === 'resyncing'
+                ? 'Menyinkronkan ulang data'
+                : 'Data mungkin stale'
+          }
         >
           {connection === 'connecting'
             ? 'Board sedang membuka koneksi event.'
-            : 'Koneksi event terputus. Data authoritative terakhir tetap ditampilkan.'}
+            : connection === 'resyncing'
+              ? 'Cursor event tidak tersedia. Board sedang mengambil ulang data authoritative.'
+              : 'Koneksi event terputus. Data authoritative terakhir tetap ditampilkan.'}
           {connection === 'disconnected' && (
             <Button size="sm" variant="ghost" onClick={() => realtime.reconnect()}>
               Sambungkan ulang
@@ -125,7 +134,9 @@ export function BoardPage() {
             ? 'Live'
             : connection === 'connecting'
               ? 'Connecting'
-              : 'Disconnected'}
+              : connection === 'resyncing'
+                ? 'Resyncing'
+                : 'Disconnected'}
         </span>
         {board.data && (
           <LastUpdated

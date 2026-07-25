@@ -17,6 +17,13 @@ describe('application configuration', () => {
     const config = loadAppConfig(baseline);
     expect(config.dbPoolMax).toBe(10);
     expect(config.outboxBatchSize).toBe(50);
+    expect(config.realtimePollMs).toBe(1_000);
     expect(config.argon2MemoryKib).toBe(19_456);
+  });
+
+  it('bounds realtime polling below the observable propagation target', () => {
+    expect(() => loadAppConfig({ ...baseline, REALTIME_POLL_MS: '99' })).toThrow();
+    expect(() => loadAppConfig({ ...baseline, REALTIME_POLL_MS: '5001' })).toThrow();
+    expect(loadAppConfig({ ...baseline, REALTIME_POLL_MS: '250' }).realtimePollMs).toBe(250);
   });
 });

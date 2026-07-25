@@ -247,7 +247,10 @@ function event(
 ) {
   return {
     eventType,
-    aggregateType: 'Henkaten',
+    aggregateType:
+      eventType.startsWith('ASSIGNMENT_ISSUE') || eventType === 'NOTIFICATION_REQUESTED'
+        ? 'AssignmentIssue'
+        : 'Henkaten',
     aggregateId,
     aggregateVersion,
     supplierId,

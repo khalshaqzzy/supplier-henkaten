@@ -1,0 +1,19 @@
+{
+  "name": "@tmmin-henkaten/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "node scripts/run.mjs",
+    "test:e2e:chromium": "node scripts/run.mjs --chromium-only",
+    "test:e2e:edge": "node scripts/run.mjs --edge-only",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint tests playwright.config.ts --max-warnings=0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.12.1",
+    "@playwright/test": "1.62.0",
+    "@types/node": "22.20.1",
+    "typescript": "6.0.3"
+  }
+}

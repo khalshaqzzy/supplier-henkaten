@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
+import type { BeforeApplicationShutdown, OnModuleInit } from '@nestjs/common';
 
 import type { Prisma } from '../generated/prisma/client.js';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
@@ -37,7 +37,7 @@ export type ClaimedOutboxEvent = {
 };
 
 @Injectable()
-export class OutboxService implements OnModuleInit, OnApplicationShutdown {
+export class OutboxService implements OnModuleInit, BeforeApplicationShutdown {
   private readonly logger = new Logger(OutboxService.name);
   private readonly handlers = new Map<string, OutboxHandler[]>();
   private timer?: NodeJS.Timeout;
@@ -148,7 +148,7 @@ export class OutboxService implements OnModuleInit, OnApplicationShutdown {
     this.logger.warn({ eventId: event.id, eventType: event.eventType, safeError }, 'outbox failed');
   }
 
-  async onApplicationShutdown(): Promise<void> {
+  async beforeApplicationShutdown(): Promise<void> {
     this.stopping = true;
     if (this.timer) clearTimeout(this.timer);
     if (this.inFlight) {

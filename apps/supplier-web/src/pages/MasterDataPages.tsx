@@ -362,7 +362,7 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
     },
     onSuccess: async (resource) => {
       await queryClient.invalidateQueries({ queryKey: scopedKey(scope, `master-${kind}`) });
-      if (!editing && kind !== 'members')
+      if (!editing && (kind !== 'members' || ('role' in resource && resource.role === 'MP')))
         void navigate(`/master-data/${kind}/${resource.id}`, { replace: true });
     },
     onError: (error) =>

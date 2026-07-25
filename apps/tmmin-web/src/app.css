@@ -71,7 +71,7 @@ textarea {
 }
 .tmmin-workspace span,
 .tmmin-workspace small {
-  color: #717887;
+  color: #626b7b;
   font-size: 10px;
   letter-spacing: 0.04em;
 }
@@ -204,7 +204,7 @@ textarea {
   font-size: 11px;
 }
 .tmmin-account small {
-  color: #747c8b;
+  color: #626b7b;
   font-size: 9px;
 }
 .tmmin-content {
@@ -259,7 +259,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #7a8290;
+  color: #626b7b;
   font-size: 10px;
 }
 .tmmin-filter-strip {
@@ -334,7 +334,7 @@ textarea {
   min-height: 56px;
   padding: 13px 16px;
 }
-.hds-panel__header h3 {
+.hds-panel__header h2 {
   font-size: 13px;
 }
 .hds-panel__header p {
@@ -361,7 +361,7 @@ textarea {
 }
 .tmmin-aging span,
 .tmmin-checks small {
-  color: #6e7787;
+  color: #626b7b;
   font-size: 10px;
 }
 .tmmin-aging strong {
@@ -394,7 +394,7 @@ textarea {
   font-variant-numeric: tabular-nums;
 }
 .tmmin-ingestion-stats span {
-  color: #737b89;
+  color: #626b7b;
   font-size: 10px;
   text-transform: uppercase;
 }
@@ -467,7 +467,7 @@ textarea {
 }
 .tmmin-table td > small {
   margin-top: 2px;
-  color: #7a8290;
+  color: #626b7b;
   font-size: 9px;
 }
 .tmmin-table code {

@@ -1,12 +1,13 @@
 import {
   realtimeHeartbeatSchema,
   realtimeInvalidationSchema,
+  realtimeResyncSchema,
   type RealtimeInvalidation,
 } from '@tmmin-henkaten/contracts';
 
 import { normalizeApiBaseUrl, type QueryRecord } from './core';
 
-export type RealtimeConnectionState = 'connecting' | 'connected' | 'disconnected';
+export type RealtimeConnectionState = 'connecting' | 'connected' | 'resyncing' | 'disconnected';
 
 export interface SupplierRealtimeOptions {
   baseUrl: string;
@@ -14,6 +15,7 @@ export interface SupplierRealtimeOptions {
   onInvalidate: (event: RealtimeInvalidation) => void;
   onStateChange: (state: RealtimeConnectionState) => void;
   onReconnect?: () => void;
+  onResync?: () => void | Promise<void>;
   eventSourceFactory?: (url: string, init: EventSourceInit) => EventSource;
 }
 
@@ -62,6 +64,20 @@ export function createSupplierRealtimeClient(
         if (parsed.success) options.onInvalidate(parsed.data);
       } catch {
         // Ignore malformed invalidations; the next authoritative refetch remains the source of truth.
+      }
+    });
+    source.addEventListener('resync', (event) => {
+      try {
+        const parsed = realtimeResyncSchema.safeParse(
+          JSON.parse((event as MessageEvent<string>).data),
+        );
+        if (!parsed.success) return;
+        options.onStateChange('resyncing');
+        void Promise.resolve(options.onResync?.()).finally(() => {
+          options.onStateChange('connected');
+        });
+      } catch {
+        // Ignore malformed control events and retain the current authoritative REST state.
       }
     });
   };
