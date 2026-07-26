@@ -4432,6 +4432,49 @@ Exit criteria:
 - Keenam halaman prioritas mencapai fidelity enterprise yang padat dan stabil pada kedua viewport.
 - Phase 15.1 kembali menjadi next recommended subphase setelah validation lengkap.
 
+### 14.12 Comprehensive Local Seed Lifecycle
+
+Status: **done**
+
+Dependency: 14.4-14.11.
+
+Execution:
+
+- `local:start:clean` menghapus volume PostgreSQL/foto lalu menjalankan migration, protected
+  bootstrap, comprehensive seed, verification, API, dan kedua frontend.
+- `local:reseed` mereset hanya main database serta volume foto dan mempertahankan disposable test
+  database.
+- Seeder development-only membuat tepat dua supplier Hosted melalui production API, menormalisasi
+  timeline historis setelah outbox drain, dan memverifikasi seluruh invariant akhir.
+- Per supplier tersedia 3 line, 12 job, 22 member, 8 part, 3 Shift Template, 39 Shift Run, dan 120
+  Henkaten dengan live warning/reservation/issue serta histori padat 30 hari yang berlanjut sampai
+  sekitar satu tahun.
+- Profil supplier sengaja berbeda: distribusi kategori/status, beban 1-6 Henkaten per historical
+  shift, konsentrasi line/part, job, narasi operasional, waktu kejadian, dan durasi keputusan tidak
+  seragam tetapi tetap deterministic.
+- Credential acak disimpan atomik hanya pada `.local/seed-credentials.json` mode `0600`.
+
+Verification:
+
+- Seed planner/guard unit tests, API typecheck, clean-start Compose acceptance, serta reseed
+  preservation/rotation acceptance lulus.
+- Full parity lulus dengan Node.js 22.23.1: clean install, format, lint, typecheck, 97 unit tests,
+  OpenAPI drift, build, PostgreSQL 18.4/pgvector 0.8.5, 32 integration tests, empat Chromium dan dua
+  Edge journeys, Gitleaks, serta diff check.
+- Tidak ada endpoint, OpenAPI, schema migration, External projection, tracked credential, atau
+  production fixture fallback.
+
+Data/migration impact:
+
+- Tidak ada database schema migration.
+- Operasi destruktif dibatasi pada command lokal eksplisit dan target Compose yang tervalidasi.
+
+Exit criteria:
+
+- Kedua command menghasilkan stack sehat dengan tepat dua supplier Hosted dan invariant seed yang
+  dikunci.
+- Phase 15.1 tetap menjadi next recommended subphase.
+
 Phase 14 exit criteria:
 
 - Seluruh major PRD acceptance flow berjalan pada local full stack tanpa fixture-only production behavior.

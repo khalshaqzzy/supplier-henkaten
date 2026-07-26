@@ -95,6 +95,28 @@ pnpm local:down
 destructive command that removes both. The local Dockerfile is a pinned development runtime, not a
 production image.
 
+For a ready-to-use synthetic development environment, use one of the explicit destructive commands:
+
+```bash
+pnpm local:start:clean
+pnpm local:reseed
+```
+
+`local:start:clean` removes both local PostgreSQL and member-photo volumes before starting,
+migrating, and seeding the stack. `local:reseed` recreates only the main application database and
+member-photo volume; the disposable `_test` database is preserved. Both commands finish with
+exactly two active Hosted suppliers containing comprehensive live and historical 4M, shift,
+approval, warning, assignment, notification, audit, and dashboard data. History is dense in the
+latest 30 days and continues through quarterly and approximately one-year trend ranges. The two
+suppliers deliberately have different 4M/status profiles, uneven 1-6 Henkaten shift loads,
+line/part concentration, operational narratives, and event/decision timing instead of uniform demo
+rows.
+
+Passwords are generated independently on every run and written only to the ignored
+`.local/seed-credentials.json` file with mode `0600`. The terminal prints the file path but never
+the credential values. These commands are guarded for the local Compose project and cannot be used
+as staging or production seed operations.
+
 ## Full-stack browser journeys
 
 Install the pinned browsers once, then run the complete Chromium suite or the critical Edge smoke:

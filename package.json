@@ -14,6 +14,8 @@
     "dev:supplier": "pnpm --filter @tmmin-henkaten/supplier-web run dev",
     "dev:tmmin": "pnpm --filter @tmmin-henkaten/tmmin-web run dev",
     "local:up": "docker compose --profile fullstack up --detach --build",
+    "local:start:clean": "node scripts/local-stack.mjs start-clean",
+    "local:reseed": "node scripts/local-stack.mjs reseed",
     "local:wait": "node scripts/local-stack.mjs wait",
     "local:bootstrap": "docker compose --profile fullstack exec -T api pnpm admin:bootstrap",
     "local:logs": "docker compose --profile fullstack logs --follow api supplier-web tmmin-web",

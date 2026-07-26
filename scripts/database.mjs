@@ -155,6 +155,19 @@ function resetTestDatabase() {
   console.log(`Reset disposable test database: ${testDatabase}.`);
 }
 
+function resetMainDatabase() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Main database reset is forbidden when NODE_ENV=production.');
+  }
+  if (mainDatabase === testDatabase || mainDatabase.endsWith('_test')) {
+    throw new Error('Main database reset target must not be the disposable test database.');
+  }
+  query('postgres', `DROP DATABASE IF EXISTS "${mainDatabase}" WITH (FORCE);`);
+  query('postgres', `CREATE DATABASE "${mainDatabase}";`);
+  query(mainDatabase, 'CREATE EXTENSION IF NOT EXISTS vector;');
+  console.log(`Reset local main database: ${mainDatabase}. Test database was not changed.`);
+}
+
 const command = process.argv[2];
 
 switch (command) {
@@ -181,6 +194,9 @@ switch (command) {
   case 'test-reset':
     resetTestDatabase();
     break;
+  case 'main-reset':
+    resetMainDatabase();
+    break;
   case 'down':
     runDocker(['down', '--remove-orphans']);
     break;
@@ -190,7 +206,7 @@ switch (command) {
     break;
   default:
     console.error(
-      'Usage: node scripts/database.mjs <up|wait|verify|migrate|test-reset|test-migrate|down|destroy>',
+      'Usage: node scripts/database.mjs <up|wait|verify|migrate|main-reset|test-reset|test-migrate|down|destroy>',
     );
     process.exitCode = 1;
 }

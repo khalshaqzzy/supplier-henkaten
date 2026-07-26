@@ -23,7 +23,8 @@
     "prisma:migrate:deploy": "prisma migrate deploy --config prisma.config.ts",
     "prisma:migrate:dev": "prisma migrate dev --config prisma.config.ts",
     "admin:bootstrap": "node dist/cli/admin.js bootstrap",
-    "admin:recover": "node dist/cli/admin.js recover"
+    "admin:recover": "node dist/cli/admin.js recover",
+    "local:seed": "node dist/cli/local-seed.js"
   },
   "dependencies": {
     "@nestjs/common": "11.1.28",
