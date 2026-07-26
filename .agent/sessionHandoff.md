@@ -1,147 +1,124 @@
-# Session Handoff — Phase 14 Local Full-stack Integration dan E2E
+# Session Handoff — TMMIN Visual Refinement
 
-Tanggal: 2026-07-25
+Tanggal: 2026-07-26
 
 Branch: `staging`
 
-Status: Phase 14 dan 14.1–14.9 `done`; Phase 15.1 adalah next
+Status: Phase 14 dan 14.1–14.10 `done`; Phase 15.1 adalah next
 
-## 1. Outcome
+## 1. Objective dan Outcome
 
-Phase 14 selesai sebagai satu local full-stack delivery:
+Seluruh TMMIN Portal dipoles ulang tanpa mengganti React/Vite, Tailwind v4, shared Henkaten Design
+System, typed API client, route, authorization, atau workflow yang sudah ada. Fidelity tertinggi
+diberikan pada Ringkasan Global dan Tata Kelola Sumber berdasarkan seluruh referensi
+`.agent/design/`, terutama `tmmin-global-overview.png` dan `source-governance.png`.
 
-- root Compose mempunyai profile `fullstack` untuk migration, API, Supplier web, dan TMMIN web,
-  sementara PostgreSQL tetap dapat dipakai sendiri oleh command `db:*`;
-- development-only `Dockerfile.local` memakai Node.js 22.23.1 dan pnpm 11.16.0, terpisah dari
-  production image yang tetap menjadi Phase 15;
-- canonical developer origins adalah Supplier `http://localhost:5173`, TMMIN
-  `http://localhost:5174`, API `http://localhost:3000`, dan PostgreSQL
-  `127.0.0.1:55432`;
-- migration one-shot harus sukses sebelum API start, dan readiness API harus sukses sebelum kedua
-  Vite service start;
-- PostgreSQL dan private member photo memakai volume lokal terpisah;
-- protected TMMIN bootstrap tetap operator-driven melalui `.env` dan production CLI. Tidak ada
-  credential default, production seed, test-only endpoint, atau fixture fallback;
-- `apps/e2e` menjalankan setiap spec/browser sebagai journey epoch PostgreSQL/pgvector yang
-  disposable dengan dynamic loopback ports dan unconditional cleanup;
-- Chromium menjalankan seluruh journey; Microsoft Edge menjalankan critical authentication,
-  governance, External, dan accessibility smoke bertanda `@edge`.
+Hasil utama:
 
-Production Dockerfile, Caddy/TLS, remote Compose, deployment automation, backup/recovery, dan staging
-runtime deployment tetap Phase 15.
+- shell TMMIN memakai navigation group Monitoring, Tata Kelola, Dukungan, dan Sistem;
+- sidebar dapat diciutkan tanpa mengubah capability filtering;
+- topbar, global context control, breadcrumbs, page header, focus, hover, spacing, dan responsive
+  behavior konsisten pada minimum 1280×720;
+- TMMIN-only composition tetap berada di `apps/tmmin-web`; Supplier Portal dan shared primitive
+  tidak menerima perubahan visual tidak disengaja;
+- terminologi antarmuka dinormalisasi ke Bahasa Indonesia, dengan istilah domain Henkaten, 4M,
+  Hosted, External, dan Quality tetap dipertahankan;
+- Quality tetap read-only dan tidak memperoleh Supplier-domain mutation control.
 
-## 2. Integration dan Realtime
+Tidak ada database migration, endpoint mutation, approval workflow, export, alert configuration,
+Docs, atau fake Live state yang ditambahkan.
 
-Kontrak HTTP tetap tepat 130 paths/146 operations. Tidak ada schema migration atau breaking API
-change pada Phase 14.
+## 2. Ringkasan Global
 
-Perbaikan integration yang dilakukan:
+Dashboard sekarang mempunyai:
 
-- default API origin kedua frontend disamakan ke `http://localhost:3000`;
-- CORS, CSRF, cookie posture, dan E2E dynamic `127.0.0.1` origins memakai host yang konsisten;
-- create flow master data kembali ke list yang authoritative;
-- shared form, heading, contrast, label/error association, dan non-color status semantics
-  diperbaiki dari executable accessibility evidence;
-- Man movement outbox membawa aggregate/line evidence yang benar agar notification dan Board
-  invalidation tidak hilang.
+- URL-authoritative filter untuk Supplier, source, tanggal, status, kategori 4M, line, part, aging,
+  freshness, dan granularity;
+- default 30 hari terakhir dengan granularity harian bila URL tidak menyediakan nilai;
+- explicit `Terapkan` dan `Reset`;
+- KPI Supplier aktif dengan Hosted/External split, Supplier dengan warning, Open Henkaten, warning
+  di atas 24 jam, affected parts, dan masalah freshness;
+- time-series volume Hosted/External/total dan outcome Open/Approved/Rejected/Cancelled;
+- ranking tabs Supplier/Line/Part, freshness distribution, External ingestion health, recent
+  External activity, emergency override, dan supplier-risk table;
+- maksimal sepuluh supplier-risk rows dengan source, freshness, aging, last data, dan drill-down;
+- layout-matched loading, empty, dan error states.
 
-Per-connection polling 15 detik diganti oleh satu API-local `RealtimeEventPump`:
+Delta terhadap periode sebelumnya tidak ditampilkan karena belum authoritative.
 
-- ordered outbox dipoll global dengan default satu detik melalui validated `REALTIME_POLL_MS`;
-- event disanitasi dan di-fan-out menurut tenant serta authorized line;
-- replay memakai `Last-Event-ID`, REST refetch tetap authoritative, dan heartbeat tetap 15 detik;
-- cursor yang tidak tersedia menghasilkan additive `resync`;
-- browser client menandai state `resyncing`/stale dan melakukan authoritative refetch.
+## 3. API dan Read Model
 
-Tidak ada Redis, frontend policy workaround, direct frontend database access, atau test-only
-application behavior.
+`tmminDashboardExtendedSchema` bertambah secara additive:
 
-## 3. Local Developer Commands
+- `trend[]` dengan bucket timestamp, Hosted, External, total, dan empat lifecycle outcome;
+- `freshnessSummary` dengan fresh, warning, stale, dan no-data;
+- `supplierOverview[]` dengan Supplier identity/source, Open Henkaten, warning aktif/aged,
+  freshness, dan last-data timestamp.
 
-```text
-pnpm local:up
-pnpm local:wait
-pnpm local:bootstrap
-pnpm local:logs
-pnpm local:down
-pnpm local:destroy
-```
+Backend melakukan day/week/month bucketing, zero-fill, source/outcome classification, freshness
+aggregation, Supplier aggregation, dan deterministic sort Open Henkaten descending, warning
+descending, lalu nama ascending. OpenAPI dan typed API client telah diregenerasi.
 
-`local:down` menghentikan stack dan mempertahankan normal database/photo volumes.
-`local:destroy` bersifat eksplisit dan destruktif terhadap kedua volume tersebut. Variable dan
-operator bootstrap procedure terdokumentasi di `.env.example` dan `README.md`; credential nyata
-tidak dilacak Git.
+Pure unit coverage ditambahkan pada
+`apps/api/src/read-models/dashboard-trend.spec.ts`. PostgreSQL integration assertions ditambahkan
+untuk Quality/Hosted dan External dashboard projections.
 
-Compose checks:
+## 4. Halaman TMMIN Lain
 
-```text
-docker compose config --quiet
-docker compose --profile fullstack config --quiet
-```
+- Peringatan Aktif dan Penelusuran Henkaten memakai toolbar, badges, table hierarchy, aging emphasis,
+  breadcrumb, dan detail semantics yang source-aware.
+- Supplier list/create/detail, one-time credential, destructive confirmation, dan Quality
+  presentation mengikuti shell baru.
+- Tata Kelola Sumber memakai Supplier/source summary strip, proposed change, preflight metrics,
+  blocker table, evidence grouping, source history, preparation section, dan sticky high-risk rail.
+  React tidak menyimpulkan readiness baru.
+- External credential dan ingestion pages menekankan lifecycle/status hierarchy, sanitized
+  diagnostics, correlation lookup, dan one-time secret acknowledgement.
+- Hosted support, assignment board, shift evidence, Quality users, audit, notification, system
+  status, account, auth, forced reset, 403, 404, dan route error memakai hierarchy dan terminology
+  yang konsisten.
 
-Keduanya lulus. Interactive smoke mencapai API health/readiness dan kedua realm pada canonical
-Compose URL. Stack kemudian dihentikan dengan `local:down`.
+## 5. Files Changed
 
-## 4. Deterministic Browser Harness
+Contracts/read model:
 
-Root commands:
+- `packages/contracts/src/tmmin.ts`
+- `apps/api/src/read-models/read-model.service.ts`
+- `apps/api/src/read-models/dashboard-trend.spec.ts`
+- `apps/api/src/henkaten/operational.integration.spec.ts`
+- `apps/api/src/external/external.integration.spec.ts`
+- generated OpenAPI dan API client
 
-```text
-pnpm test:e2e
-pnpm test:e2e:chromium
-pnpm test:e2e:edge
-```
+Frontend:
 
-Setiap journey/browser pair:
+- `apps/tmmin-web/src/components/layout.tsx`
+- `apps/tmmin-web/src/pages/MonitoringPages.tsx`
+- `apps/tmmin-web/src/pages/AdminPages.tsx`
+- `apps/tmmin-web/src/pages/SupportPages.tsx`
+- `apps/tmmin-web/src/pages/AuthPages.tsx`
+- `apps/tmmin-web/src/pages/StatePages.tsx`
+- `apps/tmmin-web/src/app.css`
+- `apps/tmmin-web/src/App.test.tsx`
+- TMMIN selectors di `apps/e2e/tests/`
 
-1. membuat unique Compose project dan named PostgreSQL volume;
-2. memilih dynamic PostgreSQL/API/Supplier/TMMIN loopback ports;
-3. memverifikasi PostgreSQL 18 dan pgvector 0.8.5;
-4. menerapkan sembilan migration dari database kosong;
-5. membuat satu protected TMMIN bootstrap identity melalui operator CLI;
-6. menjalankan API dan kedua Vite application;
-7. menunggu API readiness dan web reachability;
-8. menjalankan scenario serial dalam isolated browser contexts;
-9. menghentikan child processes dan menghapus container, network, volume, serta private-photo
-   directory melalui `finally` dan signal handlers.
+Records:
 
-Domain data dibuat melalui browser dan public API. Database hanya disentuh untuk disposable
-lifecycle, migration, readiness, dan protected bootstrap mechanics.
+- `.agent/PAGES.md`
+- `.agent/implementationPhases.md`
+- `.agent/sessionHandoff.md`
+- `docs/adr/0025-tmmin-governance-and-monitoring-composition.md`
 
-Failure diagnostics mencakup Playwright trace, screenshot, video, console/page error, network
-failure, HTML report, dan blob report. Intentional failure telah terbukti menghasilkan nonzero exit
-dan artifacts, lalu tetap membersihkan seluruh runtime.
+User-owned `.DS_Store` tetap tidak disentuh.
 
-## 5. Scenario Results
+## 6. Validation dan Environment
 
-Seluruh scenario berikut lulus dari clean disposable state:
+Visual QA memakai deterministic mocked API data pada 1672×941 dan 1280×720. Dashboard dan Source
+Governance dibandingkan kembali dengan referensi visual sebelum perubahan, setelah context
+compaction, dan sebelum final acceptance. Tabel memakai internal overflow dan tidak menimbulkan
+page-level horizontal overflow pada viewport minimum.
 
-- onboarding: kedua forced password reset, Hosted Supplier/Admin, shifts, member/account, line, job,
-  part, empat checklist category, defaults, duplicate/conflict/deactivation/readiness;
-- Hosted lifecycle: valid/blocked/override Start Shift, empat 4M, failed checklist, kedua approval
-  order, Supervisor/QC reject-fast, stale simultaneous decisions, Withdraw + Clone, warning
-  open/close, End Shift cancellation/reset;
-- Man/concurrency: cross-line replacement, duplicate reservation race `201/409`, donor
-  vacancy/notification, pre-start resolution, stale decisions, dan Board propagation di bawah
-  target lima detik;
-- realm isolation: distinct contexts dan shared-context proof bahwa Supplier/TMMIN cookies tidak
-  saling overwrite;
-- TMMIN: dashboard, warning/Henkaten drill-down, Hosted/External badges, Quality read-only UI dan
-  direct `403`, source transition, credential rotation/revocation, audit, notifications, status;
-- External: token, Open/Approved/Rejected/Cancelled, identical retry, conflicting duplicate,
-  out-of-order/gap, mixed batch, forbidden PII/over-posting, client/epoch/IP/rate isolation, warning
-  dan dashboard projection;
-- desktop/accessibility: route console diagnostics, 1280×720 overflow, keyboard/focus
-  trap/restore, labels/errors, non-color semantics, disconnected/resync SSE, dan axe scans;
-- Edge smoke: clean onboarding/authentication dan governance/External/accessibility journeys.
-
-Exact default `pnpm test:e2e` lulus dalam enam independent epochs: empat Chromium plus dua Edge.
-
-## 6. Validation Evidence
-
-Runtime delivery: Node.js `22.23.1`, pnpm `11.16.0`.
-
-Clean CI-parity sequence:
+Seluruh validation dijalankan dengan repository-pinned Node.js 22.23.1 dari pnpm cache dan pnpm
+11.16.0:
 
 ```text
 pnpm clean
@@ -160,9 +137,6 @@ pnpm db:verify
 pnpm db:test:reset
 pnpm db:test:migrate
 pnpm test:integration
-pnpm db:test:reset
-pnpm db:test:migrate
-pnpm test:baseline
 pnpm db:down
 pnpm test:e2e
 docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.24.3 \
@@ -172,65 +146,22 @@ git diff --check
 
 Results:
 
-- 86 unit/contract/client/UI/API/frontend tests passed;
-- 32 PostgreSQL integration tests passed from fresh migrations;
-- Compact baseline 2/2 passed; dashboard p95 142.05 ms, External projection 5.19 ms, audit
-  14.78 ms, notification 1.85 ms, mutation 4.44 ms, dan ingest 7.56 ms;
-- OpenAPI/generated-client drift, format, lint, typecheck, builds, both Compose configurations,
-  PostgreSQL/pgvector verification, migrations, full Chromium + Edge E2E, dan cleanup passed;
-- directory Gitleaks and `git diff --check` are rerun immediately before staging;
-- post-commit Gitleaks is required before push.
+- format, lint, typecheck, OpenAPI/generated-client drift, and all production builds passed;
+- 90 unit/contract/client/UI/API/frontend tests passed;
+- PostgreSQL 18.4 and pgvector 0.8.5 verification, nine fresh migrations, and 32 integration tests
+  passed;
+- four Chromium plus two Microsoft Edge isolated E2E epochs passed, including auth, governance,
+  External, direct `403`, focus/keyboard, axe, and cleanup journeys;
+- Gitleaks scanned 43.37 MB with no findings; `git diff --check` passed;
+- Playwright's attempted Edge reinstall required interactive macOS sudo, but the already installed
+  pinned Edge binary successfully ran both required Edge journeys.
 
-## 7. Files dan Architecture Records
+The existing shutdown-only `pg@8`/Prisma warning can still appear after a successful E2E journey
+while its disposable database is being removed. It does not affect the journey result or leave
+containers, networks, or volumes behind.
 
-Runtime/config:
+## 7. Next Action
 
-- `compose.yaml`, `Dockerfile.local`, `.dockerignore`, `.env.example`;
-- `scripts/local-stack.mjs`, root package/workspace/lock files;
-- frontend API origins and CI workflow.
-
-Realtime/contracts:
-
-- API config, pump, realtime service/module/tests, outbox/Man evidence;
-- shared read contract and typed API realtime client/tests;
-- Supplier Board resync presentation.
-
-Browser/UI:
-
-- complete `apps/e2e` workspace, four journey specs, support utilities, Compose, orchestrator, dan
-  Playwright config;
-- Supplier navigation/form repairs and shared UI/TMMIN accessibility repairs.
-
-Records:
-
-- ADR 0006 records centralized outbox polling, replay, resync, and REST authority;
-- ADR 0026 records developer/E2E separation, bootstrap boundary, ports, contexts, diagnostics, dan
-  cleanup;
-- `docs/architecture/read-models-and-realtime.md`;
-- `docs/architecture/local-full-stack-and-e2e.md`;
-- `.agent/PAGES.md`, `.agent/implementationPhases.md`, `.agent/rules.md`, dan this handoff.
-
-## 8. Delivery dan Cleanup
-
-Primary delivery commit message:
-
-`build: add validated local full-stack workflow`
-
-At this handoff snapshot, the exact SHA, push result, and GitHub Actions URL/status are pending the
-final commit/push gate. They must be replaced with observed values after `origin/staging` completes;
-success must not be inferred before all required jobs are green.
-
-The user-owned `.DS_Store` modification remains unstaged. All agent-started application processes,
-root Compose services, E2E containers, E2E networks, and E2E volumes are stopped/removed. Normal
-developer PostgreSQL and private-photo volumes are intentionally preserved by `local:down`.
-
-Known non-blocking limitation: some API shutdowns emit the existing `pg@8` deprecation warning about
-`client.query()` already executing while the process is terminating. It does not occur as a test
-failure, runtime data leak, or leftover process. Production container shutdown hardening remains
-Phase 15 evidence.
-
-## 9. Next Action
-
-Phase 15.1 owns production multi-stage images. It must not reuse the development-only image as a
-production artifact. Caddy/TLS, remote Compose, security/image workflows, rollback, and actual
-staging deployment follow the Phase 15 sequence.
+Phase 15.1 tetap menjadi next action dan memiliki production multi-stage images. Ikuti Phase 15
+sequence untuk Caddy/TLS, remote Compose, security/image workflow, rollback, dan staging
+deployment.

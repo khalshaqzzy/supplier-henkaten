@@ -18,7 +18,7 @@ export function ForbiddenPage() {
         <Ban aria-hidden="true" />
         <span className="tmmin-eyebrow">403 · Akses ditolak</span>
         <h1>Halaman ini tidak tersedia untuk role Anda.</h1>
-        <p>Quality monitoring bersifat read-only dan kontrol administrasi tidak ditampilkan.</p>
+        <p>Monitoring Quality bersifat hanya baca dan kontrol administrasi tidak ditampilkan.</p>
         <Link className="hds-button hds-button--primary hds-button--md" to="/">
           Kembali ke overview
         </Link>
@@ -34,7 +34,7 @@ export function NotFoundPage() {
         <FileQuestion aria-hidden="true" />
         <span className="tmmin-eyebrow">404 · Tidak ditemukan</span>
         <h1>Halaman atau resource tidak tersedia.</h1>
-        <p>Periksa supplier dan source epoch pada filter sebelum mencoba kembali.</p>
+        <p>Periksa supplier dan source epoch pada filter, lalu coba kembali.</p>
         <Link className="hds-button hds-button--primary hds-button--md" to="/">
           Kembali ke overview
         </Link>

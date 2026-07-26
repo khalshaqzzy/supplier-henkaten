@@ -14485,6 +14485,37 @@ export interface paths {
                   count: number;
                 }[];
               };
+              trend: {
+                /** Format: date-time */
+                bucketStart: string;
+                hosted: number;
+                external: number;
+                total: number;
+                open: number;
+                approved: number;
+                rejected: number;
+                cancelled: number;
+              }[];
+              freshnessSummary: {
+                fresh: number;
+                warning: number;
+                stale: number;
+                noData: number;
+              };
+              supplierOverview: {
+                /** Format: uuid */
+                supplierId: string;
+                supplierCode: string;
+                supplierName: string;
+                /** @enum {string} */
+                sourceMode: 'HOSTED' | 'EXTERNAL';
+                openHenkatens: number;
+                activeWarnings: number;
+                over24HourWarnings: number;
+                /** @enum {string} */
+                freshness: 'FRESH' | 'WARNING' | 'STALE' | 'NO_DATA';
+                lastDataAt: string | null;
+              }[];
               freshness: {
                 /** Format: uuid */
                 supplierId: string;

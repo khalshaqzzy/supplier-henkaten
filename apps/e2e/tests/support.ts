@@ -125,7 +125,7 @@ export async function loginBootstrapThroughUi(page: Page): Promise<string> {
   await page.getByLabel('Username').fill(runtime.bootstrapUsername);
   await page.getByLabel('Password').fill(runtime.changedPassword);
   await page.getByRole('button', { name: 'Masuk' }).click();
-  await expect(page.getByRole('heading', { name: 'Global Overview' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Ringkasan Global' })).toBeVisible();
   return sessionCsrf(page.context().request, 'tmmin');
 }
 

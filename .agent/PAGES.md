@@ -753,13 +753,19 @@ Supplier equivalent dengan perbedaan berikut:
 - **Elements:** active supplier totals per source; suppliers with warnings; Open/aging; affected
   parts; 4M/outcome trends; supplier/line/part rankings; Hosted/External freshness; emergency
   overrides; external accepted/rejected activity; supplier/source/date/status/category/line/part/
-  aging/freshness filters; generated time; drill-down.
+  aging/freshness/granularity filters; generated time; supplier-risk table; drill-down.
+- **Composition:** URL-authoritative filter toolbar with explicit apply/reset; six metric tiles;
+  volume and outcome time-series; ranking tabs; freshness distribution; ingestion, override, and
+  recent External activity summaries; and at most ten server-ranked supplier-risk rows. Loading
+  skeletons preserve the final hierarchy, while empty states distinguish an estate without
+  Suppliers from a valid filter with no matching records.
 - **Validasi dan rules:** all aggregation server-authoritative; Hosted dan External source selalu
-  ditandai; Quality read-only.
+  ditandai; date bucketing and zero-fill happen in the API; supplier risk is sorted by Open
+  Henkaten, active warning, then Supplier name; Quality read-only; no client-derived period delta.
 - **States:** no suppliers, no matching filter, partial freshness, stale data.
 - **Alur keluar:** warning, Henkaten, supplier, external health.
-- **Dependency:** basic totals/source/category/outcome/freshness `AVAILABLE`; filters, aging buckets,
-  rankings, time-series, override detail, and richer ingestion aggregates
+- **Dependency:** totals/source/category/outcome/freshness, trend buckets, freshness summary, and
+  supplier-risk overview `AVAILABLE`; richer override and ingestion details remain
   `ADDITIVE API REQUIRED`.
 
 ### 4.5 Active Warnings

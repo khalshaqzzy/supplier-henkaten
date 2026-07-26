@@ -4348,6 +4348,45 @@ Exit criteria:
 
 - Local full stack meets desktop UX acceptance.
 
+### 14.10 TMMIN Visual Refinement
+
+Status: **done**
+
+Dependency: 14.4-14.9.
+
+Execution:
+
+- TMMIN shell/navigation dikelompokkan menjadi Monitoring, Tata Kelola, Dukungan, dan Sistem dengan
+  collapse control yang mempertahankan capability filtering.
+- Ringkasan Global disusun ulang mengikuti referensi visual dengan URL-authoritative filters,
+  source-split metrics, server-bucketed trends, ranking tabs, freshness and ingestion summaries,
+  activity panels, serta supplier-risk table.
+- Dashboard read model diperluas secara additive dengan trend buckets, freshness summary, dan
+  deterministic supplier-risk overview; OpenAPI dan typed client diregenerasi.
+- Tata Kelola Sumber serta seluruh route TMMIN dipoles memakai hierarchy, density, Bahasa
+  Indonesia, source-aware evidence, dan read-only Quality boundary yang konsisten.
+- TMMIN-only composition tetap berada di `tmmin-web`; primitive generik dan visual Supplier Portal
+  tidak diubah.
+
+Verification:
+
+- Unit/contract checks mencakup bucket granularity, zero-fill, source/outcome classification,
+  filter apply/reset, URL persistence, dashboard composition, dan navigation collapse.
+- Visual review memakai data deterministik pada 1672×941 dan 1280×720 serta membandingkan ulang
+  `tmmin-global-overview.png` dan `source-governance.png`.
+- PostgreSQL integration, Chromium/Edge E2E, dan containerized Gitleaks tetap harus dijalankan pada
+  host dengan Docker daemon aktif.
+
+Data/migration impact:
+
+- Tidak ada schema database migration atau endpoint mutation baru.
+- Contract dashboard hanya bertambah secara additive.
+
+Exit criteria:
+
+- TMMIN Admin dan Quality memakai shell/refinement baru tanpa memperluas mutation capability.
+- Ringkasan Global dan Tata Kelola Sumber mempunyai fidelity visual tertinggi terhadap referensi.
+
 Phase 14 exit criteria:
 
 - Seluruh major PRD acceptance flow berjalan pada local full stack tanpa fixture-only production behavior.

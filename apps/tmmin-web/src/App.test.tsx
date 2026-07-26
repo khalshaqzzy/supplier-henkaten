@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Capability, SessionResponse } from '@tmmin-henkaten/contracts';
@@ -9,6 +10,10 @@ import type { Capability, SessionResponse } from '@tmmin-henkaten/contracts';
 import { App } from './App';
 import { tmminApi } from './app/api';
 import { consumeIntendedPath, rememberIntendedPath } from './app/session';
+
+function QueryProbe() {
+  return <output data-testid="query">{useLocation().search}</output>;
+}
 
 function session(
   role: 'TMMIN_ADMIN' | 'TMMIN_QUALITY',
@@ -87,10 +92,86 @@ describe('TMMIN application boundary', () => {
         <App />
       </MemoryRouter>,
     );
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Suppliers' })).toBeTruthy());
-    expect(screen.getByText('Source Governance')).not.toBeNull();
-    expect(screen.queryByText('Quality Users')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Create supplier' })).toBeNull();
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Supplier' })).toBeTruthy());
+    expect(screen.getByText('Tata Kelola Sumber')).not.toBeNull();
+    expect(screen.queryByText('Pengguna Quality')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Buat supplier' })).toBeNull();
+  });
+
+  it('renders the Indonesian dashboard composition and collapsible navigation', async () => {
+    vi.spyOn(tmminApi, 'session').mockResolvedValue(
+      session('TMMIN_ADMIN', [
+        'TMMIN_SUPPLIER_READ',
+        'TMMIN_DASHBOARD_READ',
+        'TMMIN_HENKATEN_READ',
+        'TMMIN_AUDIT_READ',
+      ]),
+    );
+    const dashboard = vi.spyOn(tmminApi, 'dashboard').mockResolvedValue({
+      generatedAt: '2026-07-26T00:00:00.000Z',
+      filterOptions: { suppliers: [] },
+      suppliers: { active: 2, hosted: 1, external: 1, withWarnings: 1 },
+      openHenkatens: 3,
+      affectedParts: 2,
+      emergencyOverrides: 1,
+      externalIngestion: { accepted: 8, duplicate: 1, rejected: 2, recentRejected: 2 },
+      aging: [
+        { bucket: 'UNDER_4_HOURS', count: 1 },
+        { bucket: 'FOUR_TO_EIGHT_HOURS', count: 0 },
+        { bucket: 'EIGHT_TO_24_HOURS', count: 1 },
+        { bucket: 'OVER_24_HOURS', count: 1 },
+      ],
+      bySourceMode: [],
+      byCategory: [],
+      outcomes: [],
+      rankings: {
+        suppliers: [{ label: 'Supplier Alpha', count: 3 }],
+        lines: [{ label: 'Line Utama', count: 2 }],
+        parts: [{ label: 'Part A', count: 1 }],
+      },
+      trend: [
+        {
+          bucketStart: '2026-07-26T00:00:00.000Z',
+          hosted: 1,
+          external: 1,
+          total: 2,
+          open: 1,
+          approved: 1,
+          rejected: 0,
+          cancelled: 0,
+        },
+      ],
+      freshnessSummary: { fresh: 1, warning: 1, stale: 0, noData: 0 },
+      supplierOverview: [],
+      freshness: [],
+      recentOverrides: [],
+    });
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+        <QueryProbe />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Ringkasan Global' })).toBeTruthy();
+    expect(await screen.findByText('Supplier aktif berdasarkan sumber')).toBeTruthy();
+    expect(screen.getByText('Ringkasan risiko supplier')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Ciutkan navigasi' }));
+    expect(screen.getByRole('button', { name: 'Perluas navigasi' })).toBeTruthy();
+    await user.type(screen.getByPlaceholderText('Semua line'), 'Line 1');
+    await user.click(screen.getByRole('button', { name: 'Terapkan' }));
+    await waitFor(() =>
+      expect(dashboard).toHaveBeenLastCalledWith(expect.objectContaining({ line: 'Line 1' })),
+    );
+    expect(screen.getByTestId('query').textContent).toMatch(/line=Line(?:\+|%20)1/);
+    await user.click(screen.getByRole('tab', { name: 'Line' }));
+    expect(screen.getByText('Line Utama')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText<HTMLInputElement>('Semua line').value).toBe(''),
+    );
+    expect(screen.getByTestId('query').textContent).toBe('');
   });
 
   it('keeps secure logout available on an unsupported viewport', async () => {

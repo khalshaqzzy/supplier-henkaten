@@ -19,7 +19,7 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
   await tmmin.getByLabel('IANA timezone').fill('Asia/Jakarta');
   await tmmin.getByLabel('Supplier Admin username').fill('supplier.admin');
   await tmmin.getByLabel('Supplier Admin display name').fill('Supplier Admin E2E');
-  await tmmin.getByRole('button', { name: 'Create supplier' }).click();
+  await tmmin.getByRole('button', { name: 'Buat supplier' }).click();
   await expect(tmmin.getByText('Simpan temporary credential sekarang')).toBeVisible();
   const passwordRow = tmmin.getByText('Temporary password', { exact: true }).locator('..');
   const temporaryPassword = (await passwordRow.locator('code').innerText())

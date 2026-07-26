@@ -1,7 +1,7 @@
 # ADR 0025: TMMIN Governance and Monitoring Composition
 
 - Status: Accepted
-- Date: 2026-07-25
+- Date: 2026-07-26
 
 ## Context
 
@@ -80,6 +80,30 @@ composition and contextual consequence rail. It does not add global search, expo
 configuration, fake live state, documentation controls, or an approval workflow absent from the
 PRD.
 
+The TMMIN-only composition layer now also owns labelled filters, page toolbars, source-split
+metrics, section panels, table shells, breadcrumbs, freshness summaries, ranking lists, contextual
+action rails, and layout-matched loading/empty/error states. Generic primitives remain in the
+shared design-system package so this refinement does not silently restyle Supplier Portal
+workflows.
+
+Global Overview filters are authoritative in the URL. In the absence of URL values, the browser
+requests the latest 30 days with daily granularity. Apply and reset explicitly update the query
+string; the API remains responsible for applying every filter consistently to Hosted and External
+records.
+
+### Additive dashboard projection
+
+The extended dashboard contract includes three additive projections:
+
+- zero-filled trend buckets containing Hosted, External, total, and lifecycle outcome counts;
+- a freshness summary containing fresh, warning, stale, and no-data counts;
+- at most ten Supplier overview rows with source, Open Henkaten, active/aged warning, freshness, and
+  last-data evidence.
+
+Date bucketing, source/outcome classification, freshness aggregation, Supplier risk aggregation,
+and deterministic sorting are backend responsibilities. The browser formats and presents these
+values but does not infer readiness, missing buckets, period deltas, or a new risk score.
+
 ## Rationale
 
 Server-side source-aware composition prevents a cursor page from becoming an accidental global
@@ -119,6 +143,8 @@ rotate/reset operation with a new credential.
 - Read-model and OpenAPI changes must remain synchronized with shared Zod and the generated client.
 - Adding source-specific filters or fields requires backend implementation for both source branches
   or an explicit discriminated restriction.
+- Dashboard projection additions must remain backward-compatible and must be regenerated into both
+  OpenAPI and the typed client in the same change.
 - Quality page changes require both visibility tests and direct backend mutation probes.
 - Source cutover invalidates source-bound sessions and credentials and therefore always requires a
   current version, reason, privacy acknowledgement, and consequence confirmation.
@@ -137,6 +163,9 @@ rotate/reset operation with a new credential.
   role visibility, unsupported viewport, source-specific detail, and readiness states.
 - Manual desktop review covers the approved overview and governance compositions, privileged and
   read-only shells, credentials, health, authentication, focus, overflow, and failure states.
+- Pure read-model tests cover daily/weekly/monthly bucketing, zero buckets, and Hosted/External
+  outcome classification. Frontend tests cover dashboard composition, filter apply/reset, URL
+  propagation, and navigation collapse.
 
 ## Risks and Follow-up
 

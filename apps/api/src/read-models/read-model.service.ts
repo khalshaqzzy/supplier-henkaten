@@ -523,6 +523,7 @@ export class ReadModelService {
       ...hostedRows.map((row) => ({
         supplierId: row.supplierId,
         supplierName: row.supplier.name,
+        sourceMode: 'HOSTED' as const,
         status: row.status,
         category: row.category,
         line: row.lineNameSnapshot,
@@ -532,6 +533,7 @@ export class ReadModelService {
       ...externalRows.map((row) => ({
         supplierId: row.supplierId,
         supplierName: row.supplier.name,
+        sourceMode: 'EXTERNAL' as const,
         status: row.status,
         category: row.category,
         line: snapshotLabel(row.lineSnapshot),
@@ -567,6 +569,42 @@ export class ReadModelService {
     const rejected =
       externalAttempts.find(({ action }) => action === 'EXTERNAL_INGEST_REJECTED')?._count._all ??
       0;
+    const trend = dashboardTrend(records, query.granularity, query.from, query.to);
+    const freshnessSummary = {
+      fresh: freshnessRows.filter(({ state }) => state === 'FRESH').length,
+      warning: freshnessRows.filter(({ state }) => state === 'WARNING').length,
+      stale: freshnessRows.filter(({ state }) => state === 'STALE').length,
+      noData: freshnessRows.filter(({ state }) => state === 'NO_DATA').length,
+    };
+    const supplierOverview = freshnessRows
+      .map((supplier) => {
+        const supplierRecords = records.filter(
+          ({ supplierId }) => supplierId === supplier.supplierId,
+        );
+        const supplierWarnings = filteredWarnings.filter(
+          ({ supplierId }) => supplierId === supplier.supplierId,
+        );
+        return {
+          supplierId: supplier.supplierId,
+          supplierCode: supplier.supplierCode,
+          supplierName: supplier.supplierName,
+          sourceMode: supplier.sourceMode,
+          openHenkatens: supplierRecords.filter(({ status }) => status === 'OPEN').length,
+          activeWarnings: supplierWarnings.length,
+          over24HourWarnings: supplierWarnings.filter(
+            ({ openedAt }) => ageBucket(openedAt) === 'OVER_24_HOURS',
+          ).length,
+          freshness: supplier.state,
+          lastDataAt: supplier.lastDataAt,
+        };
+      })
+      .sort(
+        (left, right) =>
+          right.openHenkatens - left.openHenkatens ||
+          right.activeWarnings - left.activeWarnings ||
+          left.supplierName.localeCompare(right.supplierName),
+      )
+      .slice(0, 10);
     return {
       generatedAt: new Date().toISOString(),
       filterOptions: {
@@ -611,6 +649,9 @@ export class ReadModelService {
         lines: rankLabels(records.map(({ line }) => line)),
         parts: rankLabels(records.map(({ part }) => part)),
       },
+      trend,
+      freshnessSummary,
+      supplierOverview,
       freshness: freshnessRows,
       recentOverrides: overrideRows.flatMap((row) =>
         row.startedAt && row.overrideReason
@@ -779,6 +820,102 @@ function freshnessState(value: Date | null): 'FRESH' | 'WARNING' | 'STALE' | 'NO
   if (age <= 4 * 60 * 60_000) return 'FRESH';
   if (age <= 24 * 60 * 60_000) return 'WARNING';
   return 'STALE';
+}
+
+export type DashboardRecord = {
+  supplierId: string;
+  supplierName: string;
+  sourceMode: 'HOSTED' | 'EXTERNAL';
+  status: string;
+  category: string;
+  line: string;
+  part: string;
+  occurredAt: Date;
+};
+
+export function dashboardTrend(
+  records: DashboardRecord[],
+  granularity: 'DAY' | 'WEEK' | 'MONTH',
+  from?: string,
+  to?: string,
+) {
+  const now = new Date();
+  const rangeEnd = to ? new Date(to) : (records.at(-1)?.occurredAt ?? now);
+  const fallbackStart = new Date(rangeEnd);
+  fallbackStart.setUTCDate(fallbackStart.getUTCDate() - 29);
+  const rangeStart = from
+    ? new Date(from)
+    : records.length
+      ? records.reduce(
+          (earliest, record) => (record.occurredAt < earliest ? record.occurredAt : earliest),
+          records[0]!.occurredAt,
+        )
+      : fallbackStart;
+  const first = dashboardBucketStart(rangeStart, granularity);
+  const last = dashboardBucketStart(rangeEnd, granularity);
+  const buckets = new Map<
+    string,
+    {
+      bucketStart: string;
+      hosted: number;
+      external: number;
+      total: number;
+      open: number;
+      approved: number;
+      rejected: number;
+      cancelled: number;
+    }
+  >();
+  for (
+    let cursor = first;
+    cursor.getTime() <= last.getTime();
+    cursor = nextDashboardBucket(cursor, granularity)
+  ) {
+    const bucketStart = cursor.toISOString();
+    buckets.set(bucketStart, {
+      bucketStart,
+      hosted: 0,
+      external: 0,
+      total: 0,
+      open: 0,
+      approved: 0,
+      rejected: 0,
+      cancelled: 0,
+    });
+  }
+  for (const record of records) {
+    const key = dashboardBucketStart(record.occurredAt, granularity).toISOString();
+    const bucket = buckets.get(key);
+    if (!bucket) continue;
+    bucket.total += 1;
+    if (record.sourceMode === 'HOSTED') bucket.hosted += 1;
+    else bucket.external += 1;
+    if (record.status === 'OPEN') bucket.open += 1;
+    if (record.status === 'APPROVED') bucket.approved += 1;
+    if (record.status === 'REJECTED') bucket.rejected += 1;
+    if (record.status === 'CANCELLED') bucket.cancelled += 1;
+  }
+  return [...buckets.values()];
+}
+
+function dashboardBucketStart(value: Date, granularity: 'DAY' | 'WEEK' | 'MONTH') {
+  const result = new Date(
+    Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()),
+  );
+  if (granularity === 'MONTH') {
+    result.setUTCDate(1);
+  } else if (granularity === 'WEEK') {
+    const day = result.getUTCDay();
+    result.setUTCDate(result.getUTCDate() - (day === 0 ? 6 : day - 1));
+  }
+  return result;
+}
+
+function nextDashboardBucket(value: Date, granularity: 'DAY' | 'WEEK' | 'MONTH') {
+  const result = new Date(value);
+  if (granularity === 'MONTH') result.setUTCMonth(result.getUTCMonth() + 1);
+  else result.setUTCDate(result.getUTCDate() + (granularity === 'WEEK' ? 7 : 1));
+  return result;
 }
 
 function ageBucket(

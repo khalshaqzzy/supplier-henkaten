@@ -278,13 +278,17 @@ test('proves TMMIN read-only governance, source cutover, and External ingestion 
 
   const tmminPage = await tmminContext.newPage();
   await tmminPage.goto(runtime.tmminOrigin);
-  await expect(tmminPage.getByRole('heading', { name: 'Global Overview' })).toBeVisible();
-  await expect(tmminPage.getByText(/\d+ Hosted · \d+ External/)).toBeVisible();
+  await expect(tmminPage.getByRole('heading', { name: 'Ringkasan Global' })).toBeVisible();
+  const sourceMetrics = tmminPage.getByRole('region', {
+    name: 'Supplier aktif berdasarkan sumber',
+  });
+  await expect(sourceMetrics.getByText('Hosted', { exact: true })).toBeVisible();
+  await expect(sourceMetrics.getByText('External', { exact: true })).toBeVisible();
   await tmminPage.goto(`${runtime.tmminOrigin}/suppliers/${externalSupplier.supplier.id}`);
-  const deactivateTrigger = tmminPage.getByRole('button', { name: 'Deactivate', exact: true });
+  const deactivateTrigger = tmminPage.getByRole('button', { name: 'Nonaktifkan', exact: true });
   await deactivateTrigger.click();
   const deactivateDialog = tmminPage.getByRole('dialog', {
-    name: 'Deactivate supplier?',
+    name: 'Nonaktifkan supplier?',
   });
   await expect(deactivateDialog).toBeVisible();
   for (let step = 0; step < 5; step += 1) {
@@ -297,12 +301,12 @@ test('proves TMMIN read-only governance, source cutover, and External ingestion 
   await expect(deactivateDialog).toBeHidden();
   await expect(deactivateTrigger).toBeFocused();
   await tmminPage.goto(`${runtime.tmminOrigin}/warnings`);
-  await expect(tmminPage.getByRole('heading', { name: 'Active Warnings' })).toBeVisible();
+  await expect(tmminPage.getByRole('heading', { name: 'Peringatan Aktif' })).toBeVisible();
   await expect(tmminPage.locator('tbody').getByText('E2E External Supplier')).toBeVisible();
-  await tmminPage.getByRole('link', { name: 'View details' }).first().click();
+  await tmminPage.getByRole('link', { name: 'Lihat detail' }).first().click();
   await expect(tmminPage.getByText('EXTERNAL', { exact: true }).first()).toBeVisible();
   await tmminPage.goto(`${runtime.tmminOrigin}/henkatens?sourceMode=EXTERNAL`);
-  await expect(tmminPage.getByRole('heading', { name: 'Global Henkaten Explorer' })).toBeVisible();
+  await expect(tmminPage.getByRole('heading', { name: 'Penelusuran Henkaten' })).toBeVisible();
   await expect(tmminPage.getByText(/EXTERNAL · E1/).first()).toBeVisible();
 
   const forbiddenMutation = await qualityContext.request.post(
@@ -320,7 +324,7 @@ test('proves TMMIN read-only governance, source cutover, and External ingestion 
   const qualityPage = await qualityContext.newPage();
   await qualityPage.goto(`${runtime.tmminOrigin}/external-health`);
   await expect(
-    qualityPage.getByRole('heading', { name: 'External Ingestion Health' }),
+    qualityPage.getByRole('heading', { name: 'Kesehatan Ingesti External' }),
   ).toBeVisible();
   await expect(qualityPage.getByRole('button', { name: /rotate|revoke|issue/i })).toHaveCount(0);
   expect((await new AxeBuilder({ page: qualityPage }).analyze()).violations).toEqual([]);

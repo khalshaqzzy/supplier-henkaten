@@ -50,9 +50,9 @@ export function SuppliersPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Supplier registry"
-        title="Suppliers"
-        description="Lifecycle, source mode, timezone, and current administration context."
+        eyebrow="Registry supplier"
+        title="Supplier"
+        description="Lifecycle, source mode, timezone, dan konteks administrasi terkini."
         actions={
           admin ? (
             <Button
@@ -60,15 +60,15 @@ export function SuppliersPage() {
               leadingIcon={<Plus />}
               onClick={() => void navigate('/suppliers/new')}
             >
-              Create supplier
+              Buat supplier
             </Button>
           ) : undefined
         }
       />
       <div className="tmmin-filter-strip">
         <Input
-          aria-label="Search suppliers"
-          placeholder="Search code or name"
+          aria-label="Cari supplier"
+          placeholder="Cari kode atau nama"
           defaultValue={params.get('search') ?? ''}
           onBlur={(event) => setSearch(params, setParams, 'search', event.target.value)}
         />
@@ -77,17 +77,17 @@ export function SuppliersPage() {
           value={query.status}
           onChange={(event) => setSearch(params, setParams, 'status', event.target.value)}
         >
-          <option value="ALL">All statuses</option>
-          <option value="ACTIVE">Active</option>
-          <option value="INACTIVE">Inactive</option>
+          <option value="ALL">Semua status</option>
+          <option value="ACTIVE">Aktif</option>
+          <option value="INACTIVE">Nonaktif</option>
         </NativeSelect>
         <NativeSelect
           aria-label="Server sort"
           value={query.sort}
           onChange={(event) => setSearch(params, setParams, 'sort', event.target.value)}
         >
-          <option value="NAME_ASC">Name A–Z</option>
-          <option value="UPDATED_DESC">Recently updated</option>
+          <option value="NAME_ASC">Nama A–Z</option>
+          <option value="UPDATED_DESC">Terakhir diperbarui</option>
         </NativeSelect>
       </div>
       {result.isLoading ? (
@@ -99,17 +99,17 @@ export function SuppliersPage() {
       ) : (
         <Panel
           title={`${result.data.items.length} suppliers`}
-          description="Server-side filtering and stable cursor ordering"
+          description="Filter server-side dengan urutan cursor yang stabil"
         >
           <div className="tmmin-table-scroll">
             <table className="tmmin-table">
               <thead>
                 <tr>
                   <th>Supplier</th>
-                  <th>Source</th>
+                  <th>Sumber</th>
                   <th>Timezone</th>
                   <th>Status</th>
-                  <th>Updated</th>
+                  <th>Diperbarui</th>
                   <th />
                 </tr>
               </thead>
@@ -133,7 +133,7 @@ export function SuppliersPage() {
                     </td>
                     <td>{dateTime(row.updatedAt)}</td>
                     <td>
-                      <Link to={`/suppliers/${row.id}`}>View</Link>
+                      <Link to={`/suppliers/${row.id}`}>Lihat</Link>
                     </td>
                   </tr>
                 ))}
@@ -165,7 +165,7 @@ const supplierFormSchema = z
       context.addIssue({
         code: 'custom',
         path: ['adminUsername'],
-        message: 'Hosted source requires Supplier Admin identity.',
+        message: 'Sumber Hosted memerlukan identitas Supplier Admin.',
       });
     }
   });
@@ -184,9 +184,9 @@ export function SupplierCreatePage() {
   return (
     <>
       <PageHeader
-        eyebrow="Supplier provisioning"
-        title="Create supplier"
-        description="Timezone is validated as IANA and Hosted identity is provisioned with one-time credential."
+        eyebrow="Provisioning supplier"
+        title="Buat supplier"
+        description="Timezone divalidasi sebagai IANA dan identitas Hosted memakai credential satu kali."
       />
       <Card className="tmmin-form-card">
         {credential ? (
@@ -271,14 +271,14 @@ export function SupplierCreatePage() {
               )}
             </div>
             {form.formState.errors.root && (
-              <Alert tone="danger" title="Supplier could not be created">
+              <Alert tone="danger" title="Supplier tidak dapat dibuat">
                 {form.formState.errors.root.message}
               </Alert>
             )}
             <div className="tmmin-actions">
-              <Button onClick={() => void navigate('/suppliers')}>Cancel</Button>
+              <Button onClick={() => void navigate('/suppliers')}>Batal</Button>
               <Button type="submit" variant="primary" loading={form.formState.isSubmitting}>
-                Create supplier
+                Buat supplier
               </Button>
             </div>
           </form>
@@ -323,22 +323,22 @@ export function SupplierDetailPage() {
       <PageHeader
         eyebrow={`${supplier.code} · ${supplier.sourceMode} E${supplier.sourceEpoch}`}
         title={supplier.name}
-        description="Supplier identity, administration, monitoring, and source context."
+        description="Identitas, administrasi, monitoring, dan konteks sumber supplier."
         actions={
           admin ? (
             <div className="tmmin-actions">
               <Button onClick={() => void navigate(`/source-governance?supplierId=${supplierId}`)}>
-                Source governance
+                Tata Kelola Sumber
               </Button>
               <AlertDialog
                 trigger={
                   <Button variant={supplier.active ? 'danger' : 'primary'}>
-                    {supplier.active ? 'Deactivate' : 'Activate'}
+                    {supplier.active ? 'Nonaktifkan' : 'Aktifkan'}
                   </Button>
                 }
-                title={`${supplier.active ? 'Deactivate' : 'Activate'} supplier?`}
-                description="This changes access and operational availability. Current version is verified by the server."
-                confirmLabel={supplier.active ? 'Deactivate' : 'Activate'}
+                title={`${supplier.active ? 'Nonaktifkan' : 'Aktifkan'} supplier?`}
+                description="Tindakan ini mengubah akses dan ketersediaan operasional. Versi diverifikasi server."
+                confirmLabel={supplier.active ? 'Nonaktifkan' : 'Aktifkan'}
                 destructive={supplier.active}
                 onConfirm={() => action.mutate(supplier.active)}
               />
@@ -359,23 +359,23 @@ export function SupplierDetailPage() {
       )}
       <div className="tmmin-detail-layout">
         <div>
-          <Panel title="Supplier context" description="Authoritative registry state">
+          <Panel title="Konteks supplier" description="Status registry authoritative">
             <KeyValueGrid
               columns={3}
               items={[
                 { label: 'Code', value: supplier.code },
                 { label: 'Timezone', value: supplier.timezone },
                 {
-                  label: 'Source',
+                  label: 'Sumber',
                   value: `${supplier.sourceMode} · Epoch ${supplier.sourceEpoch}`,
                 },
-                { label: 'Status', value: supplier.active ? 'Active' : 'Inactive' },
+                { label: 'Status', value: supplier.active ? 'Aktif' : 'Nonaktif' },
                 { label: 'Version', value: supplier.version },
                 { label: 'Updated', value: dateTime(supplier.updatedAt) },
               ]}
             />
           </Panel>
-          <Panel title="Monitoring summary" description="Source-specific last data timestamps">
+          <Panel title="Ringkasan monitoring" description="Waktu data terakhir per sumber">
             <KeyValueGrid
               columns={3}
               items={[
@@ -407,7 +407,7 @@ export function SupplierDetailPage() {
               : 'Hosted-only Board is unavailable; use External health and projection detail.'}
           </Alert>
           {result.data.activePreparation && (
-            <Alert tone="warning" title="Hosted Preparation active">
+            <Alert tone="warning" title="Persiapan Hosted aktif">
               Epoch {result.data.activePreparation.sourceEpoch} · started{' '}
               {dateTime(result.data.activePreparation.startedAt)}
             </Alert>
@@ -467,7 +467,7 @@ function SupplierAdminPanel({
     onChanged();
   });
   return (
-    <Panel title="Supplier Admin" description="Only one current administrator is presented.">
+    <Panel title="Supplier Admin" description="Hanya satu administrator aktif yang ditampilkan.">
       {current ? (
         <KeyValueGrid
           columns={3}
@@ -478,16 +478,16 @@ function SupplierAdminPanel({
           ]}
         />
       ) : (
-        <p>No current Supplier Admin.</p>
+        <p>Belum ada Supplier Admin aktif.</p>
       )}
       {admin && current && (
         <>
           <div className="tmmin-row-actions">
             <AlertDialog
               trigger={<Button size="sm">Reset temporary password</Button>}
-              title={`Reset password for ${current.username}?`}
-              description="All existing sessions are revoked. The replacement temporary password is displayed once."
-              confirmLabel="Reset password"
+              title={`Reset kata sandi ${current.username}?`}
+              description="Semua session dicabut. Temporary password baru hanya ditampilkan sekali."
+              confirmLabel="Reset kata sandi"
               onConfirm={() =>
                 void (async () => {
                   const response = await tmminApi.resetSupplierAdmin(supplierId, current.version);
@@ -518,8 +518,8 @@ function SupplierAdminPanel({
                   Replace administrator
                 </Button>
               }
-              title="Replace the current Supplier Admin?"
-              description="The current administrator is deactivated and all source-bound sessions are revoked."
+              title="Ganti Supplier Admin saat ini?"
+              description="Administrator lama dinonaktifkan dan seluruh session terkait sumber dicabut."
               confirmLabel="Replace administrator"
               destructive
               onConfirm={() => void replace()}
@@ -547,7 +547,10 @@ function SupplierEditPanel({
     values: { name: supplier.name, timezone: supplier.timezone },
   });
   return (
-    <Panel title="Edit supplier" description="Name and IANA timezone use optimistic concurrency.">
+    <Panel
+      title="Ubah supplier"
+      description="Nama dan timezone IANA memakai optimistic concurrency."
+    >
       <form
         className="tmmin-inline-form"
         onSubmit={(event) =>
@@ -573,7 +576,7 @@ function SupplierEditPanel({
           loading={form.formState.isSubmitting}
           disabled={!form.formState.isDirty}
         >
-          Save changes
+          Simpan perubahan
         </Button>
       </form>
     </Panel>
@@ -638,8 +641,8 @@ export function SourceGovernancePage() {
   if (!supplierId)
     return (
       <SupplierChooser
-        title="Source Governance"
-        description="Select a supplier to inspect computed preflight and source history."
+        title="Tata Kelola Sumber"
+        description="Pilih supplier untuk meninjau preflight dan riwayat sumber."
         onSelect={(id) => void navigate(`/source-governance?supplierId=${id}`)}
       />
     );
@@ -651,9 +654,9 @@ export function SourceGovernancePage() {
   return (
     <>
       <PageHeader
-        eyebrow={`${data.supplier.code} · Source epoch ${data.supplier.sourceEpoch}`}
-        title="Source Governance"
-        description="Computed preflight, blockers, readiness, privacy acknowledgement, and source epoch history."
+        eyebrow={`${data.supplier.code} · Epoch sumber ${data.supplier.sourceEpoch}`}
+        title="Tata Kelola Sumber"
+        description="Kelola persiapan dan cutover sumber tunggal berdasarkan preflight server."
       />
       {admin && preparationCredential && (
         <Card className="tmmin-secret-card">
@@ -668,55 +671,122 @@ export function SourceGovernancePage() {
       )}
       <div className="tmmin-governance-summary">
         <div>
-          <span>Current source</span>
-          <strong>{data.supplier.sourceMode}</strong>
-        </div>
-        <ArrowRight />
-        <div>
-          <span>Proposed target</span>
-          <strong>{data.preflight.targetMode}</strong>
+          <span>Supplier</span>
+          <strong>{data.supplier.name}</strong>
+          <small>{data.supplier.code}</small>
         </div>
         <div>
-          <span>Readiness</span>
-          <StatusBadge tone={ready ? 'success' : 'danger'}>
-            {ready ? 'READY' : 'BLOCKED'}
+          <span>Sumber saat ini</span>
+          <StatusBadge tone={data.supplier.sourceMode === 'HOSTED' ? 'success' : 'info'}>
+            {data.supplier.sourceMode}
           </StatusBadge>
+          <small>Epoch {data.supplier.sourceEpoch}</small>
         </div>
         <div>
-          <span>Next epoch</span>
-          <strong>{data.supplier.sourceEpoch + 1}</strong>
+          <span>Status persiapan</span>
+          <StatusBadge tone={data.activePreparation ? 'warning' : 'neutral'}>
+            {data.activePreparation ? 'AKTIF' : 'TIDAK AKTIF'}
+          </StatusBadge>
+          <small>{data.activePreparation ? dateTime(data.activePreparation.startedAt) : '—'}</small>
         </div>
+        <div>
+          <span>Status supplier</span>
+          <StatusBadge tone={data.supplier.active ? 'success' : 'neutral'}>
+            {data.supplier.active ? 'AKTIF' : 'NONAKTIF'}
+          </StatusBadge>
+          <small>{data.supplier.active ? 'Operasional' : 'Akses dibatasi'}</small>
+        </div>
+        <div>
+          <span>Diperbarui</span>
+          <strong>{dateTime(data.generatedAt)}</strong>
+          <small>Preflight terbaru</small>
+        </div>
+      </div>
+      <div className="tmmin-governance-hero">
+        <section>
+          <span>Perubahan yang diusulkan</span>
+          <div>
+            <StatusBadge tone={data.supplier.sourceMode === 'HOSTED' ? 'success' : 'info'}>
+              {data.supplier.sourceMode}
+            </StatusBadge>
+            <ArrowRight aria-hidden="true" />
+            <StatusBadge tone={data.preflight.targetMode === 'HOSTED' ? 'success' : 'info'}>
+              {data.preflight.targetMode}
+            </StatusBadge>
+          </div>
+          <p>Cutover membuat sumber lama read-only dan menaikkan source epoch.</p>
+        </section>
+        <section className={ready ? 'is-ready' : 'is-blocked'}>
+          <div>
+            <span>Kelayakan preflight</span>
+            <StatusBadge tone={ready ? 'success' : 'danger'}>
+              {ready ? 'SIAP' : 'TERBLOKIR'}
+            </StatusBadge>
+          </div>
+          <dl>
+            <div>
+              <dt>Blocker</dt>
+              <dd>{data.preflight.blockers.length}</dd>
+            </div>
+            <div>
+              <dt>Target epoch</dt>
+              <dd>{data.supplier.sourceEpoch + 1}</dd>
+            </div>
+            <div>
+              <dt>Sumber target</dt>
+              <dd>{data.preflight.targetMode}</dd>
+            </div>
+          </dl>
+        </section>
       </div>
       <div className="tmmin-detail-layout">
         <div>
-          <Panel title="Computed preflight" description="Reloadable server-computed readiness">
-            <div className="tmmin-checks">
-              {data.preflight.blockers.length ? (
-                data.preflight.blockers.map((blocker) => (
-                  <div key={`${blocker.contributor}-${blocker.code}`}>
-                    <span>
-                      <strong>{blocker.code}</strong>
-                      <small>{blocker.detail}</small>
-                    </span>
-                    <StatusBadge tone="danger">BLOCKER</StatusBadge>
-                  </div>
-                ))
-              ) : (
-                <div>
-                  <span>
-                    <strong>ALL_CONTRIBUTORS_READY</strong>
-                    <small>No active blocker was reported.</small>
-                  </span>
-                  <StatusBadge tone="success">PASSED</StatusBadge>
-                </div>
-              )}
+          <Panel title="Blocker preflight" description="Evidence dihitung ulang oleh server">
+            <div className="tmmin-table-scroll">
+              <table className="tmmin-table tmmin-blocker-table">
+                <thead>
+                  <tr>
+                    <th>Severity</th>
+                    <th>Kode</th>
+                    <th>Deskripsi</th>
+                    <th>Contributor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.preflight.blockers.length ? (
+                    data.preflight.blockers.map((blocker) => (
+                      <tr key={`${blocker.contributor}-${blocker.code}`}>
+                        <td>
+                          <StatusBadge tone="danger">BLOCKER</StatusBadge>
+                        </td>
+                        <td>
+                          <strong>{blocker.code}</strong>
+                        </td>
+                        <td>{blocker.detail}</td>
+                        <td>{blocker.contributor}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td>
+                        <StatusBadge tone="success">LULUS</StatusBadge>
+                      </td>
+                      <td>
+                        <strong>SEMUA_PEMERIKSAAN_SIAP</strong>
+                      </td>
+                      <td>Tidak ada blocker aktif dari contributor preflight.</td>
+                      <td>Server preflight</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </Panel>
-          <Panel title="Source history" description="Epoch and cutover evidence">
+          <Panel title="Riwayat sumber" description="Evidence epoch dan cutover yang immutable">
             <Timeline
               items={data.history.map((entry) => ({
                 title: `${entry.mode} · Epoch ${entry.epoch}`,
-                description: entry.reason ?? entry.action,
+                description: entry.reason ?? sourceActionLabel(entry.action),
                 meta: dateTime(entry.occurredAt),
                 tone: entry.action === 'SUPPLIER_SOURCE_MODE_CHANGED' ? 'success' : 'neutral',
               }))}
@@ -744,11 +814,11 @@ export function SourceGovernancePage() {
             <>
               <Alert
                 tone={ready ? 'warning' : 'danger'}
-                title={ready ? 'High-risk change' : 'Cutover blocked'}
+                title={ready ? 'Perubahan berisiko tinggi' : 'Cutover terblokir'}
               >
                 {ready
-                  ? 'Cutover revokes source-bound sessions and credentials. Confirm the operational consequence.'
-                  : 'Resolve every server-computed blocker before cutover.'}
+                  ? 'Cutover mencabut session dan credential yang terikat pada sumber lama.'
+                  : 'Selesaikan setiap blocker hasil perhitungan server sebelum cutover.'}
               </Alert>
               <form
                 className="tmmin-rail-form"
@@ -756,7 +826,7 @@ export function SourceGovernancePage() {
                   void form.handleSubmit((values) => mutation.mutate(values))(event)
                 }
               >
-                <Field label="Reason" errorText={form.formState.errors.reason?.message} required>
+                <Field label="Alasan" errorText={form.formState.errors.reason?.message} required>
                   <Textarea rows={5} {...form.register('reason')} />
                 </Field>
                 <Checkbox
@@ -764,7 +834,7 @@ export function SourceGovernancePage() {
                   onCheckedChange={(checked) =>
                     form.setValue('privacyAcknowledged', checked === true, { shouldValidate: true })
                   }
-                  label="I acknowledge the privacy and credential revocation consequences."
+                  label="Saya memahami konsekuensi privasi dan pencabutan credential."
                 />
                 <Button
                   type="submit"
@@ -772,14 +842,14 @@ export function SourceGovernancePage() {
                   disabled={!ready}
                   loading={mutation.isPending}
                 >
-                  Cut over to {data.preflight.targetMode}
+                  Cutover ke {data.preflight.targetMode}
                 </Button>
               </form>
             </>
           ) : (
-            <Alert tone="info" title="Read-only source summary">
-              Quality can inspect current source, computed blockers, and immutable epoch history.
-              Source changes and preparation controls are intentionally absent.
+            <Alert tone="info" title="Ringkasan hanya baca">
+              Quality dapat meninjau sumber, blocker, dan riwayat epoch. Kontrol perubahan sumber
+              tidak ditampilkan.
             </Alert>
           )}
         </aside>
@@ -811,11 +881,11 @@ function PreparationPanel({
   if (active)
     return (
       <Panel
-        title="Hosted Preparation active"
-        description={`Epoch ${active.sourceEpoch} · started ${dateTime(active.startedAt)}`}
+        title="Persiapan Hosted aktif"
+        description={`Epoch ${active.sourceEpoch} · dimulai ${dateTime(active.startedAt)}`}
       >
-        <Alert tone="warning" title="Preparation identity is isolated">
-          Cancel revokes its session and temporary credential.
+        <Alert tone="warning" title="Identitas persiapan terisolasi">
+          Pembatalan mencabut session dan temporary credential persiapan.
         </Alert>
         <form
           className="tmmin-inline-form"
@@ -826,38 +896,35 @@ function PreparationPanel({
             })(event)
           }
         >
-          <Field
-            label="Cancellation reason"
-            errorText={cancelForm.formState.errors.reason?.message}
-          >
+          <Field label="Alasan pembatalan" errorText={cancelForm.formState.errors.reason?.message}>
             <Textarea rows={3} {...cancelForm.register('reason')} />
           </Field>
           <Button type="submit" variant="danger" loading={cancelForm.formState.isSubmitting}>
-            Cancel preparation
+            Batalkan persiapan
           </Button>
         </form>
       </Panel>
     );
   return (
     <Panel
-      title="Start Hosted Preparation"
-      description="Exactly one isolated preparation administrator may be active."
+      title="Mulai Persiapan Hosted"
+      description="Hanya satu administrator persiapan terisolasi yang boleh aktif."
     >
       <form
         className="tmmin-form-grid"
         onSubmit={(event) => void form.handleSubmit(onStart)(event)}
       >
-        <Field label="Reason" errorText={form.formState.errors.reason?.message}>
+        <Field label="Alasan" errorText={form.formState.errors.reason?.message}>
           <Textarea {...form.register('reason')} />
         </Field>
-        <Field label="Admin username" errorText={form.formState.errors.username?.message}>
+        <Field label="Username Admin" errorText={form.formState.errors.username?.message}>
           <Input {...form.register('username')} />
         </Field>
-        <Field label="Admin display name" errorText={form.formState.errors.displayName?.message}>
+        <Field label="Nama tampilan Admin" errorText={form.formState.errors.displayName?.message}>
           <Input {...form.register('displayName')} />
         </Field>
         <Button type="submit" variant="primary" loading={busy}>
-          Start preparation
+          Mulai persiapan
         </Button>
       </form>
     </Panel>
@@ -921,9 +988,9 @@ export function ExternalCredentialsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="External source security"
-        title="External Credentials"
-        description="Client epoch, least-privilege scope, IP allowlist, status, last use, rotation, and revocation."
+        eyebrow="Keamanan sumber External"
+        title="Credential External"
+        description="Client epoch, scope, IP allowlist, status, penggunaan terakhir, rotasi, dan pencabutan."
       />
       {credential && (
         <Card className="tmmin-secret-card">
@@ -935,8 +1002,8 @@ export function ExternalCredentialsPage() {
         </Card>
       )}
       <Panel
-        title="Issue client"
-        description="The new secret remains in memory until acknowledged or navigation."
+        title="Terbitkan client"
+        description="Secret baru hanya berada di memory sampai dikonfirmasi atau halaman ditinggalkan."
       >
         <form
           className="tmmin-inline-form"
@@ -954,7 +1021,7 @@ export function ExternalCredentialsPage() {
             loading={issue.isPending}
             leadingIcon={<KeyRound />}
           >
-            Issue credential
+            Terbitkan credential
           </Button>
         </form>
       </Panel>
@@ -964,8 +1031,8 @@ export function ExternalCredentialsPage() {
         <QueryState error={result.error} retry={() => void result.refetch()} />
       ) : (
         <Panel
-          title="External clients"
-          description="Secrets are never returned by list operations."
+          title="Client External"
+          description="Operasi list tidak pernah mengembalikan secret."
         >
           <div className="tmmin-table-scroll">
             <table className="tmmin-table">
@@ -975,8 +1042,8 @@ export function ExternalCredentialsPage() {
                   <th>Epoch / scope</th>
                   <th>IP allowlist</th>
                   <th>Status</th>
-                  <th>Last use</th>
-                  <th>Actions</th>
+                  <th>Penggunaan terakhir</th>
+                  <th>Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -1012,17 +1079,17 @@ export function ExternalCredentialsPage() {
                                 })
                               }
                             >
-                              Rotate
+                              Rotasi
                             </Button>
                             <AlertDialog
                               trigger={
                                 <Button size="sm" variant="danger">
-                                  Revoke
+                                  Cabut
                                 </Button>
                               }
-                              title="Revoke External client?"
-                              description="All active secrets and access tokens for this client will be revoked."
-                              confirmLabel="Revoke"
+                              title="Cabut client External?"
+                              description="Semua secret dan access token aktif untuk client ini akan dicabut."
+                              confirmLabel="Cabut"
                               destructive
                               onConfirm={() =>
                                 action.mutate({
@@ -1094,9 +1161,9 @@ export function QualityUsersPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Read-only monitoring identities"
-        title="TMMIN Quality Users"
-        description="Provision and recover Quality accounts without granting mutation capabilities."
+        eyebrow="Identitas monitoring hanya baca"
+        title="Pengguna Quality TMMIN"
+        description="Provisioning dan pemulihan akun Quality tanpa capability mutation."
       />
       {credential && (
         <Card className="tmmin-secret-card">
@@ -1109,7 +1176,7 @@ export function QualityUsersPage() {
           />
         </Card>
       )}
-      <Panel title="Create Quality user" description="A temporary password is displayed once.">
+      <Panel title="Buat pengguna Quality" description="Temporary password ditampilkan sekali.">
         <form
           className="tmmin-inline-form"
           onSubmit={(event) => void form.handleSubmit((values) => create.mutate(values))(event)}
@@ -1126,7 +1193,7 @@ export function QualityUsersPage() {
             loading={create.isPending}
             leadingIcon={<UserRoundPlus />}
           >
-            Create user
+            Buat pengguna
           </Button>
         </form>
       </Panel>
@@ -1135,16 +1202,16 @@ export function QualityUsersPage() {
       ) : result.error || !result.data ? (
         <QueryState error={result.error} retry={() => void result.refetch()} />
       ) : (
-        <Panel title="Quality accounts" description="Role remains TMMIN Quality and read-only.">
+        <Panel title="Akun Quality" description="Role tetap TMMIN Quality dan hanya baca.">
           <div className="tmmin-table-scroll">
             <table className="tmmin-table">
               <thead>
                 <tr>
-                  <th>User</th>
+                  <th>Pengguna</th>
                   <th>Status</th>
-                  <th>Password state</th>
-                  <th>Updated</th>
-                  <th>Actions</th>
+                  <th>Status password</th>
+                  <th>Diperbarui</th>
+                  <th>Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -1164,10 +1231,10 @@ export function QualityUsersPage() {
                     <td>
                       <div className="tmmin-row-actions">
                         <AlertDialog
-                          trigger={<Button size="sm">Reset password</Button>}
-                          title={`Reset password for ${row.username}?`}
+                          trigger={<Button size="sm">Reset kata sandi</Button>}
+                          title={`Reset kata sandi ${row.username}?`}
                           description="Existing sessions are revoked and a new temporary password is displayed once."
-                          confirmLabel="Reset password"
+                          confirmLabel="Reset kata sandi"
                           onConfirm={() =>
                             action.mutate({
                               id: row.id,
@@ -1182,16 +1249,18 @@ export function QualityUsersPage() {
                               size="sm"
                               variant={row.status === 'ACTIVE' ? 'danger' : 'primary'}
                             >
-                              {row.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
+                              {row.status === 'ACTIVE' ? 'Nonaktifkan' : 'Aktifkan kembali'}
                             </Button>
                           }
-                          title={`${row.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'} ${row.username}?`}
+                          title={`${row.status === 'ACTIVE' ? 'Nonaktifkan' : 'Aktifkan kembali'} ${row.username}?`}
                           description={
                             row.status === 'ACTIVE'
                               ? 'The Quality user immediately loses monitoring access.'
                               : 'The Quality user regains read-only monitoring access.'
                           }
-                          confirmLabel={row.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
+                          confirmLabel={
+                            row.status === 'ACTIVE' ? 'Nonaktifkan' : 'Aktifkan kembali'
+                          }
                           destructive={row.status === 'ACTIVE'}
                           onConfirm={() =>
                             action.mutate({
@@ -1231,7 +1300,7 @@ function SupplierChooser({
   });
   return (
     <>
-      <PageHeader eyebrow="Choose context" title={title} description={description} />
+      <PageHeader eyebrow="Pilih konteks" title={title} description={description} />
       {result.data && (
         <div className="tmmin-chooser">
           {result.data.items.map((supplier) => (
@@ -1255,7 +1324,7 @@ function LoadingRows() {
   return (
     <Card className="tmmin-table-skeleton">
       <RefreshCw className="hds-spinner" />
-      <span>Loading authoritative data…</span>
+      <span>Memuat data authoritative…</span>
     </Card>
   );
 }
@@ -1275,4 +1344,12 @@ function dateTime(value?: string | null) {
   return value
     ? new Date(value).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
     : 'No data';
+}
+
+function sourceActionLabel(action: string) {
+  if (action === 'SUPPLIER_CREATED') return 'Supplier dibuat';
+  if (action === 'HOSTED_PREPARATION_STARTED') return 'Persiapan Hosted dimulai';
+  if (action === 'HOSTED_PREPARATION_CANCELLED') return 'Persiapan Hosted dibatalkan';
+  if (action === 'SUPPLIER_SOURCE_MODE_CHANGED') return 'Source mode diubah';
+  return action;
 }

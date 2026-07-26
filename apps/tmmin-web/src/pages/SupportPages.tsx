@@ -49,13 +49,13 @@ export function HostedSupportPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Hosted read-only support"
-        title="Hosted Support"
-        description="Historical Hosted shifts remain traceable after cutover; current Board requires Hosted source."
+        eyebrow="Dukungan Hosted hanya baca"
+        title="Dukungan Hosted"
+        description="Shift Hosted historis tetap dapat ditelusuri; Board aktif memerlukan sumber Hosted."
       />
       <div className="tmmin-filter-strip">
         <label>
-          Supplier context
+          Konteks supplier
           <select
             value={supplierId}
             onChange={(event) => {
@@ -65,7 +65,7 @@ export function HostedSupportPage() {
               setParams(next);
             }}
           >
-            <option value="">Choose Hosted supplier</option>
+            <option value="">Pilih supplier Hosted</option>
             {suppliers.data?.items.map((supplier) => (
               <option key={supplier.id} value={supplier.id}>
                 {supplier.code} · {supplier.name}
@@ -148,12 +148,12 @@ export function AssignmentBoardPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Current Hosted source"
+        eyebrow="Sumber Hosted saat ini"
         title="Assignment Board"
-        description="Read-only assignment and open Henkaten indicators. External current source is rejected by the server."
+        description="Assignment dan indikator Open Henkaten hanya baca untuk sumber Hosted."
       />
       {result.isLoading ? (
-        <QueryState empty="Loading Board…" />
+        <QueryState empty="Memuat Board…" />
       ) : result.error || !result.data ? (
         <QueryState error={result.error} retry={() => void result.refetch()} />
       ) : result.data.lines.length === 0 ? (
@@ -167,7 +167,7 @@ export function AssignmentBoardPage() {
               description={`${line.shiftName} · ${line.businessDate}`}
             >
               {line.activeOverride && (
-                <Alert tone="warning" title="Shift started with override">
+                <Alert tone="warning" title="Shift dimulai dengan override">
                   {line.activeOverride.reason}
                 </Alert>
               )}
@@ -210,7 +210,7 @@ export function ShiftDetailPage() {
     queryKey: tmminKey(session!.principal.userId, 'shift-detail', { supplierId, shiftId }),
     queryFn: () => tmminApi.shift(supplierId, shiftId),
   });
-  if (result.isLoading) return <QueryState empty="Loading shift evidence…" />;
+  if (result.isLoading) return <QueryState empty="Memuat evidence Shift…" />;
   if (result.error || !result.data)
     return <QueryState error={result.error} retry={() => void result.refetch()} />;
   const data = result.data;
@@ -219,14 +219,14 @@ export function ShiftDetailPage() {
       <PageHeader
         eyebrow={`${data.line.code} · ${data.businessDate}`}
         title={data.shift.name}
-        description="Historical Hosted shift detail remains available after a source cutover."
+        description="Detail Shift Hosted historis tetap tersedia setelah source cutover."
       />
-      <Panel title="Shift evidence" description="Read-only source snapshot">
+      <Panel title="Evidence Shift" description="Snapshot sumber hanya baca">
         <KeyValueGrid
           columns={3}
           items={[
             { label: 'Status', value: data.status },
-            { label: 'Source epoch', value: 'Hosted snapshot' },
+            { label: 'Epoch sumber', value: 'Snapshot Hosted' },
             { label: 'Supervisor', value: data.supervisor?.name ?? 'Unassigned' },
             { label: 'Line leader', value: data.lineLeader?.name ?? 'Unassigned' },
             { label: 'Scheduled start', value: dateTime(data.scheduledStartAt) },
@@ -247,12 +247,12 @@ function ResourceTable({
   columns: string[];
   link?: (row: Record<string, unknown>) => string;
 }) {
-  if (result.isLoading) return <QueryState empty="Loading Hosted read model…" />;
+  if (result.isLoading) return <QueryState empty="Memuat read model Hosted…" />;
   const data = result.data as { items?: Array<Record<string, unknown>> } | undefined;
   if (result.error || !data?.items)
     return <QueryState error={result.error} retry={() => void result.refetch()} />;
   return (
-    <Panel title={`${data.items.length} records`} description="Read-only Hosted source data">
+    <Panel title={`${data.items.length} record`} description="Data sumber Hosted hanya baca">
       <div className="tmmin-table-scroll">
         <table className="tmmin-table">
           <thead>

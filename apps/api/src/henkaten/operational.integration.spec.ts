@@ -945,6 +945,31 @@ describe('Hosted shift and Henkaten core', () => {
       .set('Cookie', tmminCookie);
     expect(globalDashboard.status).toBe(200);
     expect(globalDashboard.body.suppliers.hosted).toBeGreaterThan(0);
+    expect(globalDashboard.body.trend).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          bucketStart: expect.any(String),
+          hosted: expect.any(Number),
+          total: expect.any(Number),
+        }),
+      ]),
+    );
+    expect(globalDashboard.body.freshnessSummary).toEqual({
+      fresh: expect.any(Number),
+      warning: expect.any(Number),
+      stale: expect.any(Number),
+      noData: expect.any(Number),
+    });
+    expect(globalDashboard.body.supplierOverview).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          supplierId,
+          sourceMode: 'HOSTED',
+          openHenkatens: expect.any(Number),
+          over24HourWarnings: expect.any(Number),
+        }),
+      ]),
+    );
   });
 
   it('applies approved Man movement once and End Shift cancels remaining work atomically', async () => {
