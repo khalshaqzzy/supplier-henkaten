@@ -2,11 +2,14 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
+  Factory,
   FileClock,
   FolderOpen,
+  RefreshCw,
   ShieldCheck,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import type { DashboardQuery } from '@tmmin-henkaten/contracts';
@@ -22,17 +25,18 @@ import {
   NativeSelect,
   Panel,
   Skeleton,
-  StatCard,
 } from '@tmmin-henkaten/ui';
 
 import { supplierApi } from '../app/api';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { PageHeader } from '../components/layout';
+import { SummaryMetric, SummaryStrip } from '../components/OperationalUI';
 
 export function OverviewPage() {
-  const { session } = useSession();
+  const { session, hasCapability } = useSession();
   const [params, setParams] = useSearchParams();
+  const [draft, setDraft] = useState(() => new URLSearchParams(params));
   const identity = session!.principal;
   const supplier = session!.supplier!;
   const from = params.get('from');
@@ -63,12 +67,13 @@ export function OverviewPage() {
     ),
     queryFn: () => supplierApi.dashboard(query),
   });
+  useEffect(() => setDraft(new URLSearchParams(params)), [params]);
 
   return (
     <div className="product-page">
       <PageHeader
         eyebrow={identity.purpose === 'HOSTED_PREPARATION' ? 'Mode persiapan' : 'Operasi Hosted'}
-        title="Supplier Overview"
+        title="Overview Supplier"
         description="Pantau Henkaten, approval, dan risiko operasional sesuai scope Anda."
         actions={
           identity.role === 'LINE_LEADER' ? (
@@ -83,23 +88,23 @@ export function OverviewPage() {
           <span>Dari tanggal</span>
           <Input
             type="date"
-            value={from ?? ''}
-            onChange={(event) => updateParam(params, setParams, 'from', event.target.value)}
+            value={draft.get('from') ?? ''}
+            onChange={(event) => updateDraft(draft, setDraft, 'from', event.target.value)}
           />
         </label>
         <label>
           <span>Sampai tanggal</span>
           <Input
             type="date"
-            value={to ?? ''}
-            onChange={(event) => updateParam(params, setParams, 'to', event.target.value)}
+            value={draft.get('to') ?? ''}
+            onChange={(event) => updateDraft(draft, setDraft, 'to', event.target.value)}
           />
         </label>
         <label>
           <span>Status</span>
           <NativeSelect
-            value={params.get('status') ?? ''}
-            onChange={(event) => updateParam(params, setParams, 'status', event.target.value)}
+            value={draft.get('status') ?? ''}
+            onChange={(event) => updateDraft(draft, setDraft, 'status', event.target.value)}
           >
             <option value="">Semua status</option>
             <option value="OPEN">Open</option>
@@ -111,8 +116,8 @@ export function OverviewPage() {
         <label>
           <span>Kategori 4M</span>
           <NativeSelect
-            value={params.get('category') ?? ''}
-            onChange={(event) => updateParam(params, setParams, 'category', event.target.value)}
+            value={draft.get('category') ?? ''}
+            onChange={(event) => updateDraft(draft, setDraft, 'category', event.target.value)}
           >
             <option value="">Semua kategori</option>
             <option value="MAN">Man</option>
@@ -124,8 +129,8 @@ export function OverviewPage() {
         <label>
           <span>Interval tren</span>
           <NativeSelect
-            value={params.get('granularity') ?? 'DAY'}
-            onChange={(event) => updateParam(params, setParams, 'granularity', event.target.value)}
+            value={draft.get('granularity') ?? 'DAY'}
+            onChange={(event) => updateDraft(draft, setDraft, 'granularity', event.target.value)}
           >
             <option value="DAY">Harian</option>
             <option value="WEEK">Mingguan</option>
@@ -135,8 +140,8 @@ export function OverviewPage() {
         <label>
           <span>Line</span>
           <NativeSelect
-            value={params.get('lineId') ?? ''}
-            onChange={(event) => updateParam(params, setParams, 'lineId', event.target.value)}
+            value={draft.get('lineId') ?? ''}
+            onChange={(event) => updateDraft(draft, setDraft, 'lineId', event.target.value)}
           >
             <option value="">Semua line</option>
             {dashboard.data?.filterOptions.lines.map((line) => (
@@ -149,9 +154,9 @@ export function OverviewPage() {
         <label>
           <span>Shift Template</span>
           <NativeSelect
-            value={params.get('shiftTemplateId') ?? ''}
+            value={draft.get('shiftTemplateId') ?? ''}
             onChange={(event) =>
-              updateParam(params, setParams, 'shiftTemplateId', event.target.value)
+              updateDraft(draft, setDraft, 'shiftTemplateId', event.target.value)
             }
           >
             <option value="">Semua shift</option>
@@ -165,18 +170,16 @@ export function OverviewPage() {
         <label>
           <span>Part</span>
           <Input
-            value={params.get('part') ?? ''}
+            value={draft.get('part') ?? ''}
             placeholder="Nomor atau nama"
-            onChange={(event) => updateParam(params, setParams, 'part', event.target.value)}
+            onChange={(event) => updateDraft(draft, setDraft, 'part', event.target.value)}
           />
         </label>
         <label>
           <span>Approval route</span>
           <NativeSelect
-            value={params.get('approvalRoute') ?? ''}
-            onChange={(event) =>
-              updateParam(params, setParams, 'approvalRoute', event.target.value)
-            }
+            value={draft.get('approvalRoute') ?? ''}
+            onChange={(event) => updateDraft(draft, setDraft, 'approvalRoute', event.target.value)}
           >
             <option value="">Semua route</option>
             <option value="SUPERVISOR">Supervisor</option>
@@ -186,10 +189,8 @@ export function OverviewPage() {
         <label>
           <span>Approval status</span>
           <NativeSelect
-            value={params.get('approvalStatus') ?? ''}
-            onChange={(event) =>
-              updateParam(params, setParams, 'approvalStatus', event.target.value)
-            }
+            value={draft.get('approvalStatus') ?? ''}
+            onChange={(event) => updateDraft(draft, setDraft, 'approvalStatus', event.target.value)}
           >
             <option value="">Semua status</option>
             <option value="PENDING">Pending</option>
@@ -201,6 +202,29 @@ export function OverviewPage() {
         {dashboard.data && (
           <LastUpdated value={formatTime(dashboard.data.generatedAt, supplier.timezone)} />
         )}
+        <div className="overview-filter-actions">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setDraft(new URLSearchParams());
+              setParams({}, { replace: true });
+            }}
+          >
+            Reset
+          </Button>
+          <Button
+            size="sm"
+            leadingIcon={<RefreshCw />}
+            onClick={() => {
+              const next = new URLSearchParams(draft);
+              next.delete('cursor');
+              setParams(next, { replace: true });
+            }}
+          >
+            Terapkan
+          </Button>
+        </div>
       </FilterBar>
       {dashboard.isLoading && <OverviewSkeleton />}
       {dashboard.isError && (
@@ -212,44 +236,44 @@ export function OverviewPage() {
       )}
       {dashboard.data && (
         <>
-          <section className="overview-stats" aria-label="Ringkasan Henkaten">
-            <StatCard
+          <SummaryStrip label="Ringkasan Henkaten" className="overview-stats">
+            <SummaryMetric
               label="Open Henkaten"
               value={dashboard.data.totals.open}
               icon={<FolderOpen />}
               tone="info"
             />
-            <StatCard
+            <SummaryMetric
               label="Approved"
               value={dashboard.data.totals.approved}
               icon={<CheckCircle2 />}
               tone="success"
             />
-            <StatCard
+            <SummaryMetric
               label="Rejected / Cancelled"
               value={dashboard.data.totals.rejected + dashboard.data.totals.cancelled}
               icon={<AlertTriangle />}
               tone="danger"
             />
-            <StatCard
+            <SummaryMetric
               label="Warning aktif"
               value={dashboard.data.totals.activeWarnings}
               icon={<AlertTriangle />}
               tone="warning"
             />
-            <StatCard
+            <SummaryMetric
               label="Pending Supervisor"
               value={dashboard.data.pendingApprovals.supervisor}
               icon={<ShieldCheck />}
               tone="info"
             />
-            <StatCard
+            <SummaryMetric
               label="Pending QC"
               value={dashboard.data.pendingApprovals.qc}
               icon={<Clock3 />}
               tone="warning"
             />
-          </section>
+          </SummaryStrip>
           {dashboard.data.totals.all === 0 ? (
             <EmptyState
               title="Belum ada Henkaten"
@@ -301,6 +325,36 @@ export function OverviewPage() {
                   {!dashboard.data.assignmentIssues.length && <span>Tidak ada issue terbuka.</span>}
                 </div>
               </Panel>
+              <Panel title="Henkaten per line">
+                <div className="metric-list">
+                  {dashboard.data.byLine.slice(0, 6).map((item) => (
+                    <Link key={item.label} to="/henkatens">
+                      <span>{item.label}</span>
+                      <strong>{item.count}</strong>
+                    </Link>
+                  ))}
+                </div>
+              </Panel>
+              <Panel title="Henkaten per part">
+                <div className="metric-list">
+                  {dashboard.data.byPart.slice(0, 6).map((item) => (
+                    <Link key={item.label} to="/henkatens">
+                      <span>{item.label}</span>
+                      <strong>{item.count}</strong>
+                    </Link>
+                  ))}
+                </div>
+              </Panel>
+              <Panel title="Outcome">
+                <div className="metric-list">
+                  {dashboard.data.outcomes.map((item) => (
+                    <Link key={item.label} to="/henkatens">
+                      <span>{item.label}</span>
+                      <strong>{item.count}</strong>
+                    </Link>
+                  ))}
+                </div>
+              </Panel>
               <Panel title="Emergency override">
                 {dashboard.data.recentOverrides.length ? (
                   <div className="metric-list">
@@ -332,6 +386,33 @@ export function OverviewPage() {
               </Panel>
             </section>
           )}
+          <nav className="overview-quick-links" aria-label="Tautan cepat">
+            <strong>Tautan cepat</strong>
+            {hasCapability('SUPPLIER_BOARD_READ') && (
+              <Link to="/board">
+                <Factory aria-hidden="true" />
+                Assignment Board
+              </Link>
+            )}
+            {hasCapability('SUPPLIER_HENKATEN_READ') && (
+              <Link to="/henkatens">
+                <FolderOpen aria-hidden="true" />
+                Open Henkaten
+              </Link>
+            )}
+            {hasCapability('SUPPLIER_HENKATEN_DECIDE') && (
+              <Link to="/approvals">
+                <ShieldCheck aria-hidden="true" />
+                Antrean Approval
+              </Link>
+            )}
+            {hasCapability('SUPPLIER_SHIFT_READ') && (
+              <Link to="/shifts">
+                <Clock3 aria-hidden="true" />
+                Ringkasan Shift
+              </Link>
+            )}
+          </nav>
         </>
       )}
     </div>
@@ -348,17 +429,16 @@ function OverviewSkeleton() {
   );
 }
 
-function updateParam(
+function updateDraft(
   params: URLSearchParams,
-  setParams: ReturnType<typeof useSearchParams>[1],
+  setDraft: (value: URLSearchParams) => void,
   key: string,
   value: string,
 ) {
   const next = new URLSearchParams(params);
   if (value) next.set(key, value);
   else next.delete(key);
-  next.delete('cursor');
-  setParams(next, { replace: true });
+  setDraft(next);
 }
 
 function formatTime(value: string, timeZone: string) {
@@ -372,9 +452,9 @@ function formatTime(value: string, timeZone: string) {
 function agingLabel(bucket: string) {
   return (
     {
-      UNDER_4_HOURS: '0–4 jam',
-      FOUR_TO_EIGHT_HOURS: '4–8 jam',
-      EIGHT_TO_24_HOURS: '8–24 jam',
+      UNDER_4_HOURS: '0-4 jam',
+      FOUR_TO_EIGHT_HOURS: '4-8 jam',
+      EIGHT_TO_24_HOURS: '8-24 jam',
       OVER_24_HOURS: '>24 jam',
     }[bucket] ?? bucket
   );

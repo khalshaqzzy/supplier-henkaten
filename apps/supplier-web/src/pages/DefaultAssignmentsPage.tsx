@@ -1,6 +1,6 @@
 import { AlertTriangle, ArrowRightLeft, CheckCircle2, UserPlus, Users } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import {
@@ -10,6 +10,7 @@ import {
   ErrorState,
   NativeSelect,
   Panel,
+  Sheet,
   Skeleton,
 } from '@tmmin-henkaten/ui';
 
@@ -35,6 +36,12 @@ export function DefaultAssignmentsPage() {
   } | null>(null);
   const [selectedMember, setSelectedMember] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const closeEditor = () => {
+    setEditor(null);
+    setSelectedMember('');
+    queueMicrotask(() => returnFocusRef.current?.focus());
+  };
   const scope = {
     userId: session!.principal.userId,
     supplierId: session!.supplier!.id,
@@ -98,8 +105,7 @@ export function DefaultAssignmentsPage() {
       });
     },
     onSuccess: async () => {
-      setEditor(null);
-      setSelectedMember('');
+      closeEditor();
       await queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'default-assignments') });
     },
     onError: (error) => {
@@ -126,8 +132,7 @@ export function DefaultAssignmentsPage() {
       });
     },
     onSuccess: async () => {
-      setEditor(null);
-      setSelectedMember('');
+      closeEditor();
       await queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'default-assignments') });
     },
     onError: (error) =>
@@ -141,6 +146,18 @@ export function DefaultAssignmentsPage() {
   const lineAssignment = (kind: 'supervisors' | 'lineLeaders') =>
     assignments.data?.[kind].find((assignment) => assignment.resourceId === lineId);
   const loading = lines.isLoading || members.isLoading || assignments.isLoading;
+  const editorCollection =
+    editor && assignments.data
+      ? editor.kind === 'supervisor'
+        ? assignments.data.supervisors
+        : editor.kind === 'leader'
+          ? assignments.data.lineLeaders
+          : assignments.data.mps
+      : [];
+  const occupiedAssignment = editorCollection.find(
+    (assignment) =>
+      assignment.memberId === selectedMember && assignment.resourceId !== editor?.resourceId,
+  );
 
   return (
     <div className="product-page">
@@ -180,7 +197,7 @@ export function DefaultAssignmentsPage() {
           Assignment saat ini.
         </Alert>
       )}
-      {problem && (
+      {problem && !editor && (
         <Alert tone="danger" title="Assignment gagal">
           {problem}
         </Alert>
@@ -212,7 +229,8 @@ export function DefaultAssignmentsPage() {
               label="Supervisor default"
               assignment={lineAssignment('supervisors')}
               memberMap={memberMap}
-              onEdit={(assignment) => {
+              onEdit={(assignment, trigger) => {
+                returnFocusRef.current = trigger;
                 setProblem(null);
                 setEditor({
                   kind: 'supervisor',
@@ -228,7 +246,8 @@ export function DefaultAssignmentsPage() {
               label="Line Leader default"
               assignment={lineAssignment('lineLeaders')}
               memberMap={memberMap}
-              onEdit={(assignment) => {
+              onEdit={(assignment, trigger) => {
+                returnFocusRef.current = trigger;
                 setProblem(null);
                 setEditor({
                   kind: 'leader',
@@ -275,7 +294,8 @@ export function DefaultAssignmentsPage() {
                     <Button
                       size="sm"
                       variant={assignment ? 'secondary' : 'primary'}
-                      onClick={() => {
+                      onClick={(event) => {
+                        returnFocusRef.current = event.currentTarget;
                         setProblem(null);
                         setEditor({
                           kind: 'mp',
@@ -297,11 +317,69 @@ export function DefaultAssignmentsPage() {
         </>
       )}
       {editor && (
-        <aside className="context-sheet" aria-label="Ubah default assignment">
-          <div>
-            <span className="product-eyebrow">Atomic assignment</span>
-            <h2>{editor.currentMemberId ? 'Ubah assignment' : 'Assign member'}</h2>
-            <p>Konflik uniqueness akan diselesaikan sebagai atomic move setelah konfirmasi.</p>
+        <Sheet
+          trigger={<button type="button" hidden />}
+          open
+          onOpenChange={(open) => {
+            if (!open) closeEditor();
+          }}
+          title={editor.currentMemberId ? 'Ubah Default Assignment' : 'Assign Member'}
+          description="Konflik uniqueness diselesaikan sebagai atomic move dengan version check."
+          footer={
+            <div className="assignment-sheet-actions">
+              {editor.assignmentId && (
+                <Button
+                  variant="danger"
+                  loading={remove.isPending}
+                  onClick={() => {
+                    if (window.confirm('Hapus default assignment ini?')) remove.mutate();
+                  }}
+                >
+                  Hapus assignment
+                </Button>
+              )}
+              <Button variant="ghost" onClick={closeEditor}>
+                Batal
+              </Button>
+              <Button
+                leadingIcon={<ArrowRightLeft />}
+                loading={mutation.isPending}
+                disabled={!selectedMember}
+                onClick={() => mutation.mutate()}
+              >
+                Konfirmasi perubahan
+              </Button>
+            </div>
+          }
+        >
+          <div className="assignment-change-preview">
+            <section>
+              <span>Dari kondisi saat ini</span>
+              <strong>
+                {editor.currentMemberId
+                  ? (memberMap.get(editor.currentMemberId)?.fullName ?? 'Member tidak tersedia')
+                  : 'Belum assigned'}
+              </strong>
+              <small>
+                {editor.currentMemberId
+                  ? memberMap.get(editor.currentMemberId)?.registrationNumber
+                  : 'Tidak ada default pada target'}
+              </small>
+            </section>
+            <ArrowRightLeft aria-hidden="true" />
+            <section>
+              <span>Ke kondisi baru</span>
+              <strong>
+                {selectedMember
+                  ? (memberMap.get(selectedMember)?.fullName ?? 'Pilih member')
+                  : 'Pilih member'}
+              </strong>
+              <small>
+                {occupiedAssignment
+                  ? 'Member akan dipindahkan secara atomik'
+                  : 'Assignment target akan diperbarui'}
+              </small>
+            </section>
           </div>
           <FieldSelect
             kind={editor.kind}
@@ -312,31 +390,12 @@ export function DefaultAssignmentsPage() {
           <Alert tone="warning" title="Efektif untuk future shift">
             Working Assignment aktif tidak berubah. Audit event akan direkam.
           </Alert>
-          <div className="context-sheet__actions">
-            {editor.assignmentId && (
-              <Button
-                variant="danger"
-                loading={remove.isPending}
-                onClick={() => {
-                  if (window.confirm('Hapus default assignment ini?')) remove.mutate();
-                }}
-              >
-                Hapus assignment
-              </Button>
-            )}
-            <Button variant="ghost" onClick={() => setEditor(null)}>
-              Batal
-            </Button>
-            <Button
-              leadingIcon={<ArrowRightLeft />}
-              loading={mutation.isPending}
-              disabled={!selectedMember}
-              onClick={() => mutation.mutate()}
-            >
-              Konfirmasi perubahan
-            </Button>
-          </div>
-        </aside>
+          {problem && (
+            <Alert tone="danger" title="Assignment perlu dimuat ulang">
+              {problem}
+            </Alert>
+          )}
+        </Sheet>
       )}
     </div>
   );
@@ -354,7 +413,7 @@ function AssignmentSummary({
   label: string;
   assignment: Assignment | undefined;
   memberMap: Map<string, Member>;
-  onEdit: (assignment?: Assignment) => void;
+  onEdit: (assignment: Assignment | undefined, trigger: HTMLElement) => void;
 }) {
   const member = assignment ? memberMap.get(assignment.memberId) : undefined;
   return (
@@ -365,7 +424,7 @@ function AssignmentSummary({
         size="sm"
         variant="ghost"
         leadingIcon={<UserPlus />}
-        onClick={() => onEdit(assignment)}
+        onClick={(event) => onEdit(assignment, event.currentTarget)}
       >
         {assignment ? 'Ganti' : 'Assign'}
       </Button>

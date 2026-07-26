@@ -28,6 +28,7 @@ import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { CursorPager } from '../components/CursorPager';
 import { PageHeader } from '../components/layout';
+import { FactItem, FactStrip } from '../components/OperationalUI';
 
 export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: boolean }) {
   const { session } = useSession();
@@ -88,11 +89,11 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
   return (
     <div className="product-page">
       <PageHeader
-        eyebrow={approvalQueue ? 'Decision workspace' : '4M traceability'}
-        title={approvalQueue ? 'Approval Queue' : 'Henkaten'}
+        eyebrow={approvalQueue ? 'Ruang keputusan' : 'Ketertelusuran 4M'}
+        title={approvalQueue ? 'Antrean Approval' : 'Henkaten'}
         description={
           approvalQueue
-            ? 'Selesaikan route approval yang menjadi responsibility Anda; reject pertama bersifat terminal.'
+            ? 'Selesaikan rute approval yang menjadi tanggung jawab Anda; reject pertama bersifat terminal.'
             : 'Telusuri perubahan 4M current dan terminal dengan filter server-side.'
         }
         actions={
@@ -231,7 +232,7 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
       {list.isLoading && <HenkatenSkeleton />}
       {list.isError && (
         <ErrorState
-          title={`${approvalQueue ? 'Approval Queue' : 'Henkaten'} tidak dapat dimuat`}
+          title={`${approvalQueue ? 'Antrean Approval' : 'Henkaten'} tidak dapat dimuat`}
           description="Coba refetch tanpa mengubah filter URL."
           action={<Button onClick={() => void list.refetch()}>Coba lagi</Button>}
         />
@@ -391,6 +392,7 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
   const checklistComplete =
     Boolean(checklist?.items.length) &&
     checklist!.items.every((item) => answers[item.id] === 'YES');
+  const answeredCount = checklist?.items.filter((item) => answers[item.id] === 'YES').length ?? 0;
   const valid =
     Boolean(
       effectiveShiftId && jobId && partId && cause.trim() && detail.trim() && checklistComplete,
@@ -456,9 +458,9 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
   return (
     <div className="product-page create-henkaten-page">
       <PageHeader
-        eyebrow={clone ? 'Correction as new record' : '4M submission'}
+        eyebrow={clone ? 'Koreksi sebagai record baru' : 'Submission 4M'}
         title={clone ? 'Clone Henkaten' : 'Buat Henkaten'}
-        description="Satu submission immutable untuk Shift Run dan checklist version saat ini."
+        description="Satu submission immutable untuk Shift Run dan versi checklist saat ini."
       />
       {!current.data && !current.isLoading && (
         <Alert tone="danger" title="Tidak ada active atau planned shift">
@@ -469,6 +471,15 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
         <Alert tone="danger" title="Submission gagal">
           {problem}
         </Alert>
+      )}
+      {current.data && (
+        <FactStrip label="Konteks Shift untuk Henkaten">
+          <FactItem label="Line" value={current.data.line.code} detail={current.data.line.name} />
+          <FactItem label="Shift Run" value={current.data.shift.name} />
+          <FactItem label="Business date" value={current.data.businessDate} />
+          <FactItem label="Status Shift" value={humanize(current.data.status)} />
+          <FactItem label="Timezone" value={current.data.timezone} />
+        </FactStrip>
       )}
       <form onSubmit={send} className="henkaten-form">
         <div className="henkaten-form__main">
@@ -503,7 +514,15 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
                 }
                 required
               >
-                <Input id="shift" value={effectiveShiftId} readOnly />
+                <Input
+                  id="shift"
+                  value={
+                    current.data
+                      ? `${current.data.shift.name} · ${current.data.businessDate}`
+                      : effectiveShiftId
+                  }
+                  readOnly
+                />
               </Field>
               <Field label="Target job" htmlFor="job" required>
                 <NativeSelect
@@ -590,7 +609,7 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
                             ? ' · Reserved'
                             : member.currentAssignment
                               ? ` · ${member.currentAssignment.lineName}/${member.currentAssignment.jobName}`
-                              : ' · Available'}
+                              : ' · Tersedia'}
                         </option>
                       ))}
                   </NativeSelect>
@@ -624,9 +643,9 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
               </Alert>
             )}
           </div>
-          <Panel title="4. Cause dan detail">
+          <Panel title="4. Penyebab dan detail">
             <div className="form-two-col">
-              <Field label="Cause" htmlFor="cause" required>
+              <Field label="Penyebab" htmlFor="cause" required>
                 <Textarea
                   id="cause"
                   value={cause}
@@ -659,6 +678,7 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
                     <span>{index + 1}</span>
                     <strong>{item.label}</strong>
                     <NativeSelect
+                      aria-label={`Jawaban checklist: ${item.label}`}
                       value={answers[item.id] ?? ''}
                       onChange={(event) =>
                         setAnswers({ ...answers, [item.id]: event.target.value as 'YES' | 'NO' })
@@ -674,9 +694,9 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
             )}
           </Panel>
         </div>
-        <aside className="henkaten-review">
-          <span className="product-eyebrow">Review submission</span>
-          <h2>Henkaten Summary</h2>
+        <aside className="henkaten-review" aria-label="Ringkasan Henkaten">
+          <span className="product-eyebrow">Tinjau submission</span>
+          <h2>Ringkasan Henkaten</h2>
           <dl>
             <div>
               <dt>Kategori</dt>
@@ -684,26 +704,49 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
             </div>
             <div>
               <dt>Line</dt>
-              <dd>{current.data?.line.name ?? '—'}</dd>
+              <dd>{current.data?.line.name ?? 'Belum dipilih'}</dd>
             </div>
             <div>
               <dt>Job</dt>
-              <dd>{working.data?.find((item) => item.jobId === jobId)?.jobName ?? '—'}</dd>
+              <dd>
+                {working.data?.find((item) => item.jobId === jobId)?.jobName ?? 'Belum dipilih'}
+              </dd>
             </div>
             <div>
               <dt>Part</dt>
               <dd>
-                {formOptions.data?.parts.find((item) => item.id === partId)?.partNumber ?? '—'}
+                {formOptions.data?.parts.find((item) => item.id === partId)?.partNumber ??
+                  'Belum dipilih'}
               </dd>
             </div>
             <div>
               <dt>Checklist</dt>
               <dd>
-                {checklist?.items.filter((item) => answers[item.id] === 'YES').length ?? 0}/
-                {checklist?.items.length ?? 0} Yes
+                {answeredCount}/{checklist?.items.length ?? 0} Yes
               </dd>
             </div>
           </dl>
+          <div className="henkaten-progress">
+            <div>
+              <span>Progress checklist</span>
+              <strong>
+                {checklist?.items.length
+                  ? Math.round((answeredCount / checklist.items.length) * 100)
+                  : 0}
+                %
+              </strong>
+            </div>
+            <progress
+              max={checklist?.items.length || 1}
+              value={answeredCount}
+              aria-label={`${answeredCount} dari ${checklist?.items.length ?? 0} checklist dijawab Yes`}
+            />
+            <small>
+              {checklistComplete
+                ? 'Checklist lengkap dan siap disubmit.'
+                : `${Math.max((checklist?.items.length ?? 0) - answeredCount, 0)} item tersisa.`}
+            </small>
+          </div>
           {!checklistComplete && (
             <Alert tone="warning" title="Checklist belum lengkap">
               Jawab Yes pada semua item sebelum submit.
@@ -822,7 +865,20 @@ export function HenkatenDetailPage() {
       <PageHeader
         eyebrow={`${item.sourceMode} · source epoch ${item.sourceEpoch}`}
         title={item.identifier}
-        description={`${humanize(item.category)} · ${humanize(item.status)} · dibuat ${formatDate(item.occurredAt, item.timezone)}`}
+        description={`${humanize(item.category)} · dibuat ${formatDate(item.occurredAt, item.timezone)}`}
+        status={
+          <span className={`status-label is-${item.status.toLowerCase()}`}>
+            {humanize(item.status)}
+          </span>
+        }
+        meta={
+          <div className="route-pills">
+            <span>Supervisor</span>
+            <RouteStatus value={item.routes.supervisor.status} />
+            <span>QC</span>
+            <RouteStatus value={item.routes.qc.status} />
+          </div>
+        }
         actions={
           <Link className="hds-button hds-button--secondary hds-button--md" to="/board">
             Kembali ke Board
@@ -837,21 +893,21 @@ export function HenkatenDetailPage() {
           </Button>
         </Alert>
       )}
-      <section className="detail-facts">
-        <Fact label="Shift" value={item.shiftName} />
-        <Fact label="Business date" value={item.businessDate} />
-        <Fact label="Line" value={`${item.line.code} · ${item.line.name}`} />
-        <Fact label="Job" value={item.jobName} />
-        <Fact label="Part" value={`${item.part.number} · ${item.part.name}`} />
-        <Fact label="Dibuat oleh" value={item.creatorName} />
-      </section>
+      <FactStrip label="Konteks Henkaten">
+        <FactItem label="Shift" value={item.shiftName} />
+        <FactItem label="Business date" value={item.businessDate} />
+        <FactItem label="Line" value={item.line.code} detail={item.line.name} />
+        <FactItem label="Job" value={item.jobName} />
+        <FactItem label="Part" value={item.part.number} detail={item.part.name} />
+        <FactItem label="Dibuat oleh" value={item.creatorName} />
+      </FactStrip>
       <div className="henkaten-detail__layout">
         <div className="henkaten-detail__content">
           <div className="detail-panels">
-            <Panel title="Cause & detail">
+            <Panel title="Penyebab & detail">
               <dl className="stacked-details">
                 <div>
-                  <dt>Cause</dt>
+                  <dt>Penyebab</dt>
                   <dd>{item.cause}</dd>
                 </div>
                 <div>
@@ -862,7 +918,9 @@ export function HenkatenDetailPage() {
             </Panel>
             <Panel
               title={
-                item.category === 'MAN' ? 'Reservation & movement' : 'Affected / replacement object'
+                item.category === 'MAN'
+                  ? 'Reservation & perpindahan'
+                  : 'Objek terdampak / pengganti'
               }
             >
               {item.man ? (
@@ -897,8 +955,8 @@ export function HenkatenDetailPage() {
             </Panel>
           </div>
           <Panel
-            title="Approval route"
-            description="Route parallel; reject pertama membuat route lain Not Required."
+            title="Rute approval"
+            description="Rute berjalan paralel; reject pertama membuat rute lain Not Required."
           >
             <div className="approval-route">
               <RouteStep label="Submitted" state="APPROVED" person={item.creatorName} />
@@ -922,7 +980,7 @@ export function HenkatenDetailPage() {
           <div className="detail-panels">
             <Panel
               title="Checklist snapshot"
-              description={`Version ${item.checklist.versionNumber} · immutable`}
+              description={`Versi ${item.checklist.versionNumber} · immutable`}
             >
               <ol className="snapshot-list">
                 {item.checklist.answers.map((answer) => (
@@ -935,7 +993,7 @@ export function HenkatenDetailPage() {
               </ol>
             </Panel>
             <Panel
-              title="Lifecycle history"
+              title="Riwayat lifecycle"
               description="Evidence actor dan waktu dari event domain."
             >
               <ol className="history-list">
@@ -957,9 +1015,9 @@ export function HenkatenDetailPage() {
             </Panel>
           </div>
         </div>
-        <aside className="detail-action-rail">
-          <span className="product-eyebrow">Action context</span>
-          <h2>{canDecide ? `${humanize(route.route)} Decision` : 'Record actions'}</h2>
+        <aside className="detail-action-rail" aria-label="Tindakan Henkaten">
+          <span className="product-eyebrow">Konteks tindakan</span>
+          <h2>{canDecide ? `Keputusan ${humanize(route.route)}` : 'Tindakan record'}</h2>
           <div className="route-pills">
             <RouteStatus value={item.routes.supervisor.status} />
             <RouteStatus value={item.routes.qc.status} />
@@ -1073,15 +1131,6 @@ export function HenkatenDetailPage() {
           </Link>
         </aside>
       </div>
-    </div>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span>{label}</span>
-      <strong>{value}</strong>
     </div>
   );
 }

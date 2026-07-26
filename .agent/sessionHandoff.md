@@ -1,124 +1,168 @@
-# Session Handoff — TMMIN Visual Refinement
+# Session Handoff — Supplier Visual Refinement
 
 Tanggal: 2026-07-26
 
-Branch: `staging`
+Branch: `feat/supplier-visual-refinement`
 
-Status: Phase 14 dan 14.1–14.10 `done`; Phase 15.1 adalah next
+Status: Phase 14.11 `done`; Phase 15.1 adalah next
 
 ## 1. Objective dan Outcome
 
-Seluruh TMMIN Portal dipoles ulang tanpa mengganti React/Vite, Tailwind v4, shared Henkaten Design
-System, typed API client, route, authorization, atau workflow yang sudah ada. Fidelity tertinggi
-diberikan pada Ringkasan Global dan Tata Kelola Sumber berdasarkan seluruh referensi
-`.agent/design/`, terutama `tmmin-global-overview.png` dan `source-governance.png`.
+Supplier Portal direfinement dalam preserve mode tanpa mengubah React/Vite, shared Henkaten Design
+System, typed API client, route, field/lifecycle order, authorization, atau backend authority.
+Bahasa visualnya enterprise, light-only, padat, stabil, dan berorientasi workflow dengan fidelity
+tertinggi pada enam referensi Supplier:
 
-Hasil utama:
+- Overview;
+- Assignment Board;
+- Default Assignment;
+- Create Henkaten;
+- Henkaten Detail/Approval;
+- Blocked Shift.
 
-- shell TMMIN memakai navigation group Monitoring, Tata Kelola, Dukungan, dan Sistem;
-- sidebar dapat diciutkan tanpa mengubah capability filtering;
-- topbar, global context control, breadcrumbs, page header, focus, hover, spacing, dan responsive
-  behavior konsisten pada minimum 1280×720;
-- TMMIN-only composition tetap berada di `apps/tmmin-web`; Supplier Portal dan shared primitive
-  tidak menerima perubahan visual tidak disengaja;
-- terminologi antarmuka dinormalisasi ke Bahasa Indonesia, dengan istilah domain Henkaten, 4M,
-  Hosted, External, dan Quality tetap dipertahankan;
-- Quality tetap read-only dan tidak memperoleh Supplier-domain mutation control.
+Seluruh referensi `.agent/design/` dibuka pada resolusi asli sebelum implementasi dan setelah
+context compaction. Hasil visual aktual juga diperiksa pada 1672×941 dan 1280×720.
 
-Tidak ada database migration, endpoint mutation, approval workflow, export, alert configuration,
-Docs, atau fake Live state yang ditambahkan.
+## 2. Shell dan Composition
 
-## 2. Ringkasan Global
+- Navigation dikelompokkan menjadi Operasional, Data & Konfigurasi, dan Sistem setelah capability
+  serta Hosted Preparation filtering.
+- Sidebar 236px dapat diciutkan menjadi 72px; collapsed links mempertahankan accessible name/title.
+- Supplier workspace, timezone, source mode/epoch, notification count, identity, role, dan logout
+  tetap terlihat pada konteks yang relevan.
+- Topbar memakai active-area dan Supplier context satu baris.
+- `PageHeader` mendukung breadcrumb, status, metadata, action grouping, dan focus restoration.
+- Komponen app-local baru menyediakan summary strip, metric tile, fact strip, dan contextual rail.
+- Shared `@tmmin-henkaten/ui` dan visual TMMIN tidak berubah.
 
-Dashboard sekarang mempunyai:
+## 3. Priority Workflows
 
-- URL-authoritative filter untuk Supplier, source, tanggal, status, kategori 4M, line, part, aging,
-  freshness, dan granularity;
-- default 30 hari terakhir dengan granularity harian bila URL tidak menyediakan nilai;
-- explicit `Terapkan` dan `Reset`;
-- KPI Supplier aktif dengan Hosted/External split, Supplier dengan warning, Open Henkaten, warning
-  di atas 24 jam, affected parts, dan masalah freshness;
-- time-series volume Hosted/External/total dan outcome Open/Approved/Rejected/Cancelled;
-- ranking tabs Supplier/Line/Part, freshness distribution, External ingestion health, recent
-  External activity, emergency override, dan supplier-risk table;
-- maksimal sepuluh supplier-risk rows dengan source, freshness, aging, last data, dan drill-down;
-- layout-matched loading, empty, dan error states.
+Overview:
 
-Delta terhadap periode sebelumnya tidak ditampilkan karena belum authoritative.
+- filter memakai draft state dengan explicit `Terapkan`/`Reset`, lalu URL menjadi authority;
+- KPI memakai server totals tanpa synthetic period delta;
+- aging, 4M trend, assignment issues, line/part ranking, outcome, override, activity, dan
+  capability-aware quick links disusun menjadi dense dashboard grid.
 
-## 3. API dan Read Model
+Assignment Board:
 
-`tmminDashboardExtendedSchema` bertambah secara additive:
+- summary strip, authoritative line/Shift facts, realtime freshness, job cards, 4M indicators,
+  issue/override state, legend, dan contextual rail diterapkan;
+- board/table density tetap contained secara internal.
 
-- `trend[]` dengan bucket timestamp, Hosted, External, total, dan empat lifecycle outcome;
-- `freshnessSummary` dengan fresh, warning, stale, dan no-data;
-- `supplierOverview[]` dengan Supplier identity/source, Open Henkaten, warning aktif/aged,
-  freshness, dan last-data timestamp.
+Default Assignment:
 
-Backend melakukan day/week/month bucketing, zero-fill, source/outcome classification, freshness
-aggregation, Supplier aggregation, dan deterministic sort Open Henkaten descending, warning
-descending, lalu nama ascending. OpenAPI dan typed API client telah diregenerasi.
+- Supervisor, Line Leader, job/MP hierarchy, missing state, active-shift warning, dan assignment
+  status dipertegas;
+- edit memakai accessible side sheet dengan current/new comparison, atomic-move consequence,
+  optimistic conflict message, dan deterministic focus return.
 
-Pure unit coverage ditambahkan pada
-`apps/api/src/read-models/dashboard-trend.spec.ts`. PostgreSQL integration assertions ditambahkan
-untuk Quality/Hosted dan External dashboard projections.
+Create Henkaten:
 
-## 4. Halaman TMMIN Lain
+- field dan submission contract dipertahankan dalam numbered operational sections;
+- Shift context, Man/non-Man layout, checklist progress, readiness message, dan sticky summary rail
+  memakai data/form state nyata;
+- tidak ada Save Draft atau synthetic wizard state.
 
-- Peringatan Aktif dan Penelusuran Henkaten memakai toolbar, badges, table hierarchy, aging emphasis,
-  breadcrumb, dan detail semantics yang source-aware.
-- Supplier list/create/detail, one-time credential, destructive confirmation, dan Quality
-  presentation mengikuti shell baru.
-- Tata Kelola Sumber memakai Supplier/source summary strip, proposed change, preflight metrics,
-  blocker table, evidence grouping, source history, preparation section, dan sticky high-risk rail.
-  React tidak menyimpulkan readiness baru.
-- External credential dan ingestion pages menekankan lifecycle/status hierarchy, sanitized
-  diagnostics, correlation lookup, dan one-time secret acknowledgement.
-- Hosted support, assignment board, shift evidence, Quality users, audit, notification, system
-  status, account, auth, forced reset, 403, 404, dan route error memakai hierarchy dan terminology
-  yang konsisten.
+Henkaten Detail/Approval:
+
+- lifecycle/source/approval status ditempatkan bersama identifier;
+- fact strip, affected/replacement comparison, parallel approval stepper, immutable checklist,
+  history, dan sticky capability-gated decision rail diterapkan;
+- reject-fast, reroute, withdraw, clone, expected-version refresh, dan immutable history tidak
+  berubah.
+
+Shift Detail:
+
+- Not Started, Active, dan Ended memakai composition yang sama;
+- blocking cards, Working Assignment preview, preflight rail, freshness, resolution link, dan
+  terminal summary mengikuti status authoritative;
+- Emergency Start tetap Admin-only, danger-styled, memerlukan alasan, dan selalu dinyatakan sebagai
+  blocked exception.
+
+## 4. Portal Consistency
+
+- Setup disusun sebagai readiness journey dengan summary, progress area, next area, blocker evidence,
+  dan direct route action.
+- Master Data, Shift/Henkaten lists, Notifikasi, Audit, auth, forced reset, account, viewport
+  unsupported, 403, 404, dan route error mewarisi shell, toolbar, panel, table/list, empty/error, dan
+  focus behavior baru.
+- Visible copy dinormalisasi ke Bahasa Indonesia sambil mempertahankan istilah domain Henkaten,
+  Man/Machine/Material/Method, Hosted, External, Shift, Supervisor, Line Leader, QC, dan source
+  epoch.
+
+Tidak ada migration, endpoint baru, production fixture fallback, client-derived lifecycle,
+global search, Export, Save Draft, fake Live state, dark mode, atau mobile operational UI.
 
 ## 5. Files Changed
 
-Contracts/read model:
+Supplier frontend:
 
-- `packages/contracts/src/tmmin.ts`
-- `apps/api/src/read-models/read-model.service.ts`
-- `apps/api/src/read-models/dashboard-trend.spec.ts`
-- `apps/api/src/henkaten/operational.integration.spec.ts`
-- `apps/api/src/external/external.integration.spec.ts`
-- generated OpenAPI dan API client
+- `apps/supplier-web/src/components/layout.tsx`
+- `apps/supplier-web/src/components/OperationalUI.tsx`
+- `apps/supplier-web/src/pages/OverviewPage.tsx`
+- `apps/supplier-web/src/pages/BoardPage.tsx`
+- `apps/supplier-web/src/pages/DefaultAssignmentsPage.tsx`
+- `apps/supplier-web/src/pages/HenkatenPages.tsx`
+- `apps/supplier-web/src/pages/ShiftPages.tsx`
+- `apps/supplier-web/src/pages/SetupPage.tsx`
+- `apps/supplier-web/src/pages/MasterDataPages.tsx`
+- `apps/supplier-web/src/pages/ActivityPages.tsx`
+- `apps/supplier-web/src/pages/AuthPages.tsx`
+- `apps/supplier-web/src/app.css`
 
-Frontend:
+Tests:
 
-- `apps/tmmin-web/src/components/layout.tsx`
-- `apps/tmmin-web/src/pages/MonitoringPages.tsx`
-- `apps/tmmin-web/src/pages/AdminPages.tsx`
-- `apps/tmmin-web/src/pages/SupportPages.tsx`
-- `apps/tmmin-web/src/pages/AuthPages.tsx`
-- `apps/tmmin-web/src/pages/StatePages.tsx`
-- `apps/tmmin-web/src/app.css`
-- `apps/tmmin-web/src/App.test.tsx`
-- TMMIN selectors di `apps/e2e/tests/`
+- `apps/supplier-web/src/App.test.tsx`
+- `apps/supplier-web/src/test/visualFixtures.ts`
+- `apps/e2e/tests/hosted-lifecycle.spec.ts`
 
 Records:
 
-- `.agent/PAGES.md`
 - `.agent/implementationPhases.md`
 - `.agent/sessionHandoff.md`
-- `docs/adr/0025-tmmin-governance-and-monitoring-composition.md`
+- `docs/adr/0024-supplier-application-composition.md`
 
-User-owned `.DS_Store` tetap tidak disentuh.
+User-owned `.DS_Store` tetap tidak disentuh dan tidak boleh dimasukkan ke hasil kerja.
 
-## 6. Validation dan Environment
+## 6. Validation dan Visual Evidence
 
-Visual QA memakai deterministic mocked API data pada 1672×941 dan 1280×720. Dashboard dan Source
-Governance dibandingkan kembali dengan referensi visual sebelum perubahan, setelah context
-compaction, dan sebelum final acceptance. Tabel memakai internal overflow dan tidak menimbulkan
-page-level horizontal overflow pada viewport minimum.
+Perintah terfokus telah dijalankan memakai Node.js 22.23.1 dari pnpm cache dan pnpm 11.16.0:
 
-Seluruh validation dijalankan dengan repository-pinned Node.js 22.23.1 dari pnpm cache dan pnpm
-11.16.0:
+```text
+pnpm --filter @tmmin-henkaten/supplier-web lint
+pnpm --filter @tmmin-henkaten/supplier-web typecheck
+pnpm --filter @tmmin-henkaten/supplier-web test:unit
+pnpm --filter @tmmin-henkaten/e2e lint
+pnpm --filter @tmmin-henkaten/e2e typecheck
+E2E_VISUAL_CAPTURE=1 pnpm --filter @tmmin-henkaten/e2e exec node \
+  scripts/run.mjs --chromium-only --spec=hosted-lifecycle
+```
+
+Current results:
+
+- Supplier lint dan typecheck lulus;
+- 8 Supplier unit tests lulus;
+- E2E lint/typecheck lulus;
+- deterministic Hosted lifecycle Chromium journey lulus;
+- 12 screenshots untuk enam priority pages pada 1672×941 dan 1280×720 berhasil dibuat;
+- semua capture bebas page-level horizontal overflow;
+- reduced-motion mode digunakan;
+- axe bersih pada seluruh priority page di 1280×720.
+
+Visual QA sebelumnya menemukan dan kemudian memperbaiki:
+
+- duplicate unnamed complementary landmarks;
+- checklist select tanpa accessible name;
+- prohibited `aria-label` pada role-less board group;
+- borderline contrast pada approval route metadata.
+
+Disposable E2E PostgreSQL container, volume, network, API, dan Vite processes telah dibersihkan oleh
+harness setelah setiap run.
+
+## 7. Full Validation dan Next Action
+
+Parity suite penuh dari `.agent/rules.md` selesai:
 
 ```text
 pnpm clean
@@ -146,22 +190,20 @@ git diff --check
 
 Results:
 
-- format, lint, typecheck, OpenAPI/generated-client drift, and all production builds passed;
-- 90 unit/contract/client/UI/API/frontend tests passed;
-- PostgreSQL 18.4 and pgvector 0.8.5 verification, nine fresh migrations, and 32 integration tests
-  passed;
-- four Chromium plus two Microsoft Edge isolated E2E epochs passed, including auth, governance,
-  External, direct `403`, focus/keyboard, axe, and cleanup journeys;
-- Gitleaks scanned 43.37 MB with no findings; `git diff --check` passed;
-- Playwright's attempted Edge reinstall required interactive macOS sudo, but the already installed
-  pinned Edge binary successfully ran both required Edge journeys.
+- clean install, format, lint, typecheck, OpenAPI/generated-client drift, dan seluruh production
+  build lulus;
+- 92 unit/contract/client/UI/API/frontend tests lulus;
+- PostgreSQL 18.4, pgvector 0.8.5, sembilan fresh migrations, dan 32 integration tests lulus;
+- empat Chromium dan dua Microsoft Edge isolated E2E journeys lulus;
+- visual capture journey untuk enam halaman prioritas lulus pada dua viewport dengan overflow,
+  reduced-motion, dan axe assertions;
+- Gitleaks memindai 61.65 MB tanpa finding;
+- `git diff --check` lulus;
+- seluruh agent-started database, Vite, API, browser, network, dan volume disposable dihentikan.
 
-The existing shutdown-only `pg@8`/Prisma warning can still appear after a successful E2E journey
-while its disposable database is being removed. It does not affect the journey result or leave
-containers, networks, or volumes behind.
+Playwright berhasil memakai Chromium dan Edge yang sudah terpasang. Perintah reinstall Edge tetap
+memerlukan sudo interaktif macOS dan gagal sebelum meminta credential; ini bukan kegagalan test atau
+runtime karena kedua Edge journey lulus dengan binary terpasang.
 
-## 7. Next Action
-
-Phase 15.1 tetap menjadi next action dan memiliki production multi-stage images. Ikuti Phase 15
-sequence untuk Caddy/TLS, remote Compose, security/image workflow, rollback, dan staging
-deployment.
+Seluruh `.agent/design/` dibuka kembali pada resolusi asli sebelum final acceptance. Next
+recommended work kembali ke Phase 15.1 Production Dockerfiles.

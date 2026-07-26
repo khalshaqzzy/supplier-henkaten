@@ -23,6 +23,7 @@ import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { CursorPager } from '../components/CursorPager';
 import { PageHeader } from '../components/layout';
+import { ContextRail, FactItem, FactStrip } from '../components/OperationalUI';
 
 export function ShiftListPage() {
   const { session } = useSession();
@@ -59,7 +60,7 @@ export function ShiftListPage() {
       <PageHeader
         eyebrow="Lifecycle operasional"
         title="Shift"
-        description="Lihat planned, current, dan ended Shift Run sesuai scope line."
+        description="Lihat Shift Run terencana, aktif, dan berakhir sesuai scope line."
         actions={
           session!.principal.role === 'LINE_LEADER' ? (
             <Link className="hds-button hds-button--primary hds-button--md" to="/shifts/prepare">
@@ -76,9 +77,9 @@ export function ShiftListPage() {
             onChange={(event) => update('status', event.target.value)}
           >
             <option value="">Semua status</option>
-            <option value="NOT_STARTED">Not Started</option>
-            <option value="ACTIVE">Active</option>
-            <option value="ENDED">Ended</option>
+            <option value="NOT_STARTED">Belum Dimulai</option>
+            <option value="ACTIVE">Aktif</option>
+            <option value="ENDED">Berakhir</option>
           </NativeSelect>
         </label>
         <label>
@@ -144,7 +145,7 @@ export function ShiftListPage() {
                   <div>
                     <dt>Jadwal</dt>
                     <dd>
-                      {formatTime(shift.scheduledStartAt, shift.timezone)} –{' '}
+                      {formatTime(shift.scheduledStartAt, shift.timezone)} -{' '}
                       {formatTime(shift.scheduledEndAt, shift.timezone)}
                     </dd>
                   </div>
@@ -212,10 +213,10 @@ export function PrepareShiftPage() {
       <PageHeader
         eyebrow="Shift Run"
         title="Prepare Shift"
-        description="Buat planned Shift Run, lalu tinjau hasil preflight server sebelum Start."
+        description="Buat Shift Run terencana, lalu tinjau hasil preflight server sebelum Start."
       />
       {problem && (
-        <Alert tone="danger" title="Prepare gagal">
+        <Alert tone="danger" title="Persiapan gagal">
           {problem}
         </Alert>
       )}
@@ -255,7 +256,7 @@ export function PrepareShiftPage() {
               <option value="">Pilih template</option>
               {templates.data?.items.map((template) => (
                 <option key={template.id} value={template.id}>
-                  {template.name} · {template.startTime}–{template.endTime}
+                  {template.name} · {template.startTime} - {template.endTime}
                 </option>
               ))}
             </NativeSelect>
@@ -338,7 +339,12 @@ export function ShiftDetailPage() {
       <PageHeader
         eyebrow={`${current.line.code} · ${current.businessDate}`}
         title={`${current.shift.name} Shift`}
-        description={`${current.line.name} · ${humanize(current.status)} · ${current.timezone}`}
+        description={`${current.line.name} · ${current.timezone}`}
+        status={
+          <span className={`status-label is-${current.status.toLowerCase()}`}>
+            {humanize(current.status)}
+          </span>
+        }
         actions={
           current.status === 'NOT_STARTED' && canOperate ? (
             <Button
@@ -370,7 +376,7 @@ export function ShiftDetailPage() {
         }
       />
       {problem && (
-        <Alert tone="danger" title="Action gagal">
+        <Alert tone="danger" title="Tindakan gagal">
           {problem}
           <Button size="sm" variant="ghost" onClick={() => void refresh()}>
             Refresh state
@@ -383,7 +389,7 @@ export function ShiftDetailPage() {
           title={
             current.eligible
               ? 'Preflight eligible'
-              : 'Preflight blocked — Shift belum dapat dimulai'
+              : 'Preflight blocked - Shift belum dapat dimulai'
           }
         >
           {current.eligible
@@ -396,96 +402,142 @@ export function ShiftDetailPage() {
           {current.overrideReason}
         </Alert>
       )}
-      <section className="shift-facts">
-        <Fact label="Status" value={humanize(current.status)} />
-        <Fact label="Business date" value={current.businessDate} />
-        <Fact label="Supervisor" value={current.supervisor?.name ?? 'Kosong'} />
-        <Fact label="Line Leader" value={current.lineLeader?.name ?? 'Kosong'} />
-        <Fact
+      <FactStrip label="Konteks Shift">
+        <FactItem label="Business date" value={current.businessDate} />
+        <FactItem label="Supervisor" value={current.supervisor?.name ?? 'Belum tersedia'} />
+        <FactItem label="Line Leader" value={current.lineLeader?.name ?? 'Belum tersedia'} />
+        <FactItem
           label="Jadwal"
-          value={`${formatTime(current.scheduledStartAt, current.timezone)}–${formatTime(current.scheduledEndAt, current.timezone)}`}
+          value={`${formatTime(current.scheduledStartAt, current.timezone)} - ${formatTime(current.scheduledEndAt, current.timezone)}`}
         />
-      </section>
-      {blockers.length > 0 && (
-        <Panel
-          title={`Blocking issues (${blockers.length})`}
-          description="Hanya checks yang dikembalikan API yang ditampilkan."
-        >
-          <div className="preflight-grid">
-            {blockers.map((check, index) => (
-              <article key={`${check.code}-${index}`}>
-                <AlertTriangle aria-hidden="true" />
-                <span>
-                  <strong>{humanize(check.code)}</strong>
-                  <p>{check.message}</p>
-                  <code>{check.code}</code>
-                </span>
-                {check.resourceId && (
-                  <Link to={`/shifts/${current.id}/resolve`}>
-                    Buka resolusi <ArrowRight />
-                  </Link>
-                )}
-              </article>
-            ))}
-          </div>
-        </Panel>
-      )}
-      <Panel
-        title="Working Assignment"
-        description={`${current.workingAssignments.length} job pada snapshot Shift Run.`}
-      >
-        <div className="working-grid">
-          {current.workingAssignments.map((assignment) => (
-            <article key={assignment.id} className={`is-${assignment.state.toLowerCase()}`}>
-              <span>{String(assignment.jobDisplayOrder).padStart(2, '0')}</span>
-              <div>
-                <strong>{assignment.jobName}</strong>
-                <small>{assignment.mpName ?? 'Vacant'}</small>
+      </FactStrip>
+      <div className="shift-detail__workspace">
+        <div className="shift-detail__content">
+          {blockers.length > 0 && (
+            <Panel
+              title={`Blocking issues (${blockers.length})`}
+              description="Hanya pemeriksaan yang dikembalikan API yang ditampilkan."
+            >
+              <div className="preflight-grid">
+                {blockers.map((check, index) => (
+                  <article key={`${check.code}-${index}`}>
+                    <AlertTriangle aria-hidden="true" />
+                    <span>
+                      <strong>{humanize(check.code)}</strong>
+                      <p>{check.message}</p>
+                      <code>{check.code}</code>
+                    </span>
+                    {check.resourceId && (
+                      <Link to={`/shifts/${current.id}/resolve`}>
+                        Buka resolusi <ArrowRight />
+                      </Link>
+                    )}
+                  </article>
+                ))}
               </div>
-              <em>{humanize(assignment.state)}</em>
-            </article>
-          ))}
-        </div>
-      </Panel>
-      {!current.eligible && current.status === 'NOT_STARTED' && canEmergency && (
-        <Panel
-          title="Emergency Start"
-          description="Hanya untuk exception yang disetujui; alasan minimal 10 karakter dan diaudit."
-        >
-          <Field label="Alasan override" htmlFor="emergencyReason" required>
-            <Textarea
-              id="emergencyReason"
-              value={emergencyReason}
-              onChange={(event) => setEmergencyReason(event.target.value)}
-              maxLength={1000}
-            />
-          </Field>
-          <Button
-            variant="danger"
-            leadingIcon={<AlertTriangle />}
-            disabled={emergencyReason.trim().length < 10}
-            loading={action.isPending}
-            onClick={() => {
-              if (window.confirm('Mulai Shift walaupun preflight masih blocked?'))
-                action.mutate('emergency');
-            }}
+            </Panel>
+          )}
+          <Panel
+            title="Working Assignment"
+            description={`${current.workingAssignments.length} job pada snapshot Shift Run.`}
           >
-            Emergency Start
-          </Button>
-        </Panel>
-      )}
-      {current.status === 'ENDED' && current.endSummary && (
-        <Panel title="Terminal summary" description="Shift ended bersifat final.">
-          <dl className="terminal-summary">
-            {Object.entries(current.endSummary).map(([key, value]) => (
-              <div key={key}>
-                <dt>{humanize(key)}</dt>
-                <dd>{value}</dd>
-              </div>
-            ))}
+            <div className="working-grid">
+              {current.workingAssignments.map((assignment) => (
+                <article key={assignment.id} className={`is-${assignment.state.toLowerCase()}`}>
+                  <span>{String(assignment.jobDisplayOrder).padStart(2, '0')}</span>
+                  <div>
+                    <strong>{assignment.jobName}</strong>
+                    <small>{assignment.mpName ?? 'Vacant'}</small>
+                  </div>
+                  <em>{humanize(assignment.state)}</em>
+                </article>
+              ))}
+            </div>
+          </Panel>
+          {current.status === 'ENDED' && current.endSummary && (
+            <Panel title="Ringkasan terminal" description="Shift yang berakhir bersifat final.">
+              <dl className="terminal-summary">
+                {Object.entries(current.endSummary).map(([key, value]) => (
+                  <div key={key}>
+                    <dt>{humanize(key)}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Panel>
+          )}
+        </div>
+        <ContextRail
+          eyebrow="Preflight"
+          title={current.eligible ? 'Shift siap dimulai' : `${blockers.length} blocker aktif`}
+          footer={
+            current.status === 'NOT_STARTED' ? (
+              <Link to={`/shifts/${current.id}/resolve`}>
+                Buka panduan resolusi <ArrowRight />
+              </Link>
+            ) : undefined
+          }
+        >
+          <dl className="shift-checklist-summary">
+            <div>
+              <dt>Status lifecycle</dt>
+              <dd>{humanize(current.status)}</dd>
+            </div>
+            <div>
+              <dt>Hasil preflight</dt>
+              <dd>{current.eligible ? 'Eligible' : 'Blocked'}</dd>
+            </div>
+            <div>
+              <dt>Pemeriksaan gagal</dt>
+              <dd>{blockers.length}</dd>
+            </div>
+            <div>
+              <dt>Terakhir diperiksa</dt>
+              <dd>{new Date(current.latestPreflightAt).toLocaleString('id-ID')}</dd>
+            </div>
           </dl>
-        </Panel>
-      )}
+          {blockers.length > 0 && (
+            <ol className="shift-checklist">
+              {blockers.map((check) => (
+                <li key={check.code}>
+                  <AlertTriangle aria-hidden="true" />
+                  <span>
+                    <strong>{humanize(check.code)}</strong>
+                    <small>Memblokir</small>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+          {!current.eligible && current.status === 'NOT_STARTED' && canEmergency && (
+            <div className="emergency-action">
+              <Alert tone="danger" title="Pengecualian Admin">
+                Emergency Start tetap dicatat sebagai preflight blocked dan diaudit.
+              </Alert>
+              <Field label="Alasan override" htmlFor="emergencyReason" required>
+                <Textarea
+                  id="emergencyReason"
+                  value={emergencyReason}
+                  onChange={(event) => setEmergencyReason(event.target.value)}
+                  maxLength={1000}
+                />
+              </Field>
+              <Button
+                variant="danger"
+                leadingIcon={<AlertTriangle />}
+                disabled={emergencyReason.trim().length < 10}
+                loading={action.isPending}
+                onClick={() => {
+                  if (window.confirm('Mulai Shift walaupun preflight masih blocked?'))
+                    action.mutate('emergency');
+                }}
+              >
+                Emergency Start
+              </Button>
+            </div>
+          )}
+        </ContextRail>
+      </div>
     </div>
   );
 }
@@ -503,7 +555,7 @@ export function ShiftResolutionPage() {
       <PageHeader
         eyebrow="Assignment Resolution"
         title="Selesaikan vacancy dan conflict"
-        description="Issue hanya dianggap selesai setelah movement Approved atau Shift berakhir."
+        description="Issue hanya dianggap selesai setelah perpindahan Approved atau Shift berakhir."
       />
       {context.isLoading && <ShiftSkeleton />}
       {context.data?.issues.length === 0 && (
@@ -541,14 +593,6 @@ export function ShiftResolutionPage() {
   );
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
 function ShiftSkeleton() {
   return (
     <div className="list-skeleton">

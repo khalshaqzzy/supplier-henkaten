@@ -4387,6 +4387,51 @@ Exit criteria:
 - TMMIN Admin dan Quality memakai shell/refinement baru tanpa memperluas mutation capability.
 - Ringkasan Global dan Tata Kelola Sumber mempunyai fidelity visual tertinggi terhadap referensi.
 
+### 14.11 Supplier Visual Refinement
+
+Status: **done**
+
+Dependency: 14.4-14.10.
+
+Execution:
+
+- Supplier shell/navigation dikelompokkan menjadi Operasional, Data & Konfigurasi, dan Sistem
+  dengan collapse control accessible, supplier/source context, notification count, account
+  identity, breadcrumbs, dan route-focus restoration.
+- Overview, Assignment Board, Default Assignment, Create Henkaten, Henkaten Detail/Approval, dan
+  Shift Detail/Blocked Preflight disusun ulang memakai summary strip, fact strip, filter strip,
+  contextual rail, dense operational panels, dan sticky decision/action surfaces.
+- Setup, Master Data, Shift/Henkaten list, Notifikasi, Audit, auth/account, dan route-state
+  menggunakan hierarchy, loading/error/empty state, interaction feedback, dan Bahasa Indonesia
+  yang konsisten.
+- Composition baru tetap app-local di `supplier-web`; shared Henkaten Design System dan visual
+  TMMIN tidak diubah.
+- API, lifecycle, URL state, authority, field order, capability boundary, source epoch, dan
+  optimistic-version behavior dipertahankan.
+
+Verification:
+
+- Unit coverage mencakup grouped capability navigation, collapse state, Hosted Preparation
+  restriction, breadcrumb/focus restoration, filter apply/persistence, dan capability-aware quick
+  links.
+- Visual review test-only memakai fixture API deterministik dan lifecycle API nyata pada 1672×941
+  serta 1280×720 untuk enam halaman prioritas.
+- Visual journey memeriksa page-level overflow, reduced motion, dan axe; temuan accessible naming,
+  prohibited ARIA, serta contrast diperbaiki pada source.
+- Full repository parity checks selesai: clean install, format, lint, typecheck, 92 unit tests,
+  OpenAPI drift, production build, PostgreSQL verification, 32 integration tests, empat Chromium
+  dan dua Edge journeys, containerized Gitleaks, dan diff check lulus.
+
+Data/migration impact:
+
+- Tidak ada database migration, endpoint, backend lifecycle, atau breaking contract baru.
+
+Exit criteria:
+
+- Seluruh Supplier role tetap melihat dan mengubah hanya capability/scope yang diizinkan.
+- Keenam halaman prioritas mencapai fidelity enterprise yang padat dan stabil pada kedua viewport.
+- Phase 15.1 kembali menjadi next recommended subphase setelah validation lengkap.
+
 Phase 14 exit criteria:
 
 - Seluruh major PRD acceptance flow berjalan pada local full stack tanpa fixture-only production behavior.

@@ -47,7 +47,7 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
   await supplier.getByLabel('Username').fill('supplier.admin');
   await supplier.getByLabel('Password').fill(supplierPassword);
   await supplier.getByRole('button', { name: 'Masuk' }).click();
-  await expect(supplier.getByRole('heading', { name: 'Supplier Overview' })).toBeVisible();
+  await expect(supplier.getByRole('heading', { name: 'Overview Supplier' })).toBeVisible();
 
   await createResource(supplier, 'lines', {
     'Kode line': 'LINE-ONBOARD',
@@ -107,9 +107,12 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
     ['MP Onboarding', 'MP Onboarding · REG-ONBOARD-4'],
   ] as const) {
     await supplier.getByRole('button', { name: 'Assign' }).first().click();
-    await supplier.getByLabel('Member tersedia').selectOption({ label: optionLabel });
-    await supplier.getByRole('button', { name: 'Konfirmasi perubahan' }).click();
-    await expect(supplier.getByText(memberLabel)).toBeVisible();
+    const assignmentSheet = supplier.getByRole('dialog');
+    await expect(assignmentSheet).toBeVisible();
+    await assignmentSheet.getByLabel('Member tersedia').selectOption({ label: optionLabel });
+    await assignmentSheet.getByRole('button', { name: 'Konfirmasi perubahan' }).click();
+    await expect(assignmentSheet).toBeHidden();
+    await expect(supplier.getByText(memberLabel, { exact: true }).first()).toBeVisible();
   }
 
   await supplier.goto(`${runtime.supplierOrigin}/setup`);

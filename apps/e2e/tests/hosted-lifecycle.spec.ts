@@ -1,4 +1,5 @@
-import { expect } from '@playwright/test';
+import { AxeBuilder } from '@axe-core/playwright';
+import { expect, type Page, type TestInfo } from '@playwright/test';
 
 import {
   createHostedFixture,
@@ -13,7 +14,7 @@ import {
 
 test('proves shift, four-4M, approval, rejection, clone, warning and realtime behavior', async ({
   trackedBrowser: browser,
-}) => {
+}, testInfo) => {
   const tmminContext = await browser.newContext();
   const tmminCsrf = await loginBootstrapThroughApi(tmminContext.request);
   const fixture = await createHostedFixture(browser, tmminContext.request, tmminCsrf, 'lifecycle');
@@ -78,6 +79,18 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
     'e2e-start-lifecycle',
   );
   expect(active.status).toBe('ACTIVE');
+  await captureSupplierPage(
+    fixture.context,
+    `${runtime.supplierOrigin}/master-data/default-assignments?lineId=${fixture.line.id}`,
+    'default-assignments',
+    testInfo,
+  );
+  await captureSupplierPage(
+    leader.context,
+    `${runtime.supplierOrigin}/henkatens/new?shiftRunId=${active.id}&jobId=${fixture.job.id}`,
+    'create-henkaten',
+    testInfo,
+  );
 
   const blockedLine = await post<{ id: string }>(
     fixture.request,
@@ -126,6 +139,12 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
   );
   expect(blockedStart.status()).toBe(409);
   expect((await blockedStart.json()).code).toBe('STATE_CONFLICT');
+  await captureSupplierPage(
+    fixture.context,
+    `${runtime.supplierOrigin}/shifts/${blockedPlan.id}`,
+    'blocked-shift',
+    testInfo,
+  );
   const overridden = await post<Shift>(
     fixture.request,
     `/api/v1/supplier/shifts/${blockedPlan.id}/emergency-start`,
@@ -141,6 +160,7 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
   await boardPage.goto(`${runtime.supplierOrigin}/board`);
   await expect(boardPage.getByText('Live')).toBeVisible();
   await expect(boardPage.getByText('Open Henkaten').locator('..').getByText('0')).toBeVisible();
+  await captureSupplierVisuals(boardPage, 'assignment-board', testInfo);
 
   const invalid = await leader.context.request.post(
     `${runtime.apiOrigin}/api/v1/supplier/henkatens`,
@@ -166,6 +186,12 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
       { timeout: 5_000 },
     )
     .toBe(1);
+  await captureSupplierPage(
+    fixture.context,
+    `${runtime.supplierOrigin}/`,
+    'supplier-overview',
+    testInfo,
+  );
   const warnings = await get<{ items: Array<{ supplierId: string; openWarningCount: number }> }>(
     tmminContext.request,
     '/api/v1/tmmin/warnings/affected-parts',
@@ -183,6 +209,12 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
     'e2e-machine-supervisor',
   );
   expect(supervisorApproved.status).toBe('OPEN');
+  await captureSupplierPage(
+    qc.context,
+    `${runtime.supplierOrigin}/henkatens/${machine.id}`,
+    'henkaten-detail-approval',
+    testInfo,
+  );
   const fullyApproved = await post<Henkaten>(
     qc.context.request,
     `/api/v1/supplier/henkatens/${machine.id}/decisions`,
@@ -395,4 +427,41 @@ function createHenkaten(
     201,
     `e2e-${key}`,
   );
+}
+
+async function captureSupplierPage(
+  context: Awaited<ReturnType<typeof loginRole>>['context'],
+  url: string,
+  slug: string,
+  testInfo: TestInfo,
+) {
+  if (process.env.E2E_VISUAL_CAPTURE !== '1') return;
+  const page = await context.newPage();
+  await page.goto(url);
+  await expect(page.locator('h1')).toBeVisible();
+  await captureSupplierVisuals(page, slug, testInfo);
+  await page.close();
+}
+
+async function captureSupplierVisuals(page: Page, slug: string, testInfo: TestInfo) {
+  if (process.env.E2E_VISUAL_CAPTURE !== '1') return;
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  for (const viewport of [
+    { width: 1672, height: 941 },
+    { width: 1280, height: 720 },
+  ]) {
+    await page.setViewportSize(viewport);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      viewport.width,
+    );
+    await page.screenshot({
+      path: testInfo.outputPath(`${slug}-${viewport.width}x${viewport.height}.png`),
+      animations: 'disabled',
+      fullPage: false,
+    });
+    if (viewport.width === 1280) {
+      expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    }
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
 }
