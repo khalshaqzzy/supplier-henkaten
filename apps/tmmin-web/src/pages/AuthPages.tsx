@@ -29,10 +29,10 @@ export function LoginPage() {
           <h1>Governance yang tenang, keputusan yang dapat ditelusuri.</h1>
           <p>Pantau sumber Hosted dan External dalam satu boundary yang aman.</p>
         </div>
-        <small>Internal TMMIN access · Session protected</small>
+        <small>Akses internal TMMIN · Session terlindungi</small>
       </section>
       <Card>
-        <span className="tmmin-eyebrow">Secure access</span>
+        <span className="tmmin-eyebrow">Akses aman</span>
         <h2>Masuk ke TMMIN Portal</h2>
         <p>Gunakan identitas internal TMMIN.</p>
         {problem && (
@@ -163,8 +163,8 @@ export function AccountPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Identity & session"
-        title="Account"
+        eyebrow="Identitas dan session"
+        title="Akun"
         description="Tinjau identitas dan batas waktu session aktif."
       />
       <Card className="tmmin-detail-card">

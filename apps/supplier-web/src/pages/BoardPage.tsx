@@ -21,6 +21,13 @@ import { supplierApi, supplierApiOrigin } from '../app/api';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { PageHeader } from '../components/layout';
+import {
+  ContextRail,
+  FactItem,
+  FactStrip,
+  SummaryMetric,
+  SummaryStrip,
+} from '../components/OperationalUI';
 
 export function BoardPage() {
   const { session } = useSession();
@@ -58,6 +65,7 @@ export function BoardPage() {
             void queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'dashboard') });
         },
         onReconnect: () => void queryClient.invalidateQueries({ queryKey: boardKey }),
+        onResync: () => queryClient.invalidateQueries({ queryKey: boardKey }),
       }),
     [boardKey, lineId, queryClient, scope.purpose, scope.supplierId, scope.userId],
   );
@@ -72,12 +80,16 @@ export function BoardPage() {
     .flatMap((job) => job.indicators)
     .filter((item) => item.status === 'OPEN').length;
   const issues = jobs.filter((job) => job.state === 'VACANT' || job.state === 'CONFLICTED').length;
+  const criticalJobs = jobs.filter(
+    (job) => job.state === 'VACANT' || job.state === 'CONFLICTED' || job.state === 'RESERVED',
+  );
+  const contextLine = lines[0];
 
   return (
     <div className="product-page board-page">
       <PageHeader
         eyebrow="Realtime monitoring"
-        title="Supplier Assignment Board"
+        title="Assignment Board Supplier"
         description="Working Assignment dan active change state untuk Shift Run dalam scope Anda."
         actions={
           session!.principal.role === 'LINE_LEADER' ? (
@@ -90,11 +102,19 @@ export function BoardPage() {
       {connection !== 'connected' && (
         <Alert
           tone="warning"
-          title={connection === 'connecting' ? 'Menyambungkan realtime' : 'Data mungkin stale'}
+          title={
+            connection === 'connecting'
+              ? 'Menyambungkan realtime'
+              : connection === 'resyncing'
+                ? 'Menyinkronkan ulang data'
+                : 'Data mungkin stale'
+          }
         >
           {connection === 'connecting'
             ? 'Board sedang membuka koneksi event.'
-            : 'Koneksi event terputus. Data authoritative terakhir tetap ditampilkan.'}
+            : connection === 'resyncing'
+              ? 'Cursor event tidak tersedia. Board sedang mengambil ulang data authoritative.'
+              : 'Koneksi event terputus. Data authoritative terakhir tetap ditampilkan.'}
           {connection === 'disconnected' && (
             <Button size="sm" variant="ghost" onClick={() => realtime.reconnect()}>
               Sambungkan ulang
@@ -125,7 +145,9 @@ export function BoardPage() {
             ? 'Live'
             : connection === 'connecting'
               ? 'Connecting'
-              : 'Disconnected'}
+              : connection === 'resyncing'
+                ? 'Resyncing'
+                : 'Disconnected'}
         </span>
         {board.data && (
           <LastUpdated
@@ -162,123 +184,167 @@ export function BoardPage() {
         />
       )}
       {board.data && lines.length > 0 && (
-        <>
-          <section className="board-metrics">
-            <Metric label="Line aktif" value={lines.length} icon={<Users />} />
-            <Metric label="Job aktif" value={jobs.length} icon={<CheckCircle2 />} />
-            <Metric
-              label="Open Henkaten"
-              value={openIndicators}
-              icon={<Radio />}
-              tone={openIndicators ? 'warning' : undefined}
-            />
-            <Metric
-              label="Assignment issue"
-              value={issues}
-              icon={<AlertTriangle />}
-              tone={issues ? 'danger' : undefined}
-            />
-          </section>
-          <div className="board-lines">
-            {lines.map((line) => (
-              <section key={line.shiftRunId} className="board-line">
-                <header>
-                  <div>
-                    <span>{line.lineCode}</span>
-                    <h2>{line.lineName}</h2>
-                    <p>
-                      {line.shiftName} · {line.businessDate}
-                    </p>
-                  </div>
-                  <dl>
+        <div className="board-workspace">
+          <div className="board-workspace__main">
+            <SummaryStrip label="Ringkasan Assignment Board" className="board-metrics">
+              <SummaryMetric label="Line aktif" value={lines.length} icon={<Users />} />
+              <SummaryMetric label="Job aktif" value={jobs.length} icon={<CheckCircle2 />} />
+              <SummaryMetric
+                label="Open Henkaten"
+                value={openIndicators}
+                icon={<Radio />}
+                tone={openIndicators ? 'warning' : 'neutral'}
+              />
+              <SummaryMetric
+                label="Assignment issue"
+                value={issues}
+                icon={<AlertTriangle />}
+                tone={issues ? 'danger' : 'neutral'}
+              />
+            </SummaryStrip>
+            <div className="board-lines">
+              {lines.map((line) => (
+                <section key={line.shiftRunId} className="board-line">
+                  <header>
                     <div>
-                      <dt>Supervisor</dt>
-                      <dd>{line.supervisor.name ?? 'Kosong'}</dd>
+                      <span>{line.lineCode}</span>
+                      <h2>{line.lineName}</h2>
+                      <p>
+                        {line.shiftName} · {line.businessDate}
+                      </p>
                     </div>
-                    <div>
-                      <dt>Line Leader</dt>
-                      <dd>{line.lineLeader.name ?? 'Kosong'}</dd>
-                    </div>
-                  </dl>
-                  <Link to={`/shifts/${line.shiftRunId}`}>Detail Shift</Link>
-                </header>
-                {line.activeOverride && (
-                  <Alert tone="danger" title="Emergency Start aktif">
-                    {line.activeOverride.reason} · {line.activeOverride.unresolvedIssueCount} issue
-                    belum selesai.
-                  </Alert>
-                )}
-                <div className="board-job-grid">
-                  {line.jobs.map((job) => (
-                    <article
-                      key={job.assignmentId}
-                      className={`board-job is-${job.state.toLowerCase()}`}
-                    >
-                      <header>
-                        <span>{String(job.displayOrder).padStart(2, '0')}</span>
-                        <strong>{job.jobName}</strong>
-                        {job.state === 'ASSIGNED' ? <CheckCircle2 /> : <AlertTriangle />}
-                      </header>
-                      <div className="board-job__person">
-                        <i>
-                          {job.mp.photoThumbnailUrl ? (
-                            <img src={job.mp.photoThumbnailUrl} alt="" />
-                          ) : job.mp.initials ? (
-                            job.mp.initials
-                          ) : (
-                            <UserRound />
-                          )}
-                        </i>
-                        <span>
-                          <strong>{job.mp.name ?? 'Vacant'}</strong>
-                          <small>{job.mp.registrationNumber ?? humanize(job.state)}</small>
-                        </span>
+                    <dl>
+                      <div>
+                        <dt>Supervisor</dt>
+                        <dd>{line.supervisor.name ?? 'Kosong'}</dd>
                       </div>
-                      <div className="board-job__status">
-                        <span>{humanize(job.state)}</span>
-                        <div aria-label={`${job.indicators.length} Henkaten aktif`}>
-                          {job.indicators.map((indicator) => (
-                            <Link
-                              key={indicator.henkatenId}
-                              to={`/henkatens/${indicator.henkatenId}`}
-                              className={`four-m is-${indicator.category.toLowerCase()} is-${indicator.status.toLowerCase()}`}
-                              title={`${indicator.identifier}: ${indicator.category} ${indicator.status}`}
-                            >
-                              {indicator.category[0]}
-                            </Link>
-                          ))}
+                      <div>
+                        <dt>Line Leader</dt>
+                        <dd>{line.lineLeader.name ?? 'Kosong'}</dd>
+                      </div>
+                    </dl>
+                    <Link to={`/shifts/${line.shiftRunId}`}>Detail Shift</Link>
+                  </header>
+                  {line.activeOverride && (
+                    <Alert tone="danger" title="Emergency Start aktif">
+                      {line.activeOverride.reason} · {line.activeOverride.unresolvedIssueCount}{' '}
+                      issue belum selesai.
+                    </Alert>
+                  )}
+                  <div className="board-job-grid">
+                    {line.jobs.map((job) => (
+                      <article
+                        key={job.assignmentId}
+                        className={`board-job is-${job.state.toLowerCase()}`}
+                      >
+                        <header>
+                          <span>{String(job.displayOrder).padStart(2, '0')}</span>
+                          <strong>{job.jobName}</strong>
+                          {job.state === 'ASSIGNED' ? <CheckCircle2 /> : <AlertTriangle />}
+                        </header>
+                        <div className="board-job__person">
+                          <i>
+                            {job.mp.photoThumbnailUrl ? (
+                              <img src={job.mp.photoThumbnailUrl} alt="" />
+                            ) : job.mp.initials ? (
+                              job.mp.initials
+                            ) : (
+                              <UserRound />
+                            )}
+                          </i>
+                          <span>
+                            <strong>{job.mp.name ?? 'Vacant'}</strong>
+                            <small>{job.mp.registrationNumber ?? humanize(job.state)}</small>
+                          </span>
                         </div>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            ))}
+                        <div className="board-job__status">
+                          <span>{humanize(job.state)}</span>
+                          <div role="group" aria-label={`${job.indicators.length} Henkaten aktif`}>
+                            {job.indicators.map((indicator) => (
+                              <Link
+                                key={indicator.henkatenId}
+                                to={`/henkatens/${indicator.henkatenId}`}
+                                className={`four-m is-${indicator.category.toLowerCase()} is-${indicator.status.toLowerCase()}`}
+                                title={`${indicator.identifier}: ${indicator.category} ${indicator.status}`}
+                              >
+                                {indicator.category[0]}
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
           </div>
-        </>
+          <ContextRail
+            eyebrow="Konteks authoritative"
+            title="Status operasional"
+            footer={
+              contextLine && (
+                <Link
+                  className="hds-button hds-button--secondary hds-button--sm"
+                  to={`/shifts/${contextLine.shiftRunId}`}
+                >
+                  Buka detail Shift
+                </Link>
+              )
+            }
+          >
+            {criticalJobs.length ? (
+              <section className="board-critical">
+                <h3>Issue dan reservation</h3>
+                {criticalJobs.slice(0, 6).map((job) => (
+                  <div key={job.assignmentId}>
+                    <AlertTriangle aria-hidden="true" />
+                    <span>
+                      <strong>{job.jobName}</strong>
+                      <small>{humanize(job.state)}</small>
+                    </span>
+                  </div>
+                ))}
+                <Link to="/shifts">Buka resolusi Shift</Link>
+              </section>
+            ) : (
+              <Alert tone="success" title="Assignment stabil">
+                Tidak ada vacancy, conflict, atau reservation pada scope ini.
+              </Alert>
+            )}
+            {contextLine && (
+              <FactStrip label="Ringkasan Shift aktif">
+                <FactItem label="Line" value={contextLine.lineCode} detail={contextLine.lineName} />
+                <FactItem label="Shift" value={contextLine.shiftName} />
+                <FactItem label="Business date" value={contextLine.businessDate} />
+                <FactItem
+                  label="Supervisor"
+                  value={contextLine.supervisor.name ?? 'Belum assigned'}
+                />
+                <FactItem
+                  label="Line Leader"
+                  value={contextLine.lineLeader.name ?? 'Belum assigned'}
+                />
+              </FactStrip>
+            )}
+            <section className="board-legend">
+              <h3>Legenda status</h3>
+              <span>
+                <i className="is-assigned" /> Assigned
+              </span>
+              <span>
+                <i className="is-vacant" /> Vacant
+              </span>
+              <span>
+                <i className="is-reserved" /> Reserved
+              </span>
+              <span>
+                <i className="is-conflicted" /> Conflicted
+              </span>
+            </section>
+          </ContextRail>
+        </div>
       )}
-    </div>
-  );
-}
-
-function Metric({
-  label,
-  value,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: number;
-  icon: React.ReactNode;
-  tone?: string | undefined;
-}) {
-  return (
-    <div className={tone ? `is-${tone}` : undefined}>
-      <span>{icon}</span>
-      <div>
-        <small>{label}</small>
-        <strong>{value}</strong>
-      </div>
     </div>
   );
 }

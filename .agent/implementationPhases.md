@@ -67,12 +67,14 @@ Kondisi repository setelah Phase 0-10:
   `.agent/PAGES.md`;
 - dua React/Vite frontend workspace, shared Henkaten Design System, typed browser API boundary,
   session-aware shells, seluruh Hosted Supplier workflow, dan seluruh TMMIN governance/monitoring
-  workflow tersedia; full Playwright E2E dan remote deployment belum ada;
+  workflow tersedia;
+- local full-stack Compose, centralized realtime outbox fan-out, dan isolated Playwright
+  Chromium/Edge E2E tersedia; production containers dan remote deployment belum ada;
 - materi slide tersedia sebagai reference-only input.
 
-Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8, Phase 9, Phase 10, Phase 11, Phase 12, dan Phase 13**
-Current phase: **Phase 14 - Frontend/Backend Integration dan Full E2E (`planned`)**
-Next subphase: **14.1 Local full-stack harness (`planned`)**
+Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8, Phase 9, Phase 10, Phase 11, Phase 12, Phase 13, dan Phase 14**
+Current phase: **Phase 15 - Production Containers, CI/CD, dan Staging (`planned`)**
+Next subphase: **15.1 Production Dockerfiles (`planned`)**
 
 Tidak ada application behavior yang boleh ditandai implemented sampai source code dan acceptance checks terkait benar-benar tersedia di repository.
 
@@ -4072,7 +4074,7 @@ Phase 13 exit criteria:
 
 ## 22. Phase 14 - Frontend/Backend Integration dan Full E2E
 
-Status: **planned**
+Status: **done**
 
 Goal: menguji seluruh application sebagai satu local full stack dan melakukan hanya backend adjustments yang diizinkan setelah contract freeze.
 
@@ -4091,7 +4093,7 @@ Unlocks:
 
 ### 14.1 Real API Integration Pass
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 12-13.
 
@@ -4117,7 +4119,7 @@ Exit criteria:
 
 ### 14.2 Constrained Backend Adjustments
 
-Status: **planned**
+Status: **done**
 
 Dependency: 14.1.
 
@@ -4157,7 +4159,7 @@ Exit criteria:
 
 ### 14.3 Playwright/PostgreSQL E2E Harness
 
-Status: **planned**
+Status: **done**
 
 Dependency: 14.1.
 
@@ -4186,7 +4188,7 @@ Exit criteria:
 
 ### 14.4 Tenant Onboarding E2E
 
-Status: **planned**
+Status: **done**
 
 Dependency: 14.3.
 
@@ -4211,7 +4213,7 @@ Exit criteria:
 
 ### 14.5 Shift, Henkaten, dan Approval E2E
 
-Status: **planned**
+Status: **done**
 
 Dependency: 14.4.
 
@@ -4240,7 +4242,7 @@ Exit criteria:
 
 ### 14.6 Man Cascade dan Concurrency E2E
 
-Status: **planned**
+Status: **done**
 
 Dependency: 14.5.
 
@@ -4267,7 +4269,7 @@ Exit criteria:
 
 ### 14.7 TMMIN Monitoring E2E
 
-Status: **planned**
+Status: **done**
 
 Dependency: 14.5-14.6.
 
@@ -4293,7 +4295,7 @@ Exit criteria:
 
 ### 14.8 External API E2E
 
-Status: **planned**
+Status: **done**
 
 Dependency: 14.7.
 
@@ -4320,7 +4322,7 @@ Exit criteria:
 
 ### 14.9 Accessibility dan Desktop Browser Pass
 
-Status: **planned**
+Status: **done**
 
 Dependency: 14.4-14.8.
 
@@ -4345,6 +4347,90 @@ Data/migration impact:
 Exit criteria:
 
 - Local full stack meets desktop UX acceptance.
+
+### 14.10 TMMIN Visual Refinement
+
+Status: **done**
+
+Dependency: 14.4-14.9.
+
+Execution:
+
+- TMMIN shell/navigation dikelompokkan menjadi Monitoring, Tata Kelola, Dukungan, dan Sistem dengan
+  collapse control yang mempertahankan capability filtering.
+- Ringkasan Global disusun ulang mengikuti referensi visual dengan URL-authoritative filters,
+  source-split metrics, server-bucketed trends, ranking tabs, freshness and ingestion summaries,
+  activity panels, serta supplier-risk table.
+- Dashboard read model diperluas secara additive dengan trend buckets, freshness summary, dan
+  deterministic supplier-risk overview; OpenAPI dan typed client diregenerasi.
+- Tata Kelola Sumber serta seluruh route TMMIN dipoles memakai hierarchy, density, Bahasa
+  Indonesia, source-aware evidence, dan read-only Quality boundary yang konsisten.
+- TMMIN-only composition tetap berada di `tmmin-web`; primitive generik dan visual Supplier Portal
+  tidak diubah.
+
+Verification:
+
+- Unit/contract checks mencakup bucket granularity, zero-fill, source/outcome classification,
+  filter apply/reset, URL persistence, dashboard composition, dan navigation collapse.
+- Visual review memakai data deterministik pada 1672×941 dan 1280×720 serta membandingkan ulang
+  `tmmin-global-overview.png` dan `source-governance.png`.
+- PostgreSQL integration, Chromium/Edge E2E, dan containerized Gitleaks tetap harus dijalankan pada
+  host dengan Docker daemon aktif.
+
+Data/migration impact:
+
+- Tidak ada schema database migration atau endpoint mutation baru.
+- Contract dashboard hanya bertambah secara additive.
+
+Exit criteria:
+
+- TMMIN Admin dan Quality memakai shell/refinement baru tanpa memperluas mutation capability.
+- Ringkasan Global dan Tata Kelola Sumber mempunyai fidelity visual tertinggi terhadap referensi.
+
+### 14.11 Supplier Visual Refinement
+
+Status: **done**
+
+Dependency: 14.4-14.10.
+
+Execution:
+
+- Supplier shell/navigation dikelompokkan menjadi Operasional, Data & Konfigurasi, dan Sistem
+  dengan collapse control accessible, supplier/source context, notification count, account
+  identity, breadcrumbs, dan route-focus restoration.
+- Overview, Assignment Board, Default Assignment, Create Henkaten, Henkaten Detail/Approval, dan
+  Shift Detail/Blocked Preflight disusun ulang memakai summary strip, fact strip, filter strip,
+  contextual rail, dense operational panels, dan sticky decision/action surfaces.
+- Setup, Master Data, Shift/Henkaten list, Notifikasi, Audit, auth/account, dan route-state
+  menggunakan hierarchy, loading/error/empty state, interaction feedback, dan Bahasa Indonesia
+  yang konsisten.
+- Composition baru tetap app-local di `supplier-web`; shared Henkaten Design System dan visual
+  TMMIN tidak diubah.
+- API, lifecycle, URL state, authority, field order, capability boundary, source epoch, dan
+  optimistic-version behavior dipertahankan.
+
+Verification:
+
+- Unit coverage mencakup grouped capability navigation, collapse state, Hosted Preparation
+  restriction, breadcrumb/focus restoration, filter apply/persistence, dan capability-aware quick
+  links.
+- Visual review test-only memakai fixture API deterministik dan lifecycle API nyata pada 1672×941
+  serta 1280×720 untuk enam halaman prioritas.
+- Visual journey memeriksa page-level overflow, reduced motion, dan axe; temuan accessible naming,
+  prohibited ARIA, serta contrast diperbaiki pada source.
+- Full repository parity checks selesai: clean install, format, lint, typecheck, 92 unit tests,
+  OpenAPI drift, production build, PostgreSQL verification, 32 integration tests, empat Chromium
+  dan dua Edge journeys, containerized Gitleaks, dan diff check lulus.
+
+Data/migration impact:
+
+- Tidak ada database migration, endpoint, backend lifecycle, atau breaking contract baru.
+
+Exit criteria:
+
+- Seluruh Supplier role tetap melihat dan mengubah hanya capability/scope yang diizinkan.
+- Keenam halaman prioritas mencapai fidelity enterprise yang padat dan stabil pada kedua viewport.
+- Phase 15.1 kembali menjadi next recommended subphase setelah validation lengkap.
 
 Phase 14 exit criteria:
 
@@ -5216,20 +5302,18 @@ No acceptance criterion may remain without an owning phase.
 
 Current recommended batch:
 
-1. Begin Phase 14 with a deterministic local full-stack harness for both identity realms.
-2. Add Playwright ownership for cross-realm authentication, Hosted operations, TMMIN monitoring,
-   source transitions, External ingestion, and realtime propagation.
-3. Permit only backward-compatible backend adjustments discovered through executable full-stack
-   evidence.
+1. Begin Phase 15 with separate production multi-stage images for the API and both web apps.
+2. Add Caddy/TLS and remote Compose without reusing the development-only `Dockerfile.local`.
+3. Extend release/security automation and validate the staging deployment only after production
+   runtime gates pass.
 
 Initial implementation order inside the next coding batch:
 
-1. create isolated full-stack fixture/bootstrap and cleanup automation;
-2. exercise Supplier and TMMIN sessions without sharing cookie or cache state;
-3. cover Hosted/External drill-down, cutover, warning, Board, and notification propagation;
-4. retain the frozen 130-path/146-operation contract unless an explicit additive correction is
-   proven;
-5. keep Phase 15 deployment files behind completed full-stack acceptance.
+1. create pinned, non-root production image definitions with explicit health behavior;
+2. add Caddy routing and environment separation for Supplier, TMMIN, API, and PostgreSQL;
+3. preserve operator-driven credentials and production secret boundaries;
+4. extend GitHub Actions image, security, release, and rollback gates;
+5. deploy and verify staging only after the production Compose topology passes locally.
 
 ## 32. Deferred dan Explicitly Out-of-scope
 

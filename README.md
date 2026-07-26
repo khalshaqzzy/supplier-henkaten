@@ -1,10 +1,9 @@
 # Enterprise Digital Henkaten Management
 
-TypeScript monorepo for the TMMIN Supplier Digital Henkaten platform. Phase 0-4 provides the
-NestJS/Express API foundation, Prisma/PostgreSQL persistence, authentication, tenant governance,
-TMMIN administration, supplier provisioning, controlled Hosted Preparation, Hosted master data,
-versioned 4M checklists, and default assignments. Frontends and Henkaten operational domains are
-not implemented yet.
+TypeScript monorepo for the TMMIN Supplier Digital Henkaten platform. It contains the
+NestJS/Express API, Prisma/PostgreSQL persistence, Supplier and TMMIN React applications, Hosted
+Henkaten operations, External supplier ingestion, read models, realtime invalidation, and isolated
+full-stack browser journeys.
 
 ## Prerequisites
 
@@ -29,8 +28,13 @@ pnpm validate
 The active workspaces are:
 
 - `@tmmin-henkaten/api` — NestJS API, Prisma client/migrations, OpenAPI, auth, and administration;
+- `@tmmin-henkaten/supplier-web` — Hosted Supplier operations and monitoring application;
+- `@tmmin-henkaten/tmmin-web` — cross-supplier governance and monitoring application;
 - `@tmmin-henkaten/contracts` — shared Zod runtime contracts and TypeScript types;
-- `@tmmin-henkaten/test-fixtures` — deterministic test-only builders.
+- `@tmmin-henkaten/api-client` — typed browser API and realtime clients;
+- `@tmmin-henkaten/ui` — shared accessible UI primitives;
+- `@tmmin-henkaten/test-fixtures` — deterministic test-only builders;
+- `@tmmin-henkaten/e2e` — disposable PostgreSQL and Playwright full-stack journeys.
 
 ## Local PostgreSQL
 
@@ -66,6 +70,45 @@ pnpm admin:recover
 
 Both commands deliberately keep credentials out of arguments and logs. Bootstrap is idempotent;
 recovery rotates the protected administrator password and revokes its sessions.
+
+## Local full stack
+
+Copy `.env.example` to an untracked `.env` and provide the protected TMMIN bootstrap identity and
+local secrets. The development-only image and root Compose `fullstack` profile run migrations, API,
+and both Vite applications:
+
+```bash
+pnpm local:up
+pnpm local:wait
+pnpm local:bootstrap
+pnpm local:logs
+```
+
+Open Supplier at `http://localhost:5173`, TMMIN at `http://localhost:5174`, and the API health probe
+at `http://localhost:3000/health`. PostgreSQL remains available at `127.0.0.1:55432`.
+
+```bash
+pnpm local:down
+```
+
+`local:down` preserves the PostgreSQL and private-photo volumes. `local:destroy` is the explicit
+destructive command that removes both. The local Dockerfile is a pinned development runtime, not a
+production image.
+
+## Full-stack browser journeys
+
+Install the pinned browsers once, then run the complete Chromium suite or the critical Edge smoke:
+
+```bash
+pnpm e2e:install
+pnpm test:e2e
+pnpm test:e2e:edge
+```
+
+Each spec receives a unique pgvector Compose project, dynamic loopback ports, fresh migrations, an
+operator-CLI bootstrap identity, and isolated application processes. The runner destroys its
+containers, network, volumes, photo storage, and processes even after failure. Failure diagnostics
+are written to root `test-results/e2e`, `playwright-report`, and `blob-report`.
 
 ## Tests and generated contracts
 

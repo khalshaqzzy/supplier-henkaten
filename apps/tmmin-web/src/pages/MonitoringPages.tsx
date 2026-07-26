@@ -4,11 +4,14 @@ import {
   BellRing,
   Boxes,
   Clock3,
+  DatabaseZap,
   Factory,
+  PackageSearch,
   RefreshCw,
   ShieldAlert,
-  Siren,
+  TriangleAlert,
 } from 'lucide-react';
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import {
@@ -34,6 +37,7 @@ import { QueryState } from './StatePages';
 export function OverviewPage() {
   const { session } = useTmminSession();
   const [params, setParams] = useSearchParams();
+  const fallbackRange = useMemo(() => defaultDashboardRange(), []);
   const query = queryObject(params, [
     'supplierId',
     'sourceMode',
@@ -47,6 +51,9 @@ export function OverviewPage() {
     'freshness',
     'granularity',
   ]);
+  query.from ??= fallbackRange.from;
+  query.to ??= fallbackRange.to;
+  query.granularity ??= 'DAY';
   const result = useQuery({
     queryKey: tmminKey(session!.principal.userId, 'dashboard', query),
     queryFn: () =>
@@ -55,9 +62,9 @@ export function OverviewPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Cross-supplier monitoring"
-        title="Global Overview"
-        description="Satu read model untuk Henkaten Hosted, proyeksi External, warning, override, dan freshness."
+        eyebrow="Monitoring lintas supplier"
+        title="Ringkasan Global"
+        description="Pantau risiko, warning, dan freshness dari sumber Hosted dan External dalam satu tampilan."
         actions={
           <UpdatedAt
             value={result.data?.generatedAt}
@@ -66,171 +73,260 @@ export function OverviewPage() {
           />
         }
       />
-      <div className="tmmin-filter-strip">
-        <NativeSelect
-          aria-label="Status"
-          value={params.get('status') ?? ''}
-          onChange={(event) => updateParam(params, setParams, 'status', event.target.value)}
-        >
-          <option value="">Semua status</option>
-          <option value="OPEN">Open</option>
-          <option value="APPROVED">Approved</option>
-          <option value="REJECTED">Rejected</option>
-          <option value="CANCELLED">Cancelled</option>
-        </NativeSelect>
-        <NativeSelect
-          aria-label="Kategori 4M"
-          value={params.get('category') ?? ''}
-          onChange={(event) => updateParam(params, setParams, 'category', event.target.value)}
-        >
-          <option value="">Semua 4M</option>
-          <option value="MAN">Man</option>
-          <option value="MACHINE">Machine</option>
-          <option value="MATERIAL">Material</option>
-          <option value="METHOD">Method</option>
-        </NativeSelect>
-        <NativeSelect
-          aria-label="Aging"
-          value={params.get('aging') ?? ''}
-          onChange={(event) => updateParam(params, setParams, 'aging', event.target.value)}
-        >
-          <option value="">Semua aging</option>
-          <option value="UNDER_4_HOURS">&lt; 4 jam</option>
-          <option value="FOUR_TO_EIGHT_HOURS">4–8 jam</option>
-          <option value="EIGHT_TO_24_HOURS">8–24 jam</option>
-          <option value="OVER_24_HOURS">&gt; 24 jam</option>
-        </NativeSelect>
-        <NativeSelect
-          aria-label="Freshness"
-          value={params.get('freshness') ?? ''}
-          onChange={(event) => updateParam(params, setParams, 'freshness', event.target.value)}
-        >
-          <option value="">Semua freshness</option>
-          <option value="FRESH">Fresh</option>
-          <option value="WARNING">Warning</option>
-          <option value="STALE">Stale</option>
-          <option value="NO_DATA">No data</option>
-        </NativeSelect>
-      </div>
+      <DashboardFilters
+        key={params.toString()}
+        params={params}
+        suppliers={result.data?.filterOptions.suppliers ?? []}
+        fallbackRange={fallbackRange}
+        onApply={setParams}
+      />
       {result.isLoading ? (
         <DashboardSkeleton />
       ) : result.error || !result.data ? (
         <QueryState error={result.error} retry={() => void result.refetch()} />
       ) : (
         <>
-          <div className="tmmin-stat-grid">
-            <StatCard
-              label="Active suppliers"
-              value={result.data.suppliers.active}
-              detail={`${result.data.suppliers.hosted} Hosted · ${result.data.suppliers.external} External`}
-              icon={<Factory />}
-            />
-            <StatCard
-              label="Open Henkaten"
-              value={result.data.openHenkatens}
-              detail={`${result.data.affectedParts} affected parts`}
-              icon={<Boxes />}
+          <div className="tmmin-kpi-grid">
+            <section className="tmmin-source-kpi" aria-label="Supplier aktif berdasarkan sumber">
+              <header>
+                <Factory />
+                <span>Supplier aktif berdasarkan sumber</span>
+              </header>
+              <div>
+                <SourceMetric
+                  label="Hosted"
+                  value={result.data.suppliers.hosted}
+                  total={result.data.suppliers.active}
+                  tone="hosted"
+                />
+                <SourceMetric
+                  label="External"
+                  value={result.data.suppliers.external}
+                  total={result.data.suppliers.active}
+                  tone="external"
+                />
+              </div>
+            </section>
+            <DashboardMetric
+              label="Supplier dengan warning"
+              value={result.data.suppliers.withWarnings}
+              detail="Perlu ditinjau"
+              icon={<TriangleAlert />}
               tone="warning"
             />
-            <StatCard
-              label="Active warnings"
-              value={result.data.suppliers.withWarnings}
-              detail="Supplier membutuhkan perhatian"
-              icon={<Siren />}
+            <DashboardMetric
+              label="Open Henkaten"
+              value={result.data.openHenkatens}
+              detail="Lintas semua sumber"
+              icon={<Boxes />}
+              tone="orange"
+            />
+            <DashboardMetric
+              label="Masalah aging"
+              value={result.data.aging.find(({ bucket }) => bucket === 'OVER_24_HOURS')?.count ?? 0}
+              detail="Lebih dari 24 jam"
+              icon={<Clock3 />}
+              tone="warning"
+            />
+            <DashboardMetric
+              label="Affected parts"
+              value={result.data.affectedParts}
+              detail="Part dengan warning aktif"
+              icon={<PackageSearch />}
+              tone="violet"
+            />
+            <DashboardMetric
+              label="Masalah freshness"
+              value={
+                result.data.freshnessSummary.warning +
+                result.data.freshnessSummary.stale +
+                result.data.freshnessSummary.noData
+              }
+              detail="Warning, stale, atau tanpa data"
+              icon={<DatabaseZap />}
               tone="danger"
             />
-            <StatCard
-              label="Emergency overrides"
-              value={result.data.emergencyOverrides}
-              detail="Hosted shift starts"
-              icon={<ShieldAlert />}
-            />
           </div>
-          <div className="tmmin-dashboard-grid">
-            <Panel title="Henkaten by 4M" description="Hosted + External filtered total">
+          <div className="tmmin-trend-grid">
+            <Panel title="Tren Henkaten" description="Volume Hosted, External, dan total">
               <ChartFrame
                 title=""
-                data={result.data.byCategory}
-                xKey="label"
-                kind="bar"
-                series={[{ dataKey: 'count', label: 'Henkaten', color: 'var(--hds-brand-accent)' }]}
-              />
-            </Panel>
-            <Panel title="Outcome distribution" description="Terminal Henkaten status">
-              <ChartFrame
-                title=""
-                data={result.data.outcomes}
-                xKey="label"
-                kind="bar"
+                data={result.data.trend.map((item) => ({
+                  ...item,
+                  bucket: trendLabel(item.bucketStart, query.granularity),
+                }))}
+                xKey="bucket"
+                kind="line"
                 series={[
-                  { dataKey: 'count', label: 'Records', color: 'var(--hds-color-blue-600)' },
+                  { dataKey: 'hosted', label: 'Hosted', color: 'var(--hds-state-success-accent)' },
+                  { dataKey: 'external', label: 'External', color: 'var(--hds-state-info-accent)' },
+                  { dataKey: 'total', label: 'Total', color: 'var(--hds-color-slate-500)' },
                 ]}
               />
             </Panel>
-            <Panel title="Warning aging" description="Open warning exposure">
-              <div className="tmmin-aging">
-                {result.data.aging.map((item) => (
-                  <div key={item.bucket}>
-                    <span>{agingLabel(item.bucket)}</span>
-                    <strong>{item.count}</strong>
-                  </div>
-                ))}
-              </div>
+            <Panel title="Tren outcome" description="Status lifecycle per periode">
+              <ChartFrame
+                title=""
+                data={result.data.trend.map((item) => ({
+                  ...item,
+                  bucket: trendLabel(item.bucketStart, query.granularity),
+                }))}
+                xKey="bucket"
+                kind="line"
+                series={[
+                  {
+                    dataKey: 'approved',
+                    label: 'Approved',
+                    color: 'var(--hds-state-success-accent)',
+                  },
+                  { dataKey: 'open', label: 'Open', color: 'var(--hds-state-warning-accent)' },
+                  {
+                    dataKey: 'rejected',
+                    label: 'Rejected',
+                    color: 'var(--hds-state-danger-accent)',
+                  },
+                  {
+                    dataKey: 'cancelled',
+                    label: 'Cancelled',
+                    color: 'var(--hds-color-slate-400)',
+                  },
+                ]}
+              />
             </Panel>
-            <Panel title="External ingestion" description="Authoritative activity counters">
-              <div className="tmmin-ingestion-stats">
+            <RankingPanel rankings={result.data.rankings} />
+          </div>
+          <div className="tmmin-signal-grid">
+            <Panel title="Ringkasan freshness" description="Kondisi data supplier saat ini">
+              <FreshnessSummary
+                summary={result.data.freshnessSummary}
+                total={
+                  result.data.freshnessSummary.fresh +
+                  result.data.freshnessSummary.warning +
+                  result.data.freshnessSummary.stale +
+                  result.data.freshnessSummary.noData
+                }
+              />
+            </Panel>
+            <Panel title="Kesehatan ingesti" description="Aktivitas External authoritative">
+              <div className="tmmin-health-list">
+                <HealthRow
+                  label="Accepted"
+                  value={result.data.externalIngestion.accepted}
+                  tone="success"
+                />
+                <HealthRow
+                  label="Duplicate"
+                  value={result.data.externalIngestion.duplicate}
+                  tone="warning"
+                />
+                <HealthRow
+                  label="Rejected"
+                  value={result.data.externalIngestion.rejected}
+                  tone="danger"
+                />
+              </div>
+              <Link className="tmmin-panel-link" to="/external-health">
+                Buka kesehatan External
+              </Link>
+            </Panel>
+            <Panel title="Emergency override" description="Start Shift Hosted">
+              <div className="tmmin-override-summary">
+                <ShieldAlert aria-hidden="true" />
                 <div>
-                  <strong>{result.data.externalIngestion.accepted}</strong>
-                  <span>Accepted</span>
-                </div>
-                <div>
-                  <strong>{result.data.externalIngestion.duplicate}</strong>
-                  <span>Duplicate</span>
-                </div>
-                <div>
-                  <strong>{result.data.externalIngestion.rejected}</strong>
-                  <span>Rejected</span>
+                  <strong>{result.data.emergencyOverrides}</strong>
+                  <span>override pada scope filter</span>
                 </div>
               </div>
+              {result.data.recentOverrides.slice(0, 2).map((override) => (
+                <Link
+                  key={override.shiftRunId}
+                  className="tmmin-compact-link"
+                  to={`/hosted-support/${override.supplierId}/shifts/${override.shiftRunId}`}
+                >
+                  <span>{override.supplierName}</span>
+                  <small>{override.lineName}</small>
+                </Link>
+              ))}
+            </Panel>
+            <Panel title="Aktivitas External" description="Accepted dan rejected">
+              <div className="tmmin-external-activity">
+                <div>
+                  <span>Accepted</span>
+                  <strong>{result.data.externalIngestion.accepted}</strong>
+                </div>
+                <div>
+                  <span>Rejected</span>
+                  <strong>{result.data.externalIngestion.rejected}</strong>
+                </div>
+              </div>
+              <Link className="tmmin-panel-link" to="/external-health">
+                Lihat aktivitas External
+              </Link>
             </Panel>
           </div>
-          <div className="tmmin-wide-grid">
-            <Panel title="Supplier ranking" description="Highest filtered Henkaten volume">
-              <RankList items={result.data.rankings.suppliers} />
-            </Panel>
-            <Panel title="Data freshness" description="Source-specific last data time">
+          <Panel
+            title="Ringkasan risiko supplier"
+            description="Maksimal 10 supplier, diurutkan server berdasarkan Open Henkaten dan warning"
+            action={
+              <Link className="tmmin-panel-link" to="/suppliers">
+                Lihat semua supplier
+              </Link>
+            }
+          >
+            {result.data.supplierOverview.length === 0 ? (
+              <div className="tmmin-inline-empty">
+                <Factory aria-hidden="true" />
+                <div>
+                  <strong>Belum ada supplier pada scope ini</strong>
+                  <span>Ubah filter atau periksa status supplier.</span>
+                </div>
+              </div>
+            ) : (
               <div className="tmmin-table-scroll">
-                <table className="tmmin-table">
+                <table className="tmmin-table tmmin-risk-table">
                   <thead>
                     <tr>
                       <th>Supplier</th>
-                      <th>Source</th>
-                      <th>State</th>
-                      <th>Last data</th>
-                      <th>Warnings</th>
+                      <th>Sumber</th>
+                      <th>Open Henkaten</th>
+                      <th>Warning</th>
+                      <th>Aging &gt;24j</th>
+                      <th>Freshness</th>
+                      <th>Data terakhir</th>
+                      <th />
                     </tr>
                   </thead>
                   <tbody>
-                    {result.data.freshness.map((row) => (
+                    {result.data.supplierOverview.map((row) => (
                       <tr key={row.supplierId}>
                         <td>
-                          <Link to={`/suppliers/${row.supplierId}`}>
-                            {row.supplierCode} · {row.supplierName}
-                          </Link>
+                          <strong>{row.supplierName}</strong>
+                          <small>{row.supplierCode}</small>
                         </td>
-                        <td>{row.sourceMode}</td>
                         <td>
-                          <StatusBadge tone={freshnessTone(row.state)}>{row.state}</StatusBadge>
+                          <StatusBadge tone={row.sourceMode === 'HOSTED' ? 'success' : 'info'}>
+                            {row.sourceMode}
+                          </StatusBadge>
+                        </td>
+                        <td className="tmmin-number tmmin-emphasis">{row.openHenkatens}</td>
+                        <td className="tmmin-number">{row.activeWarnings}</td>
+                        <td className="tmmin-number">{row.over24HourWarnings}</td>
+                        <td>
+                          <StatusBadge tone={freshnessTone(row.freshness)}>
+                            {freshnessLabel(row.freshness)}
+                          </StatusBadge>
                         </td>
                         <td>{dateTime(row.lastDataAt)}</td>
-                        <td className="tmmin-number">{row.activeWarnings}</td>
+                        <td>
+                          <Link to={`/suppliers/${row.supplierId}`}>Lihat</Link>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            </Panel>
-          </div>
+            )}
+          </Panel>
         </>
       )}
     </>
@@ -248,9 +344,9 @@ export function WarningsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Active warning registry"
-        title="Active Warnings"
-        description="Affected part groups remain open until their source Henkaten reaches a terminal state."
+        eyebrow="Registry warning aktif"
+        title="Peringatan Aktif"
+        description="Affected part tetap terbuka sampai seluruh sumber Henkaten mencapai status terminal."
         actions={<UpdatedAt fetching={result.isFetching} retry={() => void result.refetch()} />}
       />
       {result.isLoading ? (
@@ -270,8 +366,8 @@ export function WarningsPage() {
                 <tr>
                   <th>Supplier</th>
                   <th>Part</th>
-                  <th>Oldest warning</th>
-                  <th>Open instances</th>
+                  <th>Warning tertua</th>
+                  <th>Instance Open</th>
                   <th />
                 </tr>
               </thead>
@@ -289,7 +385,7 @@ export function WarningsPage() {
                       <Link
                         to={`/warnings/${row.supplierId}/${encodeURIComponent(row.partNumber)}`}
                       >
-                        View details
+                        Lihat detail
                       </Link>
                     </td>
                   </tr>
@@ -321,17 +417,17 @@ export function WarningDetailPage() {
         description={`${result.data.openWarningCount} open source records contribute to this affected-part warning.`}
       />
       <Panel
-        title="Source records"
-        description="Lifecycle remains authoritative in Hosted or External Henkaten."
+        title="Record sumber"
+        description="Lifecycle tetap authoritative pada Henkaten Hosted atau External."
       >
         <div className="tmmin-table-scroll">
           <table className="tmmin-table">
             <thead>
               <tr>
-                <th>Source</th>
+                <th>Sumber</th>
                 <th>Record</th>
                 <th>Status</th>
-                <th>Opened</th>
+                <th>Dibuka</th>
               </tr>
             </thead>
             <tbody>
@@ -382,9 +478,9 @@ export function HenkatenExplorerPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Unified source-aware explorer"
-        title="Global Henkaten Explorer"
-        description="Hosted identity and External snapshots remain visibly distinct while sharing one stable ordering."
+        eyebrow="Penelusuran source-aware"
+        title="Penelusuran Henkaten"
+        description="Identitas Hosted dan snapshot External tetap terpisah dalam satu urutan stabil."
         actions={<UpdatedAt fetching={result.isFetching} retry={() => void result.refetch()} />}
       />
       <div className="tmmin-filter-strip">
@@ -418,19 +514,19 @@ export function HenkatenExplorerPage() {
       ) : result.data.items.length === 0 ? (
         <QueryState />
       ) : (
-        <Panel title="Henkaten records" description="Server-filtered, source-aware results">
+        <Panel title="Record Henkaten" description="Hasil source-aware yang difilter server">
           <div className="tmmin-table-scroll">
             <table className="tmmin-table">
               <thead>
                 <tr>
                   <th>Record</th>
                   <th>Supplier</th>
-                  <th>Source</th>
+                  <th>Sumber</th>
                   <th>4M</th>
                   <th>Line / job</th>
                   <th>Part</th>
                   <th>Status</th>
-                  <th>Occurred</th>
+                  <th>Terjadi</th>
                 </tr>
               </thead>
               <tbody>
@@ -502,12 +598,12 @@ export function HenkatenDetailPage() {
       <PageHeader
         eyebrow={`${external ? 'External snapshot' : 'Hosted operational record'} · Epoch ${stringValue(data.sourceEpoch)}`}
         title={stringValue(data.sourceHenkatenId) || stringValue(data.identifier) || recordId}
-        description="Source-specific fields are presented without inventing cross-source identity."
+        description="Field spesifik sumber ditampilkan tanpa menciptakan identitas lintas sumber."
       />
       <div className="tmmin-detail-layout">
         <div>
           <Panel
-            title="Context summary"
+            title="Ringkasan konteks"
             description={
               external ? 'Immutable External snapshot boundary' : 'Hosted operational identity'
             }
@@ -536,7 +632,7 @@ export function HenkatenDetailPage() {
           </Panel>
           <Panel
             title={external ? 'Change & checklist snapshot' : 'Hosted evidence'}
-            description="Read-only evidence captured by the authoritative source."
+            description="Evidence hanya baca yang ditangkap oleh sumber authoritative."
           >
             <pre className="tmmin-json">
               {JSON.stringify(
@@ -591,9 +687,9 @@ export function ExternalHealthPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Sanitized ingestion diagnostics"
-        title="External Ingestion Health"
-        description="Freshness, client epoch, and accepted/duplicate/rejected attempts without raw payload or secret exposure."
+        eyebrow="Diagnostik ingesti tersanitasi"
+        title="Kesehatan Ingesti External"
+        description="Freshness, client epoch, dan outcome ingesti tanpa mengekspos payload atau secret."
         actions={
           <UpdatedAt
             value={result.data?.generatedAt}
@@ -629,7 +725,7 @@ export function ExternalHealthPage() {
               tone="warning"
             />
           </div>
-          <Panel title="Supplier freshness" description="Current External source clients">
+          <Panel title="Freshness supplier" description="Client sumber External saat ini">
             <div className="tmmin-table-scroll">
               <table className="tmmin-table">
                 <thead>
@@ -637,8 +733,8 @@ export function ExternalHealthPage() {
                     <th>Supplier</th>
                     <th>Epoch</th>
                     <th>Client</th>
-                    <th>State</th>
-                    <th>Last successful ingestion</th>
+                    <th>Status</th>
+                    <th>Ingesti sukses terakhir</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -668,8 +764,8 @@ export function ExternalHealthPage() {
             </div>
           </Panel>
           <Panel
-            title="Ingestion activity"
-            description="Safe event and correlation lookup fields only"
+            title="Aktivitas ingesti"
+            description="Hanya field event dan correlation yang aman"
           >
             <div className="tmmin-table-scroll">
               <table className="tmmin-table">
@@ -678,9 +774,9 @@ export function ExternalHealthPage() {
                     <th>Outcome</th>
                     <th>Supplier</th>
                     <th>Event</th>
-                    <th>Safe code</th>
+                    <th>Kode aman</th>
                     <th>Correlation</th>
-                    <th>Occurred</th>
+                    <th>Terjadi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -758,16 +854,16 @@ export function AuditPage() {
       ) : result.error || !result.data ? (
         <QueryState error={result.error} retry={() => void result.refetch()} />
       ) : (
-        <Panel title="Audit events" description="Viewing this timeline is itself audited.">
+        <Panel title="Event audit" description="Akses ke timeline ini juga diaudit.">
           <div className="tmmin-table-scroll">
             <table className="tmmin-table">
               <thead>
                 <tr>
-                  <th>Occurred</th>
+                  <th>Terjadi</th>
                   <th>Supplier</th>
                   <th>Action</th>
                   <th>Resource</th>
-                  <th>Source</th>
+                  <th>Sumber</th>
                   <th>Result</th>
                   <th>Correlation</th>
                 </tr>
@@ -824,9 +920,9 @@ export function NotificationsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Role-aware inbox"
-        title="Notifications"
-        description="External warnings reach Admin and Quality; rejected ingestion alerts remain Admin-only."
+        eyebrow="Inbox berbasis role"
+        title="Notifikasi"
+        description="Warning External diterima Admin dan Quality; ingesti ditolak hanya untuk Admin."
       />
       {result.isLoading ? (
         <TableSkeleton />
@@ -846,7 +942,7 @@ export function NotificationsPage() {
                 <small>{dateTime(item.createdAt)}</small>
               </div>
               <div>
-                {item.deepLink && <Link to={item.deepLink}>Open context</Link>}
+                {item.deepLink && <Link to={item.deepLink}>Buka konteks</Link>}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -877,9 +973,9 @@ export function SystemStatusPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Typed browser boundary"
-        title="System Status"
-        description="Readiness accepts healthy and schema-valid 503 not_ready responses; unreachable state remains distinct."
+        eyebrow="Boundary browser bertipe"
+        title="Status Sistem"
+        description="Readiness membedakan kondisi sehat, belum siap, dan endpoint yang tidak dapat dijangkau."
         actions={
           <UpdatedAt
             value={result.data?.checkedAt}
@@ -917,6 +1013,283 @@ export function SystemStatusPage() {
         </div>
       )}
     </>
+  );
+}
+
+function DashboardFilters({
+  params,
+  suppliers,
+  fallbackRange,
+  onApply,
+}: {
+  params: URLSearchParams;
+  suppliers: Array<{ id: string; code: string; name: string; sourceMode: string }>;
+  fallbackRange: { from: string; to: string };
+  onApply: (next: URLSearchParams) => void;
+}) {
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const next = new URLSearchParams();
+    for (const key of [
+      'supplierId',
+      'sourceMode',
+      'status',
+      'category',
+      'line',
+      'part',
+      'aging',
+      'freshness',
+      'granularity',
+    ]) {
+      const value = formText(form, key).trim();
+      if (value) next.set(key, value);
+    }
+    const from = formText(form, 'from');
+    const to = formText(form, 'to');
+    if (from) next.set('from', new Date(`${from}T00:00:00.000Z`).toISOString());
+    if (to) next.set('to', new Date(`${to}T23:59:59.999Z`).toISOString());
+    onApply(next);
+  };
+  return (
+    <form className="tmmin-dashboard-filters" onSubmit={submit}>
+      <div className="tmmin-dashboard-filters__grid">
+        <label>
+          <span>Supplier</span>
+          <NativeSelect name="supplierId" defaultValue={params.get('supplierId') ?? ''}>
+            <option value="">Semua supplier</option>
+            {suppliers.map((supplier) => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.code} · {supplier.name}
+              </option>
+            ))}
+          </NativeSelect>
+        </label>
+        <label>
+          <span>Sumber</span>
+          <NativeSelect name="sourceMode" defaultValue={params.get('sourceMode') ?? ''}>
+            <option value="">Semua sumber</option>
+            <option value="HOSTED">Hosted</option>
+            <option value="EXTERNAL">External</option>
+          </NativeSelect>
+        </label>
+        <label className="tmmin-date-field">
+          <span>Dari tanggal</span>
+          <input
+            name="from"
+            type="date"
+            defaultValue={(params.get('from') ?? fallbackRange.from).slice(0, 10)}
+          />
+        </label>
+        <label className="tmmin-date-field">
+          <span>Sampai tanggal</span>
+          <input
+            name="to"
+            type="date"
+            defaultValue={(params.get('to') ?? fallbackRange.to).slice(0, 10)}
+          />
+        </label>
+        <label>
+          <span>Status</span>
+          <NativeSelect name="status" defaultValue={params.get('status') ?? ''}>
+            <option value="">Semua status</option>
+            <option value="OPEN">Open</option>
+            <option value="APPROVED">Approved</option>
+            <option value="REJECTED">Rejected</option>
+            <option value="CANCELLED">Cancelled</option>
+          </NativeSelect>
+        </label>
+        <label>
+          <span>Kategori</span>
+          <NativeSelect name="category" defaultValue={params.get('category') ?? ''}>
+            <option value="">Semua 4M</option>
+            <option value="MAN">Man</option>
+            <option value="MACHINE">Machine</option>
+            <option value="MATERIAL">Material</option>
+            <option value="METHOD">Method</option>
+          </NativeSelect>
+        </label>
+        <label>
+          <span>Line</span>
+          <input name="line" defaultValue={params.get('line') ?? ''} placeholder="Semua line" />
+        </label>
+        <label>
+          <span>Part</span>
+          <input name="part" defaultValue={params.get('part') ?? ''} placeholder="Nomor / nama" />
+        </label>
+        <label>
+          <span>Aging</span>
+          <NativeSelect name="aging" defaultValue={params.get('aging') ?? ''}>
+            <option value="">Semua aging</option>
+            <option value="UNDER_4_HOURS">&lt; 4 jam</option>
+            <option value="FOUR_TO_EIGHT_HOURS">4–8 jam</option>
+            <option value="EIGHT_TO_24_HOURS">8–24 jam</option>
+            <option value="OVER_24_HOURS">&gt; 24 jam</option>
+          </NativeSelect>
+        </label>
+        <label>
+          <span>Freshness</span>
+          <NativeSelect name="freshness" defaultValue={params.get('freshness') ?? ''}>
+            <option value="">Semua freshness</option>
+            <option value="FRESH">Fresh</option>
+            <option value="WARNING">Perlu perhatian</option>
+            <option value="STALE">Stale</option>
+            <option value="NO_DATA">Tanpa data</option>
+          </NativeSelect>
+        </label>
+        <label>
+          <span>Interval</span>
+          <NativeSelect name="granularity" defaultValue={params.get('granularity') ?? 'DAY'}>
+            <option value="DAY">Harian</option>
+            <option value="WEEK">Mingguan</option>
+            <option value="MONTH">Bulanan</option>
+          </NativeSelect>
+        </label>
+      </div>
+      <div className="tmmin-dashboard-filters__actions">
+        <button
+          type="button"
+          className="hds-button hds-button--ghost hds-button--sm"
+          onClick={() => onApply(new URLSearchParams())}
+        >
+          Reset
+        </button>
+        <Button type="submit" size="sm">
+          Terapkan
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function DashboardMetric({
+  label,
+  value,
+  detail,
+  icon,
+  tone,
+}: {
+  label: string;
+  value: number;
+  detail: string;
+  icon: ReactNode;
+  tone: 'orange' | 'warning' | 'danger' | 'violet';
+}) {
+  return (
+    <section className={`tmmin-dashboard-metric is-${tone}`}>
+      <header>
+        <span className="tmmin-dashboard-metric__icon">{icon}</span>
+        <span>{label}</span>
+      </header>
+      <strong>{value.toLocaleString('id-ID')}</strong>
+      <small>{detail}</small>
+    </section>
+  );
+}
+
+function SourceMetric({
+  label,
+  value,
+  total,
+  tone,
+}: {
+  label: string;
+  value: number;
+  total: number;
+  tone: 'hosted' | 'external';
+}) {
+  const percent = total ? Math.round((value / total) * 100) : 0;
+  return (
+    <div className={`tmmin-source-metric is-${tone}`}>
+      <span>{label}</span>
+      <strong>{value.toLocaleString('id-ID')}</strong>
+      <small>{percent}%</small>
+      <i>
+        <b style={{ width: `${percent}%` }} />
+      </i>
+    </div>
+  );
+}
+
+function RankingPanel({
+  rankings,
+}: {
+  rankings: {
+    suppliers: Array<{ label: string; count: number }>;
+    lines: Array<{ label: string; count: number }>;
+    parts: Array<{ label: string; count: number }>;
+  };
+}) {
+  const [active, setActive] = useState<'suppliers' | 'lines' | 'parts'>('suppliers');
+  const labels = { suppliers: 'Supplier', lines: 'Line', parts: 'Part' };
+  return (
+    <Panel title="Peringkat volume" description="Henkaten terbanyak pada scope filter">
+      <div className="tmmin-rank-tabs" role="tablist" aria-label="Peringkat berdasarkan">
+        {(Object.keys(labels) as Array<keyof typeof labels>).map((key) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={active === key}
+            onClick={() => setActive(key)}
+          >
+            {labels[key]}
+          </button>
+        ))}
+      </div>
+      <RankList items={rankings[active].slice(0, 5)} />
+    </Panel>
+  );
+}
+
+function FreshnessSummary({
+  summary,
+  total,
+}: {
+  summary: { fresh: number; warning: number; stale: number; noData: number };
+  total: number;
+}) {
+  const rows = [
+    ['Fresh', summary.fresh, 'success'],
+    ['Perlu perhatian', summary.warning, 'warning'],
+    ['Stale', summary.stale, 'danger'],
+    ['Tanpa data', summary.noData, 'neutral'],
+  ] as const;
+  return (
+    <div className="tmmin-freshness-summary">
+      <div className="tmmin-freshness-summary__total">
+        <strong>{total}</strong>
+        <span>supplier</span>
+      </div>
+      <div>
+        {rows.map(([label, value, tone]) => (
+          <div key={label}>
+            <i className={`is-${tone}`} />
+            <span>{label}</span>
+            <strong>{value}</strong>
+            <small>{total ? Math.round((value / total) * 100) : 0}%</small>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HealthRow({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: 'success' | 'warning' | 'danger';
+}) {
+  return (
+    <div>
+      <i className={`is-${tone}`} />
+      <span>{label}</span>
+      <strong>{value.toLocaleString('id-ID')}</strong>
+    </div>
   );
 }
 
@@ -1023,17 +1396,28 @@ function freshnessTone(state: string): 'success' | 'danger' | 'warning' | 'neutr
         ? 'warning'
         : 'neutral';
 }
-function agingLabel(value: string) {
-  return (
-    (
-      {
-        UNDER_4_HOURS: '< 4 hours',
-        FOUR_TO_EIGHT_HOURS: '4–8 hours',
-        EIGHT_TO_24_HOURS: '8–24 hours',
-        OVER_24_HOURS: '> 24 hours',
-      } as Record<string, string>
-    )[value] ?? value
-  );
+
+function freshnessLabel(state: string) {
+  if (state === 'FRESH') return 'Fresh';
+  if (state === 'WARNING') return 'Perlu perhatian';
+  if (state === 'STALE') return 'Stale';
+  return 'Tanpa data';
+}
+
+function defaultDashboardRange() {
+  const to = new Date();
+  const from = new Date(to);
+  from.setUTCDate(from.getUTCDate() - 29);
+  return { from: from.toISOString(), to: to.toISOString() };
+}
+
+function trendLabel(value: string, granularity?: string) {
+  const date = new Date(value);
+  if (granularity === 'MONTH')
+    return date.toLocaleDateString('id-ID', { month: 'short', year: '2-digit', timeZone: 'UTC' });
+  if (granularity === 'WEEK')
+    return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', timeZone: 'UTC' });
+  return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', timeZone: 'UTC' });
 }
 function labelOf(value: unknown, key = 'name') {
   if (!value || typeof value !== 'object') return '—';
@@ -1045,4 +1429,8 @@ function labelOf(value: unknown, key = 'name') {
 }
 function stringValue(value: unknown) {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+}
+function formText(form: FormData, key: string) {
+  const value = form.get(key);
+  return typeof value === 'string' ? value : '';
 }

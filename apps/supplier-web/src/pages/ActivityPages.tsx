@@ -49,7 +49,7 @@ export function NotificationsPage() {
       <PageHeader
         eyebrow="Perhatian dan tindak lanjut"
         title="Notifikasi"
-        description="Event operasional sesuai permission Anda, dengan deep link yang diverifikasi kembali."
+        description="Event operasional sesuai izin Anda, dengan deep link yang diverifikasi kembali."
         actions={
           <Button
             variant="secondary"
@@ -179,7 +179,7 @@ export function AuditPage() {
       />
       <FilterBar>
         <label>
-          <span>Action</span>
+          <span>Tindakan</span>
           <Input
             value={action}
             placeholder="Contoh: HENKATEN_CREATED"
@@ -187,7 +187,7 @@ export function AuditPage() {
           />
         </label>
         <label>
-          <span>Resource</span>
+          <span>Sumber daya</span>
           <Input
             value={resourceType}
             placeholder="Contoh: HENKATEN"

@@ -27,6 +27,7 @@ const environmentSchema = z
     OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(50),
     OUTBOX_LOCK_LEASE_MS: z.coerce.number().int().min(1_000).default(30_000),
     OUTBOX_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(100).default(10),
+    REALTIME_POLL_MS: z.coerce.number().int().min(100).max(5_000).default(1_000),
     SESSION_CSRF_SECRET: z.string().min(32),
     AUTH_THROTTLE_SECRET: z.string().min(32),
     ARGON2_MEMORY_KIB: z.coerce.number().int().min(19_456).default(19_456),
@@ -58,6 +59,7 @@ export type AppConfig = {
   outboxBatchSize: number;
   outboxLockLeaseMs: number;
   outboxMaxAttempts: number;
+  realtimePollMs: number;
   sessionCsrfSecret: string;
   authThrottleSecret: string;
   argon2MemoryKib: number;
@@ -94,6 +96,7 @@ export function loadAppConfig(environment: NodeJS.ProcessEnv = process.env): App
     outboxBatchSize: parsed.OUTBOX_BATCH_SIZE,
     outboxLockLeaseMs: parsed.OUTBOX_LOCK_LEASE_MS,
     outboxMaxAttempts: parsed.OUTBOX_MAX_ATTEMPTS,
+    realtimePollMs: parsed.REALTIME_POLL_MS,
     sessionCsrfSecret: parsed.SESSION_CSRF_SECRET,
     authThrottleSecret: parsed.AUTH_THROTTLE_SECRET,
     argon2MemoryKib: parsed.ARGON2_MEMORY_KIB,

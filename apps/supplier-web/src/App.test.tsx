@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,7 +9,9 @@ import type { SessionResponse } from '@tmmin-henkaten/contracts';
 
 import { App } from './App';
 import { supplierApi } from './app/api';
+import { queryClient } from './app/query';
 import { consumeIntendedPath, rememberIntendedPath } from './app/session';
+import { supplierDashboardVisualFixture } from './test/visualFixtures';
 
 const supplierContext = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -46,6 +49,7 @@ describe('Supplier application foundation', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/');
     sessionStorage.clear();
+    queryClient.clear();
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
   });
@@ -109,6 +113,76 @@ describe('Supplier application foundation', () => {
     expect(await screen.findByRole('heading', { name: 'Setup Supplier' })).toBeTruthy();
     expect(screen.queryByText('Assignment Board')).toBeNull();
     expect(screen.getByText('Mode persiapan aktif')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Setup' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Master Data' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Akun' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Henkaten' })).toBeNull();
+  });
+
+  it('groups capability navigation, collapses accessibly, and restores route focus', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(supplierApi, 'session').mockResolvedValue(
+      session('NORMAL', [
+        'SUPPLIER_SELF_SERVICE',
+        'SUPPLIER_DASHBOARD_READ',
+        'SUPPLIER_BOARD_READ',
+        'SUPPLIER_HENKATEN_READ',
+        'SUPPLIER_HENKATEN_DECIDE',
+        'SUPPLIER_SHIFT_READ',
+        'SUPPLIER_NOTIFICATION_READ',
+        'SUPPLIER_MASTER_DATA_READ',
+        'SUPPLIER_AUDIT_READ',
+      ]),
+    );
+    vi.spyOn(supplierApi, 'notificationCount').mockResolvedValue({ count: 3 });
+    render(
+      <MemoryRouter initialEntries={['/account']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    const heading = await screen.findByRole('heading', { name: 'Akun' });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+    expect(screen.getByText('Operasional')).toBeTruthy();
+    expect(screen.getByText('Data & Konfigurasi')).toBeTruthy();
+    expect(screen.getByText('Sistem')).toBeTruthy();
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' }).textContent).toContain(
+      'Supplier/Akun',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Ciutkan navigasi' }));
+    expect(screen.getByRole('link', { name: 'Assignment Board' }).getAttribute('title')).toBe(
+      'Assignment Board',
+    );
+    expect(screen.getByRole('button', { name: 'Perluas navigasi' })).toBeTruthy();
+  });
+
+  it('keeps Overview filters URL-authoritative and hides unavailable quick actions', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(supplierApi, 'session').mockResolvedValue(
+      session('NORMAL', ['SUPPLIER_SELF_SERVICE', 'SUPPLIER_DASHBOARD_READ']),
+    );
+    const dashboard = vi
+      .spyOn(supplierApi, 'dashboard')
+      .mockResolvedValue(supplierDashboardVisualFixture);
+
+    render(
+      <MemoryRouter initialEntries={['/?status=OPEN']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Overview Supplier' })).toBeTruthy();
+    expect(screen.getByLabelText('Status')).toHaveProperty('value', 'OPEN');
+    await user.selectOptions(screen.getByLabelText('Status'), 'APPROVED');
+    await user.click(screen.getByRole('button', { name: 'Terapkan' }));
+    await waitFor(() =>
+      expect(dashboard).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: 'APPROVED', granularity: 'DAY' }),
+      ),
+    );
+    expect(screen.queryByRole('link', { name: 'Assignment Board' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Antrean Approval' })).toBeNull();
   });
 
   it('renders forbidden for a valid route without its capability', async () => {

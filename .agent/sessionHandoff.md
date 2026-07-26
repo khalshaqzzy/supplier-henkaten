@@ -1,110 +1,168 @@
-# Session Handoff — TMMIN Governance dan Monitoring
+# Session Handoff — Supplier Visual Refinement
 
-Tanggal: 2026-07-25
+Tanggal: 2026-07-26
 
-Branch: `staging`
+Branch: `feat/supplier-visual-refinement`
 
-Status: Phase 13 dan subphase 13.1–13.10 `done`; Phase 14 adalah next
+Status: Phase 14.11 `done`; Phase 15.1 adalah next
 
-## 1. Outcome
+## 1. Objective dan Outcome
 
-Seluruh TMMIN Admin dan TMMIN Quality workflow telah diimplementasikan pada `tmmin-web`.
-GAP-05–12 dan GAP-14 ditutup melalui kontrak read additive; GAP-01–15 sekarang `AVAILABLE`.
+Supplier Portal direfinement dalam preserve mode tanpa mengubah React/Vite, shared Henkaten Design
+System, typed API client, route, field/lifecycle order, authorization, atau backend authority.
+Bahasa visualnya enterprise, light-only, padat, stabil, dan berorientasi workflow dengan fidelity
+tertinggi pada enam referensi Supplier:
 
-- TMMIN Admin dapat mengelola Supplier, Supplier Admin, Quality user, source transition/Hosted
-  Preparation, dan External client credential.
-- Global Overview, Active Warnings, unified Henkaten Explorer, Hosted support, External ingestion
-  health, notifications, audit, System Status, dan account tersedia sebagai production pages.
-- TMMIN Quality memakai monitoring dan source-summary presentation yang sama secara read-only.
-  Mutation control tidak dirender dan direct source/user/credential/domain mutation tetap `403`.
-- Hosted dan External memakai discriminated read contracts. Board hanya tersedia untuk current
-  Hosted source; External diagnostics tidak mengekspos raw payload, secret, token, atau Hosted-only
-  identity.
-- Query/cache keys memuat realm dan principal ID. Logout, expiry, identity change, dan forced reset
-  membersihkan cache, CSRF, intended destination, form memory, serta one-time credential.
-- Tidak ada migration baru; sembilan migration yang ada cukup untuk read model dan query baru.
+- Overview;
+- Assignment Board;
+- Default Assignment;
+- Create Henkaten;
+- Henkaten Detail/Approval;
+- Blocked Shift.
 
-## 2. Contract dan Backend
+Seluruh referensi `.agent/design/` dibuka pada resolusi asli sebelum implementasi dan setelah
+context compaction. Hasil visual aktual juga diperiksa pada 1672×941 dan 1280×720.
 
-Empat read operation additive:
+## 2. Shell dan Composition
 
-- `GET /api/v1/tmmin/suppliers/:supplierId/source`;
-- `GET /api/v1/tmmin/suppliers/:supplierId/assignment-board`;
-- `GET /api/v1/tmmin/henkatens`;
-- `GET /api/v1/tmmin/external-health`.
+- Navigation dikelompokkan menjadi Operasional, Data & Konfigurasi, dan Sistem setelah capability
+  serta Hosted Preparation filtering.
+- Sidebar 236px dapat diciutkan menjadi 72px; collapsed links mempertahankan accessible name/title.
+- Supplier workspace, timezone, source mode/epoch, notification count, identity, role, dan logout
+  tetap terlihat pada konteks yang relevan.
+- Topbar memakai active-area dan Supplier context satu baris.
+- `PageHeader` mendukung breadcrumb, status, metadata, action grouping, dan focus restoration.
+- Komponen app-local baru menyediakan summary strip, metric tile, fact strip, dan contextual rail.
+- Shared `@tmmin-henkaten/ui` dan visual TMMIN tidak berubah.
 
-Shared Zod, OpenAPI, NestJS controllers, generated client, dan contract-freeze sekarang reconcile
-pada tepat 130 paths/146 operations.
+## 3. Priority Workflows
 
-Perubahan backend utama:
+Overview:
 
-- supplier/Quality-user filtering, sorting, cursor, dan paginated server reads;
-- Supplier detail dengan monitoring timestamps, current Admin, dan active Preparation; identity
-  administration disanitasi dari response Quality;
-- source summary dengan computed preflight dan immutable epoch history;
-- dashboard filters dan Hosted/External aggregates pada read-model service;
-- unified source-aware Henkaten explorer dan source-specific detail;
-- current-Hosted TMMIN Board read;
-- authoritative accepted/duplicate/rejected External health dan safe correlation lookup;
-- duplicate/rejected ingestion audit/notification behavior tanpa payload duplication;
-- role-scoped audit default-deny untuk Quality dan Supplier-aware notification deep links;
-- privacy acknowledgement, exactly-one Preparation admin, IANA timezone, and current-version
-  enforcement.
+- filter memakai draft state dengan explicit `Terapkan`/`Reset`, lalu URL menjadi authority;
+- KPI memakai server totals tanpa synthetic period delta;
+- aging, 4M trend, assignment issues, line/part ranking, outcome, override, activity, dan
+  capability-aware quick links disusun menjadi dense dashboard grid.
 
-## 3. Frontend Composition
+Assignment Board:
 
-TMMIN foundation sekarang mempunyai QueryClient, typed browser boundary, session/cache isolation,
-safe intended destination, forced-reset/capability/viewport guards, error boundary, skip link,
-route-title focus, Not Found/Forbidden states, dan role-aware shell.
+- summary strip, authoritative line/Shift facts, realtime freshness, job cards, 4M indicators,
+  issue/override state, legend, dan contextual rail diterapkan;
+- board/table density tetap contained secara internal.
 
-Implemented routes mencakup:
+Default Assignment:
 
-- login, forced password reset, logout, account/session;
-- Global Overview dengan stats, filters, aging, trends, rankings, freshness, override, External
-  activity, dan drill-down;
-- Active Warnings list/detail tanpa manual close;
-- Hosted/External Henkaten explorer/detail;
-- Supplier lifecycle, edit, Supplier Admin replace/reset, dan one-time credential;
-- Source Governance preflight/blocker/history/Preparation/cutover;
-- External client issue/rotate/revoke dengan one-time secret;
-- Hosted master data, Shift reads, dan Assignment Board;
-- External Ingestion Health, notifications, Quality-user administration, audit, dan status.
+- Supervisor, Line Leader, job/MP hierarchy, missing state, active-shift warning, dan assignment
+  status dipertegas;
+- edit memakai accessible side sheet dengan current/new comparison, atomic-move consequence,
+  optimistic conflict message, dan deterministic focus return.
 
-`DataTable` mendukung controlled manual server sorting. Forms memakai React Hook Form/Zod,
-optimistic version, duplicate-submit protection, field errors, dan consequence dialogs. Shared
-one-time credential value hanya hidup dalam component memory dan hilang setelah acknowledgement,
-navigation, atau session cleanup.
+Create Henkaten:
 
-## 4. Visual Evidence
+- field dan submission contract dipertahankan dalam numbered operational sections;
+- Shift context, Man/non-Man layout, checklist progress, readiness message, dan sticky summary rail
+  memakai data/form state nyata;
+- tidak ada Save Draft atau synthetic wizard state.
 
-Reference yang diinspeksi sebelum implementasi:
+Henkaten Detail/Approval:
 
-- `.agent/design/tmmin-global-overview.png`;
-- `.agent/design/source-governance.png`.
+- lifecycle/source/approval status ditempatkan bersama identifier;
+- fact strip, affected/replacement comparison, parallel approval stepper, immutable checklist,
+  history, dan sticky capability-gated decision rail diterapkan;
+- reject-fast, reroute, withdraw, clone, expected-version refresh, dan immutable history tidak
+  berubah.
 
-Manual audit menggunakan API lokal dan disposable PostgreSQL data:
+Shift Detail:
 
-- login dan Global Overview pada 1440×900;
-- Source Governance blocked state dan Supplier Detail pada 1440×900;
-- one-time Supplier Admin credential pada 1440×900;
-- External Ingestion Health dan Quality read-only Source Governance pada 1280×720;
-- unsupported viewport pada 1100×650.
+- Not Started, Active, dan Ended memakai composition yang sama;
+- blocking cards, Working Assignment preview, preflight rail, freshness, resolution link, dan
+  terminal summary mengikuti status authoritative;
+- Emergency Start tetap Admin-only, danger-styled, memerlukan alasan, dan selalu dinyatakan sebagai
+  blocked exception.
 
-Semua page yang diaudit memiliki `scrollWidth === clientWidth`; tabel lebar berada dalam scroll
-container. Audit menemukan dan menutup dua visual/interaction defects: privacy acknowledgement
-yang sebelumnya default checked, serta inherited heading line-height yang membuat unsupported
-viewport overlap. Quality Source Governance terbukti tidak mempunyai submit/mutation control.
+## 4. Portal Consistency
 
-Visual composition mempertahankan compact sidebar, 60 px topbar, near-white canvas, thin border,
-low elevation, dense table, tabular numbers, selective orange, visible focus, dan contextual rail.
-UI tidak menambah fake live indicator, global search, export, alert configuration, Docs control,
-dark mode, bulk action, mobile workflow, atau manual warning lifecycle.
+- Setup disusun sebagai readiness journey dengan summary, progress area, next area, blocker evidence,
+  dan direct route action.
+- Master Data, Shift/Henkaten lists, Notifikasi, Audit, auth, forced reset, account, viewport
+  unsupported, 403, 404, dan route error mewarisi shell, toolbar, panel, table/list, empty/error, dan
+  focus behavior baru.
+- Visible copy dinormalisasi ke Bahasa Indonesia sambil mempertahankan istilah domain Henkaten,
+  Man/Machine/Material/Method, Hosted, External, Shift, Supervisor, Line Leader, QC, dan source
+  epoch.
 
-## 5. Validation Evidence
+Tidak ada migration, endpoint baru, production fixture fallback, client-derived lifecycle,
+global search, Export, Save Draft, fake Live state, dark mode, atau mobile operational UI.
 
-Runtime delivery: Node.js `22.23.1`, pnpm `11.16.0`.
+## 5. Files Changed
 
-Local GitHub Actions parity:
+Supplier frontend:
+
+- `apps/supplier-web/src/components/layout.tsx`
+- `apps/supplier-web/src/components/OperationalUI.tsx`
+- `apps/supplier-web/src/pages/OverviewPage.tsx`
+- `apps/supplier-web/src/pages/BoardPage.tsx`
+- `apps/supplier-web/src/pages/DefaultAssignmentsPage.tsx`
+- `apps/supplier-web/src/pages/HenkatenPages.tsx`
+- `apps/supplier-web/src/pages/ShiftPages.tsx`
+- `apps/supplier-web/src/pages/SetupPage.tsx`
+- `apps/supplier-web/src/pages/MasterDataPages.tsx`
+- `apps/supplier-web/src/pages/ActivityPages.tsx`
+- `apps/supplier-web/src/pages/AuthPages.tsx`
+- `apps/supplier-web/src/app.css`
+
+Tests:
+
+- `apps/supplier-web/src/App.test.tsx`
+- `apps/supplier-web/src/test/visualFixtures.ts`
+- `apps/e2e/tests/hosted-lifecycle.spec.ts`
+
+Records:
+
+- `.agent/implementationPhases.md`
+- `.agent/sessionHandoff.md`
+- `docs/adr/0024-supplier-application-composition.md`
+
+User-owned `.DS_Store` tetap tidak disentuh dan tidak boleh dimasukkan ke hasil kerja.
+
+## 6. Validation dan Visual Evidence
+
+Perintah terfokus telah dijalankan memakai Node.js 22.23.1 dari pnpm cache dan pnpm 11.16.0:
+
+```text
+pnpm --filter @tmmin-henkaten/supplier-web lint
+pnpm --filter @tmmin-henkaten/supplier-web typecheck
+pnpm --filter @tmmin-henkaten/supplier-web test:unit
+pnpm --filter @tmmin-henkaten/e2e lint
+pnpm --filter @tmmin-henkaten/e2e typecheck
+E2E_VISUAL_CAPTURE=1 pnpm --filter @tmmin-henkaten/e2e exec node \
+  scripts/run.mjs --chromium-only --spec=hosted-lifecycle
+```
+
+Current results:
+
+- Supplier lint dan typecheck lulus;
+- 8 Supplier unit tests lulus;
+- E2E lint/typecheck lulus;
+- deterministic Hosted lifecycle Chromium journey lulus;
+- 12 screenshots untuk enam priority pages pada 1672×941 dan 1280×720 berhasil dibuat;
+- semua capture bebas page-level horizontal overflow;
+- reduced-motion mode digunakan;
+- axe bersih pada seluruh priority page di 1280×720.
+
+Visual QA sebelumnya menemukan dan kemudian memperbaiki:
+
+- duplicate unnamed complementary landmarks;
+- checklist select tanpa accessible name;
+- prohibited `aria-label` pada role-less board group;
+- borderline contrast pada approval route metadata.
+
+Disposable E2E PostgreSQL container, volume, network, API, dan Vite processes telah dibersihkan oleh
+harness setelah setiap run.
+
+## 7. Full Validation dan Next Action
+
+Parity suite penuh dari `.agent/rules.md` selesai:
 
 ```text
 pnpm clean
@@ -116,20 +174,15 @@ pnpm test:unit
 pnpm openapi:check
 VITE_API_ORIGIN=https://api.example.invalid pnpm build
 docker compose config --quiet
+docker compose --profile fullstack config --quiet
 pnpm db:up
 pnpm db:wait
 pnpm db:verify
 pnpm db:test:reset
 pnpm db:test:migrate
-NODE_ENV=test DATABASE_URL=<disposable-test-url> RELEASE_SHA=ci \
-  SESSION_CSRF_SECRET=<safe-test-value> AUTH_THROTTLE_SECRET=<safe-test-value> \
-  OUTBOX_ENABLED=false pnpm test:integration
-pnpm db:test:reset
-pnpm db:test:migrate
-NODE_ENV=test DATABASE_URL=<disposable-test-url> RELEASE_SHA=ci \
-  SESSION_CSRF_SECRET=<safe-test-value> AUTH_THROTTLE_SECRET=<safe-test-value> \
-  OUTBOX_ENABLED=false pnpm test:baseline
+pnpm test:integration
 pnpm db:down
+pnpm test:e2e
 docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.24.3 \
   dir /repo --config=/repo/.gitleaks.toml --redact --verbose
 git diff --check
@@ -137,50 +190,20 @@ git diff --check
 
 Results:
 
-- contracts: 27 unit tests passed;
-- API client: 8 unit tests passed;
-- shared UI: 14 unit/accessibility tests passed;
-- API: 16 unit/policy/contract tests passed;
-- Supplier foundation: 6 tests passed;
-- TMMIN foundation: 5 tests passed;
-- test fixtures: 6 tests passed;
-- PostgreSQL integration: 32/32 passed from a fresh nine-migration database;
-- Compact baseline: 2/2 passed; dashboard p95 89.72 ms against 3,000 ms target, all measured error
-  rates zero, and bounded reads retained index/index-only plans;
-- runtime/OpenAPI reconciliation: 130 paths/146 operations;
-- production builds passed with explicit API origin; the existing non-failing Vite chunk-size
-  advisory remains;
-- format, lint, typecheck, OpenAPI/client drift, Compose/pgvector, Gitleaks directory/commit scan,
-  and `git diff --check` passed.
+- clean install, format, lint, typecheck, OpenAPI/generated-client drift, dan seluruh production
+  build lulus;
+- 92 unit/contract/client/UI/API/frontend tests lulus;
+- PostgreSQL 18.4, pgvector 0.8.5, sembilan fresh migrations, dan 32 integration tests lulus;
+- empat Chromium dan dua Microsoft Edge isolated E2E journeys lulus;
+- visual capture journey untuk enam halaman prioritas lulus pada dua viewport dengan overflow,
+  reduced-motion, dan axe assertions;
+- Gitleaks memindai 61.65 MB tanpa finding;
+- `git diff --check` lulus;
+- seluruh agent-started database, Vite, API, browser, network, dan volume disposable dihentikan.
 
-## 6. Documentation dan Delivery
+Playwright berhasil memakai Chromium dan Edge yang sudah terpasang. Perintah reinstall Edge tetap
+memerlukan sudo interaktif macOS dan gagal sebelum meminta credential; ini bukan kegagalan test atau
+runtime karena kedua Edge journey lulus dengan binary terpasang.
 
-Architecture records:
-
-- ADR 0019: executable contract count updated to 130/146;
-- ADR 0020: TMMIN additive gap resolution;
-- ADR 0022: schema-validated accepted `503` browser response;
-- ADR 0023: TMMIN realm/principal cache isolation;
-- ADR 0025: source-aware TMMIN governance and monitoring composition.
-
-Progress records:
-
-- `.agent/PAGES.md`: GAP-01–15 `AVAILABLE`;
-- `.agent/implementationPhases.md`: Phase 13 and 13.1–13.10 `done`, Phase 14 next.
-
-Delivery uses one behavior-based commit:
-
-`feat(tmmin): deliver governance and monitoring workflows`
-
-The exact self-referential SHA is available in `git log` and the delivery response. Existing
-`.DS_Store` remains unstaged and belongs to the user.
-
-## 7. Open Scope dan Next Action
-
-Phase 14 owns full Playwright cross-realm/full-stack E2E, including deterministic fixture bootstrap,
-two-realm cookie isolation, realtime Board/notification propagation, and source transition journeys.
-
-Phase 15 retains deployment automation. This handoff does not claim a staging deployment URL or
-runtime deployment; only the `staging` branch delivery and required GitHub Actions are verified.
-
-No long-running local API/web process or Compose stack remains after delivery.
+Seluruh `.agent/design/` dibuka kembali pada resolusi asli sebelum final acceptance. Next
+recommended work kembali ke Phase 15.1 Production Dockerfiles.

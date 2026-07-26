@@ -161,7 +161,7 @@ export function ChangePasswordPage() {
           <ShieldCheck />
         </span>
         <h1>{forced ? 'Ganti temporary password' : 'Ganti password'}</h1>
-        <p>Password baru harus 12–128 karakter dan tidak boleh sama dengan password sekarang.</p>
+        <p>Password baru harus 12-128 karakter dan tidak boleh sama dengan password sekarang.</p>
         {problem && <FormErrorSummary errors={[{ field: 'password', message: problem }]} />}
         <form onSubmit={(event) => void submit(event)} noValidate>
           <Field

@@ -346,6 +346,13 @@ export const realtimeQuerySchema = z.object({ lineId: opaqueIdSchema.optional() 
 export type RealtimeQuery = z.infer<typeof realtimeQuerySchema>;
 
 export const realtimeHeartbeatSchema = z.object({ at: utcTimestampSchema }).strict();
+export const realtimeResyncSchema = z
+  .object({
+    reason: z.literal('CURSOR_UNAVAILABLE'),
+    at: utcTimestampSchema,
+  })
+  .strict();
+export type RealtimeResync = z.infer<typeof realtimeResyncSchema>;
 export const realtimeInvalidationSchema = z
   .object({
     eventType: z.string().min(1).max(150),

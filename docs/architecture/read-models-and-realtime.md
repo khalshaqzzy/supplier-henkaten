@@ -18,9 +18,11 @@ flowchart LR
   B --> G["REST read models"]
   C --> G
   F --> G
-  D --> H["Scoped SSE invalidation"]
-  H --> I["Browser refreshes REST"]
-  G --> I
+  D --> H["One ordered API-local outbox pump"]
+  H --> J["In-memory tenant and line fan-out"]
+  J --> I["Scoped SSE invalidation"]
+  I --> K["Browser marks stale and refreshes REST"]
+  G --> K
 ```
 
 ## Notification Rules
@@ -64,11 +66,29 @@ SSE transports invalidation metadata only:
 - event and aggregate type;
 - aggregate identity and version;
 - occurrence timestamp;
-- REST topics to refresh.
+- REST topics to refresh;
+- an additive resync control event when a requested replay position is unavailable.
 
-The stream filters by tenant and permitted lines. `Last-Event-ID` resumes against retained outbox
-events. Heartbeats keep the connection observable. A disconnected client must display stale state
-and refresh the authoritative REST endpoints after reconnect.
+One API-local pump polls the globally ordered outbox at the validated `REALTIME_POLL_MS` interval,
+which defaults to one second. Database polling is independent of connected browser count. The pump
+fans events to live connections in memory; each connection filters by tenant and permitted lines.
+
+`Last-Event-ID` resumes against retained outbox events before live subscription. Replay is bounded
+to 500 events. If the cursor is unavailable or the replay window is exceeded, the stream emits
+`resync`; the client marks its data stale and performs an authoritative REST refetch. Heartbeats are
+sent every 15 seconds. A disconnected client likewise displays stale state and refreshes after
+reconnect.
+
+This fan-out design relies on the single-API-process topology. Multiple API replicas would require
+connection affinity or shared event distribution before they could preserve the same live-delivery
+guarantee.
+
+## Propagation Validation
+
+Disposable full-stack browser coverage creates a domain mutation through the real API, observes its
+scoped SSE invalidation, and verifies that the Assignment Board refetches within five seconds. Unit
+coverage separately verifies configuration bounds, replay ordering, authorization scope, resync,
+deduplication, and browser stale-state behavior.
 
 ## Query Evolution
 

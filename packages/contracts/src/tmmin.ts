@@ -196,6 +196,43 @@ export const tmminDashboardExtendedSchema = z
         parts: countByLabelSchema,
       })
       .strict(),
+    trend: z.array(
+      z
+        .object({
+          bucketStart: utcTimestampSchema,
+          hosted: z.number().int().nonnegative(),
+          external: z.number().int().nonnegative(),
+          total: z.number().int().nonnegative(),
+          open: z.number().int().nonnegative(),
+          approved: z.number().int().nonnegative(),
+          rejected: z.number().int().nonnegative(),
+          cancelled: z.number().int().nonnegative(),
+        })
+        .strict(),
+    ),
+    freshnessSummary: z
+      .object({
+        fresh: z.number().int().nonnegative(),
+        warning: z.number().int().nonnegative(),
+        stale: z.number().int().nonnegative(),
+        noData: z.number().int().nonnegative(),
+      })
+      .strict(),
+    supplierOverview: z.array(
+      z
+        .object({
+          supplierId: opaqueIdSchema,
+          supplierCode: z.string(),
+          supplierName: z.string(),
+          sourceMode: sourceModeSchema,
+          openHenkatens: z.number().int().nonnegative(),
+          activeWarnings: z.number().int().nonnegative(),
+          over24HourWarnings: z.number().int().nonnegative(),
+          freshness: z.enum(['FRESH', 'WARNING', 'STALE', 'NO_DATA']),
+          lastDataAt: utcTimestampSchema.nullable(),
+        })
+        .strict(),
+    ),
     freshness: z.array(
       z
         .object({

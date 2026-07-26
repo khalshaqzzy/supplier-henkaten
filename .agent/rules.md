@@ -102,6 +102,8 @@ NODE_ENV=test DATABASE_URL=<disposable-test-url> RELEASE_SHA=ci \
   SESSION_CSRF_SECRET=<safe-test-value> AUTH_THROTTLE_SECRET=<safe-test-value> \
   OUTBOX_ENABLED=false pnpm test:integration
 pnpm db:down
+pnpm --filter @tmmin-henkaten/e2e exec playwright install chromium msedge
+pnpm test:e2e
 docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.24.3 \
   dir /repo --config=/repo/.gitleaks.toml --redact --verbose
 git diff --check

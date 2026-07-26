@@ -1,6 +1,6 @@
 import { ApiClient, SupplierApi } from '@tmmin-henkaten/api-client';
 
-const apiOrigin = environmentString('VITE_API_ORIGIN') ?? 'http://127.0.0.1:3000';
+const apiOrigin = environmentString('VITE_API_ORIGIN') ?? 'http://localhost:3000';
 let csrfToken: string | null = null;
 let sessionExpiredHandler: (() => void) | null = null;
 

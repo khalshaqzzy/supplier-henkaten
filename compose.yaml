@@ -25,6 +25,153 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  migrate:
+    profiles: [fullstack]
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    command: pnpm --filter @tmmin-henkaten/api run prisma:migrate:deploy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-supplier_henkaten}:${POSTGRES_PASSWORD:-supplier_henkaten_local_only}@postgres:5432/${POSTGRES_DB:-supplier_henkaten}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  api:
+    profiles: [fullstack]
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    command: pnpm --filter @tmmin-henkaten/api run dev
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-supplier_henkaten}:${POSTGRES_PASSWORD:-supplier_henkaten_local_only}@postgres:5432/${POSTGRES_DB:-supplier_henkaten}
+      RELEASE_SHA: development-compose
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_PRETTY: ${LOG_PRETTY:-false}
+      CORS_ALLOWED_ORIGINS: http://localhost:${SUPPLIER_WEB_PORT:-5173},http://localhost:${TMMIN_WEB_PORT:-5174}
+      SUPPLIER_APP_ORIGIN: http://localhost:${SUPPLIER_WEB_PORT:-5173}
+      TMMIN_APP_ORIGIN: http://localhost:${TMMIN_WEB_PORT:-5174}
+      TRUST_PROXY_HOPS: 0
+      OUTBOX_ENABLED: ${OUTBOX_ENABLED:-true}
+      OUTBOX_POLL_MS: ${OUTBOX_POLL_MS:-1000}
+      OUTBOX_BATCH_SIZE: ${OUTBOX_BATCH_SIZE:-50}
+      OUTBOX_LOCK_LEASE_MS: ${OUTBOX_LOCK_LEASE_MS:-30000}
+      OUTBOX_MAX_ATTEMPTS: ${OUTBOX_MAX_ATTEMPTS:-10}
+      REALTIME_POLL_MS: ${REALTIME_POLL_MS:-1000}
+      SESSION_CSRF_SECRET: ${SESSION_CSRF_SECRET:-local-development-csrf-secret-change-me}
+      AUTH_THROTTLE_SECRET: ${AUTH_THROTTLE_SECRET:-local-development-throttle-secret-change-me}
+      ARGON2_MEMORY_KIB: ${ARGON2_MEMORY_KIB:-19456}
+      ARGON2_ITERATIONS: ${ARGON2_ITERATIONS:-2}
+      ARGON2_PARALLELISM: ${ARGON2_PARALLELISM:-1}
+      PHOTO_STORAGE_ROOT: /var/lib/supplier-henkaten/member-photos
+      TMMIN_BOOTSTRAP_USERNAME: ${TMMIN_BOOTSTRAP_USERNAME:-}
+      TMMIN_BOOTSTRAP_DISPLAY_NAME: ${TMMIN_BOOTSTRAP_DISPLAY_NAME:-}
+      TMMIN_BOOTSTRAP_PASSWORD: ${TMMIN_BOOTSTRAP_PASSWORD:-}
+    ports:
+      - '127.0.0.1:${API_PORT:-3000}:3000'
+    volumes:
+      - member-photos:/var/lib/supplier-henkaten/member-photos
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  supplier-web:
+    profiles: [fullstack]
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    command:
+      [
+        'pnpm',
+        '--filter',
+        '@tmmin-henkaten/supplier-web',
+        'exec',
+        'vite',
+        '--host',
+        '0.0.0.0',
+        '--port',
+        '5173',
+        '--strictPort',
+      ]
+    environment:
+      VITE_API_ORIGIN: http://localhost:${API_PORT:-3000}
+    ports:
+      - '127.0.0.1:${SUPPLIER_WEB_PORT:-5173}:5173'
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:5173').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    restart: unless-stopped
+
+  tmmin-web:
+    profiles: [fullstack]
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    command:
+      [
+        'pnpm',
+        '--filter',
+        '@tmmin-henkaten/tmmin-web',
+        'exec',
+        'vite',
+        '--host',
+        '0.0.0.0',
+        '--port',
+        '5174',
+        '--strictPort',
+      ]
+    environment:
+      VITE_API_ORIGIN: http://localhost:${API_PORT:-3000}
+    ports:
+      - '127.0.0.1:${TMMIN_WEB_PORT:-5174}:5174'
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:5174').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    restart: unless-stopped
+
 volumes:
   postgres-data:
     name: supplier-henkaten-local-postgres-data
+  member-photos:
+    name: supplier-henkaten-local-member-photos

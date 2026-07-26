@@ -223,6 +223,11 @@ describe('External API credential and ingestion boundary', () => {
     expect(dashboard.body.suppliers.external).toBeGreaterThan(0);
     expect(dashboard.body.externalIngestion.accepted).toBeGreaterThanOrEqual(3);
     expect(dashboard.body.externalIngestion.recentRejected).toBeGreaterThan(0);
+    const trend = dashboard.body.trend as { external: number }[];
+    expect(trend.some((bucket) => bucket.external > 0)).toBe(true);
+    expect(dashboard.body.supplierOverview).toEqual(
+      expect.arrayContaining([expect.objectContaining({ supplierId, sourceMode: 'EXTERNAL' })]),
+    );
 
     const explorer = await request(app.getHttpServer())
       .get(`/api/v1/tmmin/henkatens?supplierId=${supplierId}&sourceMode=EXTERNAL`)

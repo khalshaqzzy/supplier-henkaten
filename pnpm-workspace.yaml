@@ -2,6 +2,7 @@ packages:
   - apps/api
   - apps/supplier-web
   - apps/tmmin-web
+  - apps/e2e
   - packages/api-client
   - packages/contracts
   - packages/test-fixtures
@@ -16,5 +17,8 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - lucide-react@1.26.0
+  - '@playwright/test@1.62.0'
+  - playwright-core@1.62.0
+  - playwright@1.62.0
 
 sharedWorkspaceLockfile: true

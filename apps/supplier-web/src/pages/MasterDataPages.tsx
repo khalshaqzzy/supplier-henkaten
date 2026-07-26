@@ -28,7 +28,7 @@ import { PageHeader } from '../components/layout';
 const resources = {
   members: {
     title: 'Member & Akun',
-    description: 'Kelola identitas operator, role, account, dan photo secara individual.',
+    description: 'Kelola identitas operator, role, akun, dan foto secara individual.',
     createLabel: 'Tambah member',
     columns: ['Member', 'Registrasi', 'Role', 'Akun', 'Status'],
   },
@@ -46,7 +46,7 @@ const resources = {
   },
   shifts: {
     title: 'Shift Template',
-    description: 'Kelola jam kerja lokal, timezone, dan shift lintas tengah malam.',
+    description: 'Kelola jam kerja lokal, timezone, dan shift yang melintasi tengah malam.',
     createLabel: 'Tambah template',
     columns: ['Template', 'Jam', 'Timezone', 'Status'],
   },
@@ -56,11 +56,11 @@ type ResourceKind = keyof typeof resources;
 
 export function MasterDataOverviewPage() {
   const cards = [
-    ['Member & Akun', 'Identitas, credential, dan photo', '/master-data/members'],
+    ['Member & Akun', 'Identitas, credential, dan foto', '/master-data/members'],
     ['Line & Job', 'Struktur line dan job berurutan', '/master-data/lines'],
     ['Part', 'Part number dan nama', '/master-data/parts'],
-    ['Shift Template', 'Jam, timezone, dan cross-midnight', '/master-data/shifts'],
-    ['Checklist 4M', 'Draft, publish, dan version history', '/master-data/checklists'],
+    ['Shift Template', 'Jam, timezone, dan lintas tengah malam', '/master-data/shifts'],
+    ['Checklist 4M', 'Draft, publish, dan riwayat versi', '/master-data/checklists'],
     ['Default Assignment', 'Supervisor, LL, dan MP default', '/master-data/default-assignments'],
   ] as const;
   return (
@@ -251,7 +251,7 @@ function MasterRow({ kind, item }: { kind: ResourceKind; item: MasterItem }) {
           : 'startTime' in item
             ? [
                 item.name,
-                `${item.startTime}–${item.endTime}${item.crossesMidnight ? ' (+1)' : ''}`,
+                `${item.startTime} - ${item.endTime}${item.crossesMidnight ? ' (+1)' : ''}`,
                 item.timezone,
                 item.active ? 'Aktif' : 'Nonaktif',
               ]
@@ -362,7 +362,7 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
     },
     onSuccess: async (resource) => {
       await queryClient.invalidateQueries({ queryKey: scopedKey(scope, `master-${kind}`) });
-      if (!editing && kind !== 'members')
+      if (!editing && (kind !== 'members' || ('role' in resource && resource.role === 'MP')))
         void navigate(`/master-data/${kind}/${resource.id}`, { replace: true });
     },
     onError: (error) =>
@@ -656,7 +656,7 @@ function MemberLifecycle({
   });
   return (
     <Panel
-      title="Lifecycle & photo"
+      title="Lifecycle & foto"
       description="Action berdampak tinggi memerlukan konfirmasi eksplisit."
     >
       {secret && <OneTimeCredential value={secret} onDone={() => setSecret(null)} />}
@@ -997,7 +997,7 @@ export function ChecklistDetailPage() {
               </Button>
             </div>
           </Panel>
-          <Panel title="Version history" description="Published version tidak dapat diedit.">
+          <Panel title="Riwayat versi" description="Versi published tidak dapat diedit.">
             <ol className="version-list">
               {versions.data?.items.map((version) => (
                 <li key={version.id}>

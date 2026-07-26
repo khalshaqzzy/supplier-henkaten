@@ -10,6 +10,8 @@ import {
   KeyRound,
   LogOut,
   Network,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings2,
   ShieldCheck,
   Siren,
@@ -32,66 +34,101 @@ type Item = {
   adminOnly?: boolean;
   monitor?: boolean;
   icon: typeof Gauge;
+  group: 'MONITORING' | 'TATA_KELOLA' | 'DUKUNGAN' | 'SISTEM';
 };
 
 const items: Item[] = [
   {
     to: '/',
-    label: 'Global Overview',
+    label: 'Ringkasan Global',
     capability: 'TMMIN_DASHBOARD_READ',
     monitor: true,
     icon: Gauge,
+    group: 'MONITORING',
   },
   {
     to: '/warnings',
-    label: 'Active Warnings',
+    label: 'Peringatan Aktif',
     capability: 'TMMIN_HENKATEN_READ',
     monitor: true,
     icon: Siren,
+    group: 'MONITORING',
   },
   {
     to: '/henkatens',
-    label: 'Henkaten Explorer',
+    label: 'Penelusuran Henkaten',
     capability: 'TMMIN_HENKATEN_READ',
     monitor: true,
     icon: Network,
+    group: 'MONITORING',
   },
-  { to: '/suppliers', label: 'Suppliers', capability: 'TMMIN_SUPPLIER_READ', icon: Building2 },
+  {
+    to: '/suppliers',
+    label: 'Supplier',
+    capability: 'TMMIN_SUPPLIER_READ',
+    icon: Building2,
+    group: 'TATA_KELOLA',
+  },
   {
     to: '/source-governance',
-    label: 'Source Governance',
+    label: 'Tata Kelola Sumber',
     capability: 'TMMIN_SUPPLIER_READ',
     icon: ShieldCheck,
+    group: 'TATA_KELOLA',
   },
   {
     to: '/external-health',
-    label: 'External Health',
+    label: 'Kesehatan External',
     capability: 'TMMIN_HENKATEN_READ',
     monitor: true,
     icon: Activity,
+    group: 'MONITORING',
   },
   {
     to: '/hosted-support',
-    label: 'Hosted Support',
+    label: 'Dukungan Hosted',
     capability: 'TMMIN_MASTER_DATA_READ',
     icon: ClipboardList,
+    group: 'DUKUNGAN',
   },
   {
     to: '/quality-users',
-    label: 'Quality Users',
+    label: 'Pengguna Quality',
     capability: 'TMMIN_QUALITY_MANAGE',
     adminOnly: true,
     icon: UsersRound,
+    group: 'TATA_KELOLA',
   },
-  { to: '/audit', label: 'Audit', capability: 'TMMIN_AUDIT_READ', monitor: true, icon: History },
+  {
+    to: '/audit',
+    label: 'Audit',
+    capability: 'TMMIN_AUDIT_READ',
+    monitor: true,
+    icon: History,
+    group: 'SISTEM',
+  },
   {
     to: '/system-status',
-    label: 'System Status',
+    label: 'Status Sistem',
     capability: 'TMMIN_DASHBOARD_READ',
     icon: Settings2,
+    group: 'SISTEM',
   },
-  { to: '/account', label: 'Account', capability: 'TMMIN_SUPPLIER_READ', icon: CircleUserRound },
+  {
+    to: '/account',
+    label: 'Akun',
+    capability: 'TMMIN_SUPPLIER_READ',
+    icon: CircleUserRound,
+    group: 'SISTEM',
+  },
 ];
+
+const groupLabels = {
+  MONITORING: 'Monitoring',
+  TATA_KELOLA: 'Tata kelola',
+  DUKUNGAN: 'Dukungan',
+  SISTEM: 'Sistem',
+} as const;
 
 export function TmminLayout() {
   const { session, hasCapability, logout } = useTmminSession();
@@ -101,6 +138,7 @@ export function TmminLayout() {
   const [supported, setSupported] = useState(
     () => window.innerWidth >= 1280 && window.innerHeight >= 720,
   );
+  const [collapsed, setCollapsed] = useState(false);
   const identity = session?.principal;
   const admin = identity?.role === 'TMMIN_ADMIN';
   const navigation = useMemo(
@@ -166,7 +204,7 @@ export function TmminLayout() {
     item.monitor && shared.size ? `${item.to}?${shared.toString()}` : item.to;
 
   return (
-    <div className="tmmin-product">
+    <div className={`tmmin-product${collapsed ? ' is-sidebar-collapsed' : ''}`}>
       <a className="tmmin-skip" href="#main-content">
         Lewati ke konten
       </a>
@@ -174,34 +212,58 @@ export function TmminLayout() {
         <BrandLockup context="TMMIN Portal" />
         <div className="tmmin-workspace">
           <span>Enterprise Digital Henkaten</span>
-          <strong>Governance Console</strong>
-          <small>{admin ? 'Administration & monitoring' : 'Quality monitoring · Read only'}</small>
+          <strong>Konsol tata kelola</strong>
+          <small>{admin ? 'Administrasi dan monitoring' : 'Monitoring Quality · Hanya baca'}</small>
         </div>
         <nav aria-label="Navigasi utama">
-          {navigation.map((item) => {
-            const Icon = item.icon;
+          {Object.entries(groupLabels).map(([group, label]) => {
+            const grouped = navigation.filter((item) => item.group === group);
+            if (!grouped.length) return null;
             return (
-              <NavLink
-                key={item.to}
-                to={withShared(item)}
-                end={item.to === '/'}
-                className={({ isActive }) => (isActive ? 'is-current' : undefined)}
-              >
-                <Icon aria-hidden="true" />
-                <span>{item.label}</span>
-              </NavLink>
+              <section key={group} className="tmmin-nav-group">
+                <span className="tmmin-nav-group__label">{label}</span>
+                {grouped.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={withShared(item)}
+                      end={item.to === '/'}
+                      aria-label={collapsed ? item.label : undefined}
+                      title={collapsed ? item.label : undefined}
+                      className={({ isActive }) => (isActive ? 'is-current' : undefined)}
+                    >
+                      <Icon aria-hidden="true" />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  );
+                })}
+              </section>
             );
           })}
         </nav>
         <div className="tmmin-sidebar__footer">
-          <KeyRound aria-hidden="true" />
-          <span>{admin ? 'Admin controls enabled' : 'Mutation controls hidden'}</span>
+          <button
+            type="button"
+            aria-label={collapsed ? 'Perluas navigasi' : 'Ciutkan navigasi'}
+            onClick={() => setCollapsed((value) => !value)}
+          >
+            {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+            <span>{collapsed ? 'Perluas' : 'Ciutkan navigasi'}</span>
+          </button>
+          <div>
+            <KeyRound aria-hidden="true" />
+            <span>{admin ? 'Kontrol Admin aktif' : 'Mode hanya baca'}</span>
+          </div>
         </div>
       </aside>
       <div className="tmmin-product__main">
         <header className="tmmin-topbar">
           <div>
-            <span className="tmmin-topbar__area">{pageArea(location.pathname)}</span>
+            <span className="tmmin-topbar__area">
+              <small>Area aktif</small>
+              {pageArea(location.pathname)}
+            </span>
             {monitor && (
               <div className="tmmin-global-filters" aria-label="Filter monitoring global">
                 <NativeSelect
@@ -233,7 +295,7 @@ export function TmminLayout() {
                     setParams(next);
                   }}
                 >
-                  <option value="">Hosted + External</option>
+                  <option value="">Semua sumber</option>
                   <option value="HOSTED">Hosted</option>
                   <option value="EXTERNAL">External</option>
                 </NativeSelect>
@@ -253,7 +315,7 @@ export function TmminLayout() {
               <span>{initials(identity.displayName)}</span>
               <span>
                 <strong>{identity.displayName}</strong>
-                <small>{admin ? 'TMMIN Admin' : 'TMMIN Quality'}</small>
+                <small>{admin ? 'TMMIN Admin' : 'TMMIN Quality · Hanya baca'}</small>
               </span>
             </button>
             <IconButton label="Keluar" onClick={() => void logout().then(() => navigate('/login'))}>
@@ -283,6 +345,13 @@ export function PageHeader({
   return (
     <header className="tmmin-page-header">
       <div>
+        {title !== 'Ringkasan Global' && (
+          <nav className="tmmin-breadcrumbs" aria-label="Breadcrumb">
+            <NavLink to="/">TMMIN</NavLink>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">{title}</span>
+          </nav>
+        )}
         {eyebrow && <span className="tmmin-eyebrow">{eyebrow}</span>}
         <h1 tabIndex={-1}>{title}</h1>
         <p>{description}</p>
@@ -293,7 +362,7 @@ export function PageHeader({
 }
 
 function pageArea(path: string) {
-  if (path === '/') return 'Global Overview';
+  if (path === '/') return 'Ringkasan Global';
   return items.find((item) => item.to !== '/' && path.startsWith(item.to))?.label ?? 'TMMIN Portal';
 }
 

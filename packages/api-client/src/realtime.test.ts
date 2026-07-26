@@ -30,11 +30,13 @@ describe('Supplier realtime client', () => {
     const states: string[] = [];
     const onInvalidate = vi.fn();
     const onReconnect = vi.fn();
+    const onResync = vi.fn();
     const client = createSupplierRealtimeClient({
       baseUrl: 'https://api.example.test',
       query: { lineId: '00000000-0000-4000-8000-000000000001' },
       onInvalidate,
       onReconnect,
+      onResync,
       onStateChange: (state) => states.push(state),
       eventSourceFactory: (url, init) => new FakeEventSource(url, init) as unknown as EventSource,
     });
@@ -56,6 +58,15 @@ describe('Supplier realtime client', () => {
       }),
     );
     expect(onInvalidate).toHaveBeenCalledOnce();
+    first.listeners.get('resync')?.(
+      new MessageEvent('resync', {
+        data: JSON.stringify({
+          reason: 'CURSOR_UNAVAILABLE',
+          at: '2026-07-24T00:00:00.000Z',
+        }),
+      }),
+    );
+    expect(onResync).toHaveBeenCalledOnce();
     expect(() =>
       first.listeners.get('invalidate')?.(new MessageEvent('invalidate', { data: '{malformed' })),
     ).not.toThrow();
@@ -70,6 +81,13 @@ describe('Supplier realtime client', () => {
     expect(onReconnect).toHaveBeenCalledOnce();
     client.close();
     expect(second.closed).toBe(true);
-    expect(states).toEqual(['connecting', 'connected', 'connecting', 'connected', 'disconnected']);
+    expect(states).toEqual([
+      'connecting',
+      'connected',
+      'resyncing',
+      'connecting',
+      'connected',
+      'disconnected',
+    ]);
   });
 });

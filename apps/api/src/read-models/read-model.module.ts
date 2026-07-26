@@ -6,11 +6,12 @@ import { NotificationService } from './notification.service.js';
 import { SupplierReadModelController, TmminReadModelController } from './read-model.controller.js';
 import { ReadModelService } from './read-model.service.js';
 import { RealtimeService } from './realtime.service.js';
+import { RealtimeEventPump } from './realtime-event-pump.js';
 
 @Module({
   imports: [OperationsModule, AdministrationModule],
   controllers: [SupplierReadModelController, TmminReadModelController],
-  providers: [NotificationService, ReadModelService, RealtimeService],
+  providers: [NotificationService, ReadModelService, RealtimeEventPump, RealtimeService],
   exports: [ReadModelService, NotificationService],
 })
 export class ReadModelModule {}
