@@ -34,7 +34,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "pnpm test:unit",
-    "test:unit": "pnpm generate && pnpm shared:build && pnpm -r --sort --if-present run test:unit",
+    "test:unit": "node --test scripts/*.test.mjs && pnpm generate && pnpm shared:build && pnpm -r --sort --if-present run test:unit",
     "test:integration": "pnpm generate && pnpm shared:build && pnpm --filter @tmmin-henkaten/api run test:integration",
     "test:baseline": "pnpm generate && pnpm shared:build && pnpm --filter @tmmin-henkaten/api run test:baseline",
     "test:e2e": "pnpm generate && pnpm shared:build && pnpm --filter @tmmin-henkaten/api run build && pnpm --filter @tmmin-henkaten/e2e run test:e2e",

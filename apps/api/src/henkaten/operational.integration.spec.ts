@@ -338,6 +338,23 @@ describe('Hosted shift and Henkaten core', () => {
     ).resolves.toBe(1);
   });
 
+  it('lists multiple Shift Runs without passing the array index as presenter data', async () => {
+    const secondBusinessDate = '2026-07-24';
+    const secondPlan = await adminPost('/api/v1/supplier/shifts/preflight', {
+      lineId,
+      shiftTemplateId,
+      businessDate: secondBusinessDate,
+    });
+    expect(secondPlan.status).toBe(201);
+
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/supplier/shifts?limit=25')
+      .set('Cookie', adminCookie);
+
+    expect(response.status).toBe(200);
+    expect(responseBody<{ items: unknown[] }>(response).items).toHaveLength(2);
+  });
+
   it('enforces all-YES evidence and idempotent immutable 4M submission', async () => {
     const checklist = checklists.get('MACHINE')!;
     const payload = machinePayload(checklist);

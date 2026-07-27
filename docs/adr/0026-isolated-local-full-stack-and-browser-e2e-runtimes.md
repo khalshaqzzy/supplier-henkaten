@@ -36,6 +36,9 @@ The durable developer runtime additionally exposes `local:start:clean` and `loca
 explicitly destructive, development-only operations. Clean start removes both named volumes;
 reseed recreates only the main database and photo volume while preserving the disposable test
 database. They provision exactly two synthetic Hosted suppliers through authenticated public APIs.
+Both commands rebuild the API and both frontend images from the current working tree before the
+interactive stack is considered ready. This prevents a clean database from being audited against a
+stale browser bundle.
 After the outbox drains, a guarded local-only transaction normalizes historical timestamps and
 verifies aggregate invariants. This narrow exception is necessary because production APIs correctly
 use server-authoritative current time and immutable terminal records.
@@ -54,6 +57,13 @@ databases, missing confirmation, and nonempty targets.
 Playwright uses distinct browser contexts for roles and tenants. A deliberate shared-context
 journey proves the Supplier and TMMIN cookie names do not overwrite one another. Chromium covers the
 complete suite; pinned Microsoft Edge covers tagged critical smoke journeys.
+
+Seeded-runtime QA follows an explicit order: audit a Supplier Admin first, reseed to the verified
+baseline, then audit TMMIN Admin. Suspected defects are triangulated against database state, public
+API behavior, and UI presentation before changing either seed or application code. External-source
+states needed by TMMIN QA are created temporarily through production UI/API operations and removed
+by reseed; they are not added to the two-Hosted-supplier baseline fixture. Credential manifests and
+one-time values remain excluded from browser artifacts, logs, and audit documents.
 
 ## Rationale
 
@@ -82,6 +92,10 @@ instead of a test-only substitute.
   filters looked artificial and did not exercise skewed production workloads.
 - **Containerize the Vite/API processes inside every journey:** rejected for now because child
   processes give faster iteration while PostgreSQL remains environment-faithful.
+- **Reuse previously built frontend images during clean/reseed:** rejected because the apparent
+  seed baseline could be presented by code that is no longer in the working tree.
+- **Add a permanent External supplier to the seed for admin QA:** rejected because it would change
+  the promised two-Hosted-supplier baseline and bypass real administration/governance workflows.
 
 ## Consequences
 
@@ -107,6 +121,10 @@ concerns.
   represented, weighted line/part usage, and dozens of event/resolution timing variants. Reseed
   preserves a test-database sentinel while rotating supplier IDs, credentials, and member-photo
   files.
+- The 2026-07-27 seeded application audit exercised Supplier Admin followed by a clean TMMIN Admin
+  baseline at 1280×720 and wide desktop viewports. Database/API/UI triangulation found no seed
+  defects and seven application/runtime defects; all were fixed with regression coverage. The
+  complete evidence is recorded in `.agent/seededAppQaAudit.md`.
 - Browser journeys start from fresh PostgreSQL/pgvector, exercise real authentication and domain
   operations, and leave no project container, network, process, or volume behind.
 - An intentional browser failure produces a nonzero result and retained diagnostic artifacts while

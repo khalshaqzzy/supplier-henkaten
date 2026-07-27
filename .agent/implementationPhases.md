@@ -4463,6 +4463,15 @@ Verification:
   Edge journeys, Gitleaks, serta diff check.
 - Tidak ada endpoint, OpenAPI, schema migration, External projection, tracked credential, atau
   production fixture fallback.
+- QA seeded runtime 2026-07-27 dilakukan berurutan Supplier Admin → clean reseed → TMMIN Admin
+  dengan triangulasi database/API/UI pada kedua viewport. Tidak ditemukan `SEED_DEFECT` atau
+  `CONTRACT_DOC_MISMATCH`; tujuh `APP_DEFECT` pada presenter Shift, asset origin, UI Problem
+  Details, TMMIN nested snapshot, request observability, dan freshness image lokal telah diperbaiki
+  pada lapisan pemiliknya beserta regression test.
+- Evidence akhir mencakup invariant 2 Hosted/240 Henkaten, credential rotation dan mode `0600`,
+  preservasi test database, targeted regression, seluruh unit suite, 33 PostgreSQL integration test
+  serial, empat Chromium journey, dua Edge smoke journey, OpenAPI/build, Gitleaks, dan diff check.
+  Detail reproduksi dan root cause tersedia di `.agent/seededAppQaAudit.md`.
 
 Data/migration impact:
 
