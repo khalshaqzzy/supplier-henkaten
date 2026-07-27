@@ -2,9 +2,11 @@
 useDefault = true
 
 [allowlist]
-description = "Exact non-production credentials used only by the disposable CI test database"
+description = "Exact non-production placeholders registered with rationale and expiry"
 regexTarget = "secret"
 regexes = [
   '''integration-test-csrf-secret-at-least-32''',
   '''integration-test-throttle-secret-32''',
+  '''replace_me_with_32_safe_characters''',
+  '''0123456789abcdef0123456789abcdef''',
 ]

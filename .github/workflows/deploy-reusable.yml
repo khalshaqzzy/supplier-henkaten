@@ -1,0 +1,225 @@
+name: Reusable hosted deployment
+
+on:
+  workflow_call:
+    inputs:
+      app_env:
+        required: true
+        type: string
+      expected_branch:
+        required: true
+        type: string
+      release_sha:
+        required: true
+        type: string
+      deploy_run_number:
+        required: true
+        type: string
+      environment_url:
+        required: true
+        type: string
+      remote_base_dir:
+        required: true
+        type: string
+      supplier_domain:
+        required: true
+        type: string
+      tmmin_domain:
+        required: true
+        type: string
+      api_domain:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.app_env }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 75
+    environment:
+      name: ${{ inputs.app_env }}
+      url: ${{ inputs.environment_url }}
+    concurrency:
+      group: deploy-${{ inputs.app_env }}
+      cancel-in-progress: false
+    env:
+      REMOTE_HOST: ${{ secrets.VM_HOST }}
+      REMOTE_USER: ${{ secrets.VM_USER }}
+      REMOTE_PORT: ${{ vars.VM_SSH_PORT || '22' }}
+      REMOTE_BASE_DIR: ${{ inputs.remote_base_dir }}
+      RELEASE_SHA: ${{ inputs.release_sha }}
+      DEPLOY_RUN_NUMBER: ${{ inputs.deploy_run_number }}
+      SSH_KEY_PATH: /tmp/supplier-henkaten-deploy-key
+      KNOWN_HOSTS_PATH: /tmp/supplier-henkaten-known-hosts
+      ARCHIVE_PATH: /tmp/supplier-henkaten-release.tar.gz
+      RUNTIME_ENV_PATH: /tmp/supplier-henkaten-runtime.env
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.release_sha }}
+          fetch-depth: 0
+
+      - name: Validate immutable deployment contract
+        env:
+          APP_ENV: ${{ inputs.app_env }}
+          EXPECTED_BRANCH: ${{ inputs.expected_branch }}
+          SUPPLIER_DOMAIN: ${{ inputs.supplier_domain }}
+          TMMIN_DOMAIN: ${{ inputs.tmmin_domain }}
+          API_DOMAIN: ${{ inputs.api_domain }}
+        run: |
+          [[ "$APP_ENV" =~ ^(staging|production)$ ]]
+          [[ "$EXPECTED_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$DEPLOY_RUN_NUMBER" =~ ^[1-9][0-9]*$ ]]
+          [[ "$REMOTE_BASE_DIR" == "/opt/supplier-henkaten/$APP_ENV" ]]
+          [[ "$REMOTE_PORT" =~ ^[0-9]+$ ]] && (( REMOTE_PORT >= 1 && REMOTE_PORT <= 65535 ))
+          for domain in "$SUPPLIER_DOMAIN" "$TMMIN_DOMAIN" "$API_DOMAIN"; do
+            [[ "$domain" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]
+          done
+
+      - name: Reject stale candidate
+        id: freshness
+        env:
+          EXPECTED_BRANCH: ${{ inputs.expected_branch }}
+        run: |
+          branch_sha="$(git ls-remote origin "refs/heads/$EXPECTED_BRANCH" | cut -f1)"
+          if [[ "$branch_sha" != "$RELEASE_SHA" ]]; then
+            echo "Candidate $RELEASE_SHA is stale; current $EXPECTED_BRANCH is $branch_sha."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate required environment secrets
+        if: steps.freshness.outputs.deploy == 'true'
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+          VM_SSH_PRIVATE_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          VM_SSH_KNOWN_HOSTS: ${{ secrets.VM_SSH_KNOWN_HOSTS }}
+          CADDY_EMAIL: ${{ secrets.CADDY_EMAIL }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
+          SESSION_CSRF_SECRET: ${{ secrets.SESSION_CSRF_SECRET }}
+          AUTH_THROTTLE_SECRET: ${{ secrets.AUTH_THROTTLE_SECRET }}
+          TMMIN_BOOTSTRAP_USERNAME: ${{ secrets.TMMIN_BOOTSTRAP_USERNAME }}
+          TMMIN_BOOTSTRAP_PASSWORD: ${{ secrets.TMMIN_BOOTSTRAP_PASSWORD }}
+        run: |
+          for name in VM_HOST VM_USER VM_SSH_PRIVATE_KEY VM_SSH_KNOWN_HOSTS CADDY_EMAIL POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DATABASE SESSION_CSRF_SECRET AUTH_THROTTLE_SECRET TMMIN_BOOTSTRAP_USERNAME TMMIN_BOOTSTRAP_PASSWORD; do
+            [[ -n "${!name// }" ]] || {
+              echo "Missing required staging environment secret: $name" >&2
+              exit 1
+            }
+          done
+          [[ "$VM_HOST" =~ ^[A-Za-z0-9.-]+$ ]] || {
+            echo "VM_HOST must be a hostname or IPv4 address without a scheme or port." >&2
+            exit 1
+          }
+          [[ "$VM_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || {
+            echo "VM_USER has an invalid Linux username shape." >&2
+            exit 1
+          }
+
+      - name: Render validated runtime environment
+        if: steps.freshness.outputs.deploy == 'true'
+        env:
+          CADDY_EMAIL: ${{ secrets.CADDY_EMAIL }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
+          SESSION_CSRF_SECRET: ${{ secrets.SESSION_CSRF_SECRET }}
+          AUTH_THROTTLE_SECRET: ${{ secrets.AUTH_THROTTLE_SECRET }}
+          TMMIN_BOOTSTRAP_USERNAME: ${{ secrets.TMMIN_BOOTSTRAP_USERNAME }}
+          TMMIN_BOOTSTRAP_PASSWORD: ${{ secrets.TMMIN_BOOTSTRAP_PASSWORD }}
+          TMMIN_BOOTSTRAP_DISPLAY_NAME: ${{ vars.TMMIN_BOOTSTRAP_DISPLAY_NAME || 'TMMIN Bootstrap Admin' }}
+          PRODUCTION_SUPPLIER_DOMAIN: ${{ inputs.supplier_domain }}
+          PRODUCTION_TMMIN_DOMAIN: ${{ inputs.tmmin_domain }}
+          PRODUCTION_API_DOMAIN: ${{ inputs.api_domain }}
+        run: |
+          umask 077
+          deploy/scripts/render-runtime-env.sh \
+            "${{ inputs.app_env }}" "$RELEASE_SHA" "$DEPLOY_RUN_NUMBER" > "$RUNTIME_ENV_PATH"
+          deploy/scripts/validate-runtime-env.sh "$RUNTIME_ENV_PATH"
+
+      - name: Package exact Git archive
+        if: steps.freshness.outputs.deploy == 'true'
+        run: |
+          git archive --format=tar.gz --output "$ARCHIVE_PATH" "$RELEASE_SHA"
+          echo "ARCHIVE_SHA256=$(sha256sum "$ARCHIVE_PATH" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+
+      - name: Configure SSH
+        if: steps.freshness.outputs.deploy == 'true'
+        env:
+          VM_SSH_PRIVATE_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          VM_SSH_KNOWN_HOSTS: ${{ secrets.VM_SSH_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          printf '%s\n' "$VM_SSH_PRIVATE_KEY" > "$SSH_KEY_PATH"
+          printf '%s\n' "$VM_SSH_KNOWN_HOSTS" > "$KNOWN_HOSTS_PATH"
+
+      - name: Re-verify candidate immediately before SSH
+        id: pre_ssh_freshness
+        if: steps.freshness.outputs.deploy == 'true'
+        env:
+          EXPECTED_BRANCH: ${{ inputs.expected_branch }}
+        run: |
+          branch_sha="$(git ls-remote origin "refs/heads/$EXPECTED_BRANCH" | cut -f1)"
+          if [[ "$branch_sha" != "$RELEASE_SHA" ]]; then
+            echo "Candidate $RELEASE_SHA became stale before SSH; current $EXPECTED_BRANCH is $branch_sha."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload isolated candidate
+        if: steps.freshness.outputs.deploy == 'true' && steps.pre_ssh_freshness.outputs.deploy == 'true'
+        run: |
+          incoming="$REMOTE_BASE_DIR/incoming/$RELEASE_SHA.$DEPLOY_RUN_NUMBER"
+          remote_archive="$REMOTE_BASE_DIR/incoming/$RELEASE_SHA.$DEPLOY_RUN_NUMBER.tar.gz"
+          remote_env="$REMOTE_BASE_DIR/incoming/$RELEASE_SHA.$DEPLOY_RUN_NUMBER.env"
+          ssh_opts=(-i "$SSH_KEY_PATH" -o UserKnownHostsFile="$KNOWN_HOSTS_PATH" -o StrictHostKeyChecking=yes -p "$REMOTE_PORT")
+          # shellcheck disable=SC2029
+          ssh "${ssh_opts[@]}" "$REMOTE_USER@$REMOTE_HOST" "umask 077 && mkdir -p '$incoming'"
+          scp -i "$SSH_KEY_PATH" -o UserKnownHostsFile="$KNOWN_HOSTS_PATH" -o StrictHostKeyChecking=yes -P "$REMOTE_PORT" \
+            "$ARCHIVE_PATH" "$REMOTE_USER@$REMOTE_HOST:$remote_archive"
+          # shellcheck disable=SC2029
+          ssh "${ssh_opts[@]}" "$REMOTE_USER@$REMOTE_HOST" "umask 077 && cat > '$remote_env'" < "$RUNTIME_ENV_PATH"
+          # shellcheck disable=SC2029
+          ssh "${ssh_opts[@]}" "$REMOTE_USER@$REMOTE_HOST" "tar -xzf '$remote_archive' -C '$incoming'"
+
+      - name: Deploy under remote lock
+        if: steps.freshness.outputs.deploy == 'true' && steps.pre_ssh_freshness.outputs.deploy == 'true'
+        run: |
+          incoming="$REMOTE_BASE_DIR/incoming/$RELEASE_SHA.$DEPLOY_RUN_NUMBER"
+          remote_archive="$REMOTE_BASE_DIR/incoming/$RELEASE_SHA.$DEPLOY_RUN_NUMBER.tar.gz"
+          remote_env="$REMOTE_BASE_DIR/incoming/$RELEASE_SHA.$DEPLOY_RUN_NUMBER.env"
+          ssh -i "$SSH_KEY_PATH" -o UserKnownHostsFile="$KNOWN_HOSTS_PATH" -o StrictHostKeyChecking=yes -p "$REMOTE_PORT" \
+            "$REMOTE_USER@$REMOTE_HOST" \
+            "bash '$incoming/deploy/scripts/remote-deploy.sh' \
+              '${{ inputs.app_env }}' '$RELEASE_SHA' '$DEPLOY_RUN_NUMBER' '$REMOTE_BASE_DIR' \
+              '$incoming' '$remote_env' '$remote_archive' '$ARCHIVE_SHA256' '$REMOTE_HOST'"
+
+      - name: Verify externally from runner
+        if: steps.freshness.outputs.deploy == 'true' && steps.pre_ssh_freshness.outputs.deploy == 'true'
+        run: |
+          deploy/scripts/smoke-check.sh \
+            "$RELEASE_SHA" \
+            "https://${{ inputs.supplier_domain }}" \
+            "https://${{ inputs.tmmin_domain }}" \
+            "https://${{ inputs.api_domain }}"
+
+      - name: Remove runner secret material
+        if: always()
+        run: |
+          if [[ -f "$SSH_KEY_PATH" ]]; then shred -u "$SSH_KEY_PATH"; fi
+          if [[ -f "$RUNTIME_ENV_PATH" ]]; then shred -u "$RUNTIME_ENV_PATH"; fi
+          if [[ -f "$KNOWN_HOSTS_PATH" ]]; then shred -u "$KNOWN_HOSTS_PATH"; fi
+
+      - name: Record skipped stale deployment
+        if: steps.freshness.outputs.deploy != 'true' || steps.pre_ssh_freshness.outputs.deploy != 'true'
+        run: echo "A newer staging SHA superseded this successful candidate." >> "$GITHUB_STEP_SUMMARY"

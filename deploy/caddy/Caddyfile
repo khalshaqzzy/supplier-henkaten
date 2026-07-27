@@ -1,0 +1,58 @@
+{
+	email {$CADDY_EMAIL}
+	admin off
+}
+
+(frontend_headers) {
+	header {
+		-Server
+		-Via
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Content-Security-Policy "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'"
+	}
+}
+
+(api_headers) {
+	header {
+		-Server
+		-Via
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+	}
+}
+
+{$CADDY_SCHEME}{$SUPPLIER_DOMAIN} {
+	encode gzip zstd
+	import frontend_headers
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle {
+		reverse_proxy supplier-web:8080
+	}
+}
+
+{$CADDY_SCHEME}{$TMMIN_DOMAIN} {
+	encode gzip zstd
+	import frontend_headers
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle {
+		reverse_proxy tmmin-web:8080
+	}
+}
+
+{$CADDY_SCHEME}{$API_DOMAIN} {
+	encode gzip zstd
+	import api_headers
+	reverse_proxy api:3000
+}

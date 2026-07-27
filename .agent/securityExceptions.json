@@ -1,0 +1,50 @@
+[
+  {
+    "scanner": "gitleaks",
+    "id": "4137545a70f91adc0be6a3856e0742fe7436b89d:docs/adr/0007-hosted-member-photo-storage.md:generic-api-key:76",
+    "rationale": "Exact historical finding is documentation text describing an intentionally fake object-key example, not a credential.",
+    "expiresOn": "2026-10-31"
+  },
+  {
+    "scanner": "gitleaks",
+    "id": "integration-test-csrf-secret-at-least-32",
+    "rationale": "Exact fixed value is restricted to the disposable CI integration database and is not accepted by hosted environment validation.",
+    "expiresOn": "2026-10-31"
+  },
+  {
+    "scanner": "gitleaks",
+    "id": "integration-test-throttle-secret-32",
+    "rationale": "Exact fixed value is restricted to the disposable CI integration database and is not accepted by hosted environment validation.",
+    "expiresOn": "2026-10-31"
+  },
+  {
+    "scanner": "gitleaks",
+    "id": "replace_me_with_32_safe_characters",
+    "rationale": "Exact documented placeholder is used only by the local production-like example env and cannot be rendered by the hosted deployment workflow.",
+    "expiresOn": "2026-10-31"
+  },
+  {
+    "scanner": "gitleaks",
+    "id": "0123456789abcdef0123456789abcdef",
+    "rationale": "Exact deterministic value is scoped to the deployment-script temporary-directory harness and is never rendered into a hosted runtime environment.",
+    "expiresOn": "2026-10-31"
+  },
+  {
+    "scanner": "pnpm-audit",
+    "id": "GHSA-qwww-vcr4-c8h2",
+    "rationale": "React Router DOM has no compatible patched 7.x release; both frontends use declarative SPA mode and do not enable the advisory's React Server Components action mode.",
+    "expiresOn": "2026-08-31"
+  },
+  {
+    "scanner": "trivy",
+    "id": "GHSA-qwww-vcr4-c8h2",
+    "rationale": "React Router DOM has no compatible patched 7.x release; both frontends use declarative SPA mode and do not enable the advisory's React Server Components action mode.",
+    "expiresOn": "2026-08-31"
+  },
+  {
+    "scanner": "trivy",
+    "id": "DS-0002",
+    "rationale": "Dockerfile.local is an explicitly development-only bind-mount image; every production runtime Dockerfile declares and is tested with a non-root user.",
+    "expiresOn": "2026-08-31"
+  }
+]
