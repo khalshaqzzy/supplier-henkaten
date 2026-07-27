@@ -1,14 +1,15 @@
-# Session Handoff — Seeded App QA dan Staging Runtime
+# Session Handoff — Seeded App QA Supervisor/Line Leader dan Staging Runtime
 
 Tanggal: 2026-07-27
 
-Branch: `feat/staging-deployment` dari `staging`
+Branch: `staging`
 
-Baseline SHA audit: `67cb4491eaad69af6242a6bb8a0fed7bb58ef8f2`
+Baseline SHA audit lanjutan: `2d09543da180dc449266ede48bca6d1f1d3d9562`
 
-Status: seeded app QA Supplier Admin → TMMIN Admin **done**. Phase 15 tetap `in_progress`;
-15.1-15.8 `done`, 15.9 menunggu evidence VM, 15.10 implementation-ready/activation deferred,
-dan 15.11 menunggu rehearsal staging.
+Status: seeded app QA Supplier Admin → TMMIN Admin dan Supervisor → Line Leader **done**, termasuk
+seluruh profil Line Leader NPM khusus Henkaten. Phase 15 tetap `in_progress`; 15.1-15.8 `done`,
+15.9 menunggu evidence VM, 15.10 implementation-ready/activation deferred, dan 15.11 menunggu
+rehearsal staging.
 
 ## 1. Outcome QA
 
@@ -16,8 +17,8 @@ Clean seeded runtime telah diaudit pada database, API, dan UI, dimulai dari Supp
 di-reset sebelum TMMIN Admin. Baseline menghasilkan tepat dua supplier Hosted, 240 Henkaten, foto,
 warning, reservation, issue, audit, dan histori sesuai invariant.
 
-Tidak ditemukan seed defect atau contract/document mismatch. Tujuh app defect ditemukan dan
-diperbaiki:
+Audit awal tidak menemukan seed defect atau contract/document mismatch. Tujuh app defect ditemukan
+dan diperbaiki:
 
 1. thumbnail member Supplier Board memakai frontend origin;
 2. error mutation master data Supplier ditelan;
@@ -30,10 +31,25 @@ diperbaiki:
 Semua fix mempunyai regression test pada lapisan terdekat. Laporan lengkap berada di
 `.agent/seededAppQaAudit.md`.
 
+Audit lanjutan memakai Supervisor GKI multi-line/single-line, LL GKI untuk mutation lifecycle, serta
+LL1/LL2/LL3 NPM untuk assignment issue, partial approval, dan active Man reservation. Tidak
+ditemukan seed defect atau contract/document mismatch. Lima app defect tambahan diperbaiki:
+
+1. local stack mencetak origin portal 127.0.0.1 yang ditolak canonical CORS/cookie realm;
+2. API client memvalidasi current Shift detail memakai summary schema;
+3. API client mengharapkan working assignment array langsung, bukan `{ items }`;
+4. board mengabaikan Open Man reservation dan salah menyatakan assignment stabil;
+5. semua badge MAN/MACHINE/MATERIAL/METHOD tampak sebagai `M`.
+
+Laporan lengkap audit lanjutan berada di
+`.agent/seededAppSupervisorLineLeaderQaAudit.md`.
+
 ## 2. Runtime dan Contract Decisions
 
 - `local:start:clean` dan `local:reseed` sekarang membangun ulang API serta kedua frontend dari
   working tree saat ini.
+- Kedua command melaporkan portal canonical `localhost`; 127.0.0.1 hanya dipakai untuk readiness
+  probe API.
 - Baseline seed tetap tepat dua supplier Hosted.
 - State External untuk QA dibuat sementara lewat UI/API produksi. Audit membuktikan issue, rotate,
   revoke, preparation, dan preflight/cutover blocker, lalu state dibersihkan lewat reseed.
@@ -42,6 +58,8 @@ Semua fix mempunyai regression test pada lapisan terdekat. Laporan lengkap berad
 - Structured request log sekarang memuat low-cardinality `routeTemplate` setelah route resolution
   tanpa mencetak query/path values atau credential.
 - `.DS_Store` adalah perubahan milik pengguna dan tetap tidak disentuh.
+- Tidak ada public API, OpenAPI, Prisma schema, migration, atau production fallback baru dari audit
+  Supervisor/Line Leader.
 
 ## 3. Main Files QA
 
@@ -51,21 +69,27 @@ Semua fix mempunyai regression test pada lapisan terdekat. Laporan lengkap berad
 - Supplier: `apps/supplier-web/src/app/api.ts`,
   `apps/supplier-web/src/pages/BoardPage.tsx`,
   `apps/supplier-web/src/pages/MasterDataPages.tsx`;
+- API client: `packages/api-client/src/supplier.ts`;
 - TMMIN: `apps/tmmin-web/src/pages/AdminPages.tsx`,
   `apps/tmmin-web/src/pages/SupportPages.tsx`;
 - local runtime: `scripts/local-stack.mjs`, `scripts/local-stack-plan.mjs`;
 - regression: colocated `*.test.ts`, `*.spec.ts`, dan `scripts/local-stack-plan.test.mjs`;
-- architecture/evidence: ADR 0026, Phase 14.12, dan `.agent/seededAppQaAudit.md`.
+- architecture/evidence: ADR 0026, Phase 14.12-14.13, `.agent/seededAppQaAudit.md`, dan
+  `.agent/seededAppSupervisorLineLeaderQaAudit.md`.
 
 ## 4. Validation Evidence
 
 - clean start dan reseed akhir lulus dengan exact Node.js 22.23.1 container;
 - manifest credential berotasi, mode `0600`, dan disposable test database dipertahankan;
-- format, lint, typecheck, 109 Vitest unit test plus satu Node script test, OpenAPI/client drift, dan
+- format, lint, typecheck, 113 Vitest unit test plus dua Node script test, OpenAPI/client drift, dan
   production build lulus;
 - targeted PostgreSQL integration 15/15 dan full serial integration 33/33 lulus;
 - Chromium 4/4 journey dan Edge 2/2 smoke journey lulus;
 - Gitleaks tidak menemukan leak dan `git diff --check` lulus.
+
+Regression browser sekarang secara eksplisit memastikan form LL mendapat current Shift/target job
+dan board menampilkan active Man reservation. Audit interaktif GKI/NPM pada 1280×720 tidak
+menemukan horizontal overflow atau cross-line/cross-tenant leakage.
 
 Satu full integration run paralel sempat gagal pada notification count akibat lima file berbagi
 disposable database. Reset dan run serial lulus 33/33. Follow-up yang disarankan adalah database
@@ -107,3 +131,4 @@ Hanya setelah evidence tersebut 15.9 dan 15.11 boleh menjadi `done`. Phase 15 ha
 - Host audit memakai Node.js 26.3.1, sedangkan runtime repository yang didukung dan container
   acceptance memakai Node.js 22.23.1.
 - Vite masih memberi warning chunk besar non-blocking.
+- Integration suite harus tetap serial selama lima file memakai satu disposable test database.

@@ -23,8 +23,11 @@ Setiap anomali ditriangulasi pada database, API, dan UI sebelum diklasifikasikan
 - `APP_DEFECT`: seed benar, tetapi API, authorization, logging, cache, atau UI salah;
 - `CONTRACT_DOC_MISMATCH`: implementasi konsisten tetapi berbeda dari kontrak produk.
 
-Audit tidak mencakup QA penuh role LL/QC. Role lain hanya dipakai bila diperlukan untuk membuktikan
-state pendukung. Tidak ada kredensial, secret, atau nilai one-time credential yang disalin ke laporan.
+Audit ini tidak mencakup QA penuh role LL/QC. Audit lanjutan untuk Supervisor dan Line Leader,
+termasuk seluruh profil Line Leader NPM khusus Henkaten, tersedia di
+[`seededAppSupervisorLineLeaderQaAudit.md`](./seededAppSupervisorLineLeaderQaAudit.md). QC tetap
+hanya dipakai sebagai supporting actor. Tidak ada kredensial, secret, atau nilai one-time credential
+yang disalin ke laporan.
 
 ## 2. Environment dan Baseline
 

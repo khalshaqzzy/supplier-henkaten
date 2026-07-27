@@ -80,9 +80,7 @@ export function BoardPage() {
     .flatMap((job) => job.indicators)
     .filter((item) => item.status === 'OPEN').length;
   const issues = jobs.filter((job) => job.state === 'VACANT' || job.state === 'CONFLICTED').length;
-  const criticalJobs = jobs.filter(
-    (job) => job.state === 'VACANT' || job.state === 'CONFLICTED' || job.state === 'RESERVED',
-  );
+  const operationalRisks = boardOperationalRisks(lines);
   const contextLine = lines[0];
 
   return (
@@ -266,8 +264,9 @@ export function BoardPage() {
                                 to={`/henkatens/${indicator.henkatenId}`}
                                 className={`four-m is-${indicator.category.toLowerCase()} is-${indicator.status.toLowerCase()}`}
                                 title={`${indicator.identifier}: ${indicator.category} ${indicator.status}`}
+                                aria-label={`${indicator.category} ${indicator.status}: ${indicator.identifier}`}
                               >
-                                {indicator.category[0]}
+                                {boardCategoryLabel(indicator.category)}
                               </Link>
                             ))}
                           </div>
@@ -293,16 +292,19 @@ export function BoardPage() {
               )
             }
           >
-            {criticalJobs.length ? (
+            {operationalRisks.length ? (
               <section className="board-critical">
                 <h3>Issue dan reservation</h3>
-                {criticalJobs.slice(0, 6).map((job) => (
-                  <div key={job.assignmentId}>
+                {operationalRisks.slice(0, 6).map((risk) => (
+                  <div key={risk.key}>
                     <AlertTriangle aria-hidden="true" />
                     <span>
-                      <strong>{job.jobName}</strong>
-                      <small>{humanize(job.state)}</small>
+                      <strong>{risk.jobName}</strong>
+                      <small>{risk.label}</small>
                     </span>
+                    {risk.henkatenId && (
+                      <Link to={`/henkatens/${risk.henkatenId}`}>Buka Henkaten</Link>
+                    )}
                   </div>
                 ))}
                 <Link to="/shifts">Buka resolusi Shift</Link>
@@ -347,6 +349,42 @@ export function BoardPage() {
       )}
     </div>
   );
+}
+
+type BoardLines = NonNullable<Awaited<ReturnType<typeof supplierApi.board>>>['lines'];
+
+export function boardOperationalRisks(lines: BoardLines) {
+  return lines.flatMap((line) =>
+    line.jobs.flatMap((job) => [
+      ...(job.state === 'VACANT' || job.state === 'CONFLICTED' || job.state === 'RESERVED'
+        ? [
+            {
+              key: `assignment:${job.assignmentId}`,
+              jobName: job.jobName,
+              label: humanize(job.state),
+              henkatenId: null,
+            },
+          ]
+        : []),
+      ...job.indicators
+        .filter((indicator) => indicator.category === 'MAN' && indicator.status === 'OPEN')
+        .map((indicator) => ({
+          key: `reservation:${indicator.henkatenId}`,
+          jobName: job.jobName,
+          label: `Reservation aktif · ${indicator.identifier}`,
+          henkatenId: indicator.henkatenId,
+        })),
+    ]),
+  );
+}
+
+export function boardCategoryLabel(category: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD') {
+  return {
+    MAN: 'Man',
+    MACHINE: 'Mac',
+    MATERIAL: 'Mat',
+    METHOD: 'Met',
+  }[category];
 }
 
 function formatTime(value: string, timeZone: string) {

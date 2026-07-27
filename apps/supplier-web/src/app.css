@@ -1782,14 +1782,16 @@ body {
 }
 
 .four-m {
-  width: 20px;
+  min-width: 26px;
   height: 20px;
   display: inline-grid;
   place-items: center;
   margin-left: 3px;
+  padding: 0 4px;
   border-radius: var(--hds-radius-full);
   color: white !important;
-  font-size: 10px;
+  font-size: 9px;
+  font-weight: var(--hds-weight-semibold);
 }
 
 .four-m.is-man {

@@ -65,6 +65,19 @@ states needed by TMMIN QA are created temporarily through production UI/API oper
 by reseed; they are not added to the two-Hosted-supplier baseline fixture. Credential manifests and
 one-time values remain excluded from browser artifacts, logs, and audit documents.
 
+Operational seeded QA extends that rule with isolated mutation epochs: reseed before Supervisor
+decision scenarios and again before Line Leader lifecycle scenarios so one actor cannot consume the
+fixture required by another. Supervisor scope is proven with multi-line and single-line profiles;
+Line Leader scope uses one profile per line. Both synthetic suppliers are exercised, while NPM
+coverage is intentionally limited to Line Leader Henkaten for tenant-variance evidence.
+
+Wire-format normalization belongs in the typed API client. The UI receives domain arrays/details
+after strict parsing of API envelopes and must not add fallback production data. Board risk
+presentation combines authoritative assignment state with Open Man indicators because a reserved
+MP can coexist with an assignment whose current state remains `ASSIGNED` until final approval.
+Local runtime output reports the canonical `localhost` browser origins accepted by CORS/cookies;
+the numeric loopback origin remains appropriate only for readiness probes.
+
 ## Rationale
 
 Durable local data makes daily development practical. Per-journey database isolation makes browser
@@ -125,6 +138,17 @@ concerns.
   baseline at 1280×720 and wide desktop viewports. Database/API/UI triangulation found no seed
   defects and seven application/runtime defects; all were fixed with regression coverage. The
   complete evidence is recorded in `.agent/seededAppQaAudit.md`.
+- The Supervisor/Line Leader continuation exercised approval concurrency, rejection, idempotency,
+  immutable terminal state, warning/reservation/assignment effects, Withdraw + Clone, Shift
+  cancellation, and negative line/tenant scope. All three NPM Line Leader profiles were checked for
+  Henkaten. It found no seed or contract defects and fixed five application defects in local origin
+  reporting, API-client detail/envelope mapping, reservation risk presentation, and 4M badge
+  accessibility. Evidence is recorded in
+  `.agent/seededAppSupervisorLineLeaderQaAudit.md`.
+- Regression parity after those fixes comprises 113 Vitest tests, two Node planner tests, 33 serial
+  PostgreSQL integration tests, four Chromium journeys, and two Edge journeys. The lifecycle E2E
+  now asserts current Shift/target-job form hydration; Man concurrency E2E asserts the reservation
+  risk rail before approval.
 - Browser journeys start from fresh PostgreSQL/pgvector, exercise real authentication and domain
   operations, and leave no project container, network, process, or volume behind.
 - An intentional browser failure produces a nonzero result and retained diagnostic artifacts while

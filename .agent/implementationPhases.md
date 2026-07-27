@@ -4484,6 +4484,44 @@ Exit criteria:
   dikunci.
 - Phase 15 runtime/deployment implementation dapat dimulai dari baseline ini.
 
+### 14.13 Seeded Supervisor dan Line Leader Henkaten QA
+
+Status: **done**
+
+Dependency: 14.12.
+
+Execution:
+
+- Clean deterministic seed diaudit pada role Supervisor multi-line/single-line dan tiga profil Line
+  Leader per supplier, dengan tambahan explicit coverage seluruh Line Leader NPM khusus Henkaten.
+- Decision Supervisor mencakup approve-first/final, reject-fast, comment, terminal immutability,
+  stale version, exact idempotent retry, idempotency conflict, warning closure, notification,
+  outbox, serta audit.
+- Line Leader mencakup scope dashboard/board/Shift/Henkaten/audit/notification, empat kategori 4M,
+  checklist, part/job, validation, realtime board, Withdraw + Clone, reservation/assignment, terminal
+  immutability, End Shift cancellation, dan negative cross-line/cross-tenant checks.
+- Audit menemukan nol `SEED_DEFECT`, lima `APP_DEFECT`, dan nol `CONTRACT_DOC_MISMATCH`. Defect
+  berada pada local portal origin, dua API-client wire adapter, risk rail reservation, dan
+  distinguishability badge 4M.
+- Fix ditempatkan pada layer pemilik tanpa public API, OpenAPI, Prisma schema, migration, production
+  fallback, atau business rule React baru.
+
+Verification:
+
+- Targeted regression lulus: local planner 2/2, API client 10/10, Supplier web 14/14.
+- Full parity lulus: format, lint, typecheck, 113 Vitest + 2 Node test, OpenAPI/client drift,
+  production build, 33 PostgreSQL integration serial, empat Chromium journey, dua Edge journey,
+  clean reseed, Gitleaks, dan diff check.
+- Browser QA 1280×720 tidak menemukan horizontal overflow. Deep-link line/tenant lain tidak
+  membocorkan resource.
+- Detail reproduksi, evidence DB/API/UI, root cause, fix, dan risiko residual tersedia di
+  `.agent/seededAppSupervisorLineLeaderQaAudit.md`.
+
+Data/migration impact:
+
+- Tidak ada perubahan public contract, schema, atau migration.
+- Phase 15 tetap `in_progress`; evidence ini hanya melanjutkan penutupan QA Phase 14.
+
 Phase 14 exit criteria:
 
 - Seluruh major PRD acceptance flow berjalan pada local full stack tanpa fixture-only production behavior.

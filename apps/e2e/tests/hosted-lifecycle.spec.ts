@@ -91,6 +91,16 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
     'create-henkaten',
     testInfo,
   );
+  const createHenkatenPage = await leader.context.newPage();
+  await createHenkatenPage.goto(`${runtime.supplierOrigin}/henkatens/new`);
+  await expect(
+    createHenkatenPage.getByRole('region', { name: 'Konteks Shift untuk Henkaten' }),
+  ).toBeVisible();
+  await expect(createHenkatenPage.getByLabel('Shift Run')).not.toHaveValue('');
+  await expect(
+    createHenkatenPage.getByLabel('Target job').locator(`option[value="${fixture.job.id}"]`),
+  ).toHaveCount(1);
+  await createHenkatenPage.close();
 
   const blockedLine = await post<{ id: string }>(
     fixture.request,

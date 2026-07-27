@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { frontendComposeArguments } from './local-stack-plan.mjs';
+import { frontendComposeArguments, localStackEndpoints } from './local-stack-plan.mjs';
 
 const workspaceRoot = process.cwd();
 const composeArguments = ['compose', '--profile', 'fullstack'];
@@ -11,11 +11,11 @@ const composeProject = 'supplier-henkaten-local';
 const postgresVolume = 'supplier-henkaten-local-postgres-data';
 const photoVolume = 'supplier-henkaten-local-member-photos';
 const credentialPath = resolve(workspaceRoot, '.local/seed-credentials.json');
-const endpoints = [
-  ['API readiness', `http://127.0.0.1:${process.env.API_PORT ?? '3000'}/ready`],
-  ['Supplier web', `http://127.0.0.1:${process.env.SUPPLIER_WEB_PORT ?? '5173'}`],
-  ['TMMIN web', `http://127.0.0.1:${process.env.TMMIN_WEB_PORT ?? '5174'}`],
-];
+const endpoints = localStackEndpoints({
+  apiPort: process.env.API_PORT ?? '3000',
+  supplierWebPort: process.env.SUPPLIER_WEB_PORT ?? '5173',
+  tmminWebPort: process.env.TMMIN_WEB_PORT ?? '5174',
+});
 
 function run(command, arguments_, environment = process.env, capture = false) {
   const result = spawnSync(command, arguments_, {

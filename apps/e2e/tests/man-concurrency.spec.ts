@@ -95,6 +95,18 @@ test('proves Man cross-line reservation, donor vacancy, resolution, and realm co
   const conflict = reservationRace.find((response) => response.status() === 409)!;
   expect((await conflict.json()).code).toBe('RESERVATION_CONFLICT');
 
+  const boardWithReservation = await leader.context.newPage();
+  await boardWithReservation.goto(`${runtime.supplierOrigin}/board`);
+  await expect(
+    boardWithReservation.getByRole('link', {
+      name: `MAN OPEN: ${accepted.identifier}`,
+    }),
+  ).toBeVisible();
+  await expect(
+    boardWithReservation.getByText(`Reservation aktif · ${accepted.identifier}`),
+  ).toBeVisible();
+  await boardWithReservation.close();
+
   const supervisorApproved = await decide(supervisor, accepted, 'APPROVED', 'e2e-man-supervisor');
   const approved = await decide(qc, supervisorApproved, 'APPROVED', 'e2e-man-qc');
   expect(approved.status).toBe('APPROVED');
@@ -221,6 +233,7 @@ type Shift = {
 };
 type Henkaten = {
   id: string;
+  identifier: string;
   version: number;
   status: string;
   man: { reservationActive: boolean };
