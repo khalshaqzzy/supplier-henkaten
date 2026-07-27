@@ -4463,6 +4463,15 @@ Verification:
   Edge journeys, Gitleaks, serta diff check.
 - Tidak ada endpoint, OpenAPI, schema migration, External projection, tracked credential, atau
   production fixture fallback.
+- QA seeded runtime 2026-07-27 dilakukan berurutan Supplier Admin → clean reseed → TMMIN Admin
+  dengan triangulasi database/API/UI pada kedua viewport. Tidak ditemukan `SEED_DEFECT` atau
+  `CONTRACT_DOC_MISMATCH`; tujuh `APP_DEFECT` pada presenter Shift, asset origin, UI Problem
+  Details, TMMIN nested snapshot, request observability, dan freshness image lokal telah diperbaiki
+  pada lapisan pemiliknya beserta regression test.
+- Evidence akhir mencakup invariant 2 Hosted/240 Henkaten, credential rotation dan mode `0600`,
+  preservasi test database, targeted regression, seluruh unit suite, 33 PostgreSQL integration test
+  serial, empat Chromium journey, dua Edge smoke journey, OpenAPI/build, Gitleaks, dan diff check.
+  Detail reproduksi dan root cause tersedia di `.agent/seededAppQaAudit.md`.
 
 Data/migration impact:
 
@@ -4473,7 +4482,7 @@ Exit criteria:
 
 - Kedua command menghasilkan stack sehat dengan tepat dua supplier Hosted dan invariant seed yang
   dikunci.
-- Phase 15.1 tetap menjadi next recommended subphase.
+- Phase 15 runtime/deployment implementation dapat dimulai dari baseline ini.
 
 Phase 14 exit criteria:
 
@@ -4483,7 +4492,7 @@ Phase 14 exit criteria:
 
 ## 23. Phase 15 - Production Containers, CI/CD, dan Staging
 
-Status: **planned**
+Status: **in_progress**
 
 Goal: membuat production-like containers, full CI/security workflows, release scripts, dan staging deployment setelah local E2E stabil.
 
@@ -4502,7 +4511,7 @@ Sequencing decision:
 
 ### 15.1 Production Dockerfiles
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 14.
 
@@ -4533,7 +4542,7 @@ Exit criteria:
 
 ### 15.2 Remote Docker Compose Runtime
 
-Status: **planned**
+Status: **done**
 
 Dependency: 15.1.
 
@@ -4567,7 +4576,7 @@ Exit criteria:
 
 ### 15.3 Caddy Three-domain Routing
 
-Status: **planned**
+Status: **done**
 
 Dependency: 15.2.
 
@@ -4597,7 +4606,7 @@ Exit criteria:
 
 ### 15.4 Runtime Environment dan Secret Validation
 
-Status: **planned**
+Status: **done**
 
 Dependency: 15.2-15.3.
 
@@ -4624,7 +4633,7 @@ Exit criteria:
 
 ### 15.5 Full GitHub CI dan Security Workflows
 
-Status: **planned**
+Status: **done**
 
 Dependency: 15.1-15.4 dan baseline CI.
 
@@ -4656,7 +4665,7 @@ Exit criteria:
 
 ### 15.6 Release-by-SHA Deploy Scripts
 
-Status: **planned**
+Status: **done**
 
 Dependency: 15.2-15.5.
 
@@ -4690,7 +4699,7 @@ Exit criteria:
 
 ### 15.7 Smoke dan Readiness Checks
 
-Status: **planned**
+Status: **done**
 
 Dependency: 15.6.
 
@@ -4717,7 +4726,7 @@ Exit criteria:
 
 ### 15.8 Schema-compatible Automatic Rollback
 
-Status: **planned**
+Status: **done**
 
 Dependency: 15.6-15.7.
 
@@ -4744,7 +4753,7 @@ Exit criteria:
 
 ### 15.9 Automatic Staging Deployment
 
-Status: **planned**
+Status: **in_progress**
 
 Dependency: 15.5-15.8.
 
@@ -4772,22 +4781,22 @@ Exit criteria:
 
 ### 15.10 Automatic Production Workflow
 
-Status: **planned**
+Status: **implementation-ready, activation deferred**
 
 Dependency: 15.5-15.8.
 
 Execution:
 
-- Trigger after successful CI on `main`.
-- No manual approval gate.
-- Support manual dispatch by git ref for recovery/operator use.
-- Validate production domains/secrets/VM.
-- Deploy exact SHA.
-- Smoke/readiness/rollback.
+- Reuse the exact-SHA hosted deployment workflow shared with staging.
+- Keep production domain/secret/VM validation capability in the reusable contract.
+- Do not configure `main`, `workflow_dispatch`, or any active production caller until production
+  activation is explicitly authorized.
+- Preserve smoke/readiness/rollback behavior for the future caller.
 
 Verification:
 
-- Workflow syntax and dry/preflight validation.
+- Reusable workflow syntax and staging caller validation.
+- Repository search confirms that no production trigger or caller is active.
 - Actual production deployment deferred until Phase 16 blockers resolved.
 
 Data/migration impact:
@@ -4830,6 +4839,19 @@ Phase 15 exit criteria:
 - Automatic staging deploy works.
 - Full CI/security checks work.
 - Production workflow waits only on external production readiness.
+
+Current implementation evidence (2026-07-27):
+
+- 15.1-15.8 passed local CI parity: pinned multi-stage application images, hardened non-root
+  PostgreSQL/Caddy runtime images, seven-service Compose, exact-SHA release identity, three-domain
+  routing, fresh/upgrade migrations, security headers, private database exposure, persistence,
+  scanner gates, and deployment-script failure/race/rollback/retention harnesses.
+- 15.9 is implementation-complete in the repository but remains `in_progress` until an actual push
+  to `staging` succeeds after the VM and GitHub Environment are provisioned.
+- 15.10 is reusable and production-capable, but activation is deferred; no `main` or manual trigger
+  exists.
+- 15.11 remains planned until first deploy, second-release upgrade, close-candidate race, and
+  controlled rollback evidence are captured on the staging VM.
 
 ---
 

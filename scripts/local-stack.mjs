@@ -3,6 +3,8 @@ import { chmodSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
+import { frontendComposeArguments } from './local-stack-plan.mjs';
+
 const workspaceRoot = process.cwd();
 const composeArguments = ['compose', '--profile', 'fullstack'];
 const composeProject = 'supplier-henkaten-local';
@@ -122,7 +124,7 @@ async function startCore() {
 }
 
 async function startFrontends() {
-  runDocker(['up', '--detach', 'supplier-web', 'tmmin-web']);
+  runDocker(frontendComposeArguments());
   await Promise.all(endpoints.slice(1).map(([label, url]) => waitForEndpoint(label, url)));
 }
 

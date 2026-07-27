@@ -96,7 +96,7 @@ export function HostedSupportPage() {
               content: (
                 <ResourceTable
                   result={shifts}
-                  columns={['status', 'lineName', 'shiftTemplateName', 'businessDate']}
+                  columns={['status', 'line.name', 'shift.name', 'businessDate']}
                   link={(row) => `/hosted-support/${supplierId}/shifts/${String(row.id)}`}
                 />
               ),
@@ -258,7 +258,7 @@ function ResourceTable({
           <thead>
             <tr>
               {columns.map((column) => (
-                <th key={column}>{humanize(column)}</th>
+                <th key={column}>{columnLabel(column)}</th>
               ))}
               {link && <th />}
             </tr>
@@ -267,7 +267,7 @@ function ResourceTable({
             {data.items.map((row, index) => (
               <tr key={safeCell(row.id, String(index))}>
                 {columns.map((column) => (
-                  <td key={column}>{safeCell(row[column])}</td>
+                  <td key={column}>{resourceCell(row, column)}</td>
                 ))}
                 {link && (
                   <td>
@@ -284,6 +284,25 @@ function ResourceTable({
     </Panel>
   );
 }
+export function resourceCell(row: Record<string, unknown>, path: string): string {
+  const value = path
+    .split('.')
+    .reduce<unknown>(
+      (current, key) =>
+        current && typeof current === 'object'
+          ? (current as Record<string, unknown>)[key]
+          : undefined,
+      row,
+    );
+  return safeCell(value);
+}
+
+function columnLabel(column: string) {
+  if (column === 'line.name') return 'Line name';
+  if (column === 'shift.name') return 'Shift template name';
+  return humanize(column);
+}
+
 function humanize(value: string) {
   return value.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase());
 }

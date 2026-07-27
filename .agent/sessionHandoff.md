@@ -1,88 +1,109 @@
-# Session Handoff — Comprehensive Local Seed Lifecycle
+# Session Handoff — Seeded App QA dan Staging Runtime
 
-Tanggal: 2026-07-26
+Tanggal: 2026-07-27
 
-Branch: `staging`
+Branch: `feat/staging-deployment` dari `staging`
 
-Status: Phase 14.12 `done`; Phase 15.1 adalah next
+Baseline SHA audit: `67cb4491eaad69af6242a6bb8a0fed7bb58ef8f2`
 
-## 1. Objective dan Outcome
+Status: seeded app QA Supplier Admin → TMMIN Admin **done**. Phase 15 tetap `in_progress`;
+15.1-15.8 `done`, 15.9 menunggu evidence VM, 15.10 implementation-ready/activation deferred,
+dan 15.11 menunggu rehearsal staging.
 
-Local pnpm full stack sekarang memiliki dua lifecycle command:
+## 1. Outcome QA
 
-- `pnpm local:start:clean` menghapus volume PostgreSQL dan foto, menjalankan migration, bootstrap,
-  comprehensive seed, verification, lalu kedua frontend;
-- `pnpm local:reseed` mereset main database dan volume foto tanpa mengubah disposable test database.
+Clean seeded runtime telah diaudit pada database, API, dan UI, dimulai dari Supplier Admin lalu
+di-reset sebelum TMMIN Admin. Baseline menghasilkan tepat dua supplier Hosted, 240 Henkaten, foto,
+warning, reservation, issue, audit, dan histori sesuai invariant.
 
-Kedua command berakhir dengan tepat dua supplier aktif Hosted dan stack sehat. Tidak ada endpoint,
-OpenAPI, schema migration, production fallback, atau tracked credential baru.
+Tidak ditemukan seed defect atau contract/document mismatch. Tujuh app defect ditemukan dan
+diperbaiki:
 
-## 2. Seed Dataset
+1. thumbnail member Supplier Board memakai frontend origin;
+2. error mutation master data Supplier ditelan;
+3. Shift list API gagal jika mempunyai lebih dari satu row;
+4. clean/reseed memakai frontend image yang berpotensi stale;
+5. request log API tidak mempunyai resolved route template;
+6. TMMIN Hosted Support salah membaca nested line/shift snapshot;
+7. error mutation administrasi TMMIN ditelan.
 
-Setiap supplier memiliki:
+Semua fix mempunyai regression test pada lapisan terdekat. Laporan lengkap berada di
+`.agent/seededAppQaAudit.md`.
 
-- 3 line, 12 job, 22 member, 8 part, 3 Shift Template, dan empat published 4M checklist;
-- 36 Shift Run historis dan 3 Shift Run aktif;
-- 120 Henkaten dengan profil berbeda: NPM memiliki 36 Man, 34 Machine, 27 Material, 23 Method;
-  GKI memiliki 28 Man, 26 Machine, 38 Material, 28 Method;
-- outcome NPM adalah 66 Approved, 20 Rejected, 26 Cancelled, dan 8 Open; outcome GKI adalah 58
-  Approved, 29 Rejected, 25 Cancelled, dan 8 Open;
-- beban historical shift bervariasi 1-6 record dengan histogram berbeda per supplier, seluruh job
-  dan part digunakan, serta line/part memiliki konsentrasi demand yang tidak rata;
-- 21 variasi cause/detail per supplier, master data otomotif yang plausible, 77+ variasi waktu
-  kejadian, dan 78+ variasi durasi penyelesaian;
-- histori padat pada 30 hari terakhir, dilanjutkan titik tren mingguan/periodik sampai sekitar satu
-  tahun;
-- normal/emergency start, dual-route approval order, reject-fast, withdraw/clone, end-shift
-  cancellation, Man reservation/movement, resolved dan unresolved issue, warning, notification,
-  audit, outbox, foto, serta initials fallback.
+## 2. Runtime dan Contract Decisions
 
-Seluruh domain state dibuat melalui API nyata. Prisma hanya dipakai untuk empty-target guard,
-historical timestamp normalization setelah outbox drain, dan post-seed invariant verification.
+- `local:start:clean` dan `local:reseed` sekarang membangun ulang API serta kedua frontend dari
+  working tree saat ini.
+- Baseline seed tetap tepat dua supplier Hosted.
+- State External untuk QA dibuat sementara lewat UI/API produksi. Audit membuktikan issue, rotate,
+  revoke, preparation, dan preflight/cutover blocker, lalu state dibersihkan lewat reseed.
+- Tidak ada public API, OpenAPI, Prisma schema, migration, production fallback, atau credential tetap
+  baru.
+- Structured request log sekarang memuat low-cardinality `routeTemplate` setelah route resolution
+  tanpa mencetak query/path values atau credential.
+- `.DS_Store` adalah perubahan milik pengguna dan tetap tidak disentuh.
 
-## 3. Security dan Destructive Boundary
+## 3. Main Files QA
 
-- Seeder menolak non-development, CI, non-loopback API, nonlocal/main database mismatch, missing
-  confirmation marker, dan database yang bukan bootstrap-only.
-- `local:start:clean` menampilkan dua named volume sebelum menghapusnya.
-- `local:reseed` menghentikan writer, mempertahankan PostgreSQL/test database, membuat ulang main
-  database, serta menghapus hanya photo volume dengan Compose ownership-label validation.
-- Password dibuat acak per akun dan hanya ditulis atomik ke ignored
-  `.local/seed-credentials.json` mode `0600`; value tidak dicetak atau dilog.
+- API: `apps/api/src/shifts/shift.service.ts`,
+  `apps/api/src/common/request-logging.ts`,
+  `apps/api/src/common/request-route.interceptor.ts`;
+- Supplier: `apps/supplier-web/src/app/api.ts`,
+  `apps/supplier-web/src/pages/BoardPage.tsx`,
+  `apps/supplier-web/src/pages/MasterDataPages.tsx`;
+- TMMIN: `apps/tmmin-web/src/pages/AdminPages.tsx`,
+  `apps/tmmin-web/src/pages/SupportPages.tsx`;
+- local runtime: `scripts/local-stack.mjs`, `scripts/local-stack-plan.mjs`;
+- regression: colocated `*.test.ts`, `*.spec.ts`, dan `scripts/local-stack-plan.test.mjs`;
+- architecture/evidence: ADR 0026, Phase 14.12, dan `.agent/seededAppQaAudit.md`.
 
-## 4. Files Changed
+## 4. Validation Evidence
 
-- lifecycle/config: `package.json`, `compose.yaml`, `scripts/local-stack.mjs`,
-  `scripts/database.mjs`, dan `apps/api/package.json`;
-- seed implementation/tests: `apps/api/src/cli/local-seed.ts`,
-  `local-seed-plan.ts`, dan `local-seed-plan.spec.ts`;
-- records: `README.md`, local architecture, ADR 0026, roadmap, dan handoff ini.
+- clean start dan reseed akhir lulus dengan exact Node.js 22.23.1 container;
+- manifest credential berotasi, mode `0600`, dan disposable test database dipertahankan;
+- format, lint, typecheck, 109 Vitest unit test plus satu Node script test, OpenAPI/client drift, dan
+  production build lulus;
+- targeted PostgreSQL integration 15/15 dan full serial integration 33/33 lulus;
+- Chromium 4/4 journey dan Edge 2/2 smoke journey lulus;
+- Gitleaks tidak menemukan leak dan `git diff --check` lulus.
 
-User-owned `.DS_Store` tetap tidak disentuh.
+Satu full integration run paralel sempat gagal pada notification count akibat lima file berbagi
+disposable database. Reset dan run serial lulus 33/33. Follow-up yang disarankan adalah database
+isolation per file/worker; ini bukan seeded app defect.
 
-## 5. Validation
+## 5. Staging Runtime yang Tetap Berlaku
 
-Completed:
+Staging release pipeline untuk satu VM Ubuntu 22.04 tetap utuh:
 
-- clean install, format, lint, typecheck, 96 unit tests, OpenAPI drift check, dan production build;
-- Compose default/fullstack config;
-- PostgreSQL 18.4, pgvector 0.8.5, sembilan fresh migrations, dan 32 integration tests;
-- empat Chromium dan dua Microsoft Edge isolated full-stack journeys;
-- containerized Gitleaks v8.24.3 memindai 64.94 MB tanpa finding;
-- `git diff --check`;
-- `pnpm local:start:clean`;
-- `pnpm local:reseed`;
-- exactly-two Hosted supplier, 240-Henkaten, supplier-specific category/status, shift-load,
-  line/part, narrative, dan timing-variance SQL checks;
-- credential manifest mode/shape, new-login, ID/password rotation, photo repopulation;
-- `_test` database sentinel preservation through reseed.
+- hanya pull request/push ke `staging` menjalankan staging CI;
+- push `staging` memanggil reusable exact-SHA deployment;
+- runtime memakai non-root production images, private PostgreSQL, Caddy sebagai satu-satunya service
+  yang publish 80/443, forward-only migration, atomic pointer, rollback code/env, race guard, dan
+  five-release retention;
+- release gate mencakup quality/contracts, PostgreSQL integration, migration, browser E2E,
+  deployment tooling, production container acceptance, Gitleaks, dependency security, dan CodeQL;
+- production activation tetap dilarang sampai diotorisasi dan diprovision terpisah.
 
-Seluruh validation memakai runtime Node.js 22.23.1 dan pnpm 11.16.0 yang dipin repository. Stack
-acceptance, database integration, E2E container/network/volume, dan credential manifest yang dibuat
-untuk test telah dibersihkan. Volume lokal yang dibuat selama acceptance juga dihapus agar tidak
-meninggalkan database tanpa manifest credential; tidak ada agent-started process atau container
-berjalan.
+## 6. External Blockers dan Next Action
 
-## 6. Next Action
+Tidak ada pertanyaan repository yang terbuka. Pekerjaan eksternal tetap:
 
-Phase 15.1 Production Dockerfiles tetap menjadi next recommended work.
+1. operator menjalankan `bootstrap-vm.sh` melalui akses VM langsung;
+2. DNS, verified SSH keyscan, dan GitHub Environment `staging` dikonfigurasi sesuai
+   `.agent/deploymentGuide.md`;
+3. feature branch di-squash-merge ke `staging`;
+4. evidence first deploy, second-release upgrade, close-candidate race, dan controlled rollback
+   rehearsal diambil.
+
+Hanya setelah evidence tersebut 15.9 dan 15.11 boleh menjadi `done`. Phase 15 harus tetap
+`in_progress`.
+
+## 7. Accepted Risks
+
+- Belum ada backup, PITR, replica, disaster recovery, failover, RPO/RTO, atau HA.
+- Kehilangan VM/disk/volume dapat menghapus database dan foto.
+- Code rollback tidak mengembalikan schema atau data.
+- PostgreSQL password rotation memerlukan perubahan database role terkoordinasi.
+- Host audit memakai Node.js 26.3.1, sedangkan runtime repository yang didukung dan container
+  acceptance memakai Node.js 22.23.1.
+- Vite masih memberi warning chunk besar non-blocking.

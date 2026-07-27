@@ -448,6 +448,7 @@ function ResourceLifecycle({
 }) {
   const queryClient = useQueryClient();
   const active = resource.active;
+  const [problem, setProblem] = useState<string | null>(null);
   const action = useMutation<unknown, Error>({
     mutationFn: () => {
       const next = active ? 'deactivate' : 'activate';
@@ -460,16 +461,23 @@ function ResourceLifecycle({
       queryClient.invalidateQueries({
         queryKey: scopedKey(scope, `master-${kind}-detail`, resource.id),
       }),
+    onError: (error) => setProblem(masterMutationProblem(error)),
   });
   return (
     <Panel
       title="Lifecycle"
       description="Referenced-data blocker diperiksa secara authoritative oleh server."
     >
+      {problem && (
+        <Alert tone="danger" title="Perubahan lifecycle gagal">
+          {problem}
+        </Alert>
+      )}
       <Button
         variant="secondary"
         loading={action.isPending}
         onClick={() => {
+          setProblem(null);
           if (window.confirm(`${active ? 'Nonaktifkan' : 'Aktifkan'} resource ini?`))
             action.mutate();
         }}
@@ -636,6 +644,7 @@ function MemberLifecycle({
   const [secret, setSecret] = useState<{ username: string; temporaryPassword: string } | null>(
     null,
   );
+  const [problem, setProblem] = useState<string | null>(null);
   const action = useMutation({
     mutationFn: async (kind: 'status' | 'reset') => {
       if (kind === 'reset') {
@@ -653,6 +662,15 @@ function MemberLifecycle({
       queryClient.invalidateQueries({
         queryKey: scopedKey(scope, 'master-members-detail', member.id),
       }),
+    onError: (error) => setProblem(masterMutationProblem(error)),
+  });
+  const photo = useMutation({
+    mutationFn: (file: File) => supplierApi.uploadMemberPhoto(member.id, file),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: scopedKey(scope, 'master-members-detail', member.id),
+      }),
+    onError: (error) => setProblem(masterMutationProblem(error)),
   });
   return (
     <Panel
@@ -660,10 +678,16 @@ function MemberLifecycle({
       description="Action berdampak tinggi memerlukan konfirmasi eksplisit."
     >
       {secret && <OneTimeCredential value={secret} onDone={() => setSecret(null)} />}
+      {problem && (
+        <Alert tone="danger" title="Perubahan member gagal">
+          {problem}
+        </Alert>
+      )}
       <div className="lifecycle-actions">
         <Button
           variant="secondary"
           onClick={() => {
+            setProblem(null);
             if (window.confirm(`${member.active ? 'Nonaktifkan' : 'Aktifkan'} member ini?`))
               action.mutate('status');
           }}
@@ -674,6 +698,7 @@ function MemberLifecycle({
           <Button
             variant="secondary"
             onClick={() => {
+              setProblem(null);
               if (window.confirm('Reset password dan tampilkan temporary password baru?'))
                 action.mutate('reset');
             }}
@@ -689,12 +714,13 @@ function MemberLifecycle({
             accept="image/jpeg,image/png,image/webp"
             onChange={(event) => {
               const file = event.target.files?.[0];
-              if (file && file.size <= 2 * 1024 * 1024)
-                void supplierApi.uploadMemberPhoto(member.id, file).then(() =>
-                  queryClient.invalidateQueries({
-                    queryKey: scopedKey(scope, 'master-members-detail', member.id),
-                  }),
-                );
+              if (!file) return;
+              setProblem(null);
+              if (file.size > 2 * 1024 * 1024) {
+                setProblem('Ukuran foto maksimal 2 MB.');
+                return;
+              }
+              photo.mutate(file);
             }}
           />
         </label>
@@ -706,6 +732,7 @@ function MemberLifecycle({
 function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof scopeOf> }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
   const jobs = useQuery({
     queryKey: scopedKey(scope, 'line-jobs', lineId),
     queryFn: () => supplierApi.jobs(lineId, { limit: 100, active: 'ALL' }),
@@ -716,6 +743,7 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
       setName('');
       await queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'line-jobs', lineId) });
     },
+    onError: (error) => setProblem(masterMutationProblem(error)),
   });
   const change = useMutation({
     mutationFn: async ({
@@ -744,17 +772,26 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
     },
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'line-jobs', lineId) }),
+    onError: (error) => setProblem(masterMutationProblem(error)),
   });
   return (
     <Panel
       title="Job berurutan"
       description="Job dipertahankan sebagai resource terpisah untuk assignment dan history."
     >
+      {problem && (
+        <Alert tone="danger" title="Perubahan job gagal">
+          {problem}
+        </Alert>
+      )}
       <form
         className="inline-create"
         onSubmit={(event) => {
           event.preventDefault();
-          if (name.trim()) create.mutate();
+          if (name.trim()) {
+            setProblem(null);
+            create.mutate();
+          }
         }}
       >
         <Input
@@ -777,7 +814,10 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
                 size="sm"
                 variant="ghost"
                 disabled={index === 0 || change.isPending}
-                onClick={() => change.mutate({ jobId: job.id, kind: 'up', index })}
+                onClick={() => {
+                  setProblem(null);
+                  change.mutate({ jobId: job.id, kind: 'up', index });
+                }}
               >
                 Naik
               </Button>
@@ -785,7 +825,10 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
                 size="sm"
                 variant="ghost"
                 disabled={index === (jobs.data?.items.length ?? 0) - 1 || change.isPending}
-                onClick={() => change.mutate({ jobId: job.id, kind: 'down', index })}
+                onClick={() => {
+                  setProblem(null);
+                  change.mutate({ jobId: job.id, kind: 'down', index });
+                }}
               >
                 Turun
               </Button>
@@ -794,6 +837,7 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
                 variant="secondary"
                 disabled={change.isPending}
                 onClick={() => {
+                  setProblem(null);
                   if (window.confirm(`${job.active ? 'Nonaktifkan' : 'Aktifkan'} job ini?`))
                     change.mutate({ jobId: job.id, kind: 'toggle', index });
                 }}
@@ -893,6 +937,7 @@ export function ChecklistDetailPage() {
     queryFn: () => supplierApi.checklistVersions(category),
   });
   const [items, setItems] = useState<string[]>([]);
+  const [problem, setProblem] = useState<string | null>(null);
   useEffect(() => {
     if (draft.data) setItems(draft.data.items.map((item) => item.label));
   }, [draft.data]);
@@ -904,6 +949,7 @@ export function ChecklistDetailPage() {
       }),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'checklist-draft', category) }),
+    onError: (error) => setProblem(masterMutationProblem(error)),
   });
   const publish = useMutation({
     mutationFn: () =>
@@ -916,6 +962,7 @@ export function ChecklistDetailPage() {
         queryKey: scopedKey(scope, 'checklist-versions', category),
       });
     },
+    onError: (error) => setProblem(masterMutationProblem(error)),
   });
   const lifecycle = useMutation({
     mutationFn: () =>
@@ -924,6 +971,7 @@ export function ChecklistDetailPage() {
       }),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'checklist-draft', category) }),
+    onError: (error) => setProblem(masterMutationProblem(error)),
   });
   return (
     <div className="product-page">
@@ -932,6 +980,11 @@ export function ChecklistDetailPage() {
         title={label(category)}
         description="Edit draft, lalu publish sebagai snapshot version baru."
       />
+      {problem && (
+        <Alert tone="danger" title="Perubahan checklist gagal">
+          {problem}
+        </Alert>
+      )}
       {draft.isLoading && <TableSkeleton />}
       {draft.data && (
         <div className="checklist-editor">
@@ -967,7 +1020,13 @@ export function ChecklistDetailPage() {
               <Button variant="secondary" onClick={() => setItems([...items, ''])}>
                 Tambah item
               </Button>
-              <Button loading={save.isPending} onClick={() => save.mutate()}>
+              <Button
+                loading={save.isPending}
+                onClick={() => {
+                  setProblem(null);
+                  save.mutate();
+                }}
+              >
                 Simpan draft
               </Button>
               <Button
@@ -975,6 +1034,7 @@ export function ChecklistDetailPage() {
                 disabled={!items.some(Boolean)}
                 loading={publish.isPending}
                 onClick={() => {
+                  setProblem(null);
                   if (window.confirm('Publish draft ini sebagai versi immutable baru?'))
                     publish.mutate();
                 }}
@@ -985,6 +1045,7 @@ export function ChecklistDetailPage() {
                 variant="secondary"
                 loading={lifecycle.isPending}
                 onClick={() => {
+                  setProblem(null);
                   if (
                     window.confirm(
                       `${draft.data.active ? 'Nonaktifkan' : 'Aktifkan'} checklist ${label(category)}?`,
@@ -1066,4 +1127,10 @@ function label(value: string) {
     .toLowerCase()
     .replaceAll('_', ' ')
     .replace(/(^|\s)\w/g, (letter) => letter.toUpperCase());
+}
+
+export function masterMutationProblem(error: unknown): string {
+  return error instanceof ApiProblemError
+    ? error.problem.detail
+    : 'Perubahan tidak dapat disimpan. Muat ulang sebelum mencoba kembali.';
 }

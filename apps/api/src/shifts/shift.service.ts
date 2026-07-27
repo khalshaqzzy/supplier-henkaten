@@ -1159,7 +1159,7 @@ function page<T extends { id: string }>(rows: T[], limit: number, presenter: (ro
   const hasNextPage = rows.length > limit;
   const items = hasNextPage ? rows.slice(0, limit) : rows;
   return {
-    items: items.map(presenter),
+    items: items.map((item) => presenter(item)),
     pageInfo: {
       hasNextPage,
       nextCursor: hasNextPage && items.at(-1) ? encodeCursor(items.at(-1)!.id) : null,

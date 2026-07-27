@@ -17,7 +17,7 @@ import {
   Skeleton,
 } from '@tmmin-henkaten/ui';
 
-import { supplierApi, supplierApiOrigin } from '../app/api';
+import { supplierApi, supplierApiOrigin, supplierAssetUrl } from '../app/api';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { PageHeader } from '../components/layout';
@@ -245,7 +245,7 @@ export function BoardPage() {
                         <div className="board-job__person">
                           <i>
                             {job.mp.photoThumbnailUrl ? (
-                              <img src={job.mp.photoThumbnailUrl} alt="" />
+                              <img src={supplierAssetUrl(job.mp.photoThumbnailUrl)} alt="" />
                             ) : job.mp.initials ? (
                               job.mp.initials
                             ) : (
