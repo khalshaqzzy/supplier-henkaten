@@ -33,13 +33,15 @@ Semua fix mempunyai regression test pada lapisan terdekat. Laporan lengkap berad
 
 Audit lanjutan memakai Supervisor GKI multi-line/single-line, LL GKI untuk mutation lifecycle, serta
 LL1/LL2/LL3 NPM untuk assignment issue, partial approval, dan active Man reservation. Tidak
-ditemukan seed defect atau contract/document mismatch. Lima app defect tambahan diperbaiki:
+ditemukan seed defect atau contract/document mismatch. Enam app defect tambahan diperbaiki:
 
 1. local stack mencetak origin portal 127.0.0.1 yang ditolak canonical CORS/cookie realm;
 2. API client memvalidasi current Shift detail memakai summary schema;
 3. API client mengharapkan working assignment array langsung, bukan `{ items }`;
 4. board mengabaikan Open Man reservation dan salah menyatakan assignment stabil;
 5. semua badge MAN/MACHINE/MATERIAL/METHOD tampak sebagai `M`.
+6. active assignment issue tidak mempunyai deep-link ke resolution wizard yang membawa
+   `resolutionIssueId`.
 
 Laporan lengkap audit lanjutan berada di
 `.agent/seededAppSupervisorLineLeaderQaAudit.md`.
@@ -81,7 +83,7 @@ Laporan lengkap audit lanjutan berada di
 
 - clean start dan reseed akhir lulus dengan exact Node.js 22.23.1 container;
 - manifest credential berotasi, mode `0600`, dan disposable test database dipertahankan;
-- format, lint, typecheck, 113 Vitest unit test plus dua Node script test, OpenAPI/client drift, dan
+- format, lint, typecheck, 115 Vitest unit test plus dua Node script test, OpenAPI/client drift, dan
   production build lulus;
 - targeted PostgreSQL integration 15/15 dan full serial integration 33/33 lulus;
 - Chromium 4/4 journey dan Edge 2/2 smoke journey lulus;

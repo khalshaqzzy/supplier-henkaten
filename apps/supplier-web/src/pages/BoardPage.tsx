@@ -302,12 +302,13 @@ export function BoardPage() {
                       <strong>{risk.jobName}</strong>
                       <small>{risk.label}</small>
                     </span>
-                    {risk.henkatenId && (
+                    {risk.henkatenId ? (
                       <Link to={`/henkatens/${risk.henkatenId}`}>Buka Henkaten</Link>
-                    )}
+                    ) : risk.resolutionShiftRunId ? (
+                      <Link to={`/shifts/${risk.resolutionShiftRunId}/resolve`}>Buka resolusi</Link>
+                    ) : null}
                   </div>
                 ))}
-                <Link to="/shifts">Buka resolusi Shift</Link>
               </section>
             ) : (
               <Alert tone="success" title="Assignment stabil">
@@ -363,6 +364,8 @@ export function boardOperationalRisks(lines: BoardLines) {
               jobName: job.jobName,
               label: humanize(job.state),
               henkatenId: null,
+              resolutionShiftRunId:
+                job.state === 'VACANT' || job.state === 'CONFLICTED' ? line.shiftRunId : null,
             },
           ]
         : []),
@@ -373,6 +376,7 @@ export function boardOperationalRisks(lines: BoardLines) {
           jobName: job.jobName,
           label: `Reservation aktif · ${indicator.identifier}`,
           henkatenId: indicator.henkatenId,
+          resolutionShiftRunId: null,
         })),
     ]),
   );

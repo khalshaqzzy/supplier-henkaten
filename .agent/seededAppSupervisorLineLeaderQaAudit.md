@@ -6,7 +6,7 @@ Branch: `staging`
 
 Baseline commit: `2d09543da180dc449266ede48bca6d1f1d3d9562`
 
-Status: **lulus setelah lima APP_DEFECT diperbaiki**
+Status: **lulus setelah enam APP_DEFECT diperbaiki**
 
 Audit ini merupakan lanjutan dari
 [`seededAppQaAudit.md`](./seededAppQaAudit.md). Audit sebelumnya mencakup Supplier Admin dan TMMIN
@@ -219,12 +219,36 @@ yang ditemukan bersifat lintas tenant dan diverifikasi ulang pada NPM.
 - Regression: `apps/supplier-web/src/pages/BoardPage.test.ts`.
 - Status: **fixed dan verified**.
 
+### F-06 — Active assignment issue tidak mempunyai jalur resolution yang discoverable
+
+- Severity: **High**
+- Klasifikasi: `APP_DEFECT`
+- Reproduksi: login LINE LEADER NPM 1 setelah seed, buka vacancy pada Board/Shift, lalu gunakan
+  generic “Buat Henkaten”.
+- Expected: vacancy mengarah ke resolution wizard yang membawa `shiftRunId`, `jobId`, dan
+  `resolutionIssueId` authoritative.
+- Actual: Board mengarah ke daftar Shift dan active Shift Detail tidak menampilkan CTA resolution.
+  MAN biasa tanpa matching `resolutionIssueId` ditolak backend sebagai assignment conflict.
+- Bukti seed/API: NPM-L1 mempunyai active Shift, Press Forming vacant, dan satu open
+  `AssignmentIssue`; backend sengaja mewajibkan issue link agar issue tidak dapat ditutup palsu.
+- Akar masalah: navigasi resolution hanya didesain untuk preflight `NOT_STARTED`, sedangkan
+  cascade vacancy juga dapat muncul setelah Shift menjadi `ACTIVE`.
+- Pemilik: `apps/supplier-web/src/pages/BoardPage.tsx`,
+  `apps/supplier-web/src/pages/ShiftPages.tsx`.
+- Perbaikan: setiap vacancy/conflict Board mengarah langsung ke Shift resolution; Shift Detail
+  mengambil resolution context dan menampilkan CTA untuk open issue; hanya Line Leader mendapat
+  aksi “Buat Man Henkaten”.
+- Regression: `apps/supplier-web/src/pages/BoardPage.test.ts`,
+  `apps/supplier-web/src/pages/ShiftPages.test.ts`, dan
+  `apps/e2e/tests/man-concurrency.spec.ts`.
+- Status: **fixed dan verified**; E2E membuktikan deep-link membawa ketiga identifier yang tepat.
+
 ## 7. Ringkasan Klasifikasi
 
 | Klasifikasi | Jumlah | Kesimpulan |
 | --- | ---: | --- |
 | `SEED_DEFECT` | 0 | Fixture scope, approval, warning, reservation, issue, notification, audit, dan history valid |
-| `APP_DEFECT` | 5 | 1 local runtime origin, 2 API-client wire mapping, dan 2 board presentation/accessibility |
+| `APP_DEFECT` | 6 | 1 local runtime origin, 2 API-client mapping, dan 3 presentation/navigation |
 | `CONTRACT_DOC_MISMATCH` | 0 | Public contract dan PRD tidak perlu diubah |
 
 Tidak ada Prisma schema, migration, OpenAPI, public API, atau production fallback baru. Business rule
@@ -236,8 +260,8 @@ tetap di backend; React hanya mempresentasikan read model authoritative.
 | --- | --- |
 | Local stack planner | 2/2 Node test lulus |
 | API client | 10/10 test lulus |
-| Supplier web | 14/14 test lulus |
-| Seluruh unit suite | 113 Vitest test + 2 Node test lulus |
+| Supplier web | 16/16 test lulus |
+| Seluruh unit suite | 115 Vitest test + 2 Node test lulus |
 | Format, ESLint, TypeScript | Lulus |
 | OpenAPI/generated client drift | Lulus; tidak ada drift |
 | Production build | Lulus dengan explicit `VITE_API_ORIGIN` |
@@ -259,7 +283,7 @@ Acceptance terpenuhi:
 - capability Supervisor dan Line Leader sesuai PRD;
 - tidak ada cross-line atau cross-tenant leakage;
 - DB, API, dan UI konsisten pada seluruh transition;
-- kelima defect mempunyai regression test;
+- keenam defect mempunyai regression test;
 - GKI dan seluruh tiga profil Line Leader NPM telah diverifikasi;
 - baseline dikembalikan melalui reseed dan runtime QA dihentikan setelah verifikasi.
 

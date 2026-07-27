@@ -6,6 +6,7 @@ describe('Assignment Board operational evidence', () => {
   it('surfaces an Open Man Henkaten as an active reservation without changing assignment state', () => {
     const lines = [
       {
+        shiftRunId: '00000000-0000-4000-8000-000000000003',
         jobs: [
           {
             assignmentId: '00000000-0000-4000-8000-000000000001',
@@ -22,7 +23,7 @@ describe('Assignment Board operational evidence', () => {
           },
         ],
       },
-    ] as Parameters<typeof boardOperationalRisks>[0];
+    ] as unknown as Parameters<typeof boardOperationalRisks>[0];
 
     expect(boardOperationalRisks(lines)).toEqual([
       {
@@ -30,6 +31,33 @@ describe('Assignment Board operational evidence', () => {
         jobName: 'Function Test',
         label: 'Reservation aktif · HEN-GKI-20260727-0004',
         henkatenId: '00000000-0000-4000-8000-000000000002',
+        resolutionShiftRunId: null,
+      },
+    ]);
+  });
+
+  it('routes a vacant assignment directly to its Shift resolution wizard', () => {
+    const lines = [
+      {
+        shiftRunId: '00000000-0000-4000-8000-000000000010',
+        jobs: [
+          {
+            assignmentId: '00000000-0000-4000-8000-000000000011',
+            jobName: 'Press Forming',
+            state: 'VACANT',
+            indicators: [],
+          },
+        ],
+      },
+    ] as unknown as Parameters<typeof boardOperationalRisks>[0];
+
+    expect(boardOperationalRisks(lines)).toEqual([
+      {
+        key: 'assignment:00000000-0000-4000-8000-000000000011',
+        jobName: 'Press Forming',
+        label: 'Vacant',
+        henkatenId: null,
+        resolutionShiftRunId: '00000000-0000-4000-8000-000000000010',
       },
     ]);
   });

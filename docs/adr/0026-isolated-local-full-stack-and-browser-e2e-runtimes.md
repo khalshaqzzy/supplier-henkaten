@@ -141,11 +141,11 @@ concerns.
 - The Supervisor/Line Leader continuation exercised approval concurrency, rejection, idempotency,
   immutable terminal state, warning/reservation/assignment effects, Withdraw + Clone, Shift
   cancellation, and negative line/tenant scope. All three NPM Line Leader profiles were checked for
-  Henkaten. It found no seed or contract defects and fixed five application defects in local origin
-  reporting, API-client detail/envelope mapping, reservation risk presentation, and 4M badge
-  accessibility. Evidence is recorded in
+  Henkaten. It found no seed or contract defects and fixed six application defects in local origin
+  reporting, API-client detail/envelope mapping, reservation risk presentation, 4M badge
+  accessibility, and active-Shift resolution navigation. Evidence is recorded in
   `.agent/seededAppSupervisorLineLeaderQaAudit.md`.
-- Regression parity after those fixes comprises 113 Vitest tests, two Node planner tests, 33 serial
+- Regression parity after those fixes comprises 115 Vitest tests, two Node planner tests, 33 serial
   PostgreSQL integration tests, four Chromium journeys, and two Edge journeys. The lifecycle E2E
   now asserts current Shift/target-job form hydration; Man concurrency E2E asserts the reservation
   risk rail before approval.

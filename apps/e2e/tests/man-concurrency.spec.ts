@@ -132,6 +132,22 @@ test('proves Man cross-line reservation, donor vacancy, resolution, and realm co
   const donorIssue = donorIssues.items.find(({ status }) => status === 'OPEN');
   expect(donorIssue).toBeTruthy();
 
+  const donorResolutionPage = await donorLeader.context.newPage();
+  await donorResolutionPage.goto(`${runtime.supplierOrigin}/board`);
+  const openResolution = donorResolutionPage.getByRole('link', { name: 'Buka resolusi' });
+  await expect(openResolution).toHaveAttribute('href', `/shifts/${donor.id}/resolve`);
+  await openResolution.click();
+  await expect(
+    donorResolutionPage.getByRole('heading', { name: 'Selesaikan vacancy dan conflict' }),
+  ).toBeVisible();
+  await expect(
+    donorResolutionPage.getByRole('link', { name: 'Buat Man Henkaten' }),
+  ).toHaveAttribute(
+    'href',
+    `/henkatens/new?shiftRunId=${donor.id}&jobId=${fixture.donorJob.id}&resolutionIssueId=${donorIssue!.id}`,
+  );
+  await donorResolutionPage.close();
+
   await expect
     .poll(
       async () =>

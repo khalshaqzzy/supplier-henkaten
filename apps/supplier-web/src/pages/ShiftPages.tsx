@@ -296,8 +296,15 @@ export function ShiftDetailPage() {
     queryKey: scopedKey(scope, 'shift-detail', shiftRunId),
     queryFn: () => supplierApi.shift(shiftRunId),
   });
+  const resolution = useQuery({
+    queryKey: scopedKey(scope, 'shift-resolution', shiftRunId),
+    queryFn: () => supplierApi.resolutionContext(shiftRunId),
+  });
   const refresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'shift-detail', shiftRunId) });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'shift-detail', shiftRunId) }),
+      queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'shift-resolution', shiftRunId) }),
+    ]);
     setIntentKey(createIdempotencyKey());
   };
   const action = useMutation({
@@ -332,6 +339,7 @@ export function ShiftDetailPage() {
     );
   const current = shift.data;
   const blockers = current.checks.filter((check) => check.blocking);
+  const openIssues = openAssignmentIssues(resolution.data?.issues ?? []);
   const canOperate = session!.principal.role === 'LINE_LEADER';
   const canEmergency = session!.principal.role === 'SUPPLIER_ADMIN';
   return (
@@ -400,6 +408,14 @@ export function ShiftDetailPage() {
       {current.startedWithOverride && (
         <Alert tone="danger" title="Emergency Start aktif">
           {current.overrideReason}
+        </Alert>
+      )}
+      {openIssues.length > 0 && (
+        <Alert tone="danger" title={`${openIssues.length} assignment issue perlu resolusi`}>
+          Vacancy atau conflict hanya selesai melalui Man Henkaten yang terhubung ke issue.
+          <Link to={`/shifts/${current.id}/resolve`}>
+            Buka resolution wizard <ArrowRight />
+          </Link>
         </Alert>
       )}
       <FactStrip label="Konteks Shift">
@@ -546,6 +562,7 @@ export function ShiftResolutionPage() {
   const { shiftRunId = '' } = useParams();
   const { session } = useSession();
   const scope = scopeOf(session!);
+  const canResolve = session!.principal.role === 'LINE_LEADER';
   const context = useQuery({
     queryKey: scopedKey(scope, 'shift-resolution', shiftRunId),
     queryFn: () => supplierApi.resolutionContext(shiftRunId),
@@ -578,12 +595,18 @@ export function ShiftResolutionPage() {
                 <Link to={`/henkatens/${issue.resolutionHenkatenId}`}>
                   Lihat resolution Henkaten
                 </Link>
-              ) : (
+              ) : canResolve && issue.status === 'OPEN' ? (
                 <Link
                   to={`/henkatens/new?shiftRunId=${shiftRunId}&jobId=${issue.jobId}&resolutionIssueId=${issue.id}`}
                 >
                   Buat Man Henkaten
                 </Link>
+              ) : (
+                <span>
+                  {issue.status === 'OPEN'
+                    ? 'Menunggu resolusi Line Leader'
+                    : humanize(issue.status)}
+                </span>
               )}
             </article>
           ))}
@@ -591,6 +614,10 @@ export function ShiftResolutionPage() {
       )}
     </div>
   );
+}
+
+export function openAssignmentIssues<T extends { status: string }>(issues: T[]) {
+  return issues.filter(({ status }) => status === 'OPEN');
 }
 
 function ShiftSkeleton() {

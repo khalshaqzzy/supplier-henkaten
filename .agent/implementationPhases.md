@@ -4500,16 +4500,16 @@ Execution:
 - Line Leader mencakup scope dashboard/board/Shift/Henkaten/audit/notification, empat kategori 4M,
   checklist, part/job, validation, realtime board, Withdraw + Clone, reservation/assignment, terminal
   immutability, End Shift cancellation, dan negative cross-line/cross-tenant checks.
-- Audit menemukan nol `SEED_DEFECT`, lima `APP_DEFECT`, dan nol `CONTRACT_DOC_MISMATCH`. Defect
-  berada pada local portal origin, dua API-client wire adapter, risk rail reservation, dan
-  distinguishability badge 4M.
+- Audit menemukan nol `SEED_DEFECT`, enam `APP_DEFECT`, dan nol `CONTRACT_DOC_MISMATCH`. Defect
+  berada pada local portal origin, dua API-client wire adapter, risk rail reservation,
+  distinguishability badge 4M, dan navigation gap active assignment resolution.
 - Fix ditempatkan pada layer pemilik tanpa public API, OpenAPI, Prisma schema, migration, production
   fallback, atau business rule React baru.
 
 Verification:
 
-- Targeted regression lulus: local planner 2/2, API client 10/10, Supplier web 14/14.
-- Full parity lulus: format, lint, typecheck, 113 Vitest + 2 Node test, OpenAPI/client drift,
+- Targeted regression lulus: local planner 2/2, API client 10/10, Supplier web 16/16.
+- Full parity lulus: format, lint, typecheck, 115 Vitest + 2 Node test, OpenAPI/client drift,
   production build, 33 PostgreSQL integration serial, empat Chromium journey, dua Edge journey,
   clean reseed, Gitleaks, dan diff check.
 - Browser QA 1280×720 tidak menemukan horizontal overflow. Deep-link line/tenant lain tidak
