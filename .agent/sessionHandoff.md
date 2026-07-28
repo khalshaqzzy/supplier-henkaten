@@ -1,136 +1,90 @@
-# Session Handoff — Seeded App QA Supervisor/Line Leader dan Staging Runtime
+# Session Handoff — Comprehensive Seeded App QA
 
-Tanggal: 2026-07-27
+Tanggal: 2026-07-28
 
 Branch: `staging`
 
-Baseline SHA audit lanjutan: `2d09543da180dc449266ede48bca6d1f1d3d9562`
+Status: QA seeded app untuk seluruh role bercredential dan kedua client surface **done**. Phase 15
+tetap `in_progress`; 15.9/15.11 masih memerlukan evidence VM/rehearsal staging.
 
-Status: seeded app QA Supplier Admin → TMMIN Admin dan Supervisor → Line Leader **done**, termasuk
-seluruh profil Line Leader NPM khusus Henkaten. Phase 15 tetap `in_progress`; 15.1-15.8 `done`,
-15.9 menunggu evidence VM, 15.10 implementation-ready/activation deferred, dan 15.11 menunggu
-rehearsal staging.
+## 1. Objective dan Outcome
 
-## 1. Outcome QA
+Audit menutup matriks PRD untuk Supplier Admin, Supervisor, Line Leader, QC, TMMIN Admin, dan TMMIN
+Quality pada `supplier-web` serta `tmmin-web`. MP tetap role tanpa credential sesuai PRD.
 
-Clean seeded runtime telah diaudit pada database, API, dan UI, dimulai dari Supplier Admin lalu
-di-reset sebelum TMMIN Admin. Baseline menghasilkan tepat dua supplier Hosted, 240 Henkaten, foto,
-warning, reservation, issue, audit, dan histori sesuai invariant.
+Clean start/reseed membuktikan baseline:
 
-Audit awal tidak menemukan seed defect atau contract/document mismatch. Tujuh app defect ditemukan
-dan diperbaiki:
+- tepat dua supplier Hosted;
+- 240 Henkaten, 16 Open, 16 warning aktif;
+- dua reservation aktif dan dua open Assignment Issue;
+- approval route, notification, audit, history, foto, shift, dan Board konsisten.
 
-1. thumbnail member Supplier Board memakai frontend origin;
-2. error mutation master data Supplier ditelan;
-3. Shift list API gagal jika mempunyai lebih dari satu row;
-4. clean/reseed memakai frontend image yang berpotensi stale;
-5. request log API tidak mempunyai resolved route template;
-6. TMMIN Hosted Support salah membaca nested line/shift snapshot;
-7. error mutation administrasi TMMIN ditelan.
+Tidak ditemukan `SEED_DEFECT` atau `CONTRACT_DOC_MISMATCH`. Dua `APP_DEFECT` ditemukan dan
+diperbaiki:
 
-Semua fix mempunyai regression test pada lapisan terdekat. Laporan lengkap berada di
-`.agent/seededAppQaAudit.md`.
+1. Henkaten action error tidak hilang setelah `Refresh record`;
+2. TMMIN Quality melihat link External credential yang selalu 403 dan mendapat copy palsu bahwa
+   Supplier Admin aktif tidak ada ketika identity sebenarnya disensor.
 
-Audit lanjutan memakai Supervisor GKI multi-line/single-line, LL GKI untuk mutation lifecycle, serta
-LL1/LL2/LL3 NPM untuk assignment issue, partial approval, dan active Man reservation. Tidak
-ditemukan seed defect atau contract/document mismatch. Enam app defect tambahan diperbaiki:
+Laporan lengkap: `docs/audits/seededAppAllRolesQaAudit.md`.
 
-1. local stack mencetak origin portal 127.0.0.1 yang ditolak canonical CORS/cookie realm;
-2. API client memvalidasi current Shift detail memakai summary schema;
-3. API client mengharapkan working assignment array langsung, bukan `{ items }`;
-4. board mengabaikan Open Man reservation dan salah menyatakan assignment stabil;
-5. semua badge MAN/MACHINE/MATERIAL/METHOD tampak sebagai `M`.
-6. active assignment issue tidak mempunyai deep-link ke resolution wizard yang membawa
-   `resolutionIssueId`.
+## 2. Implementation
 
-Laporan lengkap audit lanjutan berada di
-`.agent/seededAppSupervisorLineLeaderQaAudit.md`.
+- `apps/supplier-web/src/pages/HenkatenPages.tsx`
+  - refresh authoritative sekarang membersihkan local problem state.
+- `apps/tmmin-web/src/pages/AdminPages.tsx`
+  - External credential link hanya untuk TMMIN Admin;
+  - null privileged admin untuk Quality dijelaskan sebagai permission boundary.
+- `apps/supplier-web/src/App.test.tsx`
+  - regression failed decision → refresh → alert hilang/refetch.
+- `apps/tmmin-web/src/App.test.tsx`
+  - regression Quality supplier detail tanpa credential action/false absence.
+- `docs/audits/seededAppAllRolesQaAudit.md`
+  - matriks lengkap, evidence, root cause, fix, validation, dan residual risk.
+- `.agent/implementationPhases.md`
+  - subphase 14.14 `done`.
+- `docs/adr/0026-isolated-local-full-stack-and-browser-e2e-runtimes.md`
+  - primary QC/Quality completion rule dan evidence diperbarui.
 
-## 2. Runtime dan Contract Decisions
+Tidak ada perubahan public API, OpenAPI, Prisma schema, migration, seed contract, production
+fallback, atau domain policy.
 
-- `local:start:clean` dan `local:reseed` sekarang membangun ulang API serta kedua frontend dari
-  working tree saat ini.
-- Kedua command melaporkan portal canonical `localhost`; 127.0.0.1 hanya dipakai untuk readiness
-  probe API.
-- Baseline seed tetap tepat dua supplier Hosted.
-- State External untuk QA dibuat sementara lewat UI/API produksi. Audit membuktikan issue, rotate,
-  revoke, preparation, dan preflight/cutover blocker, lalu state dibersihkan lewat reseed.
-- Tidak ada public API, OpenAPI, Prisma schema, migration, production fallback, atau credential tetap
-  baru.
-- Structured request log sekarang memuat low-cardinality `routeTemplate` setelah route resolution
-  tanpa mencetak query/path values atau credential.
-- `.DS_Store` adalah perubahan milik pengguna dan tetap tidak disentuh.
-- Tidak ada public API, OpenAPI, Prisma schema, migration, atau production fallback baru dari audit
-  Supervisor/Line Leader.
+## 3. Validation
 
-## 3. Main Files QA
+- targeted frontend regression: Supplier 17/17, TMMIN 11/11;
+- root format, lint, typecheck: lulus;
+- root unit: 117 Vitest + 2 Node tests lulus;
+- OpenAPI/generated client drift: lulus;
+- production build: lulus dengan explicit `VITE_API_ORIGIN`;
+- PostgreSQL integration serial: 33/33 lulus;
+- browser E2E: Chromium 4/4 dan Edge 2/2 lulus;
+- `local:start:clean` dan `local:reseed`: lulus memakai Node.js 22.23.1 container;
+- Gitleaks source-tree directory scan: lulus; operator key gitignored dikembalikan utuh;
+- live browser re-verification 1280×720: kedua fix tampil benar, tidak ada horizontal overflow atau
+  Quality route console warning/error.
 
-- API: `apps/api/src/shifts/shift.service.ts`,
-  `apps/api/src/common/request-logging.ts`,
-  `apps/api/src/common/request-route.interceptor.ts`;
-- Supplier: `apps/supplier-web/src/app/api.ts`,
-  `apps/supplier-web/src/pages/BoardPage.tsx`,
-  `apps/supplier-web/src/pages/MasterDataPages.tsx`;
-- API client: `packages/api-client/src/supplier.ts`;
-- TMMIN: `apps/tmmin-web/src/pages/AdminPages.tsx`,
-  `apps/tmmin-web/src/pages/SupportPages.tsx`;
-- local runtime: `scripts/local-stack.mjs`, `scripts/local-stack-plan.mjs`;
-- regression: colocated `*.test.ts`, `*.spec.ts`, dan `scripts/local-stack-plan.test.mjs`;
-- architecture/evidence: ADR 0026, Phase 14.12-14.13, `.agent/seededAppQaAudit.md`, dan
-  `.agent/seededAppSupervisorLineLeaderQaAudit.md`.
+Browser tabs difinalisasi, viewport override direset, dan seluruh local/E2E process/container
+dihentikan. Durable local database/photo volumes dipertahankan oleh `local:down`.
 
-## 4. Validation Evidence
+Host Node.js 26.3.1 tetap di luar supported range. Runtime container yang menjadi acceptance
+evidence memakai exact Node.js 22.23.1.
 
-- clean start dan reseed akhir lulus dengan exact Node.js 22.23.1 container;
-- manifest credential berotasi, mode `0600`, dan disposable test database dipertahankan;
-- format, lint, typecheck, 115 Vitest unit test plus dua Node script test, OpenAPI/client drift, dan
-  production build lulus;
-- targeted PostgreSQL integration 15/15 dan full serial integration 33/33 lulus;
-- Chromium 4/4 journey dan Edge 2/2 smoke journey lulus;
-- Gitleaks tidak menemukan leak dan `git diff --check` lulus.
+## 4. Decisions
 
-Regression browser sekarang secara eksplisit memastikan form LL mendapat current Shift/target job
-dan board menampilkan active Man reservation. Audit interaktif GKI/NPM pada 1280×720 tidak
-menemukan horizontal overflow atau cross-line/cross-tenant leakage.
+- Seed dua Hosted supplier tidak diubah. External source/notification evidence tetap dibuat melalui
+  production path pada isolated E2E dan dibersihkan otomatis.
+- Null privileged identity untuk read-only Quality bukan bukti absence dan tidak boleh dipresentasi
+  sebagai absence.
+- Frontend tidak boleh menampilkan action yang diketahui berakhir pada capability guard.
+- Error recovery harus membersihkan presentation state sekaligus mengambil ulang resource/version.
 
-Satu full integration run paralel sempat gagal pada notification count akibat lima file berbagi
-disposable database. Reset dan run serial lulus 33/33. Follow-up yang disarankan adalah database
-isolation per file/worker; ini bukan seeded app defect.
+## 5. Residual Risk dan Next Action
 
-## 5. Staging Runtime yang Tetap Berlaku
-
-Staging release pipeline untuk satu VM Ubuntu 22.04 tetap utuh:
-
-- hanya pull request/push ke `staging` menjalankan staging CI;
-- push `staging` memanggil reusable exact-SHA deployment;
-- runtime memakai non-root production images, private PostgreSQL, Caddy sebagai satu-satunya service
-  yang publish 80/443, forward-only migration, atomic pointer, rollback code/env, race guard, dan
-  five-release retention;
-- release gate mencakup quality/contracts, PostgreSQL integration, migration, browser E2E,
-  deployment tooling, production container acceptance, Gitleaks, dependency security, dan CodeQL;
-- production activation tetap dilarang sampai diotorisasi dan diprovision terpisah.
-
-## 6. External Blockers dan Next Action
-
-Tidak ada pertanyaan repository yang terbuka. Pekerjaan eksternal tetap:
-
-1. operator menjalankan `bootstrap-vm.sh` melalui akses VM langsung;
-2. DNS, verified SSH keyscan, dan GitHub Environment `staging` dikonfigurasi sesuai
-   `.agent/deploymentGuide.md`;
-3. feature branch di-squash-merge ke `staging`;
-4. evidence first deploy, second-release upgrade, close-candidate race, dan controlled rollback
-   rehearsal diambil.
-
-Hanya setelah evidence tersebut 15.9 dan 15.11 boleh menjadi `done`. Phase 15 harus tetap
-`in_progress`.
-
-## 7. Accepted Risks
-
-- Belum ada backup, PITR, replica, disaster recovery, failover, RPO/RTO, atau HA.
-- Kehilangan VM/disk/volume dapat menghapus database dan foto.
-- Code rollback tidak mengembalikan schema atau data.
-- PostgreSQL password rotation memerlukan perubahan database role terkoordinasi.
-- Host audit memakai Node.js 26.3.1, sedangkan runtime repository yang didukung dan container
-  acceptance memakai Node.js 22.23.1.
-- Vite masih memberi warning chunk besar non-blocking.
-- Integration suite harus tetap serial selama lima file memakai satu disposable test database.
+- Vite masih memberi chunk-size warning non-blocking.
+- PostgreSQL driver memberi deprecation warning pada overlapping `client.query()` dalam concurrency
+  tests; suite tetap lulus. Refactor async query ownership disarankan sebelum pg 9.
+- Host `.env` adalah dotenv input dan tidak aman untuk `source` bila value berisi spasi tanpa shell
+  quoting; gunakan loader/tooling repository, bukan shell sourcing.
+- Backup, PITR, replica, DR, failover, RPO/RTO, dan HA tidak tersedia pada v1.
+- Next external action tetap bootstrap/configure staging VM, merge ke `staging`, first/second
+  release evidence, race rehearsal, dan controlled rollback untuk menutup 15.9/15.11.

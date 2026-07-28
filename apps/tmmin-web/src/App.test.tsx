@@ -98,6 +98,49 @@ describe('TMMIN application boundary', () => {
     expect(screen.queryByRole('button', { name: 'Buat supplier' })).toBeNull();
   });
 
+  it('keeps credential actions and privileged admin identity out of the Quality supplier detail', async () => {
+    const supplierId = '00000000-0000-4000-8000-000000000020';
+    vi.spyOn(tmminApi, 'session').mockResolvedValue(
+      session('TMMIN_QUALITY', ['TMMIN_SUPPLIER_READ']),
+    );
+    vi.spyOn(tmminApi, 'supplier').mockResolvedValue({
+      supplier: {
+        id: supplierId,
+        code: 'GKI',
+        name: 'PT Garuda Komponen Indonesia',
+        timezone: 'Asia/Jakarta',
+        sourceMode: 'HOSTED',
+        sourceEpoch: 1,
+        active: true,
+        version: 1,
+        createdAt: '2026-07-28T01:00:00.000Z',
+        updatedAt: '2026-07-28T01:00:00.000Z',
+      },
+      currentSupplierAdmin: null,
+      activePreparation: null,
+      monitoring: {
+        activeWarnings: 8,
+        lastHostedDataAt: '2026-07-28T01:00:00.000Z',
+        lastExternalIngestionAt: null,
+      },
+    });
+
+    render(
+      <MemoryRouter initialEntries={[`/suppliers/${supplierId}`]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'PT Garuda Komponen Indonesia' }),
+    ).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'External credentials' })).toBeNull();
+    expect(
+      screen.getByText('Detail Supplier Admin hanya tersedia untuk TMMIN Admin.'),
+    ).toBeTruthy();
+    expect(screen.queryByText('Belum ada Supplier Admin aktif.')).toBeNull();
+  });
+
   it('renders the Indonesian dashboard composition and collapsible navigation', async () => {
     vi.spyOn(tmminApi, 'session').mockResolvedValue(
       session('TMMIN_ADMIN', [

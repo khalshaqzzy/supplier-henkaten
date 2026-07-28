@@ -424,12 +424,14 @@ export function SupplierDetailPage() {
               {dateTime(result.data.activePreparation.startedAt)}
             </Alert>
           )}
-          <Link
-            className="hds-button hds-button--secondary hds-button--md"
-            to={`/suppliers/${supplierId}/credentials`}
-          >
-            External credentials
-          </Link>
+          {admin && (
+            <Link
+              className="hds-button hds-button--secondary hds-button--md"
+              to={`/suppliers/${supplierId}/credentials`}
+            >
+              External credentials
+            </Link>
+          )}
           <Link
             className="hds-button hds-button--secondary hds-button--md"
             to={`/hosted-support?supplierId=${supplierId}`}
@@ -490,7 +492,11 @@ function SupplierAdminPanel({
           ]}
         />
       ) : (
-        <p>Belum ada Supplier Admin aktif.</p>
+        <p>
+          {admin
+            ? 'Belum ada Supplier Admin aktif.'
+            : 'Detail Supplier Admin hanya tersedia untuk TMMIN Admin.'}
+        </p>
       )}
       {admin && current && (
         <>

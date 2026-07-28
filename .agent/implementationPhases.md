@@ -4471,7 +4471,7 @@ Verification:
 - Evidence akhir mencakup invariant 2 Hosted/240 Henkaten, credential rotation dan mode `0600`,
   preservasi test database, targeted regression, seluruh unit suite, 33 PostgreSQL integration test
   serial, empat Chromium journey, dua Edge smoke journey, OpenAPI/build, Gitleaks, dan diff check.
-  Detail reproduksi dan root cause tersedia di `.agent/seededAppQaAudit.md`.
+  Detail reproduksi dan root cause tersedia di `docs/audits/seededAppQaAudit.md`.
 
 Data/migration impact:
 
@@ -4515,12 +4515,52 @@ Verification:
 - Browser QA 1280×720 tidak menemukan horizontal overflow. Deep-link line/tenant lain tidak
   membocorkan resource.
 - Detail reproduksi, evidence DB/API/UI, root cause, fix, dan risiko residual tersedia di
-  `.agent/seededAppSupervisorLineLeaderQaAudit.md`.
+  `docs/audits/seededAppSupervisorLineLeaderQaAudit.md`.
 
 Data/migration impact:
 
 - Tidak ada perubahan public contract, schema, atau migration.
 - Phase 15 tetap `in_progress`; evidence ini hanya melanjutkan penutupan QA Phase 14.
+
+### 14.14 Comprehensive Seeded Role dan Client-surface QA
+
+Status: **done**
+
+Dependency: 14.12-14.13.
+
+Execution:
+
+- Matriks PRD ditutup untuk seluruh role bercredential: Supplier Admin, Supervisor, Line Leader, QC,
+  TMMIN Admin, dan TMMIN Quality. MP tetap diverifikasi sebagai member/assignment actor tanpa akun.
+- Kedua client surface diaudit interaktif pada 1280×720, termasuk capability navigation, seluruh
+  route Quality/QC, scope line/tenant, protected route, Board, dashboard, Henkaten/approval,
+  Hosted support, source governance, External health, notification, audit, system status,
+  console, dan horizontal overflow.
+- State mutatif yang dapat menghabiskan shared fixture tetap diverifikasi pada isolated
+  Playwright/PostgreSQL epoch: onboarding, 4M lifecycle, parallel approval, reject-fast,
+  Withdraw+Clone, Man cascade/concurrency, External ingestion, cutover, dan read-only Quality.
+- Database, API, dan UI membuktikan seed tetap tepat dua Hosted/240 Henkaten, 16 Open/warning,
+  dua active reservation, dan dua open assignment issue.
+- Audit menemukan nol `SEED_DEFECT`, dua `APP_DEFECT`, dan nol `CONTRACT_DOC_MISMATCH`.
+- Fix membersihkan Henkaten action error saat record direfresh serta menyembunyikan credential
+  action dan privileged-admin false absence dari TMMIN Quality.
+
+Verification:
+
+- Regression frontend lulus: Supplier 17/17 dan TMMIN 11/11.
+- Full parity lulus: format, lint, typecheck, 117 Vitest + 2 Node test, OpenAPI/client drift,
+  production build dengan explicit API origin, 33 PostgreSQL integration serial, empat Chromium
+  journey, dua Edge journey, clean reseed, dan live browser re-verification.
+- Tidak ada public API, OpenAPI, Prisma schema, migration, production fallback, atau perubahan
+  domain policy.
+- Detail matriks, reproduksi, root cause, fix, evidence, dan risiko residual tersedia di
+  `docs/audits/seededAppAllRolesQaAudit.md`.
+
+Data/migration impact:
+
+- Tidak ada perubahan database schema atau migration.
+- Phase 15 tetap `in_progress`; audit ini tidak mengklaim staging VM, backup/recovery, atau
+  production activation.
 
 Phase 14 exit criteria:
 

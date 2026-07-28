@@ -788,6 +788,7 @@ export function HenkatenDetailPage() {
     enabled: hasCapability('SUPPLIER_APPROVAL_REROUTE'),
   });
   const refresh = async () => {
+    setProblem(null);
     await queryClient.invalidateQueries({
       queryKey: scopedKey(scope, 'henkaten-detail', henkatenId),
     });

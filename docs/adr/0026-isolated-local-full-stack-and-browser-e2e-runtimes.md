@@ -71,6 +71,13 @@ fixture required by another. Supervisor scope is proven with multi-line and sing
 Line Leader scope uses one profile per line. Both synthetic suppliers are exercised, while NPM
 coverage is intentionally limited to Line Leader Henkaten for tenant-variance evidence.
 
+Completion QA treats QC and TMMIN Quality as primary actors rather than supporting identities. QC
+is checked against the shared tenant queue and tenant-wide read models. TMMIN Quality is checked
+across every monitoring and Hosted-support route, including direct protected-route denial. A
+browser control that is known to end in a role guard must not be presented as an available action;
+redacted privileged identity must be described as unavailable to the viewer rather than falsely
+described as absent.
+
 Wire-format normalization belongs in the typed API client. The UI receives domain arrays/details
 after strict parsing of API envelopes and must not add fallback production data. Board risk
 presentation combines authoritative assignment state with Open Man indicators because a reserved
@@ -137,18 +144,25 @@ concerns.
 - The 2026-07-27 seeded application audit exercised Supplier Admin followed by a clean TMMIN Admin
   baseline at 1280×720 and wide desktop viewports. Database/API/UI triangulation found no seed
   defects and seven application/runtime defects; all were fixed with regression coverage. The
-  complete evidence is recorded in `.agent/seededAppQaAudit.md`.
+  complete evidence is recorded in `docs/audits/seededAppQaAudit.md`.
 - The Supervisor/Line Leader continuation exercised approval concurrency, rejection, idempotency,
   immutable terminal state, warning/reservation/assignment effects, Withdraw + Clone, Shift
   cancellation, and negative line/tenant scope. All three NPM Line Leader profiles were checked for
   Henkaten. It found no seed or contract defects and fixed six application defects in local origin
   reporting, API-client detail/envelope mapping, reservation risk presentation, 4M badge
   accessibility, and active-Shift resolution navigation. Evidence is recorded in
-  `.agent/seededAppSupervisorLineLeaderQaAudit.md`.
+  `docs/audits/seededAppSupervisorLineLeaderQaAudit.md`.
 - Regression parity after those fixes comprises 115 Vitest tests, two Node planner tests, 33 serial
   PostgreSQL integration tests, four Chromium journeys, and two Edge journeys. The lifecycle E2E
   now asserts current Shift/target-job form hydration; Man concurrency E2E asserts the reservation
   risk rail before approval.
+- The 2026-07-28 completion audit exercised every credentialed role and every QC/TMMIN Quality
+  route at 1280×720. Database/API/UI triangulation again found no seed or contract defect. Two
+  presentation defects were fixed: stale action errors now clear on authoritative record refresh,
+  and TMMIN Quality no longer sees a credential-management link or a false statement that an
+  intentionally redacted Supplier Admin is absent. Regression parity increased to 117 Vitest tests
+  plus two Node tests; 33 integration, four Chromium, and two Edge journeys remain green. Complete
+  evidence is recorded in `docs/audits/seededAppAllRolesQaAudit.md`.
 - Browser journeys start from fresh PostgreSQL/pgvector, exercise real authentication and domain
   operations, and leave no project container, network, process, or volume behind.
 - An intentional browser failure produces a nonzero result and retained diagnostic artifacts while
