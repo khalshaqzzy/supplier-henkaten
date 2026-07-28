@@ -75,6 +75,10 @@ changing that composition boundary:
   visibility still derives exclusively from role, capability, lifecycle, and route state;
 - all workflow-specific presentation remains in a local module next to `HenkatenPages.tsx`; it does
   not extend the public `packages/ui` contract.
+- Create/Clone layout corrections remain CSS-local: category glyphs are centered independently from
+  selection affordances, confirmation and movement surfaces have explicit separation from their
+  controlling fields, and fixed square sizing is restricted to checklist number markers instead of
+  leaking into question or answer content.
 
 Presentational links are emitted only when the corresponding capability exists. No browser-derived
 lifecycle status or partial-data queue is presented as authoritative.
@@ -115,3 +119,8 @@ checklist states, readiness, Man reservation/donor evidence, non-Man transitions
 states, and accessible decision confirmation. The Hosted lifecycle visual journey captures the
 refined create and QC-pending detail pages at both reference viewports; contrast findings discovered
 by axe are corrected in source before acceptance.
+
+A corrective Hosted lifecycle capture at 1672×941 and 1280×720 additionally verifies category-icon
+centering and field-to-preview spacing. The minimum viewport retains zero page-level horizontal
+overflow and zero axe violations. Supplier lint, typecheck, unit tests, and production build remain
+the source-level regression gate for the CSS-local correction.

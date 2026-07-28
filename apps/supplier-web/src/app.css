@@ -2089,7 +2089,6 @@ body {
 
 .category-picker button svg {
   width: 15px;
-  margin-left: auto;
   color: var(--hds-action-primary);
 }
 
@@ -2103,7 +2102,7 @@ body {
   border-bottom: 1px solid var(--hds-border-subtle);
 }
 
-.checklist-answers li > span,
+.checklist-answers li > .checklist-answers__number,
 .snapshot-list li > span {
   width: 24px;
   height: 24px;
@@ -2565,7 +2564,9 @@ body {
 .target-operational-panel > .hds-panel__body,
 .man-movement-panel > .hds-panel__body,
 .object-change-panel > .hds-panel__body {
+  display: grid;
   align-content: start;
+  gap: 12px;
 }
 
 .selected-part {

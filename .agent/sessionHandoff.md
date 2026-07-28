@@ -15,6 +15,9 @@ contract, idempotency, source epoch, optimistic version, lifecycle, dan capabili
 
 Outcome utama:
 
+- Follow-up layout correction pada Create/Clone memusatkan glyph 4M secara optik, memberi jarak
+  eksplisit antara field dengan selected-part dan Man movement preview, serta menghapus inherited
+  fixed-size span yang merusak lebar pertanyaan dan pilihan checklist.
 - Create/Clone memakai semantic 4M selector dan satu workflow canvas untuk target operasional serta
   komposisi perubahan, bukan kumpulan generic card.
 - Shift Run tampil sebagai compact locked context; job, part search/picker, selected-part
@@ -46,7 +49,8 @@ identifier, route, atau production fixture yang berubah.
     transition, dan approval timeline.
 - `apps/supplier-web/src/app.css`
   - workflow canvas, semantic variants, evidence, timeline, sticky rail, focus/hover/active states,
-    wrapping, serta explicit 1280 px fallback.
+    wrapping, explicit 1280 px fallback, dan follow-up correction untuk centering ikon, spacing
+    confirmation/preview, serta checklist row sizing.
 - `apps/supplier-web/src/pages/HenkatenWorkflow.test.tsx`
   - regression presentational state 4M, checklist, readiness, movement, transition, dan approval.
 - `apps/supplier-web/src/App.test.tsx`
@@ -104,6 +108,15 @@ Runtime acceptance: Node.js `22.23.1`, pnpm `11.16.0`.
 - browser E2E Node 22: Chromium 4/4 dan Edge 2/2 lulus;
 - visual capture: 1672×941 dan 1280×720, no horizontal overflow, reduced motion, zero axe
   violations;
+- follow-up targeted check: Prettier CSS, Supplier lint, typecheck, 20/20 unit tests, production
+  build dengan safe dummy `VITE_API_ORIGIN`, `git diff --check`, serta Hosted lifecycle Chromium
+  1/1 dengan visual capture 1672×941 dan 1280×720 lulus; capture minimum viewport tetap zero axe
+  violations dan tanpa page-level horizontal overflow;
+- final pre-commit parity diulang dari clean-artifact state dengan Node.js `22.23.1` dan pnpm
+  `11.16.0`: frozen install, format, lint, typecheck, 120 Vitest + 2 Node tests, OpenAPI drift,
+  production build, 33 integration tests, Chromium 4/4, dan Edge 2/2 lulus;
+- reinstall Edge lokal tidak dijalankan karena installer memerlukan interactive `sudo`; browser
+  Edge pinned yang sudah tersedia berhasil menjalankan seluruh 2/2 journey;
 - migration destructive check terhadap `origin/staging`: tidak ada migration SQL berubah;
 - deployment env/topology, deployment script harness, security exception registry, actionlint,
   ShellCheck, Hadolint, `bash -n`, Ubuntu 22.04 bootstrap inputs, dan Linux real-flock harness:
@@ -116,8 +129,9 @@ Runtime acceptance: Node.js `22.23.1`, pnpm `11.16.0`.
   `46d068810e6e9984c785c55090a85cb1b759729f9777029c5faa7ca2d2699174`;
 - `pnpm audit --audit-level high`: exit 0; melaporkan 1 moderate dan 1 high yang sudah ignored oleh
   registry exact/unexpired;
-- seluruh local, E2E, dan production-like container/process dihentikan; durable volumes
-  dipertahankan.
+- seluruh E2E dan production-like container/process yang dimulai pada final gate dihentikan. Stack
+  local yang sudah berjalan sebelum gate dipertahankan dan tidak diambil alih; durable volume
+  production test sebelumnya dipulihkan.
 
 ## 6. Residual Risk dan Next Action
 
@@ -129,6 +143,6 @@ Runtime acceptance: Node.js `22.23.1`, pnpm `11.16.0`.
 - Mobile operational UI, staging VM, backup/PITR/DR, failover, RPO/RTO, dan HA tetap di luar scope
   perubahan ini.
 - Next action: commit dengan subject
-  `feat(supplier): polish Henkaten create and detail workflows`, push ke
+  `fix(supplier): align Henkaten create workflow`, push ke
   `origin/feat/henkaten-page-improvement`, lalu inspect branch workflow. Jangan membuat PR atau
   merge otomatis.
