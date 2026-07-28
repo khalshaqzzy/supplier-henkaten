@@ -4408,6 +4408,14 @@ Execution:
   TMMIN tidak diubah.
 - API, lifecycle, URL state, authority, field order, capability boundary, source epoch, dan
   optimistic-version behavior dipertahankan.
+- Targeted evolution berikutnya memoles Create/Clone Henkaten menjadi operational workspace dengan
+  semantic 4M selector, selected-part confirmation, Man movement preview, numbered checklist, dan
+  readiness rail tanpa membuat client-side state menjadi authoritative.
+- Henkaten Detail/Approval memakai change-evidence untuk penyebab/narasi dan before-to-after object
+  atau reservation/completed Man movement. Approve, Reject, Reroute, dan Withdraw memakai shared
+  `AlertDialog` dengan focus management, sementara visibility tetap capability/lifecycle gated.
+- Presentational helper baru tetap lokal di samping `HenkatenPages.tsx`; public contract
+  `packages/ui`, API, OpenAPI, Prisma, dan migration tidak berubah.
 
 Verification:
 
@@ -4418,6 +4426,11 @@ Verification:
   serta 1280×720 untuk enam halaman prioritas.
 - Visual journey memeriksa page-level overflow, reduced motion, dan axe; temuan accessible naming,
   prohibited ARIA, serta contrast diperbaiki pada source.
+- Targeted component regression mencakup 4M radio state, checklist Yes/No/unanswered, readiness,
+  reserved donor preview, object transition, parallel approval/Not Required, dan decision dialog.
+- Create dan QC-pending detail ditangkap ulang pada 1672×941 serta 1280×720. Explicit 1280 fallback,
+  keyboard semantics, reduced-motion capture, zero horizontal overflow, dan zero axe violations
+  lulus; contrast microcopy serta badge 4M yang ditemukan pada iterasi awal diperbaiki.
 - Full repository parity checks selesai: clean install, format, lint, typecheck, 92 unit tests,
   OpenAPI drift, production build, PostgreSQL verification, 32 integration tests, empat Chromium
   dan dua Edge journeys, containerized Gitleaks, dan diff check lulus.

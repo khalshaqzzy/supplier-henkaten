@@ -58,6 +58,24 @@ The six reference-led workflows use the following presentation rules:
 - Shift detail shares one composition across Not Started, Active, and Ended states. Emergency Start
   remains a dangerous Admin-only exception and never presents a blocked preflight as passed.
 
+The Henkaten create, clone, and detail workflows apply a second targeted refinement without
+changing that composition boundary:
+
+- create and clone render the existing field order as one operational workspace. A semantic 4M
+  selector, compact Shift Run context, selected-part confirmation, Man source-to-destination
+  preview, numbered checklist responses, and a readiness rail make input completeness visible
+  without claiming to replace server validation;
+- Man previews show only assignment, member, availability, reservation, and donor facts returned by
+  the existing endpoints. Non-Man categories use the same before-to-after visual grammar for the
+  existing affected and replacement object fields;
+- detail renders cause and narrative as change evidence, then presents either the object transition
+  or the Man reservation/completed movement from the aggregate response. Approval routes remain
+  parallel and show current responsibility, decision evidence, Not Required, and terminal state;
+- Approve, Reject, Reroute, and Withdraw use the existing focus-managed `AlertDialog`. Their
+  visibility still derives exclusively from role, capability, lifecycle, and route state;
+- all workflow-specific presentation remains in a local module next to `HenkatenPages.tsx`; it does
+  not extend the public `packages/ui` contract.
+
 Presentational links are emitted only when the corresponding capability exists. No browser-derived
 lifecycle status or partial-data queue is presented as authoritative.
 
@@ -73,6 +91,11 @@ lifecycle status or partial-data queue is presented as authoritative.
 - Sticky rails improve decision context but consume width, so the main content column deliberately
   reduces panel columns at the minimum viewport.
 - Sidebar collapse is session-local rather than persisted, avoiding a new browser-storage contract.
+- The richer Henkaten workspace increases vertical density, especially at 1280×720. The explicit
+  fallback therefore stacks operational panels, keeps the review/action rail visible, and removes
+  nonessential category microcopy rather than introducing page-level horizontal scrolling.
+- Readiness labels are presentation guidance only. Submission eligibility, reservation conflicts,
+  optimistic versions, and lifecycle transitions remain server-authoritative.
 
 ## Validation
 
@@ -86,3 +109,9 @@ test data and real typed API responses. The capture journey also asserts no page
 overflow, emulates reduced motion, and runs axe at the minimum viewport. Visual references are
 reopened at original resolution before implementation, after context compaction, after major page
 groups, and before final acceptance.
+
+The targeted Henkaten refinement adds component coverage for 4M selection, Yes/No/unanswered
+checklist states, readiness, Man reservation/donor evidence, non-Man transitions, parallel route
+states, and accessible decision confirmation. The Hosted lifecycle visual journey captures the
+refined create and QC-pending detail pages at both reference viewports; contrast findings discovered
+by axe are corrected in source before acceptance.

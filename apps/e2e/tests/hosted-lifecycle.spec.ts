@@ -96,7 +96,9 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
   await expect(
     createHenkatenPage.getByRole('region', { name: 'Konteks Shift untuk Henkaten' }),
   ).toBeVisible();
-  await expect(createHenkatenPage.getByLabel('Shift Run')).not.toHaveValue('');
+  await expect(
+    createHenkatenPage.getByRole('status', { name: 'Shift Run read-only' }),
+  ).toContainText('Shift lifecycle');
   await expect(
     createHenkatenPage.getByLabel('Target job').locator(`option[value="${fixture.job.id}"]`),
   ).toHaveCount(1);

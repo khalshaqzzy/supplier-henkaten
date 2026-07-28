@@ -281,7 +281,6 @@ describe('Supplier application foundation', () => {
     });
     vi.spyOn(supplierApi, 'notificationCount').mockResolvedValue({ count: 0 });
     vi.spyOn(supplierApi, 'decideHenkaten').mockRejectedValue(new Error('network failed'));
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     render(
       <MemoryRouter initialEntries={[`/henkatens/${id}`]}>
@@ -290,7 +289,13 @@ describe('Supplier application foundation', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'HEN-SUP-001-20260728-0001' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Penyebab & detail' })).toBeTruthy();
+    expect(screen.getByText('Lot lama')).toBeTruthy();
+    expect(screen.getByText('Lot baru')).toBeTruthy();
+    expect(screen.getByText(/Data immutable/i)).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Approve' }));
+    expect(screen.getByRole('dialog', { name: /Approve route QC/i })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Konfirmasi Approve' }));
     expect(await screen.findByText('Action tidak dapat diproses')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Refresh record' }));
     await waitFor(() => expect(screen.queryByText('Action tidak dapat diproses')).toBeNull());
