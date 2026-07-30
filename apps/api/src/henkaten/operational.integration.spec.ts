@@ -888,6 +888,24 @@ describe('Hosted shift and Henkaten core', () => {
     expect(mainLine.jobs).toHaveLength(2);
     expect(mainLine.jobs.some((job) => job.indicators.length > 0)).toBe(true);
 
+    const activityBaseTime = Date.now() + 60_000;
+    await prisma.auditEvent.createMany({
+      data: Array.from({ length: 22 }, (_, index) => ({
+        actorKind: index === 21 ? ('USER' as const) : ('SYSTEM' as const),
+        actorUserId: index === 21 ? adminUserId : null,
+        actorRole: index === 21 ? ('SUPPLIER_ADMIN' as const) : null,
+        supplierId,
+        lineId,
+        action: `DASHBOARD_ACTIVITY_${index.toString().padStart(2, '0')}`,
+        resourceType: index === 21 ? 'Henkaten' : 'ShiftRun',
+        resourceId: index === 21 ? machineHenkatenId : randomUUID(),
+        occurredAt: new Date(activityBaseTime + index * 1_000),
+        correlationId: randomUUID(),
+        sourceMode: 'HOSTED' as const,
+        result: 'SUCCESS' as const,
+      })),
+    });
+
     const dashboard = await request(app.getHttpServer())
       .get('/api/v1/supplier/dashboard')
       .set('Cookie', adminCookie);
@@ -898,6 +916,59 @@ describe('Hosted shift and Henkaten core', () => {
     expect(Array.isArray(dashboard.body.trend)).toBe(true);
     expect(Array.isArray(dashboard.body.assignmentIssues)).toBe(true);
     expect(Array.isArray(dashboard.body.recentOverrides)).toBe(true);
+    const dashboardBody = responseBody<{
+      recentActivity: Array<{
+        action: string;
+        occurredAt: string;
+        actor: { kind: string; displayName: string | null; role: string | null };
+        henkaten: null | {
+          id: string;
+          identifier: string;
+          category: string;
+          status: string;
+          line: { code: string; name: string };
+          jobName: string;
+          part: { number: string; name: string };
+        };
+      }>;
+    }>(dashboard);
+    expect(dashboardBody.recentActivity).toHaveLength(20);
+    expect(dashboardBody.recentActivity[0]?.action).toBe('DASHBOARD_ACTIVITY_21');
+    expect(
+      dashboardBody.recentActivity.some((item) => item.action === 'DASHBOARD_ACTIVITY_00'),
+    ).toBe(false);
+    expect(dashboardBody.recentActivity).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'DASHBOARD_ACTIVITY_20',
+          actor: { kind: 'SYSTEM', displayName: null, role: null },
+          henkaten: null,
+        }),
+      ]),
+    );
+    expect(
+      dashboardBody.recentActivity.every(
+        (item, index, items) =>
+          index === 0 ||
+          new Date(items[index - 1]!.occurredAt).getTime() >= new Date(item.occurredAt).getTime(),
+      ),
+    ).toBe(true);
+    expect(dashboardBody.recentActivity).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actor: expect.objectContaining({
+            kind: 'USER',
+            displayName: expect.any(String),
+          }),
+          henkaten: expect.objectContaining({
+            id: expect.any(String),
+            identifier: expect.any(String),
+            line: expect.objectContaining({ code: expect.any(String) }),
+            part: expect.objectContaining({ number: expect.any(String) }),
+          }),
+        }),
+      ]),
+    );
 
     const hostedList = await request(app.getHttpServer())
       .get('/api/v1/supplier/henkatens?limit=1')
@@ -951,6 +1022,17 @@ describe('Hosted shift and Henkaten core', () => {
     expect(supervisorAuditBody.items.some((item) => item.action === 'FOREIGN_LINE_EVIDENCE')).toBe(
       false,
     );
+    const supervisorDashboard = await request(app.getHttpServer())
+      .get('/api/v1/supplier/dashboard')
+      .set('Cookie', supervisorCookie);
+    expect(supervisorDashboard.status).toBe(200);
+    const supervisorActivity = responseBody<{
+      recentActivity: Array<{
+        action: string;
+        henkaten: null | { line: { code: string; name: string } };
+      }>;
+    }>(supervisorDashboard).recentActivity;
+    expect(supervisorActivity.some((item) => item.action === 'FOREIGN_LINE_EVIDENCE')).toBe(false);
 
     const qcAudit = await request(app.getHttpServer())
       .get('/api/v1/supplier/audit')

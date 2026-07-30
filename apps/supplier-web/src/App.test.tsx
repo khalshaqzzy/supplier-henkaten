@@ -175,6 +175,11 @@ describe('Supplier application foundation', () => {
 
     expect(await screen.findByRole('heading', { name: 'Overview Supplier' })).toBeTruthy();
     expect(screen.getByLabelText('Status')).toHaveProperty('value', 'OPEN');
+    expect(
+      screen.queryByRole('link', {
+        name: 'HEN-E2E-20260726-0012',
+      }),
+    ).toBeNull();
     await user.selectOptions(screen.getByLabelText('Status'), 'APPROVED');
     await user.click(screen.getByRole('button', { name: 'Terapkan' }));
     await waitFor(() =>
@@ -184,6 +189,52 @@ describe('Supplier application foundation', () => {
     );
     expect(screen.queryByRole('link', { name: 'Assignment Board' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Antrean Approval' })).toBeNull();
+  });
+
+  it('shows five rich dashboard activities and expands the bounded batch inline', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(supplierApi, 'session').mockResolvedValue(
+      session('NORMAL', [
+        'SUPPLIER_SELF_SERVICE',
+        'SUPPLIER_DASHBOARD_READ',
+        'SUPPLIER_HENKATEN_READ',
+      ]),
+    );
+    vi.spyOn(supplierApi, 'dashboard').mockResolvedValue(supplierDashboardVisualFixture);
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Aktivitas terbaru' })).toBeTruthy();
+    expect(document.querySelectorAll('#overview-recent-activity > li')).toHaveLength(5);
+    const firstActivityLink = screen.getByRole('link', {
+      name: 'HEN-E2E-20260726-0012',
+    });
+    expect(firstActivityLink.getAttribute('href')).toBe(
+      '/henkatens/10000000-0000-4000-8000-000000000010',
+    );
+    expect(firstActivityLink.closest('li')?.textContent).toContain('SR-CS');
+    expect(firstActivityLink.closest('li')?.textContent).toContain('Steering Knuckle');
+    expect(firstActivityLink.closest('li')?.textContent).toContain('Daniel Arifin');
+    expect(screen.getAllByText('Sistem').length).toBeGreaterThanOrEqual(2);
+
+    const expand = screen.getByRole('button', { name: 'Tampilkan lebih banyak (2)' });
+    expect(expand.getAttribute('aria-expanded')).toBe('false');
+    await user.click(expand);
+    expect(document.querySelectorAll('#overview-recent-activity > li')).toHaveLength(7);
+    expect(
+      screen.getByRole('button', { name: 'Tampilkan lebih sedikit' }).getAttribute('aria-expanded'),
+    ).toBe('true');
+    expect(screen.getAllByText(/Shift run/).length).toBeGreaterThan(0);
+
+    await user.selectOptions(screen.getByLabelText('Status'), 'OPEN');
+    await user.click(screen.getByRole('button', { name: 'Terapkan' }));
+    await waitFor(() =>
+      expect(document.querySelectorAll('#overview-recent-activity > li')).toHaveLength(5),
+    );
   });
 
   it('renders forbidden for a valid route without its capability', async () => {

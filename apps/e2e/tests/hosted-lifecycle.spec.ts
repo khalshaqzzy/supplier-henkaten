@@ -447,10 +447,21 @@ async function captureSupplierPage(
   slug: string,
   testInfo: TestInfo,
 ) {
-  if (process.env.E2E_VISUAL_CAPTURE !== '1') return;
+  if (process.env.E2E_VISUAL_CAPTURE !== '1' && slug !== 'supplier-overview') return;
   const page = await context.newPage();
   await page.goto(url);
   await expect(page.locator('h1')).toBeVisible();
+  if (slug === 'supplier-overview') {
+    const chart = page.locator('.overview-widget--trend .recharts-wrapper');
+    await expect(chart).toBeVisible();
+    const chartBox = await chart.boundingBox();
+    expect(chartBox?.width ?? 0).toBeGreaterThan(400);
+    expect(chartBox?.height ?? 0).toBeGreaterThan(150);
+    expect(
+      await page.locator('.overview-widget--trend .recharts-line-dot').count(),
+    ).toBeGreaterThan(0);
+    expect(await page.locator('#overview-recent-activity > li').count()).toBeLessThanOrEqual(5);
+  }
   await captureSupplierVisuals(page, slug, testInfo);
   await page.close();
 }
@@ -463,6 +474,7 @@ async function captureSupplierVisuals(page: Page, slug: string, testInfo: TestIn
     { width: 1280, height: 720 },
   ]) {
     await page.setViewportSize(viewport);
+    await page.evaluate(() => window.scrollTo(0, 0));
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       viewport.width,
     );
@@ -471,6 +483,20 @@ async function captureSupplierVisuals(page: Page, slug: string, testInfo: TestIn
       animations: 'disabled',
       fullPage: false,
     });
+    if (slug === 'supplier-overview') {
+      const activity = page.locator('.overview-widget--activity');
+      const grid = page.locator('.overview-grid');
+      await activity.scrollIntoViewIfNeeded();
+      const [activityBox, gridBox] = await Promise.all([
+        activity.boundingBox(),
+        grid.boundingBox(),
+      ]);
+      expect(Math.abs((activityBox?.width ?? 0) - (gridBox?.width ?? 0))).toBeLessThanOrEqual(2);
+      await activity.screenshot({
+        path: testInfo.outputPath(`${slug}-activity-${viewport.width}x${viewport.height}.png`),
+        animations: 'disabled',
+      });
+    }
     if (viewport.width === 1280) {
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     }

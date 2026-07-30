@@ -293,6 +293,7 @@ export function ChartFrame({
   kind?: 'line' | 'bar';
 }) {
   const Chart = kind === 'line' ? LineChart : BarChart;
+  const seriesLabels = new Map(series.map((item) => [item.dataKey, item.label]));
   return (
     <ChartContext.Provider value={{ kind }}>
       <div className="hds-chart">
@@ -305,55 +306,83 @@ export function ChartFrame({
           )}
           <ChartLegend series={series} />
         </div>
-        <div className="hds-chart__plot">
-          <ResponsiveContainer width="100%" height="100%">
-            <Chart data={[...data]} margin={componentMetrics.chartMargin}>
-              <CartesianGrid stroke="var(--hds-border-subtle)" vertical={false} />
-              <XAxis
-                dataKey={xKey}
-                tick={{
-                  fill: 'var(--hds-text-tertiary)',
-                  fontSize: componentMetrics.chartAxisSize,
-                }}
-                axisLine={{ stroke: 'var(--hds-border-default)' }}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{
-                  fill: 'var(--hds-text-tertiary)',
-                  fontSize: componentMetrics.chartAxisSize,
-                }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <RechartsTooltip contentStyle={{ display: 'none' }} cursor={false} />
-              {series.map((item) =>
-                kind === 'line' ? (
-                  <Line
-                    key={item.dataKey}
-                    type="monotone"
-                    dataKey={item.dataKey}
-                    stroke={item.color}
-                    strokeWidth={componentMetrics.chartStroke}
-                    dot={false}
-                  />
-                ) : (
-                  <Bar
-                    key={item.dataKey}
-                    dataKey={item.dataKey}
-                    fill={item.color}
-                    radius={[
-                      componentMetrics.chartBarRadius,
-                      componentMetrics.chartBarRadius,
-                      0,
-                      0,
-                    ]}
-                  />
-                ),
-              )}
-            </Chart>
-          </ResponsiveContainer>
-        </div>
+        {data.length ? (
+          <div className="hds-chart__plot">
+            <ResponsiveContainer width="100%" height="100%">
+              <Chart accessibilityLayer data={[...data]} margin={componentMetrics.chartMargin}>
+                <CartesianGrid stroke="var(--hds-border-subtle)" vertical={false} />
+                <XAxis
+                  dataKey={xKey}
+                  tick={{
+                    fill: 'var(--hds-text-tertiary)',
+                    fontSize: componentMetrics.chartAxisSize,
+                  }}
+                  axisLine={{ stroke: 'var(--hds-border-default)' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{
+                    fill: 'var(--hds-text-tertiary)',
+                    fontSize: componentMetrics.chartAxisSize,
+                  }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <RechartsTooltip
+                  cursor={{ fill: 'var(--hds-surface-inset)' }}
+                  contentStyle={{
+                    border: '1px solid var(--hds-border-default)',
+                    borderRadius: 'var(--hds-radius-md)',
+                    background: 'var(--hds-surface-raised)',
+                    boxShadow: 'var(--hds-shadow-popover)',
+                    color: 'var(--hds-text-primary)',
+                    fontSize: 'var(--hds-type-11-size)',
+                  }}
+                  formatter={(value, name) => [
+                    typeof value === 'number'
+                      ? new Intl.NumberFormat('id-ID').format(value)
+                      : String(value),
+                    seriesLabels.get(String(name)) ?? String(name),
+                  ]}
+                />
+                {series.map((item) =>
+                  kind === 'line' ? (
+                    <Line
+                      key={item.dataKey}
+                      type="monotone"
+                      dataKey={item.dataKey}
+                      stroke={item.color}
+                      strokeWidth={componentMetrics.chartStroke}
+                      dot={
+                        data.length === 1
+                          ? { r: 3, fill: item.color, stroke: item.color, strokeWidth: 0 }
+                          : false
+                      }
+                      activeDot={{ r: 4 }}
+                    />
+                  ) : (
+                    <Bar
+                      key={item.dataKey}
+                      dataKey={item.dataKey}
+                      fill={item.color}
+                      radius={[
+                        componentMetrics.chartBarRadius,
+                        componentMetrics.chartBarRadius,
+                        0,
+                        0,
+                      ]}
+                    />
+                  ),
+                )}
+              </Chart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="hds-chart__empty" role="status">
+            Belum ada data untuk ditampilkan.
+          </div>
+        )}
       </div>
     </ChartContext.Provider>
   );

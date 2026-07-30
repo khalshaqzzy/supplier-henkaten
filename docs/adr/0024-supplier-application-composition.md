@@ -80,6 +80,40 @@ changing that composition boundary:
   controlling fields, and fixed square sizing is restricted to checklist number markers instead of
   leaking into question or answer content.
 
+The Supplier Overview applies a further read-model and composition refinement:
+
+- the dashboard retains the newest 20 role/line-scoped audit events, enriched through bounded batch
+  lookups with actor identity and an optional current Henkaten snapshot. Henkaten enrichment is
+  constrained by the same Supplier and line scope as the dashboard; non-Henkaten events remain
+  valid with a null Henkaten context;
+- actor kind, display name, and role plus Henkaten identifier, category, current status, line/job,
+  and part are additive read-model evidence. Cause and freeform change detail are deliberately
+  excluded from the feed;
+- recent activity is a full-width operational feed. It renders five events initially, expands
+  inline to the already-loaded batch, and collapses whenever URL-authoritative filters are applied
+  again. Henkaten links and operational summary links remain capability-gated;
+- `ChartFrame` owns a definite plot height so Recharts `ResponsiveContainer` always receives a
+  non-zero box. Empty data renders an explicit state, while single-point series retain a visible
+  marker and labelled tooltip;
+- the Overview uses a 12-column composition with approval aging, 4M trend, line/part ranking,
+  grouped outcomes, assignment issues, overrides, and full-width activity. Its 1280 px arrangement
+  keeps trend and activity full width and reorders the remaining two-column widgets without
+  changing document authority or page-level overflow behavior.
+
+The Shift assignment-resolution surface applies the same presentation quality bar while preserving
+the existing resolution authority:
+
+- Shift Detail exposes a capability-aware resolution affordance. Line Leaders receive the primary
+  action to resolve an assignment issue, while other roles receive a secondary read-only path;
+- the resolution page derives line, issue counts, job labels, issue origin, and linked Henkaten
+  evidence only from the authoritative Shift context response. Missing display labels fall back to
+  stable identifiers instead of inferred data;
+- an existing resolution Henkaten always takes precedence as the next action. Only an open issue
+  without that link offers Line Leaders the existing linked Man Henkaten create route; other roles
+  see an explicit waiting state;
+- the refinement is presentation-only. It adds no mutation or API contract, and an issue remains
+  resolved only after the linked Man movement is Approved or the Shift ends.
+
 Presentational links are emitted only when the corresponding capability exists. No browser-derived
 lifecycle status or partial-data queue is presented as authoritative.
 
@@ -100,6 +134,10 @@ lifecycle status or partial-data queue is presented as authoritative.
   nonessential category microcopy rather than introducing page-level horizontal scrolling.
 - Readiness labels are presentation guidance only. Submission eligibility, reservation conflicts,
   optimistic versions, and lifecycle transitions remain server-authoritative.
+- Dashboard activity carries a current Henkaten status beside a historical action. Consumers must
+  not interpret the current status as the status at the time of the event.
+- The activity refinement adds read-model fields and bounded queries but no mutation, schema, or
+  lifecycle changes. A maximum batch of 20 keeps enrichment cost and disclosure surface bounded.
 
 ## Validation
 
@@ -124,3 +162,18 @@ A corrective Hosted lifecycle capture at 1672×941 and 1280×720 additionally ve
 centering and field-to-preview spacing. The minimum viewport retains zero page-level horizontal
 overflow and zero axe violations. Supplier lint, typecheck, unit tests, and production build remain
 the source-level regression gate for the CSS-local correction.
+
+The Overview refinement adds strict contract coverage for complete and null activity enrichment,
+PostgreSQL integration coverage for ordering, the 20-event bound, actor fallback, tenant isolation,
+and line scope, plus UI coverage for the five-event initial state, inline expansion/collapse,
+filter-reset behavior, capability-aware Henkaten links, and safe non-Henkaten fallback. Shared chart
+tests cover empty and single-point rendering. The Hosted lifecycle browser journey asserts a
+non-zero chart box, a visible single-point marker, a five-item activity limit, full-width activity,
+no page-level horizontal overflow, reduced motion, and axe at 1280×720, with visual captures at both
+reference viewports.
+
+The Shift resolution corrective pass adds a unit-tested capability/state action matrix and extends
+the Man concurrency journey through the Board-to-resolution path. Chromium captures at 1672×941
+and 1280×720 verify the primary Line Leader CTA, non-zero action geometry, authoritative issue
+context, zero page-level horizontal overflow, and zero axe violations at the minimum viewport; the
+existing Edge journey continues to validate the linked Man resolution lifecycle.

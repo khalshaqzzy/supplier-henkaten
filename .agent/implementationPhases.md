@@ -4419,6 +4419,22 @@ Execution:
 - Follow-up corrective pass meniadakan SVG auto-margin yang menggeser glyph 4M, menambahkan rhythm
   antar-field pada panel konteks/pergerakan, dan mempersempit legacy checklist selector agar hanya
   number marker yang menerima fixed square sizing.
+- Supplier Overview refinement memperbaiki `ChartFrame` dengan definite plot height, explicit empty
+  state, visible single-point marker, labelled tooltip, serta line dan grouped-bar rendering tanpa
+  double-card.
+- Overview memakai komposisi 12 kolom untuk approval aging, 4M trend, ranked line/part,
+  outcome, assignment issue, emergency override, dan full-width activity. Breakpoint 1280
+  mempertahankan Trend dan Activity full-width serta merapikan widget lain menjadi dua kolom.
+- `recentActivity` tetap newest-first dan dibatasi 20, tetapi diperkaya secara additive dengan actor
+  dan current Henkaten context melalui dua bounded batch query. Tenant dan line scope yang sama
+  diterapkan pada enrichment; cause dan freeform detail tidak dipaparkan.
+- Activity menampilkan lima event pertama, toggle inline seluruh batch, collapse ulang setelah
+  filter diterapkan, detail line/job/part, localized actor/time, badge 4M/status, serta deep-link
+  yang capability-aware.
+- Shift Detail dan Assignment Resolution memakai CTA yang capability-aware: Line Leader mendapat
+  primary resolve/create action, sedangkan role lain hanya mendapat read-only guidance. Resolution
+  workspace menampilkan authoritative line, open/total issue count, job, origin, dan linked
+  Henkaten tanpa menambah mutation, API contract, atau client-side resolution authority.
 
 Verification:
 
@@ -4438,13 +4454,25 @@ Verification:
   spacing preview pada 1672×941 serta 1280×720; minimum viewport tetap tanpa page-level overflow dan
   zero axe violations. Supplier lint, typecheck, 20 unit tests, production build, CSS formatting,
   dan diff check juga lulus.
+- Shift resolution action matrix mencakup create, wait, linked-Henkaten, dan closed states.
+  Man-concurrency Chromium journey memverifikasi Board-to-resolution navigation, primary CTA,
+  unchanged linked Man create URL, non-zero button geometry, visual capture 1672×941 dan 1280×720,
+  zero page-level horizontal overflow, serta zero axe violations pada minimum viewport.
 - Full repository parity checks selesai: clean install, format, lint, typecheck, 92 unit tests,
   OpenAPI drift, production build, PostgreSQL verification, 32 integration tests, empat Chromium
   dan dua Edge journeys, containerized Gitleaks, dan diff check lulus.
+- Contract, UI, shared-chart, dan PostgreSQL integration regression untuk Overview mencakup complete
+  atau null enrichment, unknown-field rejection, ordering/limit 20, actor fallback, tenant/line
+  isolation, tepat lima initial activities, expand/collapse/filter reset, detail/fallback,
+  capability-aware link, empty chart, serta single-point chart.
+- Hosted lifecycle browser journey memvalidasi non-zero chart bounding box, visible single-point
+  marker, activity width/count, visual capture 1672×941 dan 1280×720, reduced motion, zero
+  page-level horizontal overflow, serta zero axe violations.
 
 Data/migration impact:
 
-- Tidak ada database migration, endpoint, backend lifecycle, atau breaking contract baru.
+- Tidak ada database migration, mutation endpoint, atau backend lifecycle change.
+- Supplier dashboard response bertambah secara additive; OpenAPI dan typed API client diregenerasi.
 
 Exit criteria:
 

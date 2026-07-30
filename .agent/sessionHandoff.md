@@ -1,148 +1,157 @@
-# Session Handoff — Henkaten Create dan Detail Polish
+# Session Handoff — Supplier Overview dan Shift Resolution Refinement
 
-Tanggal: 2026-07-28
+Tanggal: 2026-07-30
 
 Branch: `feat/henkaten-page-improvement`
 
-Status: targeted refinement untuk Create/Clone dan Detail/Approval Henkaten **done**. Phase 15
-tetap `in_progress`; perubahan ini menambah evidence Phase 14.11 tanpa mengubah current phase.
+Status: refinement Dashboard Supplier dan corrective polish Shift Resolution **done**. Phase 15
+tetap `planned`; perubahan ini menambah evidence Phase 14.11 tanpa mengubah current phase.
 
 ## 1. Objective dan Outcome
 
-`/henkatens/new`, `/henkatens/:id/clone`, dan `/henkatens/:id` dipoles sebagai light enterprise
-operational workflow yang konsisten dengan Supplier application. Route, field/payload order, API
-contract, idempotency, source epoch, optimistic version, lifecycle, dan capability gates tetap sama.
+Supplier Overview diperbaiki mengikuti quality bar `.agent/design/supplier-overview.png` tanpa
+mengubah role scope, capability authority, URL-authoritative filters, lifecycle, database schema,
+atau mutation API.
 
 Outcome utama:
 
-- Follow-up layout correction pada Create/Clone memusatkan glyph 4M secara optik, memberi jarak
-  eksplisit antara field dengan selected-part dan Man movement preview, serta menghapus inherited
-  fixed-size span yang merusak lebar pertanyaan dan pilihan checklist.
-- Create/Clone memakai semantic 4M selector dan satu workflow canvas untuk target operasional serta
-  komposisi perubahan, bukan kumpulan generic card.
-- Shift Run tampil sebagai compact locked context; job, part search/picker, selected-part
-  confirmation, loading/disabled states, serta auto-alignment job ke target assignment tetap
-  memakai data aktual.
-- Man menampilkan target-to-replacement preview termasuk MP saat ini, availability, reservation,
-  dan donor assignment. Non-Man memakai before-to-after affected/replacement composition.
-- Penyebab/detail memiliki hierarchy, helper, character count, dan long-text behavior; checklist
-  menjadi numbered Yes/No review rows dengan state memenuhi, No, dan belum dijawab.
-- Sticky review rail membedakan kelengkapan form dan checklist tanpa mengklaim menggantikan server
-  validation.
-- Detail memakai change-evidence untuk penyebab/narasi dan object transition atau Man
-  reservation/completed movement. Approval timeline menampilkan responsibility, decision
-  actor/time/comment, Not Required, dan hasil akhir.
-- Approve, Reject, Reroute, dan Withdraw memakai shared accessible `AlertDialog`; action visibility
-  tetap berasal dari role, capability, route, dan lifecycle authoritative.
-
-Tidak ada backend, OpenAPI, Prisma schema, migration, public `packages/ui` contract, analytics
-identifier, route, atau production fixture yang berubah.
+- shared `ChartFrame` mempunyai definite plot height sehingga Recharts `ResponsiveContainer`
+  selalu memperoleh non-zero box;
+- empty chart mempunyai state eksplisit, single-point line series mempunyai visible marker, dan
+  tooltip memakai label seri;
+- Approval Aging menjadi segmented count/percentage distribution; 4M Trend memakai line chart;
+  Outcome memakai grouped bar; Line dan Part memakai ranked count/percentage distribution;
+- Assignment Issue dan Emergency Override menjadi operational summaries dengan link
+  capability-aware;
+- Overview memakai grid 12 kolom. Pada 1280 px, Aging berpasangan dengan Line, Trend dan Activity
+  tetap full-width, lalu widget lain tersusun dua kolom tanpa page-level horizontal overflow;
+- filter tetap URL-authoritative dan disusun dalam dua baris. Apply memakai filter affordance,
+  Reset tetap secondary, Apply tetap primary, dan Last Updated stabil;
+- `recentActivity` tetap newest-first dan maksimal 20, tetapi bertambah additive dengan actor dan
+  optional current Henkaten context;
+- enrichment actor dan Henkaten dilakukan dengan bounded batch queries, bukan N+1. Henkaten lookup
+  tetap memakai Supplier dan role/line scope;
+- Activity full-width menampilkan lima event pertama, toggle inline seluruh batch, collapse ulang
+  setelah Apply/Reset, localized action, optional Henkaten deep-link, 4M/status, line/job, part,
+  actor fallback `Sistem`, serta waktu timezone Supplier;
+- cause dan freeform detail tidak masuk feed; event non-Henkaten memakai resource fallback yang
+  aman.
+- CTA resolusi pada Shift Detail dan Assignment Resolution sekarang capability-aware, mempunyai
+  hierarchy primary/secondary yang jelas, dan tetap memakai route/create contract yang sudah ada;
+- Assignment Resolution menampilkan authoritative line context, open/total issue count, job,
+  origin, status, dan linked Henkaten. Existing linked Henkaten selalu diprioritaskan; hanya Line
+  Leader dengan issue terbuka tanpa link yang memperoleh CTA `Buat Man Henkaten`;
+- penyelesaian issue tetap server-authoritative melalui Approved Man movement atau Shift end; tidak
+  ada mutation, schema, atau API contract baru untuk corrective polish ini.
 
 ## 2. Files Changed
 
-- `apps/supplier-web/src/pages/HenkatenPages.tsx`
-  - composition Create/Clone dan Detail/Approval;
-  - compact Shift Run context, readiness model, lifecycle/capability action gating;
-  - refresh recovery tetap membersihkan local problem state.
-- `apps/supplier-web/src/pages/HenkatenWorkflow.tsx`
-  - app-local 4M picker, selected part, Man preview, checklist/readiness, change evidence, object/Man
-    transition, dan approval timeline.
+- `packages/contracts/src/read-models.ts`
+  - strict additive supplier dashboard activity schema.
+- `apps/api/src/read-models/read-model.service.ts`
+  - bounded actor/Henkaten enrichment dengan Supplier dan role/line scope.
+- `apps/api/openapi/openapi.json`
+- `packages/api-client/src/generated/openapi.ts`
+  - regenerated activity contract.
+- `packages/ui/src/components/data-display.tsx`
+- `packages/ui/src/styles.css`
+  - definite-height chart, empty/single-point/tooltip behavior.
+- `apps/supplier-web/src/components/OverviewDashboard.tsx`
+  - app-local aging, ranked distribution, activity feed, labels, fallback, dan details.
+- `apps/supplier-web/src/pages/OverviewPage.tsx`
+- `apps/supplier-web/src/pages/ShiftPages.tsx`
+- `apps/supplier-web/src/pages/ShiftPages.test.ts`
 - `apps/supplier-web/src/app.css`
-  - workflow canvas, semantic variants, evidence, timeline, sticky rail, focus/hover/active states,
-    wrapping, explicit 1280 px fallback, dan follow-up correction untuk centering ikon, spacing
-    confirmation/preview, serta checklist row sizing.
-- `apps/supplier-web/src/pages/HenkatenWorkflow.test.tsx`
-  - regression presentational state 4M, checklist, readiness, movement, transition, dan approval.
-- `apps/supplier-web/src/App.test.tsx`
-  - detail evidence dan accessible decision-dialog recovery regression.
-- `apps/e2e/tests/hosted-lifecycle.spec.ts`
-  - Shift Run assertion mengikuti locked read-only context.
+  - filter hierarchy, 12-column composition, responsive order, cards, widgets, dan activity.
+- `apps/supplier-web/src/test/visualFixtures.ts`
+  - deterministic rich activity batch.
+- contract, shared UI, Supplier UI, PostgreSQL integration, dan Hosted lifecycle E2E tests.
+- `apps/e2e/tests/man-concurrency.spec.ts`
+  - Board-to-resolution assertion, CTA geometry, overflow check, dan viewport captures.
 - `docs/adr/0024-supplier-application-composition.md`
-  - targeted form workspace/change-evidence decision, local boundary, AlertDialog, density
-    tradeoff, dan validation.
 - `.agent/implementationPhases.md`
-  - Phase 14.11 execution/verification evidence diperluas; current Phase 15 tidak berubah.
+  - decision, consequences, validation, dan Phase 14.11 evidence.
 
-Generated exploration renders berada di luar repository dan tidak di-commit.
+Tidak ada Prisma schema change atau migration.
 
-## 3. Decisions
+## 3. Locked Decisions
 
-- Reference images adalah quality bar, bukan pixel-perfect contract.
-- Target dan composition step disatukan secara visual dalam satu operational workflow surface,
-  tetapi urutan input dan payload tetap dipertahankan.
-- Readiness rail bersifat presentational. Eligibility, checklist publication, reservation conflict,
-  optimistic version, dan lifecycle transition tetap server-authoritative.
-- Metadata yang tidak tersedia dari response tidak diciptakan. Detail Man tidak mengarang
-  line/job label; reservation dan movement hanya berasal dari aggregate response.
-- Presentational helper tetap app-local karena tidak ada generic shared primitive yang perlu
-  ditambahkan.
-- Minimum desktop tetap 1280×720. Pada fallback ini category microcopy nonesensial disembunyikan dan
-  workflow canvas ditumpuk vertikal; page-level horizontal scrolling tetap dilarang.
+- Show more adalah inline toggle terhadap batch yang sudah dimuat, bukan pagination atau Audit
+  navigation.
+- Historical action dan current Henkaten status sengaja ditampilkan bersama; current status tidak
+  merepresentasikan status pada waktu event.
+- Maximum activity batch tetap 20 dan ordering tetap newest-first.
+- Cause/change detail tidak dipaparkan pada Overview.
+- Dashboard tidak membuat delta, historical percentage, atau KPI baru yang tidak tersedia dari API.
+- Shared chart primitive berubah karena sizing dan empty/single-point behavior bersifat generik;
+  seluruh komposisi Supplier-specific tetap app-local.
+- Minimum desktop tetap 1280×720; mobile/tablet tetap out of scope.
 
-## 4. Visual Evidence Reviewed
+## 4. Visual Evidence
 
-Lifecycle API nyata dirender dan diperiksa pada:
+Lifecycle API nyata ditangkap dan diperiksa pada:
 
-- Create Henkaten 1672×941;
-- Create Henkaten 1280×720;
-- QC-pending Henkaten Detail/Approval 1672×941;
-- QC-pending Henkaten Detail/Approval 1280×720.
+- Supplier Overview 1672×941;
+- Supplier Overview 1280×720;
+- Activity panel 1672×941;
+- Activity panel 1280×720.
+- Shift Assignment Resolution 1672×941;
+- Shift Assignment Resolution 1280×720.
 
-Capture terakhir berasal dari isolated Chromium journey `hosted-lifecycle-chromium-19704-1`.
-Capture menjalankan reduced motion, assertion tanpa page-level horizontal overflow, dan axe pada
-1280×720. Iterasi awal menemukan contrast 4M microcopy/movement serta Machine badge; seluruh temuan
-diperbaiki dan capture terakhir mempunyai zero axe violations.
+Capture terakhir:
+
+`test-results/e2e/hosted-lifecycle-chromium-46531-1/hosted-lifecycle-proves-sh-1a233-rning-and-realtime-behavior-chromium/`
+
+Shift Resolution capture:
+
+`test-results/e2e/man-concurrency-chromium-6060-0/man-concurrency-proves-Man-48419--and-realm-cookie-isolation-chromium/`
+
+Journey membuktikan chart wrapper mempunyai bounding box non-zero, single-point dot terlihat,
+activity maksimal lima saat initial render, panel activity selebar grid, reduced motion aktif,
+tidak ada page-level horizontal overflow, dan axe pada 1280×720 tidak menemukan violation.
 
 ## 5. Validation
 
-Runtime acceptance: Node.js `22.23.1`, pnpm `11.16.0`.
+Repository mengunci Node.js `22.23.1` dan pnpm `11.16.0`. Host sesi ini menyediakan Node.js
+`26.3.1`, sehingga seluruh pnpm command mengeluarkan engine warning; tidak ada pinned Node 22 lokal
+yang tersedia.
 
-- clean snapshot `pnpm install --frozen-lockfile`: lulus;
-- format, lint, typecheck: lulus;
-- unit: 120 Vitest + 2 Node tests lulus; Supplier 20/20;
-- OpenAPI document/generated client byte comparison: no drift;
-- production build: lulus; hanya chunk-size warning non-blocking;
-- Compose config, PostgreSQL 18.4/vector 0.8.5 verification, disposable reset, dan 9 migrations:
-  lulus;
-- PostgreSQL integration: 33/33 lulus;
-- browser E2E Node 22: Chromium 4/4 dan Edge 2/2 lulus;
-- visual capture: 1672×941 dan 1280×720, no horizontal overflow, reduced motion, zero axe
-  violations;
-- follow-up targeted check: Prettier CSS, Supplier lint, typecheck, 20/20 unit tests, production
-  build dengan safe dummy `VITE_API_ORIGIN`, `git diff --check`, serta Hosted lifecycle Chromium
-  1/1 dengan visual capture 1672×941 dan 1280×720 lulus; capture minimum viewport tetap zero axe
-  violations dan tanpa page-level horizontal overflow;
-- final pre-commit parity diulang dari clean-artifact state dengan Node.js `22.23.1` dan pnpm
-  `11.16.0`: frozen install, format, lint, typecheck, 120 Vitest + 2 Node tests, OpenAPI drift,
-  production build, 33 integration tests, Chromium 4/4, dan Edge 2/2 lulus;
-- reinstall Edge lokal tidak dijalankan karena installer memerlukan interactive `sudo`; browser
-  Edge pinned yang sudah tersedia berhasil menjalankan seluruh 2/2 journey;
-- migration destructive check terhadap `origin/staging`: tidak ada migration SQL berubah;
-- deployment env/topology, deployment script harness, security exception registry, actionlint,
-  ShellCheck, Hadolint, `bash -n`, Ubuntu 22.04 bootstrap inputs, dan Linux real-flock harness:
-  lulus;
-- production Compose image build/start, fresh migration, bootstrap idempotence, routing, headers,
-  non-root services, private PostgreSQL, serta persistence across restart: lulus;
-- Trivy filesystem dan lima runtime image: zero HIGH/CRITICAL;
-- Gitleaks directory scan: no leaks. Gitignored staging operator key dipindahkan sementara dan
-  dikembalikan dengan SHA-256 identik
-  `46d068810e6e9984c785c55090a85cb1b759729f9777029c5faa7ca2d2699174`;
-- `pnpm audit --audit-level high`: exit 0; melaporkan 1 moderate dan 1 high yang sudah ignored oleh
-  registry exact/unexpired;
-- seluruh E2E dan production-like container/process yang dimulai pada final gate dihentikan. Stack
-  local yang sudah berjalan sebelum gate dipertahankan dan tidak diambil alih; durable volume
-  production test sebelumnya dipulihkan.
+Validation yang lulus pada host tersedia:
+
+- Prettier check;
+- ESLint;
+- workspace typecheck;
+- 125 Vitest tests dan 2 Node tests, termasuk Supplier 22/22, contracts 29/29, dan shared UI 16/16;
+- API OpenAPI document check dan deterministic generated-client comparison terhadap working-tree
+  snapshot; root `openapi:check` berhenti pada expected diff terhadap `HEAD` karena additive client
+  contract belum di-commit;
+- production workspace build;
+- PostgreSQL test database verification dan 9 migrations;
+- PostgreSQL integration 33/33;
+- Chromium E2E 4/4;
+- Edge E2E 2/2;
+- visual capture 1672×941 dan 1280×720;
+- `git diff --check`.
+
+Corrective Shift Resolution verification menambahkan action-state matrix, E2E typecheck, Chromium
+4/4, Edge 2/2, production build, dan visual inspection pada kedua viewport. Semua final repository
+source gates, zero axe violations pada 1280×720, serta `git diff --check` lulus.
+
+Integration coverage membuktikan exact 20-event bound, newest-first ordering, actor fallback,
+complete/null Henkaten enrichment, and supervisor line scope. Contract coverage menolak unknown
+fields. UI coverage membuktikan five-item default, expand/collapse/filter reset, details/fallback,
+dan capability-aware Henkaten link.
 
 ## 6. Residual Risk dan Next Action
 
-- Vite masih memberi chunk-size warning non-blocking.
-- PostgreSQL driver masih memberi deprecation warning pada overlapping `client.query()` di
-  concurrency tests; suite tetap lulus. Refactor async query ownership disarankan sebelum pg 9.
-- Dependency audit tetap mencatat satu moderate dan satu high ignored; exception registry saat ini
-  exact dan belum expired.
-- Mobile operational UI, staging VM, backup/PITR/DR, failover, RPO/RTO, dan HA tetap di luar scope
-  perubahan ini.
-- Next action: commit dengan subject
-  `fix(supplier): align Henkaten create workflow`, push ke
-  `origin/feat/henkaten-page-improvement`, lalu inspect branch workflow. Jangan membuat PR atau
-  merge otomatis.
+- CI/pinned-runtime parity masih perlu mengulang gate pada Node.js `22.23.1`; sesi ini hanya dapat
+  menjalankannya pada Node.js `26.3.1`.
+- Vite masih dapat memberi chunk-size warning non-blocking.
+- PostgreSQL concurrency test masih mengeluarkan existing `client.query()` pg@9 deprecation
+  warning; test tetap lulus.
+- Mobile operational UI, staging VM, backup/PITR/DR, failover, RPO/RTO, dan HA tetap di luar scope.
+- Working tree belum di-stage atau di-commit. Review diff lalu commit/push hanya jika diminta.
+- Setelah contract commit, ulang `pnpm openapi:check`; sebelum commit gate tersebut secara desain
+  mendeteksi intentional generated-client diff terhadap `HEAD`.
+- Local full-stack yang sudah berjalan sebelum task dipertahankan; seluruh disposable E2E
+  PostgreSQL container/volume sudah dibersihkan oleh harness.
