@@ -310,6 +310,52 @@ export class ReadModelService {
     const approvalAging = approvalAgingBuckets(pendingRouteRows.map(({ createdAt }) => createdAt));
     const trend = aggregateDashboardTrend(trendRows, query.granularity);
     const unresolvedIssueCount = issueGroups.reduce((sum, item) => sum + item._count._all, 0);
+    const activityActorIds = [
+      ...new Set(recent.flatMap((item) => (item.actorUserId ? [item.actorUserId] : []))),
+    ];
+    const activityHenkatenIds = [
+      ...new Set(
+        recent.flatMap((item) =>
+          item.resourceId && item.resourceType.toLowerCase() === 'henkaten'
+            ? [item.resourceId]
+            : [],
+        ),
+      ),
+    ];
+    const [activityActors, activityHenkatens] = await Promise.all([
+      activityActorIds.length
+        ? this.prisma.user.findMany({
+            where: { id: { in: activityActorIds } },
+            select: { id: true, displayName: true },
+          })
+        : [],
+      activityHenkatenIds.length
+        ? this.prisma.henkaten.findMany({
+            where: {
+              id: { in: activityHenkatenIds },
+              supplierId: scope.supplierId,
+              ...henkatenScope(principal),
+            },
+            select: {
+              id: true,
+              identifier: true,
+              category: true,
+              status: true,
+              lineCodeSnapshot: true,
+              lineNameSnapshot: true,
+              jobNameSnapshot: true,
+              partNumberSnapshot: true,
+              partNameSnapshot: true,
+            },
+          })
+        : [],
+    ]);
+    const activityActorNames = new Map(
+      activityActors.map((actor) => [actor.id, actor.displayName]),
+    );
+    const activityHenkatenById = new Map(
+      activityHenkatens.map((henkaten) => [henkaten.id, henkaten]),
+    );
     return {
       generatedAt: new Date().toISOString(),
       filterOptions: {
@@ -356,13 +402,40 @@ export class ReadModelService {
       outcomes: status
         .filter(({ status: value }) => value !== 'OPEN')
         .map((item) => ({ label: item.status, count: item._count._all })),
-      recentActivity: recent.map((item) => ({
-        id: item.id,
-        action: item.action,
-        resourceType: item.resourceType,
-        resourceId: item.resourceId,
-        occurredAt: item.occurredAt.toISOString(),
-      })),
+      recentActivity: recent.map((item) => {
+        const henkaten = item.resourceId ? activityHenkatenById.get(item.resourceId) : undefined;
+        return {
+          id: item.id,
+          action: item.action,
+          resourceType: item.resourceType,
+          resourceId: item.resourceId,
+          occurredAt: item.occurredAt.toISOString(),
+          actor: {
+            kind: item.actorKind as 'USER' | 'SYSTEM' | 'EXTERNAL_CLIENT',
+            displayName: item.actorUserId
+              ? (activityActorNames.get(item.actorUserId) ?? null)
+              : null,
+            role: item.actorRole,
+          },
+          henkaten: henkaten
+            ? {
+                id: henkaten.id,
+                identifier: henkaten.identifier,
+                category: henkaten.category,
+                status: henkaten.status,
+                line: {
+                  code: henkaten.lineCodeSnapshot,
+                  name: henkaten.lineNameSnapshot,
+                },
+                jobName: henkaten.jobNameSnapshot,
+                part: {
+                  number: henkaten.partNumberSnapshot,
+                  name: henkaten.partNameSnapshot,
+                },
+              }
+            : null,
+        };
+      }),
     };
   }
 

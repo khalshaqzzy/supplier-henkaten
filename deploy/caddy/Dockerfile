@@ -11,6 +11,7 @@ RUN --mount=type=cache,id=supplier-henkaten-go-mod,target=/go/pkg/mod \
   go mod init supplier-henkaten/caddy \
   && go get github.com/caddyserver/caddy/v2/cmd/caddy@v2.11.4 \
   && go get google.golang.org/grpc@v1.82.1 \
+  && go get golang.org/x/text@v0.39.0 \
   && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/caddy github.com/caddyserver/caddy/v2/cmd/caddy
 
 FROM ${RUNTIME_IMAGE} AS runtime

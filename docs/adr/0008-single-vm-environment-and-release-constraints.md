@@ -68,8 +68,10 @@ The runtime consists of `postgres`, one-shot `migrate`, one-shot `bootstrap-admi
 digest/SHA. The API copies the exact Node 22.23.1 binary into a Debian distroless runtime. The two
 static web images use pinned unprivileged Nginx. PostgreSQL 18.4 Alpine builds pgvector 0.8.5 from a
 checksum-verified source archive, and Caddy 2.11.4 is rebuilt with a patched Go toolchain and gRPC
-dependency into a distroless runtime. All five runtime images execute as non-root, have bounded JSON
-logging and healthchecks where applicable, and retain shared data across code releases.
+dependency plus `golang.org/x/text` 0.39.0 into a distroless runtime. The explicit `x/text` floor
+prevents transitive resolution from reintroducing CVE-2026-56852. All five runtime images execute
+as non-root, have bounded JSON logging and healthchecks where applicable, and retain shared data
+across code releases.
 
 The environment renderer locks staging domains/project/path and accepts secret values only through
 a safe dotenv alphabet. Each release stores a mode-`0600` env file. GitHub Environment `staging`
@@ -122,6 +124,11 @@ image built for the pinned release SHA; PostgreSQL 18.4/pgvector 0.8.5 built fro
 base/source contract. Trivy reported zero unexcepted High/Critical findings in all five runtime
 images. A fresh database applied all nine migrations offline from the API image, created the
 protected administrator, and proved repeated bootstrap was a no-op.
+
+On 2026-07-30, the PR release gate detected CVE-2026-56852 in the custom Caddy binary through the
+transitive `golang.org/x/text` 0.37.0 module. The builder now selects the fixed 0.39.0 module
+explicitly, and the filesystem scan passes its exact exception registry through the supported
+`trivyignores` action input.
 
 The production-like stack passed exact-SHA API readiness and both `/release.json` checks,
 three-domain Host routing, supplier SPA deep-link fallback, same-origin session and SSE routing,

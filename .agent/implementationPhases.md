@@ -4408,6 +4408,33 @@ Execution:
   TMMIN tidak diubah.
 - API, lifecycle, URL state, authority, field order, capability boundary, source epoch, dan
   optimistic-version behavior dipertahankan.
+- Targeted evolution berikutnya memoles Create/Clone Henkaten menjadi operational workspace dengan
+  semantic 4M selector, selected-part confirmation, Man movement preview, numbered checklist, dan
+  readiness rail tanpa membuat client-side state menjadi authoritative.
+- Henkaten Detail/Approval memakai change-evidence untuk penyebab/narasi dan before-to-after object
+  atau reservation/completed Man movement. Approve, Reject, Reroute, dan Withdraw memakai shared
+  `AlertDialog` dengan focus management, sementara visibility tetap capability/lifecycle gated.
+- Presentational helper baru tetap lokal di samping `HenkatenPages.tsx`; public contract
+  `packages/ui`, API, OpenAPI, Prisma, dan migration tidak berubah.
+- Follow-up corrective pass meniadakan SVG auto-margin yang menggeser glyph 4M, menambahkan rhythm
+  antar-field pada panel konteks/pergerakan, dan mempersempit legacy checklist selector agar hanya
+  number marker yang menerima fixed square sizing.
+- Supplier Overview refinement memperbaiki `ChartFrame` dengan definite plot height, explicit empty
+  state, visible single-point marker, labelled tooltip, serta line dan grouped-bar rendering tanpa
+  double-card.
+- Overview memakai komposisi 12 kolom untuk approval aging, 4M trend, ranked line/part,
+  outcome, assignment issue, emergency override, dan full-width activity. Breakpoint 1280
+  mempertahankan Trend dan Activity full-width serta merapikan widget lain menjadi dua kolom.
+- `recentActivity` tetap newest-first dan dibatasi 20, tetapi diperkaya secara additive dengan actor
+  dan current Henkaten context melalui dua bounded batch query. Tenant dan line scope yang sama
+  diterapkan pada enrichment; cause dan freeform detail tidak dipaparkan.
+- Activity menampilkan lima event pertama, toggle inline seluruh batch, collapse ulang setelah
+  filter diterapkan, detail line/job/part, localized actor/time, badge 4M/status, serta deep-link
+  yang capability-aware.
+- Shift Detail dan Assignment Resolution memakai CTA yang capability-aware: Line Leader mendapat
+  primary resolve/create action, sedangkan role lain hanya mendapat read-only guidance. Resolution
+  workspace menampilkan authoritative line, open/total issue count, job, origin, dan linked
+  Henkaten tanpa menambah mutation, API contract, atau client-side resolution authority.
 
 Verification:
 
@@ -4418,13 +4445,34 @@ Verification:
   serta 1280×720 untuk enam halaman prioritas.
 - Visual journey memeriksa page-level overflow, reduced motion, dan axe; temuan accessible naming,
   prohibited ARIA, serta contrast diperbaiki pada source.
+- Targeted component regression mencakup 4M radio state, checklist Yes/No/unanswered, readiness,
+  reserved donor preview, object transition, parallel approval/Not Required, dan decision dialog.
+- Create dan QC-pending detail ditangkap ulang pada 1672×941 serta 1280×720. Explicit 1280 fallback,
+  keyboard semantics, reduced-motion capture, zero horizontal overflow, dan zero axe violations
+  lulus; contrast microcopy serta badge 4M yang ditemukan pada iterasi awal diperbaiki.
+- Follow-up Hosted lifecycle Chromium 1/1 dengan visual capture mengonfirmasi centering kategori dan
+  spacing preview pada 1672×941 serta 1280×720; minimum viewport tetap tanpa page-level overflow dan
+  zero axe violations. Supplier lint, typecheck, 20 unit tests, production build, CSS formatting,
+  dan diff check juga lulus.
+- Shift resolution action matrix mencakup create, wait, linked-Henkaten, dan closed states.
+  Man-concurrency Chromium journey memverifikasi Board-to-resolution navigation, primary CTA,
+  unchanged linked Man create URL, non-zero button geometry, visual capture 1672×941 dan 1280×720,
+  zero page-level horizontal overflow, serta zero axe violations pada minimum viewport.
 - Full repository parity checks selesai: clean install, format, lint, typecheck, 92 unit tests,
   OpenAPI drift, production build, PostgreSQL verification, 32 integration tests, empat Chromium
   dan dua Edge journeys, containerized Gitleaks, dan diff check lulus.
+- Contract, UI, shared-chart, dan PostgreSQL integration regression untuk Overview mencakup complete
+  atau null enrichment, unknown-field rejection, ordering/limit 20, actor fallback, tenant/line
+  isolation, tepat lima initial activities, expand/collapse/filter reset, detail/fallback,
+  capability-aware link, empty chart, serta single-point chart.
+- Hosted lifecycle browser journey memvalidasi non-zero chart bounding box, visible single-point
+  marker, activity width/count, visual capture 1672×941 dan 1280×720, reduced motion, zero
+  page-level horizontal overflow, serta zero axe violations.
 
 Data/migration impact:
 
-- Tidak ada database migration, endpoint, backend lifecycle, atau breaking contract baru.
+- Tidak ada database migration, mutation endpoint, atau backend lifecycle change.
+- Supplier dashboard response bertambah secara additive; OpenAPI dan typed API client diregenerasi.
 
 Exit criteria:
 
@@ -4732,6 +4780,11 @@ Verification:
 
 - Intentional failure blocks workflow.
 - Security scan artifacts/action results visible.
+- PR #7 release-gate regression memverifikasi bahwa custom Caddy builder memakai
+  `golang.org/x/text` 0.39.0 untuk menutup CVE-2026-56852 dan Trivy filesystem scan memakai input
+  `trivyignores` yang didukung action. Clean Caddy build dan Trivy 0.70.0 scan melaporkan zero
+  High/Critical findings pada Debian runtime maupun Go binary; actionlint, Hadolint,
+  env/Compose, deployment harness, dan exact security-exception validation lulus.
 
 Data/migration impact:
 

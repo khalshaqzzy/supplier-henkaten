@@ -14189,6 +14189,39 @@ export interface paths {
                 resourceId: string | null;
                 /** Format: date-time */
                 occurredAt: string;
+                actor: {
+                  /** @enum {string} */
+                  kind: 'USER' | 'SYSTEM' | 'EXTERNAL_CLIENT';
+                  displayName: string | null;
+                  role:
+                    | (
+                        | 'TMMIN_ADMIN'
+                        | 'TMMIN_QUALITY'
+                        | 'SUPPLIER_ADMIN'
+                        | 'SUPERVISOR'
+                        | 'LINE_LEADER'
+                        | 'QC'
+                      )
+                    | null;
+                };
+                henkaten: {
+                  /** Format: uuid */
+                  id: string;
+                  identifier: string;
+                  /** @enum {string} */
+                  category: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
+                  /** @enum {string} */
+                  status: 'OPEN' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+                  line: {
+                    code: string;
+                    name: string;
+                  };
+                  jobName: string;
+                  part: {
+                    number: string;
+                    name: string;
+                  };
+                } | null;
               }[];
             };
           };

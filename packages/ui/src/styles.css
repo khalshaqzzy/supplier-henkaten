@@ -1845,7 +1845,19 @@ textarea {
 }
 
 .hds-chart__plot {
+  height: var(--hds-component-chart-height);
+  min-height: 0;
+}
+
+.hds-chart__empty {
   min-height: var(--hds-component-chart-height);
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--hds-border-default);
+  border-radius: var(--hds-radius-md);
+  background: var(--hds-surface-inset);
+  color: var(--hds-text-tertiary);
+  font-size: var(--hds-type-12-size);
 }
 
 .hds-chart-legend {

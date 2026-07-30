@@ -3,9 +3,8 @@ import {
   CheckCircle2,
   Clock3,
   Factory,
-  FileClock,
   FolderOpen,
-  RefreshCw,
+  ListFilter,
   ShieldCheck,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -31,12 +30,18 @@ import { supplierApi } from '../app/api';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { PageHeader } from '../components/layout';
+import {
+  ApprovalAgingDistribution,
+  RankedDistribution,
+  RecentActivityFeed,
+} from '../components/OverviewDashboard';
 import { SummaryMetric, SummaryStrip } from '../components/OperationalUI';
 
 export function OverviewPage() {
   const { session, hasCapability } = useSession();
   const [params, setParams] = useSearchParams();
   const [draft, setDraft] = useState(() => new URLSearchParams(params));
+  const [activityExpanded, setActivityExpanded] = useState(false);
   const identity = session!.principal;
   const supplier = session!.supplier!;
   const from = params.get('from');
@@ -67,7 +72,10 @@ export function OverviewPage() {
     ),
     queryFn: () => supplierApi.dashboard(query),
   });
-  useEffect(() => setDraft(new URLSearchParams(params)), [params]);
+  useEffect(() => {
+    setDraft(new URLSearchParams(params));
+    setActivityExpanded(false);
+  }, [params]);
 
   return (
     <div className="product-page">
@@ -83,149 +91,159 @@ export function OverviewPage() {
           ) : undefined
         }
       />
-      <FilterBar>
-        <label>
-          <span>Dari tanggal</span>
-          <Input
-            type="date"
-            value={draft.get('from') ?? ''}
-            onChange={(event) => updateDraft(draft, setDraft, 'from', event.target.value)}
-          />
-        </label>
-        <label>
-          <span>Sampai tanggal</span>
-          <Input
-            type="date"
-            value={draft.get('to') ?? ''}
-            onChange={(event) => updateDraft(draft, setDraft, 'to', event.target.value)}
-          />
-        </label>
-        <label>
-          <span>Status</span>
-          <NativeSelect
-            value={draft.get('status') ?? ''}
-            onChange={(event) => updateDraft(draft, setDraft, 'status', event.target.value)}
-          >
-            <option value="">Semua status</option>
-            <option value="OPEN">Open</option>
-            <option value="APPROVED">Approved</option>
-            <option value="REJECTED">Rejected</option>
-            <option value="CANCELLED">Cancelled</option>
-          </NativeSelect>
-        </label>
-        <label>
-          <span>Kategori 4M</span>
-          <NativeSelect
-            value={draft.get('category') ?? ''}
-            onChange={(event) => updateDraft(draft, setDraft, 'category', event.target.value)}
-          >
-            <option value="">Semua kategori</option>
-            <option value="MAN">Man</option>
-            <option value="MACHINE">Machine</option>
-            <option value="MATERIAL">Material</option>
-            <option value="METHOD">Method</option>
-          </NativeSelect>
-        </label>
-        <label>
-          <span>Interval tren</span>
-          <NativeSelect
-            value={draft.get('granularity') ?? 'DAY'}
-            onChange={(event) => updateDraft(draft, setDraft, 'granularity', event.target.value)}
-          >
-            <option value="DAY">Harian</option>
-            <option value="WEEK">Mingguan</option>
-            <option value="MONTH">Bulanan</option>
-          </NativeSelect>
-        </label>
-        <label>
-          <span>Line</span>
-          <NativeSelect
-            value={draft.get('lineId') ?? ''}
-            onChange={(event) => updateDraft(draft, setDraft, 'lineId', event.target.value)}
-          >
-            <option value="">Semua line</option>
-            {dashboard.data?.filterOptions.lines.map((line) => (
-              <option key={line.id} value={line.id}>
-                {line.code} · {line.name}
-              </option>
-            ))}
-          </NativeSelect>
-        </label>
-        <label>
-          <span>Shift Template</span>
-          <NativeSelect
-            value={draft.get('shiftTemplateId') ?? ''}
-            onChange={(event) =>
-              updateDraft(draft, setDraft, 'shiftTemplateId', event.target.value)
-            }
-          >
-            <option value="">Semua shift</option>
-            {dashboard.data?.filterOptions.shiftTemplates.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.name}
-              </option>
-            ))}
-          </NativeSelect>
-        </label>
-        <label>
-          <span>Part</span>
-          <Input
-            value={draft.get('part') ?? ''}
-            placeholder="Nomor atau nama"
-            onChange={(event) => updateDraft(draft, setDraft, 'part', event.target.value)}
-          />
-        </label>
-        <label>
-          <span>Approval route</span>
-          <NativeSelect
-            value={draft.get('approvalRoute') ?? ''}
-            onChange={(event) => updateDraft(draft, setDraft, 'approvalRoute', event.target.value)}
-          >
-            <option value="">Semua route</option>
-            <option value="SUPERVISOR">Supervisor</option>
-            <option value="QC">QC</option>
-          </NativeSelect>
-        </label>
-        <label>
-          <span>Approval status</span>
-          <NativeSelect
-            value={draft.get('approvalStatus') ?? ''}
-            onChange={(event) => updateDraft(draft, setDraft, 'approvalStatus', event.target.value)}
-          >
-            <option value="">Semua status</option>
-            <option value="PENDING">Pending</option>
-            <option value="APPROVED">Approved</option>
-            <option value="REJECTED">Rejected</option>
-            <option value="NOT_REQUIRED">Not Required</option>
-          </NativeSelect>
-        </label>
-        {dashboard.data && (
-          <LastUpdated value={formatTime(dashboard.data.generatedAt, supplier.timezone)} />
-        )}
-        <div className="overview-filter-actions">
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => {
-              setDraft(new URLSearchParams());
-              setParams({}, { replace: true });
-            }}
-          >
-            Reset
-          </Button>
-          <Button
-            size="sm"
-            leadingIcon={<RefreshCw />}
-            onClick={() => {
-              const next = new URLSearchParams(draft);
-              next.delete('cursor');
-              setParams(next, { replace: true });
-            }}
-          >
-            Terapkan
-          </Button>
-        </div>
-      </FilterBar>
+      <div className="overview-filter-shell">
+        <FilterBar>
+          <label className="overview-filter overview-filter--from">
+            <span>Dari tanggal</span>
+            <Input
+              type="date"
+              value={draft.get('from') ?? ''}
+              onChange={(event) => updateDraft(draft, setDraft, 'from', event.target.value)}
+            />
+          </label>
+          <label className="overview-filter overview-filter--to">
+            <span>Sampai tanggal</span>
+            <Input
+              type="date"
+              value={draft.get('to') ?? ''}
+              onChange={(event) => updateDraft(draft, setDraft, 'to', event.target.value)}
+            />
+          </label>
+          <label className="overview-filter overview-filter--status">
+            <span>Status</span>
+            <NativeSelect
+              value={draft.get('status') ?? ''}
+              onChange={(event) => updateDraft(draft, setDraft, 'status', event.target.value)}
+            >
+              <option value="">Semua status</option>
+              <option value="OPEN">Open</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
+              <option value="CANCELLED">Cancelled</option>
+            </NativeSelect>
+          </label>
+          <label className="overview-filter overview-filter--category">
+            <span>Kategori 4M</span>
+            <NativeSelect
+              value={draft.get('category') ?? ''}
+              onChange={(event) => updateDraft(draft, setDraft, 'category', event.target.value)}
+            >
+              <option value="">Semua kategori</option>
+              <option value="MAN">Man</option>
+              <option value="MACHINE">Machine</option>
+              <option value="MATERIAL">Material</option>
+              <option value="METHOD">Method</option>
+            </NativeSelect>
+          </label>
+          <label className="overview-filter overview-filter--granularity">
+            <span>Interval tren</span>
+            <NativeSelect
+              value={draft.get('granularity') ?? 'DAY'}
+              onChange={(event) => updateDraft(draft, setDraft, 'granularity', event.target.value)}
+            >
+              <option value="DAY">Harian</option>
+              <option value="WEEK">Mingguan</option>
+              <option value="MONTH">Bulanan</option>
+            </NativeSelect>
+          </label>
+          <div className="overview-filter-updated">
+            {dashboard.data && (
+              <LastUpdated value={formatTime(dashboard.data.generatedAt, supplier.timezone)} />
+            )}
+          </div>
+          <label className="overview-filter overview-filter--line">
+            <span>Line</span>
+            <NativeSelect
+              value={draft.get('lineId') ?? ''}
+              onChange={(event) => updateDraft(draft, setDraft, 'lineId', event.target.value)}
+            >
+              <option value="">Semua line</option>
+              {dashboard.data?.filterOptions.lines.map((line) => (
+                <option key={line.id} value={line.id}>
+                  {line.code} · {line.name}
+                </option>
+              ))}
+            </NativeSelect>
+          </label>
+          <label className="overview-filter overview-filter--shift">
+            <span>Shift Template</span>
+            <NativeSelect
+              value={draft.get('shiftTemplateId') ?? ''}
+              onChange={(event) =>
+                updateDraft(draft, setDraft, 'shiftTemplateId', event.target.value)
+              }
+            >
+              <option value="">Semua shift</option>
+              {dashboard.data?.filterOptions.shiftTemplates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                </option>
+              ))}
+            </NativeSelect>
+          </label>
+          <label className="overview-filter overview-filter--part">
+            <span>Part</span>
+            <Input
+              value={draft.get('part') ?? ''}
+              placeholder="Nomor atau nama"
+              onChange={(event) => updateDraft(draft, setDraft, 'part', event.target.value)}
+            />
+          </label>
+          <label className="overview-filter overview-filter--route">
+            <span>Approval route</span>
+            <NativeSelect
+              value={draft.get('approvalRoute') ?? ''}
+              onChange={(event) =>
+                updateDraft(draft, setDraft, 'approvalRoute', event.target.value)
+              }
+            >
+              <option value="">Semua route</option>
+              <option value="SUPERVISOR">Supervisor</option>
+              <option value="QC">QC</option>
+            </NativeSelect>
+          </label>
+          <label className="overview-filter overview-filter--approval">
+            <span>Approval status</span>
+            <NativeSelect
+              value={draft.get('approvalStatus') ?? ''}
+              onChange={(event) =>
+                updateDraft(draft, setDraft, 'approvalStatus', event.target.value)
+              }
+            >
+              <option value="">Semua status</option>
+              <option value="PENDING">Pending</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
+              <option value="NOT_REQUIRED">Not Required</option>
+            </NativeSelect>
+          </label>
+          <div className="overview-filter-actions">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setDraft(new URLSearchParams());
+                setActivityExpanded(false);
+                setParams({}, { replace: true });
+              }}
+            >
+              Reset
+            </Button>
+            <Button
+              size="sm"
+              leadingIcon={<ListFilter />}
+              onClick={() => {
+                const next = new URLSearchParams(draft);
+                next.delete('cursor');
+                setActivityExpanded(false);
+                setParams(next, { replace: true });
+              }}
+            >
+              Terapkan
+            </Button>
+          </div>
+        </FilterBar>
+      </div>
       {dashboard.isLoading && <OverviewSkeleton />}
       {dashboard.isError && (
         <ErrorState
@@ -282,26 +300,21 @@ export function OverviewPage() {
             />
           ) : (
             <section className="overview-grid">
-              <Panel title="Approval aging" description="Route approval yang masih pending.">
-                <div className="aging-grid">
-                  {dashboard.data.approvalAging.map((item) => (
-                    <div key={item.bucket}>
-                      <span>{agingLabel(item.bucket)}</span>
-                      <strong>{item.count}</strong>
-                    </div>
-                  ))}
-                </div>
-              </Panel>
-              <Panel title="Tren Henkaten 4M" className="overview-grid__wide">
+              <ApprovalAgingDistribution
+                items={dashboard.data.approvalAging}
+                showApprovalLink={hasCapability('SUPPLIER_HENKATEN_DECIDE')}
+              />
+              <div className="overview-widget overview-widget--trend">
                 <ChartFrame
-                  title="Volume per periode"
+                  title="Tren Henkaten 4M"
+                  description="Volume kategori per periode pada scope aktif."
                   data={dashboard.data.trend.map((item) => ({
                     ...item,
-                    period: new Intl.DateTimeFormat('id-ID', {
-                      day: '2-digit',
-                      month: 'short',
-                      timeZone: supplier.timezone,
-                    }).format(new Date(item.periodStart)),
+                    period: formatTrendPeriod(
+                      item.periodStart,
+                      query.granularity,
+                      supplier.timezone,
+                    ),
                   }))}
                   xKey="period"
                   series={[
@@ -311,57 +324,105 @@ export function OverviewPage() {
                     { dataKey: 'method', label: 'Method', color: 'var(--hds-4m-method)' },
                   ]}
                 />
-              </Panel>
-              <Panel title="Assignment issue">
-                <div className="metric-list">
-                  {dashboard.data.assignmentIssues.map((item) => (
-                    <Link key={item.type} to="/shifts">
-                      <span>
-                        {item.type === 'VACANCY' ? 'Posisi kosong' : 'Konflik assignment'}
-                      </span>
-                      <strong>{item.count}</strong>
+              </div>
+              <RankedDistribution
+                title="Henkaten per line"
+                description="Line dengan volume tertinggi."
+                items={dashboard.data.byLine}
+                emptyLabel="Belum ada distribusi line"
+                layout="line"
+              />
+              <RankedDistribution
+                title="Henkaten per part"
+                description="Part dengan Henkaten terbanyak."
+                items={dashboard.data.byPart}
+                emptyLabel="Belum ada distribusi part"
+                layout="part"
+              />
+              <div className="overview-widget overview-widget--outcome">
+                <ChartFrame
+                  title="Tren outcome"
+                  description="Keputusan terminal per periode."
+                  data={dashboard.data.trend.map((item) => ({
+                    ...item,
+                    period: formatTrendPeriod(
+                      item.periodStart,
+                      query.granularity,
+                      supplier.timezone,
+                    ),
+                  }))}
+                  xKey="period"
+                  kind="bar"
+                  series={[
+                    {
+                      dataKey: 'approved',
+                      label: 'Approved',
+                      color: 'var(--hds-state-success-accent)',
+                    },
+                    {
+                      dataKey: 'rejected',
+                      label: 'Rejected',
+                      color: 'var(--hds-state-danger-accent)',
+                    },
+                    {
+                      dataKey: 'cancelled',
+                      label: 'Cancelled',
+                      color: 'var(--hds-color-slate-400)',
+                    },
+                  ]}
+                />
+              </div>
+              <Panel
+                title="Assignment issue"
+                description="Issue yang masih membutuhkan resolusi."
+                className="overview-widget overview-widget--issues"
+                action={
+                  hasCapability('SUPPLIER_SHIFT_READ') ? (
+                    <Link className="overview-widget-link" to="/shifts">
+                      Buka Shift
                     </Link>
-                  ))}
-                  {!dashboard.data.assignmentIssues.length && <span>Tidak ada issue terbuka.</span>}
-                </div>
+                  ) : undefined
+                }
+              >
+                {dashboard.data.assignmentIssues.length ? (
+                  <div className="overview-operational-list">
+                    {dashboard.data.assignmentIssues.map((item) => (
+                      <div key={item.type}>
+                        <span className={item.type === 'VACANCY' ? 'is-danger' : 'is-warning'}>
+                          <AlertTriangle aria-hidden="true" />
+                        </span>
+                        <div>
+                          <strong>
+                            {item.type === 'VACANCY' ? 'Posisi kosong' : 'Konflik assignment'}
+                          </strong>
+                          <small>Masih terbuka pada scope aktif</small>
+                        </div>
+                        <strong>{item.count}</strong>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <Alert tone="success" title="Tidak ada issue terbuka">
+                    Seluruh assignment pada scope saat ini dalam kondisi terkendali.
+                  </Alert>
+                )}
               </Panel>
-              <Panel title="Henkaten per line">
-                <div className="metric-list">
-                  {dashboard.data.byLine.slice(0, 6).map((item) => (
-                    <Link key={item.label} to="/henkatens">
-                      <span>{item.label}</span>
-                      <strong>{item.count}</strong>
-                    </Link>
-                  ))}
-                </div>
-              </Panel>
-              <Panel title="Henkaten per part">
-                <div className="metric-list">
-                  {dashboard.data.byPart.slice(0, 6).map((item) => (
-                    <Link key={item.label} to="/henkatens">
-                      <span>{item.label}</span>
-                      <strong>{item.count}</strong>
-                    </Link>
-                  ))}
-                </div>
-              </Panel>
-              <Panel title="Outcome">
-                <div className="metric-list">
-                  {dashboard.data.outcomes.map((item) => (
-                    <Link key={item.label} to="/henkatens">
-                      <span>{item.label}</span>
-                      <strong>{item.count}</strong>
-                    </Link>
-                  ))}
-                </div>
-              </Panel>
-              <Panel title="Emergency override">
+              <Panel
+                title="Emergency override"
+                description={`${dashboard.data.totals.emergencyOverrides} override pada filter aktif.`}
+                className="overview-widget overview-widget--overrides"
+              >
                 {dashboard.data.recentOverrides.length ? (
-                  <div className="metric-list">
+                  <div className="overview-override-list">
                     {dashboard.data.recentOverrides.slice(0, 4).map((item) => (
                       <Link key={item.shiftRunId} to={`/shifts/${item.shiftRunId}`}>
-                        <span>{item.lineName}</span>
-                        <strong>{item.businessDate}</strong>
+                        <span>
+                          <strong>{item.lineName}</strong>
+                          <small title={item.reason}>{item.reason}</small>
+                        </span>
+                        <time dateTime={item.startedAt}>
+                          {formatTime(item.startedAt, supplier.timezone)}
+                        </time>
                       </Link>
                     ))}
                   </div>
@@ -371,19 +432,13 @@ export function OverviewPage() {
                   </Alert>
                 )}
               </Panel>
-              <Panel title="Aktivitas terbaru" className="overview-grid__wide">
-                <ol className="activity-list">
-                  {dashboard.data.recentActivity.map((item) => (
-                    <li key={item.id}>
-                      <FileClock aria-hidden="true" />
-                      <span>
-                        <strong>{humanizeAction(item.action)}</strong>
-                        <small>{formatTime(item.occurredAt, supplier.timezone)}</small>
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              </Panel>
+              <RecentActivityFeed
+                items={dashboard.data.recentActivity}
+                expanded={activityExpanded}
+                onExpandedChange={setActivityExpanded}
+                timezone={supplier.timezone}
+                canReadHenkaten={hasCapability('SUPPLIER_HENKATEN_READ')}
+              />
             </section>
           )}
           <nav className="overview-quick-links" aria-label="Tautan cepat">
@@ -449,20 +504,15 @@ function formatTime(value: string, timeZone: string) {
   }).format(new Date(value));
 }
 
-function agingLabel(bucket: string) {
-  return (
-    {
-      UNDER_4_HOURS: '0-4 jam',
-      FOUR_TO_EIGHT_HOURS: '4-8 jam',
-      EIGHT_TO_24_HOURS: '8-24 jam',
-      OVER_24_HOURS: '>24 jam',
-    }[bucket] ?? bucket
-  );
-}
-
-function humanizeAction(action: string) {
-  return action
-    .toLowerCase()
-    .replaceAll('_', ' ')
-    .replace(/^./, (character) => character.toUpperCase());
+function formatTrendPeriod(
+  value: string,
+  granularity: DashboardQuery['granularity'],
+  timeZone: string,
+) {
+  const options: Intl.DateTimeFormatOptions =
+    granularity === 'MONTH'
+      ? { month: 'short', year: '2-digit', timeZone }
+      : { day: '2-digit', month: 'short', timeZone };
+  const label = new Intl.DateTimeFormat('id-ID', options).format(new Date(value));
+  return granularity === 'WEEK' ? `Mgg ${label}` : label;
 }

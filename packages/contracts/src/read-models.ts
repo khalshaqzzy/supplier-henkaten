@@ -14,6 +14,7 @@ import {
   henkatenCategorySchema,
   henkatenStatusSchema,
   sourceModeSchema,
+  userRoleSchema,
   workingAssignmentStateSchema,
 } from './enums.js';
 
@@ -188,6 +189,45 @@ const dashboardPeriodSchema = z
   })
   .strict();
 
+export const supplierDashboardActivitySchema = z
+  .object({
+    id: opaqueIdSchema,
+    action: z.string(),
+    resourceType: z.string(),
+    resourceId: z.string().nullable(),
+    occurredAt: utcTimestampSchema,
+    actor: z
+      .object({
+        kind: z.enum(['USER', 'SYSTEM', 'EXTERNAL_CLIENT']),
+        displayName: z.string().min(1).max(150).nullable(),
+        role: userRoleSchema.nullable(),
+      })
+      .strict(),
+    henkaten: z
+      .object({
+        id: opaqueIdSchema,
+        identifier: z.string().min(1).max(150),
+        category: henkatenCategorySchema,
+        status: henkatenStatusSchema,
+        line: z
+          .object({
+            code: z.string().min(1).max(100),
+            name: z.string().min(1).max(150),
+          })
+          .strict(),
+        jobName: z.string().min(1).max(150),
+        part: z
+          .object({
+            number: z.string().min(1).max(100),
+            name: z.string().min(1).max(200),
+          })
+          .strict(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+
 export const supplierDashboardSchema = z
   .object({
     generatedAt: utcTimestampSchema,
@@ -250,17 +290,7 @@ export const supplierDashboardSchema = z
     byLine: countByLabelSchema,
     byPart: countByLabelSchema,
     outcomes: countByLabelSchema,
-    recentActivity: z.array(
-      z
-        .object({
-          id: opaqueIdSchema,
-          action: z.string(),
-          resourceType: z.string(),
-          resourceId: z.string().nullable(),
-          occurredAt: utcTimestampSchema,
-        })
-        .strict(),
-    ),
+    recentActivity: z.array(supplierDashboardActivitySchema),
   })
   .strict();
 
