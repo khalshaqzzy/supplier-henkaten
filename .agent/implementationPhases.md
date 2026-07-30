@@ -4780,6 +4780,11 @@ Verification:
 
 - Intentional failure blocks workflow.
 - Security scan artifacts/action results visible.
+- PR #7 release-gate regression memverifikasi bahwa custom Caddy builder memakai
+  `golang.org/x/text` 0.39.0 untuk menutup CVE-2026-56852 dan Trivy filesystem scan memakai input
+  `trivyignores` yang didukung action. Clean Caddy build dan Trivy 0.70.0 scan melaporkan zero
+  High/Critical findings pada Debian runtime maupun Go binary; actionlint, Hadolint,
+  env/Compose, deployment harness, dan exact security-exception validation lulus.
 
 Data/migration impact:
 

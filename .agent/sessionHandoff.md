@@ -137,6 +137,19 @@ Corrective Shift Resolution verification menambahkan action-state matrix, E2E ty
 4/4, Edge 2/2, production build, dan visual inspection pada kedua viewport. Semua final repository
 source gates, zero axe violations pada 1280×720, serta `git diff --check` lulus.
 
+PR #7 CI follow-up:
+
+- `Production containers and routing` menemukan CVE-2026-56852 pada transitive
+  `golang.org/x/text` 0.37.0 di custom Caddy binary;
+- Caddy builder sekarang memaksa fixed module 0.39.0 tanpa menambah runtime package atau mengubah
+  Caddy 2.11.4;
+- Trivy filesystem scan memakai supported `trivyignores` input sehingga exact exception registry
+  kembali diterapkan oleh action;
+- clean local Caddy build lulus dan log membuktikan upgrade 0.37.0 ke 0.39.0;
+- Trivy 0.70.0 melaporkan zero High/Critical finding pada Debian runtime dan Caddy Go binary;
+- actionlint, Hadolint, runtime-env/Compose validation, deployment harness, dan exact
+  security-exception registry check lulus.
+
 Integration coverage membuktikan exact 20-event bound, newest-first ordering, actor fallback,
 complete/null Henkaten enrichment, and supervisor line scope. Contract coverage menolak unknown
 fields. UI coverage membuktikan five-item default, expand/collapse/filter reset, details/fallback,
@@ -150,8 +163,7 @@ dan capability-aware Henkaten link.
 - PostgreSQL concurrency test masih mengeluarkan existing `client.query()` pg@9 deprecation
   warning; test tetap lulus.
 - Mobile operational UI, staging VM, backup/PITR/DR, failover, RPO/RTO, dan HA tetap di luar scope.
-- Working tree belum di-stage atau di-commit. Review diff lalu commit/push hanya jika diminta.
-- Setelah contract commit, ulang `pnpm openapi:check`; sebelum commit gate tersebut secara desain
-  mendeteksi intentional generated-client diff terhadap `HEAD`.
+- Dashboard/Shift contract changes sudah di-commit dan dipush melalui PR #7; CI security follow-up
+  sedang divalidasi sebelum commit tambahan.
 - Local full-stack yang sudah berjalan sebelum task dipertahankan; seluruh disposable E2E
   PostgreSQL container/volume sudah dibersihkan oleh harness.
