@@ -1,11 +1,11 @@
-# Session Handoff — Supplier Overview dan Shift Resolution Refinement
+# Session Handoff — Supplier Overview, Shift Resolution, dan Board CTA Refinement
 
-Tanggal: 2026-07-30
+Tanggal: 2026-07-31
 
-Branch: `feat/henkaten-page-improvement`
+Branch: `feat/mini-polish-fe`
 
-Status: refinement Dashboard Supplier dan corrective polish Shift Resolution **done**. Phase 15
-tetap `planned`; perubahan ini menambah evidence Phase 14.11 tanpa mengubah current phase.
+Status: refinement Dashboard Supplier, corrective polish Shift Resolution, dan Board resolution CTA
+**done**. Phase 15 tidak berubah oleh refinement ini.
 
 ## 1. Objective dan Outcome
 
@@ -43,6 +43,9 @@ Outcome utama:
   Leader dengan issue terbuka tanpa link yang memperoleh CTA `Buat Man Henkaten`;
 - penyelesaian issue tetap server-authoritative melalui Approved Man movement atau Shift end; tidak
   ada mutation, schema, atau API contract baru untuk corrective polish ini.
+- Follow-up pada `/board` mengubah `Buka resolusi` dari text link menjadi compact HDS CTA dengan
+  ikon wrench/arrow. Line Leader mendapat primary treatment; role read-only mendapat secondary
+  treatment. Route dan risk derivation tetap sama.
 
 ## 2. Files Changed
 
@@ -63,6 +66,10 @@ Outcome utama:
 - `apps/supplier-web/src/pages/ShiftPages.test.ts`
 - `apps/supplier-web/src/app.css`
   - filter hierarchy, 12-column composition, responsive order, cards, widgets, dan activity.
+- `apps/supplier-web/src/pages/BoardPage.tsx`
+  - role-aware resolution CTA dan icon affordance pada Assignment Board rail.
+- `apps/supplier-web/src/app.css`
+  - compact CTA sizing/spacing dan link-vs-action treatment pada risk rail.
 - `apps/supplier-web/src/test/visualFixtures.ts`
   - deterministic rich activity batch.
 - contract, shared UI, Supplier UI, PostgreSQL integration, dan Hosted lifecycle E2E tests.
@@ -167,3 +174,47 @@ dan capability-aware Henkaten link.
   sedang divalidasi sebelum commit tambahan.
 - Local full-stack yang sudah berjalan sebelum task dipertahankan; seluruh disposable E2E
   PostgreSQL container/volume sudah dibersihkan oleh harness.
+
+## 7. Follow-up Validation — Board Resolution CTA
+
+Source-level validation pada Node.js `26.3.1` (repository meminta `22.23.1`; engine warning tetap
+tercatat):
+
+- `pnpm --filter @tmmin-henkaten/supplier-web test:unit`: 22/22 lulus;
+- `pnpm --filter @tmmin-henkaten/supplier-web lint`: lulus;
+- `pnpm --filter @tmmin-henkaten/supplier-web typecheck`: lulus;
+- `VITE_API_ORIGIN=http://localhost:3000 pnpm --filter @tmmin-henkaten/supplier-web build`: lulus;
+- Prettier target check dan `git diff --check`: lulus.
+
+Build tetap mengeluarkan warning chunk-size existing yang non-blocking. Tidak ada database,
+container, dev server, public contract, schema, migration, atau API process yang dijalankan atau
+ditinggalkan oleh follow-up ini.
+
+## 8. Pre-commit CI Parity
+
+Repository-pinned parity dijalankan sebelum publish. Host memakai Node.js `26.3.1` sehingga engine
+warning terhadap requirement Node.js `22.23.1` tetap muncul, tetapi command yang membutuhkan hasil
+valid lulus:
+
+- `pnpm install --frozen-lockfile`, format check, lint, typecheck, 125 Vitest + 2 Node tests,
+  OpenAPI/client drift, dan production build dengan `VITE_API_ORIGIN=https://api.example.invalid`:
+  lulus;
+- Compose config, PostgreSQL verification, fresh migrations, dan PostgreSQL integration: 33/33
+  lulus; disposable database dibersihkan, lalu local full-stack yang sudah ada dipulihkan dan
+  kembali healthy;
+- destructive migration check, previous-SHA/current migration upgrade, dan Prisma status:
+  lulus terhadap `origin/staging` (`e74844c3c7e3e10449282839a1cfd083db31a17f`);
+- Chromium/Edge E2E: 4 Chromium + 2 Edge journey lulus. Browser install command CI tidak dapat
+  memakai `sudo` pada macOS, tetapi browser yang sudah tersedia menjalankan seluruh journey;
+- actionlint, ShellCheck, Hadolint, runtime/Compose validation, deployment harness, security
+  exception registry, Ubuntu bootstrap check, production-like image build/start/routing/non-root/
+  persistence: lulus;
+- Trivy 0.70.0 filesystem dan seluruh API/Supplier/TMMIN/PostgreSQL/Caddy image: zero High/Critical;
+- `pnpm security:audit`: exit 0, melaporkan 1 moderate dan 1 high yang sudah ignored oleh baseline;
+- Gitleaks exact directory scan menemukan satu private key pada ignored local artifact
+  `.local/.ssh/supplier-henkaten-staging-ci`. File tidak tracked dan tidak masuk PR. Scan publishable
+  tree dengan hanya mount `.local` kosong lulus tanpa leak.
+
+CodeQL dan dependency-review adalah job GitHub-hosted dan tidak memiliki parity runner lokal yang
+setara; keduanya tetap akan dieksekusi oleh PR workflow. Tidak ada perubahan schema, migration,
+contract, atau workflow pada PR ini.

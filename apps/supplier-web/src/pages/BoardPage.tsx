@@ -1,4 +1,13 @@
-import { AlertTriangle, CheckCircle2, Radio, RefreshCw, UserRound, Users } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  Radio,
+  RefreshCw,
+  UserRound,
+  Users,
+  Wrench,
+} from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -82,6 +91,7 @@ export function BoardPage() {
   const issues = jobs.filter((job) => job.state === 'VACANT' || job.state === 'CONFLICTED').length;
   const operationalRisks = boardOperationalRisks(lines);
   const contextLine = lines[0];
+  const canResolve = session!.principal.role === 'LINE_LEADER';
 
   return (
     <div className="product-page board-page">
@@ -305,7 +315,16 @@ export function BoardPage() {
                     {risk.henkatenId ? (
                       <Link to={`/henkatens/${risk.henkatenId}`}>Buka Henkaten</Link>
                     ) : risk.resolutionShiftRunId ? (
-                      <Link to={`/shifts/${risk.resolutionShiftRunId}/resolve`}>Buka resolusi</Link>
+                      <Link
+                        className={`hds-button hds-button--${
+                          canResolve ? 'primary' : 'secondary'
+                        } hds-button--sm board-critical__action`}
+                        to={`/shifts/${risk.resolutionShiftRunId}/resolve`}
+                      >
+                        <Wrench aria-hidden="true" />
+                        Buka resolusi
+                        <ArrowRight aria-hidden="true" />
+                      </Link>
                     ) : null}
                   </div>
                 ))}

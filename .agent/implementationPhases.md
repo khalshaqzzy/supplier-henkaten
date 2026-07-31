@@ -2,7 +2,7 @@
 
 Document status: Active implementation roadmap
 Created: 2026-07-23
-Last updated: 2026-07-24
+Last updated: 2026-07-31
 Source of truth: `.agent/PRD.md`
 Implementation approach: Backend-first
 Workspace tooling: Node.js 22 + pnpm workspaces, tanpa Turborepo
@@ -4613,6 +4613,38 @@ Data/migration impact:
 Phase 14 exit criteria:
 
 - Seluruh major PRD acceptance flow berjalan pada local full stack tanpa fixture-only production behavior.
+
+### 14.15 Board Resolution CTA Refinement
+
+Status: **done**
+
+Dependency: 14.14.
+
+Execution:
+
+- CTA `Buka resolusi` pada contextual rail Assignment Board diberi treatment Henkaten Design
+  System yang eksplisit, dengan ikon wrench/arrow dan area klik compact yang tetap terbaca pada
+  rail desktop.
+- Treatment mengikuti authority yang sudah digunakan Shift Detail: Line Leader menerima primary
+  CTA, sedangkan role read-only menerima secondary CTA. Route `/shifts/:id/resolve` dan helper
+  risk tetap unchanged.
+- Link `Buka Henkaten` tetap menjadi text action terpisah sehingga CTA resolusi menjadi next step
+  operasional yang paling mudah dipindai tanpa mengubah urutan atau isi risk rail.
+
+Verification:
+
+- Supplier web unit tests: 22/22.
+- Supplier web ESLint: lulus dengan `--max-warnings=0`.
+- Supplier web typecheck: lulus.
+- Supplier production build: lulus dengan `VITE_API_ORIGIN=http://localhost:3000`; Vite hanya
+  mengeluarkan existing chunk-size warning non-blocking.
+- `pnpm exec prettier --check apps/supplier-web/src/pages/BoardPage.tsx apps/supplier-web/src/app.css`
+  dan `git diff --check`: lulus.
+
+Data/migration impact:
+
+- Tidak ada perubahan public contract, OpenAPI, database schema, migration, API, atau domain policy.
+- Phase 15 tidak berubah oleh refinement ini.
 
 ---
 

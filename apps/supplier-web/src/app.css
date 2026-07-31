@@ -2132,7 +2132,15 @@ a.overview-activity-identifier:hover {
 }
 
 .board-critical > div > span {
+  min-width: 0;
+  flex: 1;
   display: grid;
+}
+
+.board-critical > div > span strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .board-critical small {
@@ -2140,11 +2148,33 @@ a.overview-activity-identifier:hover {
   font-size: 10px;
 }
 
-.board-critical > a {
+.board-critical > div > a:not(.hds-button) {
   color: #b43a0c;
   font-size: 11px;
   font-weight: 700;
   text-decoration: none;
+}
+
+.board-critical > div > a:not(.hds-button):hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.board-critical__action {
+  flex: 0 0 auto;
+  margin-left: auto;
+  white-space: nowrap;
+  box-shadow: none;
+  text-decoration: none;
+}
+
+.board-critical__action:hover {
+  text-decoration: none;
+}
+
+.board-critical__action svg {
+  width: 14px;
+  height: 14px;
 }
 
 .board-workspace .operational-facts {

@@ -113,6 +113,10 @@ the existing resolution authority:
   see an explicit waiting state;
 - the refinement is presentation-only. It adds no mutation or API contract, and an issue remains
   resolved only after the linked Man movement is Approved or the Shift ends.
+- the Assignment Board contextual rail presents an open vacancy or conflict as a compact resolution
+  CTA. Line Leaders receive the primary treatment, read-only roles receive the secondary treatment,
+  and both retain the same server-authoritative resolution route. Supporting Henkaten links remain
+  text actions so the next operational step has clear visual priority.
 
 Presentational links are emitted only when the corresponding capability exists. No browser-derived
 lifecycle status or partial-data queue is presented as authoritative.
@@ -177,3 +181,8 @@ the Man concurrency journey through the Board-to-resolution path. Chromium captu
 and 1280×720 verify the primary Line Leader CTA, non-zero action geometry, authoritative issue
 context, zero page-level horizontal overflow, and zero axe violations at the minimum viewport; the
 existing Edge journey continues to validate the linked Man resolution lifecycle.
+
+The subsequent Board CTA refinement is source-level presentation work only. Supplier unit tests,
+lint, typecheck, and a production build with an explicit API origin verify the added role-aware
+button treatment, icon affordance, and unchanged resolution route without introducing a contract,
+schema, migration, or lifecycle change.
