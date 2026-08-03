@@ -72,9 +72,7 @@ export function LoginPage() {
         <BrandLockup context="Supplier Portal" />
         <div>
           <span className="product-eyebrow">Enterprise Digital Henkaten</span>
-          <p>
-            Kelola shift, perubahan 4M, approval, dan assignment.
-          </p>
+          <p>Kelola shift, perubahan 4M, approval, dan assignment.</p>
         </div>
       </section>
       <section className="auth-form">
