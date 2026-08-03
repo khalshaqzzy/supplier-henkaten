@@ -26,10 +26,10 @@ export function LoginPage() {
         <BrandLockup context="TMMIN Portal" />
         <div>
           <span className="tmmin-eyebrow">Enterprise Digital Henkaten</span>
-          <h1>Governance yang tenang, keputusan yang dapat ditelusuri.</h1>
-          <p>Pantau sumber Hosted dan External dalam satu boundary yang aman.</p>
+          <h1>.</h1>
+          <p></p>
         </div>
-        <small>Akses internal TMMIN · Session terlindungi</small>
+        <small>Akses internal TMMIN</small>
       </section>
       <Card>
         <span className="tmmin-eyebrow">Akses aman</span>

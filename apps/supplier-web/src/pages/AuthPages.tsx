@@ -72,12 +72,10 @@ export function LoginPage() {
         <BrandLockup context="Supplier Portal" />
         <div>
           <span className="product-eyebrow">Enterprise Digital Henkaten</span>
-          <h1>Keputusan operasional yang bisa ditelusuri.</h1>
           <p>
-            Kelola shift, perubahan 4M, approval, dan assignment dalam satu alur yang terkontrol.
+            Kelola shift, perubahan 4M, approval, dan assignment.
           </p>
         </div>
-        <small>Desktop minimum 1280 × 720</small>
       </section>
       <section className="auth-form">
         <div>
