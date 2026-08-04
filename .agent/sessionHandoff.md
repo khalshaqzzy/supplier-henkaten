@@ -143,3 +143,28 @@ artifact lalu melaporkan no leaks.
 - Feature-branch push tidak memicu workflow repository saat ini. CI baru berjalan pada PR menuju
   `staging` atau push ke `staging`; next product action adalah membuka/menjalankan jalur tersebut,
   kemudian menyelesaikan external evidence Phase 15.9 dan rehearsal 15.11.
+
+## 8. Follow-up — Assignment Board dan Henkaten Input Dots
+
+Follow-up 2026-08-04 menyatukan representasi kategori pada dua surface operasional:
+
+- public shared `FourMDot` ditambahkan dan memakai exact `--hds-4m-*` category tokens;
+- Assignment Board mengganti pill singkatan Man/Mac/Mat/Met dengan dot pada target link 28 px;
+- Open indicator mempertahankan ring visual tanpa mengubah link, identifier, status, realtime, atau
+  Board read model;
+- category input Henkaten mengganti ikon person/gear/package/wrench dengan dot merah, biru, amber,
+  dan hijau; label radio tetap eksplisit dan selection check tetap tersedia;
+- login legend memakai primitive dot yang sama sehingga seluruh dot 4M mempunyai satu owner.
+
+Regression yang lulus:
+
+- shared UI unit 19/19;
+- Supplier unit 23/23;
+- scoped UI/Supplier/E2E typecheck dan E2E lint;
+- Hosted lifecycle Chromium dengan disposable PostgreSQL dan 9 migrations;
+- exact computed colors, Board dot/link geometry, zero Axe violation, serta visual capture Board dan
+  Create Henkaten pada 1280×720 dan 1672×941;
+- formatting, scoped production build, Gitleaks diff scan, dan `git diff --check`.
+
+Tidak ada perubahan API, database, migration, routing, auth, atau lifecycle Henkaten. Screenshot
+tetap ignored dan disposable E2E infrastructure dibersihkan oleh harness.

@@ -93,6 +93,7 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
   );
   const createHenkatenPage = await leader.context.newPage();
   await createHenkatenPage.goto(`${runtime.supplierOrigin}/henkatens/new`);
+  await expectCategoryDots(createHenkatenPage);
   await expect(
     createHenkatenPage.getByRole('region', { name: 'Konteks Shift untuk Henkaten' }),
   ).toBeVisible();
@@ -198,6 +199,13 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
       { timeout: 5_000 },
     )
     .toBe(1);
+  const machineIndicator = boardPage.locator('.four-m .hds-4m-dot--machine');
+  await expect(machineIndicator).toHaveCount(1);
+  await expect(machineIndicator).toHaveCSS('background-color', 'rgb(47, 111, 237)');
+  const indicatorLink = boardPage.locator('.four-m');
+  await expect(indicatorLink).toHaveCount(1);
+  expect(await indicatorLink.evaluate((element) => element.getBoundingClientRect().width)).toBe(28);
+  await captureSupplierVisuals(boardPage, 'assignment-board-indicator', testInfo);
   await captureSupplierPage(
     fixture.context,
     `${runtime.supplierOrigin}/`,
@@ -384,6 +392,21 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
     tmminContext.close(),
   ]);
 });
+
+async function expectCategoryDots(page: Page) {
+  const expected = [
+    ['man', 'rgb(220, 38, 38)'],
+    ['machine', 'rgb(47, 111, 237)'],
+    ['material', 'rgb(217, 119, 6)'],
+    ['method', 'rgb(22, 163, 74)'],
+  ] as const;
+
+  for (const [category, color] of expected) {
+    const dot = page.locator(`.category-picker .hds-4m-dot--${category}`);
+    await expect(dot).toHaveCount(1);
+    await expect(dot).toHaveCSS('background-color', color);
+  }
+}
 
 type Shift = {
   id: string;

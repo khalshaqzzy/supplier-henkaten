@@ -152,8 +152,8 @@ async function expectFourMLegend(page: Page) {
   for (const [index, [label, color]] of expected.entries()) {
     const item = items.nth(index);
     await expect(item).toHaveAccessibleName(label);
-    await expect(item.locator('i')).toHaveCSS('background-color', color);
-    await expect(item.locator('span')).toHaveCSS('font-weight', '400');
+    await expect(item.locator('.hds-4m-dot')).toHaveCSS('background-color', color);
+    await expect(item.locator('span:not(.hds-4m-dot)')).toHaveCSS('font-weight', '400');
     await expect(item.locator('strong')).toHaveText('M');
     await expect(item.locator('strong')).toHaveCSS('font-weight', '700');
   }

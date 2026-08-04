@@ -2331,34 +2331,21 @@ a.overview-activity-identifier:hover {
 }
 
 .four-m {
-  min-width: 26px;
-  height: 20px;
+  width: 28px;
+  height: 28px;
   display: inline-grid;
   place-items: center;
-  margin-left: 3px;
-  padding: 0 4px;
+  margin-left: 2px;
   border-radius: var(--hds-radius-full);
-  color: white !important;
-  font-size: 10px;
-  font-weight: var(--hds-weight-semibold);
 }
 
-.four-m.is-man {
-  background: var(--hds-4m-man);
-}
-.four-m.is-machine {
-  background: var(--hds-4m-machine);
-}
-.four-m.is-material {
-  background: var(--hds-4m-material);
-}
-.four-m.is-method {
-  background: var(--hds-4m-method);
-}
 .four-m.is-open {
+  background: var(--hds-surface-inset);
+}
+.four-m.is-open .hds-4m-dot {
   box-shadow:
-    inset 0 0 0 2px white,
-    0 0 0 1px currentColor;
+    0 0 0 2px var(--hds-surface-default),
+    0 0 0 3px var(--hds-4m-dot-color);
 }
 
 /* Shift */
@@ -3195,8 +3182,6 @@ a.overview-activity-identifier:hover {
 }
 
 .category-picker button {
-  --category-fg: var(--hds-text-secondary);
-  --category-bg: var(--hds-surface-inset);
   position: relative;
   min-height: 68px;
   padding: 11px 12px;
@@ -3215,42 +3200,8 @@ a.overview-activity-identifier:hover {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hds-action-primary) 14%, transparent);
 }
 
-.category-picker button.is-man {
-  --category-fg: var(--hds-state-info-fg);
-  --category-bg: var(--hds-state-info-bg);
-}
-
-.category-picker button.is-machine {
-  --category-fg: var(--hds-state-success-fg);
-  --category-bg: var(--hds-state-success-bg);
-}
-
-.category-picker button.is-material {
-  --category-fg: var(--hds-state-warning-fg);
-  --category-bg: var(--hds-state-warning-bg);
-}
-
-.category-picker button.is-method {
-  --category-fg: var(--hds-state-danger-fg);
-  --category-bg: var(--hds-state-danger-bg);
-}
-
-.category-picker__icon {
-  width: 36px;
-  height: 36px;
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  border-radius: var(--hds-radius-md);
-  color: var(--category-fg);
-  background: var(--category-bg);
-}
-
-.category-picker__icon svg {
-  width: 19px;
-  height: 19px;
-  margin: 0;
-  color: currentColor;
+.category-picker button > .hds-4m-dot {
+  flex: 0 0 var(--hds-space-3);
 }
 
 .category-picker button > span:nth-child(2) {

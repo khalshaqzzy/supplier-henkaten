@@ -4625,6 +4625,8 @@ Execution:
   contract test.
 - Shared `FourMLegend` ditambahkan dengan urutan tetap, nama kategori aksesibel, dot dekoratif,
   dan hanya huruf awal M yang bold; kedua halaman login memakainya tanpa mengubah behavior auth.
+- Shared `FourMDot` menjadi primitive warna kategori untuk indicator Assignment Board dan category
+  input Henkaten; pill singkatan serta ikon objek pada input diganti dot token-driven yang konsisten.
 - Seluruh typography token dan literal font size Supplier/TMMIN dinaikkan secara adaptif, sementara
   layout desktop minimum 1280×720, control alignment, truncation, dan overflow tetap stabil.
 - Public design-system showcase disinkronkan dengan resolved typography scale baru.
@@ -4635,6 +4637,9 @@ Verification:
   typography scale, urutan legend, accessible names, dan markup bold M.
 - Auth E2E Chromium dan Edge membuktikan computed dot colors, keyboard flow, zero Axe violation,
   serta screenshot pada 1280×720 dan 1672×941.
+- Hosted lifecycle E2E membuktikan exact computed color keempat dot pada category input, dot Machine
+  pada Assignment Board, target link 28 px, zero horizontal overflow/Axe violation, dan visual
+  capture pada 1280×720 serta 1672×941.
 - Browser QA mencakup kedua login, `/design`, Supplier Overview/Board/Create/Detail/Shift/dense
   master data, serta TMMIN Overview/Explorer/governance/monitoring tanpa page-level horizontal
   overflow, clipping, overlap, atau hidden action.

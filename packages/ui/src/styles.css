@@ -2120,31 +2120,33 @@ textarea {
   letter-spacing: -0.025em;
 }
 
-.hds-4m-legend li > i {
+.hds-4m-dot {
   width: var(--hds-space-3);
   height: var(--hds-space-3);
+  display: inline-block;
   flex: 0 0 var(--hds-space-3);
   border-radius: var(--hds-radius-full);
+  background: var(--hds-4m-dot-color);
 }
 
 .hds-4m-legend li > span > strong {
   font-weight: var(--hds-weight-bold);
 }
 
-.hds-4m-legend__item--man > i {
-  background: var(--hds-4m-man);
+.hds-4m-dot--man {
+  --hds-4m-dot-color: var(--hds-4m-man);
 }
 
-.hds-4m-legend__item--machine > i {
-  background: var(--hds-4m-machine);
+.hds-4m-dot--machine {
+  --hds-4m-dot-color: var(--hds-4m-machine);
 }
 
-.hds-4m-legend__item--material > i {
-  background: var(--hds-4m-material);
+.hds-4m-dot--material {
+  --hds-4m-dot-color: var(--hds-4m-material);
 }
 
-.hds-4m-legend__item--method > i {
-  background: var(--hds-4m-method);
+.hds-4m-dot--method {
+  --hds-4m-dot-color: var(--hds-4m-method);
 }
 
 .hds-source-mode svg,

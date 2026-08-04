@@ -63,18 +63,29 @@ export function FourMIndicator({
 
 const categoryOrder: HenkatenCategory[] = ['MAN', 'MACHINE', 'MATERIAL', 'METHOD'];
 
+export function FourMDot({
+  category,
+  className,
+}: {
+  category: HenkatenCategory;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn('hds-4m-dot', `hds-4m-dot--${category.toLowerCase()}`, className)}
+      aria-hidden="true"
+    />
+  );
+}
+
 export function FourMLegend({ className }: { className?: string }) {
   return (
     <ul className={cn('hds-4m-legend', className)} aria-label="Kategori Henkaten 4M">
       {categoryOrder.map((category) => {
         const label = categoryMeta[category].label;
         return (
-          <li
-            key={category}
-            className={`hds-4m-legend__item--${category.toLowerCase()}`}
-            aria-label={label}
-          >
-            <i aria-hidden="true" />
+          <li key={category} aria-label={label}>
+            <FourMDot category={category} />
             <span aria-hidden="true">
               <strong>M</strong>
               {label.slice(1)}

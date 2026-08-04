@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
+import type { HenkatenCategory, HenkatenStatus } from '@tmmin-henkaten/contracts';
 import {
   createSupplierRealtimeClient,
   type RealtimeConnectionState,
@@ -12,6 +13,7 @@ import {
   Button,
   EmptyState,
   ErrorState,
+  FourMDot,
   LastUpdated,
   NativeSelect,
   Skeleton,
@@ -259,15 +261,10 @@ export function BoardPage() {
                           <span>{humanize(job.state)}</span>
                           <div role="group" aria-label={`${job.indicators.length} Henkaten aktif`}>
                             {job.indicators.map((indicator) => (
-                              <Link
+                              <BoardHenkatenIndicator
                                 key={indicator.henkatenId}
-                                to={`/henkatens/${indicator.henkatenId}`}
-                                className={`four-m is-${indicator.category.toLowerCase()} is-${indicator.status.toLowerCase()}`}
-                                title={`${indicator.identifier}: ${indicator.category} ${indicator.status}`}
-                                aria-label={`${indicator.category} ${indicator.status}: ${indicator.identifier}`}
-                              >
-                                {boardCategoryLabel(indicator.category)}
-                              </Link>
+                                indicator={indicator}
+                              />
                             ))}
                           </div>
                         </div>
@@ -382,13 +379,26 @@ export function boardOperationalRisks(lines: BoardLines) {
   );
 }
 
-export function boardCategoryLabel(category: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD') {
-  return {
-    MAN: 'Man',
-    MACHINE: 'Mac',
-    MATERIAL: 'Mat',
-    METHOD: 'Met',
-  }[category];
+export function BoardHenkatenIndicator({
+  indicator,
+}: {
+  indicator: {
+    henkatenId: string;
+    identifier: string;
+    category: HenkatenCategory;
+    status: HenkatenStatus;
+  };
+}) {
+  return (
+    <Link
+      to={`/henkatens/${indicator.henkatenId}`}
+      className={`four-m is-${indicator.status.toLowerCase()}`}
+      title={`${indicator.identifier}: ${indicator.category} ${indicator.status}`}
+      aria-label={`${indicator.category} ${indicator.status}: ${indicator.identifier}`}
+    >
+      <FourMDot category={indicator.category} />
+    </Link>
+  );
 }
 
 function formatTime(value: string, timeZone: string) {

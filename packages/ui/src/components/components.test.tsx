@@ -186,7 +186,10 @@ describe('domain enum mapping', () => {
       const emphasis = item.querySelector('strong');
       expect(emphasis).toHaveTextContent('M');
       expect(item.querySelectorAll('strong')).toHaveLength(1);
-      expect(item.querySelector('span')).toHaveTextContent(item.getAttribute('aria-label')!);
+      expect(item.querySelector('.hds-4m-dot')).toBeVisible();
+      expect(item.querySelector('span:not(.hds-4m-dot)')).toHaveTextContent(
+        item.getAttribute('aria-label')!,
+      );
     }
   });
 });
