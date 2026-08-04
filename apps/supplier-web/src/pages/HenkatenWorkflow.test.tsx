@@ -28,10 +28,25 @@ describe('Henkaten workflow presentation', () => {
 
     render(<Harness />);
 
-    expect(screen.getByRole('radio', { name: /Man/i }).getAttribute('aria-checked')).toBe('true');
-    await user.click(screen.getByRole('radio', { name: /Material/i }));
-    expect(screen.getByRole('radio', { name: /Man/i }).getAttribute('aria-checked')).toBe('false');
-    expect(screen.getByRole('radio', { name: /Material/i }).getAttribute('aria-checked')).toBe(
+    const expectedDots = {
+      Man: 'man',
+      Machine: 'machine',
+      Material: 'material',
+      Method: 'method',
+    } as const;
+    for (const [label, category] of Object.entries(expectedDots)) {
+      expect(
+        screen
+          .getByRole('radio', { name: label })
+          .querySelector('.hds-4m-dot')
+          ?.classList.contains(`hds-4m-dot--${category}`),
+      ).toBe(true);
+    }
+
+    expect(screen.getByRole('radio', { name: 'Man' }).getAttribute('aria-checked')).toBe('true');
+    await user.click(screen.getByRole('radio', { name: 'Material' }));
+    expect(screen.getByRole('radio', { name: 'Man' }).getAttribute('aria-checked')).toBe('false');
+    expect(screen.getByRole('radio', { name: 'Material' }).getAttribute('aria-checked')).toBe(
       'true',
     );
   });

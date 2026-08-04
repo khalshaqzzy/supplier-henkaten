@@ -72,29 +72,29 @@
   --hds-state-hosted-bg: #ecfdf3;
   --hds-state-external-fg: #175cd3;
   --hds-state-external-bg: #eff8ff;
-  --hds-4m-man: #2f6fed;
-  --hds-4m-machine: #16a34a;
+  --hds-4m-man: #dc2626;
+  --hds-4m-machine: #2f6fed;
   --hds-4m-material: #d97706;
-  --hds-4m-method: #dc2626;
+  --hds-4m-method: #16a34a;
   --hds-font-sans: 'Inter Variable', Inter, ui-sans-serif, system-ui, sans-serif;
-  --hds-type-11-size: 0.6875rem;
-  --hds-type-11-line: 1rem;
-  --hds-type-12-size: 0.75rem;
-  --hds-type-12-line: 1.125rem;
-  --hds-type-13-size: 0.8125rem;
-  --hds-type-13-line: 1.25rem;
-  --hds-type-14-size: 0.875rem;
-  --hds-type-14-line: 1.3125rem;
-  --hds-type-16-size: 1rem;
-  --hds-type-16-line: 1.5rem;
-  --hds-type-18-size: 1.125rem;
-  --hds-type-18-line: 1.625rem;
-  --hds-type-20-size: 1.25rem;
-  --hds-type-20-line: 1.75rem;
-  --hds-type-24-size: 1.5rem;
-  --hds-type-24-line: 2rem;
-  --hds-type-30-size: 1.875rem;
-  --hds-type-30-line: 2.375rem;
+  --hds-type-11-size: 0.75rem;
+  --hds-type-11-line: 1.125rem;
+  --hds-type-12-size: 0.8125rem;
+  --hds-type-12-line: 1.25rem;
+  --hds-type-13-size: 0.875rem;
+  --hds-type-13-line: 1.375rem;
+  --hds-type-14-size: 0.9375rem;
+  --hds-type-14-line: 1.4375rem;
+  --hds-type-16-size: 1.0625rem;
+  --hds-type-16-line: 1.625rem;
+  --hds-type-18-size: 1.1875rem;
+  --hds-type-18-line: 1.75rem;
+  --hds-type-20-size: 1.375rem;
+  --hds-type-20-line: 1.875rem;
+  --hds-type-24-size: 1.625rem;
+  --hds-type-24-line: 2.125rem;
+  --hds-type-30-size: 2rem;
+  --hds-type-30-line: 2.5rem;
   --hds-weight-regular: 400;
   --hds-weight-medium: 500;
   --hds-weight-semibold: 600;
@@ -2083,12 +2083,12 @@ textarea {
 
 .hds-4m--man {
   color: var(--hds-4m-man);
-  background: var(--hds-state-info-bg);
+  background: var(--hds-state-danger-bg);
 }
 
 .hds-4m--machine {
   color: var(--hds-4m-machine);
-  background: var(--hds-state-success-bg);
+  background: var(--hds-state-info-bg);
 }
 
 .hds-4m--material {
@@ -2098,7 +2098,55 @@ textarea {
 
 .hds-4m--method {
   color: var(--hds-4m-method);
-  background: var(--hds-state-danger-bg);
+  background: var(--hds-state-success-bg);
+}
+
+.hds-4m-legend {
+  display: grid;
+  gap: clamp(var(--hds-space-3), 2vh, var(--hds-space-5));
+  margin: var(--hds-space-5) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hds-4m-legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--hds-space-4);
+  color: inherit;
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-weight: var(--hds-weight-regular);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.hds-4m-dot {
+  width: var(--hds-space-3);
+  height: var(--hds-space-3);
+  display: inline-block;
+  flex: 0 0 var(--hds-space-3);
+  border-radius: var(--hds-radius-full);
+  background: var(--hds-4m-dot-color);
+}
+
+.hds-4m-legend li > span > strong {
+  font-weight: var(--hds-weight-bold);
+}
+
+.hds-4m-dot--man {
+  --hds-4m-dot-color: var(--hds-4m-man);
+}
+
+.hds-4m-dot--machine {
+  --hds-4m-dot-color: var(--hds-4m-machine);
+}
+
+.hds-4m-dot--material {
+  --hds-4m-dot-color: var(--hds-4m-material);
+}
+
+.hds-4m-dot--method {
+  --hds-4m-dot-color: var(--hds-4m-method);
 }
 
 .hds-source-mode svg,

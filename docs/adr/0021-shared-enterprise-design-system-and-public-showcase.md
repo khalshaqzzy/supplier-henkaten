@@ -32,7 +32,7 @@ The visual direction is derived from `.agent/design/`:
 - orange only for primary action, current navigation, and selective emphasis;
 - minimal elevation, small radii, thin borders, and functional motion;
 - icon, label, and color combined for every operational status;
-- PRD-authoritative 4M semantics: Man blue, Machine green, Material amber, Method red.
+- PRD-authoritative 4M semantics: Man red, Machine blue, Material amber, Method green.
 
 Unsupported screenshot behavior is not inherited. Export, Save Draft, Skills, Calendars, extra
 source approvals, auto-accept, and tooling checks are excluded.

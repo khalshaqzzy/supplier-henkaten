@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest';
+// @vitest-environment jsdom
 
-import { boardCategoryLabel, boardOperationalRisks } from './BoardPage';
+import { createElement } from 'react';
+import { cleanup, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, describe, expect, it } from 'vitest';
+
+import { BoardHenkatenIndicator, boardOperationalRisks } from './BoardPage';
+
+afterEach(cleanup);
 
 describe('Assignment Board operational evidence', () => {
   it('surfaces an Open Man Henkaten as an active reservation without changing assignment state', () => {
@@ -62,11 +69,26 @@ describe('Assignment Board operational evidence', () => {
     ]);
   });
 
-  it('uses distinct visible labels for every 4M category', () => {
-    expect(
-      ['MAN', 'MACHINE', 'MATERIAL', 'METHOD'].map((category) =>
-        boardCategoryLabel(category as 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD'),
+  it('renders an accessible Henkaten link with the shared category dot', () => {
+    render(
+      createElement(
+        MemoryRouter,
+        {},
+        createElement(BoardHenkatenIndicator, {
+          indicator: {
+            henkatenId: '00000000-0000-4000-8000-000000000002',
+            identifier: 'HEN-GKI-20260727-0004',
+            category: 'METHOD',
+            status: 'OPEN',
+          },
+        }),
       ),
-    ).toEqual(['Man', 'Mac', 'Mat', 'Met']);
+    );
+
+    const link = screen.getByRole('link', {
+      name: 'METHOD OPEN: HEN-GKI-20260727-0004',
+    });
+    expect(link.getAttribute('href')).toBe('/henkatens/00000000-0000-4000-8000-000000000002');
+    expect(link.querySelector('.hds-4m-dot')?.classList.contains('hds-4m-dot--method')).toBe(true);
   });
 });

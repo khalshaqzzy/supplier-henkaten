@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -64,6 +64,26 @@ describe('TMMIN application boundary', () => {
     expect(screen.getByText(/Memuat Henkaten Design System/i)).toBeTruthy();
     await Promise.resolve();
     expect(sessionSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows the shared 4M legend on the TMMIN login without placeholder copy', async () => {
+    vi.spyOn(tmminApi, 'session').mockRejectedValue(new Error('anonymous'));
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Masuk ke TMMIN Portal' })).toBeTruthy();
+    const legend = screen.getByRole('list', { name: 'Kategori Henkaten 4M' });
+    expect(
+      within(legend)
+        .getAllByRole('listitem')
+        .map((item) => item.getAttribute('aria-label')),
+    ).toEqual(['Man', 'Machine', 'Material', 'Method']);
+    expect(screen.queryByRole('heading', { name: '.' })).toBeNull();
+    expect(screen.getByLabelText(/^Username/)).toBeTruthy();
+    expect(screen.getByLabelText(/^Password/)).toBeTruthy();
   });
 
   it('forces temporary-password identities to the reset guard', async () => {

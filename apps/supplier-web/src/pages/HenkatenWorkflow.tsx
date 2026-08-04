@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 import type { HenkatenCategory, WorkingAssignment } from '@tmmin-henkaten/contracts';
+import { FourMDot } from '@tmmin-henkaten/ui';
 
 type ReplacementMember = {
   id: string;
@@ -56,20 +57,18 @@ export function HenkatenCategoryPicker({
     <div className="category-picker" role="radiogroup" aria-label="Kategori Henkaten">
       {(Object.keys(CATEGORY_META) as HenkatenCategory[]).map((category) => {
         const meta = CATEGORY_META[category];
-        const Icon = meta.icon;
         const selected = value === category;
         return (
           <button
             key={category}
             type="button"
             role="radio"
+            aria-label={meta.label}
             aria-checked={selected}
             className={`is-${category.toLowerCase()}${selected ? ' is-selected' : ''}`}
             onClick={() => onChange(category)}
           >
-            <span className="category-picker__icon">
-              <Icon aria-hidden="true" />
-            </span>
+            <FourMDot category={category} />
             <span>
               <strong>{meta.label}</strong>
               <small>
