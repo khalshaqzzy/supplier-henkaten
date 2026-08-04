@@ -7,6 +7,7 @@ import {
   ApprovalRouteStatus,
   AssignmentState,
   FourMIndicator,
+  FourMLegend,
   HenkatenStatus,
   SourceModeBadge,
 } from './domain';
@@ -168,6 +169,25 @@ describe('domain enum mapping', () => {
     expect(screen.getByText('QC · Pending')).toBeVisible();
     expect(screen.getByText('Vacant')).toBeVisible();
     expect(document.querySelectorAll('svg').length).toBeGreaterThan(2);
+  });
+
+  it('renders the accessible 4M legend in contract order with only M emphasized', () => {
+    render(<FourMLegend />);
+
+    const legend = screen.getByRole('list', { name: 'Kategori Henkaten 4M' });
+    const items = within(legend).getAllByRole('listitem');
+    expect(items.map((item) => item.getAttribute('aria-label'))).toEqual([
+      'Man',
+      'Machine',
+      'Material',
+      'Method',
+    ]);
+    for (const item of items) {
+      const emphasis = item.querySelector('strong');
+      expect(emphasis).toHaveTextContent('M');
+      expect(item.querySelectorAll('strong')).toHaveLength(1);
+      expect(item.querySelector('span')).toHaveTextContent(item.getAttribute('aria-label')!);
+    }
   });
 });
 

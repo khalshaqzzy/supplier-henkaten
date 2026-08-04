@@ -147,7 +147,7 @@ body {
 .product-nav-group__label {
   padding: 0 10px 4px;
   color: #667085;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -163,7 +163,7 @@ body {
   padding: 7px 10px;
   border-radius: 7px;
   color: #555e70;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   text-decoration: none;
   transition:
@@ -196,7 +196,7 @@ body {
   border-radius: var(--hds-radius-full);
   background: var(--hds-state-danger-accent);
   color: #fff;
-  font-size: 10px;
+  font-size: 11px;
   font-style: normal;
   text-align: center;
 }
@@ -305,13 +305,13 @@ body {
   gap: 1px;
   padding-right: 16px;
   border-right: 1px solid #e2e5ea;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .product-topbar__path small {
   color: #667085;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -320,13 +320,13 @@ body {
 .product-topbar__supplier {
   display: grid;
   color: #667085;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.2;
 }
 
 .product-topbar__supplier strong {
   color: #202838;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .product-topbar__actions .hds-icon-button {
@@ -344,7 +344,7 @@ body {
   border-radius: 10px;
   background: #d53f12;
   color: white;
-  font-size: 9px;
+  font-size: 10px;
   font-style: normal;
 }
 
@@ -403,7 +403,7 @@ body {
 
 .cursor-pager > span {
   color: var(--hds-color-text-subtle);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .cursor-pager > div {
@@ -431,7 +431,7 @@ body {
 .product-page-header h1 {
   margin: 4px 0 5px;
   color: #131b2a;
-  font-size: 28px;
+  font-size: 30px;
   line-height: 1.1;
   letter-spacing: -0.035em;
   outline: 0;
@@ -444,7 +444,7 @@ body {
   max-width: var(--hds-measure-reading);
   margin: 0;
   color: var(--hds-text-secondary);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
   text-wrap: pretty;
 }
@@ -467,7 +467,7 @@ body {
 .product-page-header__meta {
   margin-top: 6px;
   color: #667085;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .product-breadcrumbs {
@@ -476,7 +476,7 @@ body {
   gap: 6px;
   margin-bottom: 6px;
   color: #667085;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .product-breadcrumbs a {
@@ -490,7 +490,7 @@ body {
 
 .product-eyebrow {
   color: #b43a0c;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -569,13 +569,13 @@ body {
 .operational-facts span,
 .operational-facts small {
   color: #687182;
-  font-size: 10px;
+  font-size: 11px;
   font-style: normal;
 }
 
 .operational-metric strong {
   color: #131b2a;
-  font-size: 21px;
+  font-size: 22px;
   line-height: 1.1;
   letter-spacing: -0.025em;
 }
@@ -599,7 +599,7 @@ body {
 
 .operational-facts strong {
   color: #202838;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .operational-rail {
@@ -624,7 +624,7 @@ body {
 
 .operational-rail > header > span {
   color: #b43a0c;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -633,7 +633,7 @@ body {
 .operational-rail h2 {
   margin: 2px 0 0;
   color: #172033;
-  font-size: 15px;
+  font-size: 17px;
 }
 
 .operational-rail__body {
@@ -695,13 +695,6 @@ body {
   max-width: 560px;
 }
 
-.auth-brand h1 {
-  margin: var(--hds-space-3) 0;
-  font-size: clamp(2.2rem, 4vw, 4rem);
-  line-height: 1.02;
-  letter-spacing: -0.055em;
-}
-
 .auth-brand p,
 .auth-brand .product-eyebrow {
   color: var(--hds-color-slate-300);
@@ -720,7 +713,7 @@ body {
   padding: var(--hds-space-10);
 }
 
-.auth-form h2,
+.auth-form h1,
 .auth-compact h1 {
   margin: var(--hds-space-3) 0 var(--hds-space-1);
   font-size: var(--hds-type-24-size);
@@ -1031,7 +1024,7 @@ body {
 
 .overview-widget-link {
   color: #b43a0c;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-decoration: none;
 }
@@ -1094,12 +1087,12 @@ body {
 .aging-breakdown span,
 .aging-breakdown small {
   color: var(--hds-text-tertiary);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .aging-breakdown strong {
   color: var(--hds-text-primary);
-  font-size: 22px;
+  font-size: 24px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -1133,7 +1126,7 @@ body {
   border-radius: 6px;
   background: var(--hds-surface-inset);
   color: var(--hds-text-tertiary);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -1154,7 +1147,7 @@ body {
 .ranked-distribution__content strong {
   overflow: hidden;
   color: var(--hds-text-primary);
-  font-size: 11px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1162,7 +1155,7 @@ body {
 .ranked-distribution__content small {
   flex: 0 0 auto;
   color: var(--hds-text-tertiary);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .ranked-distribution__track {
@@ -1181,7 +1174,7 @@ body {
 
 .ranked-distribution__value {
   color: var(--hds-text-primary);
-  font-size: 15px;
+  font-size: 17px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1218,12 +1211,12 @@ body {
 
 .overview-widget-empty strong {
   color: var(--hds-text-primary);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .overview-widget-empty small {
   color: var(--hds-text-tertiary);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .overview-operational-list,
@@ -1277,17 +1270,17 @@ body {
 .overview-operational-list strong,
 .overview-override-list strong {
   color: var(--hds-text-primary);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .overview-operational-list small,
 .overview-override-list small {
   color: var(--hds-text-tertiary);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .overview-operational-list > div > strong {
-  font-size: 18px;
+  font-size: 19px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1316,12 +1309,12 @@ body {
 .overview-override-list time {
   flex: 0 0 auto;
   color: var(--hds-text-tertiary);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .overview-activity-count {
   color: var(--hds-text-tertiary);
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -1391,13 +1384,13 @@ body {
 
 .overview-activity-heading > strong {
   color: var(--hds-text-primary);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .overview-activity-heading .hds-badge,
 .overview-activity-heading .hds-4m {
   min-height: 19px;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .overview-activity-identifier {
@@ -1405,7 +1398,7 @@ body {
   max-width: 100%;
   overflow: hidden;
   color: #b43a0c;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-overflow: ellipsis;
   text-decoration: none;
@@ -1421,7 +1414,7 @@ a.overview-activity-identifier:hover {
   gap: 8px 18px;
   flex-wrap: wrap;
   color: var(--hds-text-secondary);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .overview-activity-facts strong {
@@ -1430,7 +1423,7 @@ a.overview-activity-identifier:hover {
 
 .overview-activity-resource {
   color: var(--hds-text-secondary);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .overview-activity-meta {
@@ -1439,7 +1432,7 @@ a.overview-activity-identifier:hover {
   justify-items: end;
   gap: 4px;
   color: var(--hds-text-tertiary);
-  font-size: 9px;
+  font-size: 10px;
   text-align: right;
 }
 
@@ -1569,7 +1562,7 @@ a.overview-activity-identifier:hover {
   padding: 10px 14px;
   border-right: 1px solid #e5e8ed;
   color: #30394a;
-  font-size: 11px;
+  font-size: 12px;
   text-decoration: none;
 }
 
@@ -1633,7 +1626,7 @@ a.overview-activity-identifier:hover {
 .setup-next-copy {
   margin: 0;
   color: var(--hds-text-secondary);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .setup-workspace .blocker-list {
@@ -1652,7 +1645,7 @@ a.overview-activity-identifier:hover {
 
 .setup-workspace .blocker-list span,
 .setup-workspace .blocker-list code {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .setup-grid > .hds-skeleton {
@@ -2045,7 +2038,7 @@ a.overview-activity-identifier:hover {
 .assignment-change-preview > section > span,
 .assignment-change-preview > section > small {
   color: #687182;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .assignment-change-preview > svg {
@@ -2113,7 +2106,7 @@ a.overview-activity-identifier:hover {
 .board-legend h3 {
   margin: 0 0 2px;
   color: #30394a;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .board-critical > div {
@@ -2137,12 +2130,12 @@ a.overview-activity-identifier:hover {
 
 .board-critical small {
   color: var(--hds-state-danger-fg);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .board-critical > a {
   color: #b43a0c;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-decoration: none;
 }
@@ -2174,7 +2167,7 @@ a.overview-activity-identifier:hover {
   align-items: center;
   gap: 6px;
   color: #687182;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .board-legend i {
@@ -2346,7 +2339,7 @@ a.overview-activity-identifier:hover {
   padding: 0 4px;
   border-radius: var(--hds-radius-full);
   color: white !important;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: var(--hds-weight-semibold);
 }
 
@@ -2657,7 +2650,7 @@ a.overview-activity-identifier:hover {
 
 .resolution-overview dt {
   color: var(--hds-text-tertiary);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .resolution-overview dd {
@@ -2778,7 +2771,7 @@ a.overview-activity-identifier:hover {
   border-radius: var(--hds-radius-full);
   color: var(--hds-text-secondary);
   background: var(--hds-state-neutral-bg);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: var(--hds-weight-semibold);
 }
 
@@ -2814,7 +2807,7 @@ a.overview-activity-identifier:hover {
 
 .resolution-list__action > small {
   color: var(--hds-text-tertiary);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: var(--hds-weight-semibold);
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -2962,7 +2955,7 @@ a.overview-activity-identifier:hover {
 
 .henkaten-review h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
 }
 
 .henkaten-review dl,
@@ -3010,12 +3003,12 @@ a.overview-activity-identifier:hover {
   align-items: center;
   justify-content: space-between;
   color: #687182;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .henkaten-progress > div strong {
   color: #b43a0c;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .henkaten-progress progress {
@@ -3040,7 +3033,7 @@ a.overview-activity-identifier:hover {
 
 .henkaten-progress small {
   color: #687182;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .henkaten-detail__layout {
@@ -3384,7 +3377,7 @@ a.overview-activity-identifier:hover {
   border-radius: var(--hds-radius-full);
   color: var(--hds-state-success-fg);
   background: var(--hds-state-success-bg);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: var(--hds-weight-semibold);
   font-style: normal;
 }
@@ -3524,7 +3517,7 @@ a.overview-activity-identifier:hover {
 
 .movement-preview__node dt {
   color: var(--hds-text-secondary);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .movement-preview__node dd {
@@ -3753,7 +3746,7 @@ a.overview-activity-identifier:hover {
 .readiness-list small {
   overflow-wrap: anywhere;
   color: var(--hds-text-tertiary);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .henkaten-header-status {
@@ -3782,7 +3775,7 @@ a.overview-activity-identifier:hover {
 
 .record-traceability strong {
   color: var(--hds-text-secondary);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .record-traceability a {
@@ -3944,7 +3937,7 @@ a.overview-activity-identifier:hover {
 
 .object-transition__node > span {
   color: var(--hds-text-primary);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: var(--hds-weight-bold);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -3952,7 +3945,7 @@ a.overview-activity-identifier:hover {
 
 .object-transition__node > small {
   color: var(--hds-text-tertiary);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .object-transition__node > strong {
@@ -4057,7 +4050,7 @@ a.overview-activity-identifier:hover {
 .approval-route > div > p,
 .approval-route > div > time {
   color: var(--hds-text-tertiary);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.35;
 }
 
@@ -4122,7 +4115,7 @@ a.overview-activity-identifier:hover {
 
 .record-lock-note small {
   color: var(--hds-text-secondary);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.4;
 }
 
@@ -4171,12 +4164,12 @@ a.overview-activity-identifier:hover {
 
 .shift-checklist-summary dt {
   color: var(--hds-text-tertiary);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .shift-checklist-summary dd {
   color: var(--hds-text-primary);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: var(--hds-weight-semibold);
 }
 

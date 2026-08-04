@@ -1,13 +1,18 @@
 import { AxeBuilder } from '@axe-core/playwright';
-import { expect } from '@playwright/test';
+import { expect, type Page, type TestInfo } from '@playwright/test';
 
 import { loginBootstrapThroughUi, runtime, test } from './support.js';
 
 test('onboards a Hosted tenant through both portals and completes start-ready setup @edge', async ({
   trackedBrowser: browser,
-}) => {
+}, testInfo) => {
   const tmminContext = await browser.newContext();
   const tmmin = await tmminContext.newPage();
+  await tmmin.goto(`${runtime.tmminOrigin}/login`);
+  await expectFourMLegend(tmmin);
+  await expectKeyboardSequence(tmmin, ['Username', 'Password'], 'Masuk');
+  expect((await new AxeBuilder({ page: tmmin }).analyze()).violations).toEqual([]);
+  await captureAuthEvidence(tmmin, 'tmmin-login', testInfo);
   await loginBootstrapThroughUi(tmmin);
 
   const tmminA11y = await new AxeBuilder({ page: tmmin }).analyze();
@@ -32,6 +37,10 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
   const supplierContext = await browser.newContext();
   const supplier = await supplierContext.newPage();
   await supplier.goto(`${runtime.supplierOrigin}/login`);
+  await expectFourMLegend(supplier);
+  await expectKeyboardSequence(supplier, ['Supplier Code', 'Username', 'Password'], 'Masuk');
+  expect((await new AxeBuilder({ page: supplier }).analyze()).violations).toEqual([]);
+  await captureAuthEvidence(supplier, 'supplier-login', testInfo);
   await supplier.getByLabel('Supplier Code').fill('E2E-ONBOARD');
   await supplier.getByLabel('Username').fill('supplier.admin');
   await supplier.getByLabel('Password').fill(temporaryPassword);
@@ -127,6 +136,58 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
   await supplierContext.close();
   await tmminContext.close();
 });
+
+async function expectFourMLegend(page: Page) {
+  const legend = page.getByRole('list', { name: 'Kategori Henkaten 4M' });
+  const expected = [
+    ['Man', 'rgb(220, 38, 38)'],
+    ['Machine', 'rgb(47, 111, 237)'],
+    ['Material', 'rgb(217, 119, 6)'],
+    ['Method', 'rgb(22, 163, 74)'],
+  ] as const;
+
+  await expect(legend).toBeVisible();
+  const items = legend.getByRole('listitem');
+  await expect(items).toHaveCount(expected.length);
+  for (const [index, [label, color]] of expected.entries()) {
+    const item = items.nth(index);
+    await expect(item).toHaveAccessibleName(label);
+    await expect(item.locator('i')).toHaveCSS('background-color', color);
+    await expect(item.locator('span')).toHaveCSS('font-weight', '400');
+    await expect(item.locator('strong')).toHaveText('M');
+    await expect(item.locator('strong')).toHaveCSS('font-weight', '700');
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    await page.evaluate(() => document.documentElement.clientWidth),
+  );
+}
+
+async function expectKeyboardSequence(page: Page, fieldLabels: string[], submitName: string) {
+  await page.getByLabel(fieldLabels[0]!).focus();
+  for (const label of fieldLabels.slice(1)) {
+    await page.keyboard.press('Tab');
+    await expect(page.getByLabel(label)).toBeFocused();
+  }
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: submitName })).toBeFocused();
+}
+
+async function captureAuthEvidence(page: Page, name: string, testInfo: TestInfo) {
+  for (const viewport of [
+    { width: 1280, height: 720 },
+    { width: 1672, height: 941 },
+  ]) {
+    await page.setViewportSize(viewport);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      await page.evaluate(() => document.documentElement.clientWidth),
+    );
+    await page.screenshot({
+      path: testInfo.outputPath(`${name}-${viewport.width}x${viewport.height}.png`),
+      fullPage: true,
+    });
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
+}
 
 async function createResource(
   page: import('@playwright/test').Page,

@@ -2,7 +2,7 @@
 
 Document status: Active implementation roadmap
 Created: 2026-07-23
-Last updated: 2026-07-24
+Last updated: 2026-08-04
 Source of truth: `.agent/PRD.md`
 Implementation approach: Backend-first
 Workspace tooling: Node.js 22 + pnpm workspaces, tanpa Turborepo
@@ -28,7 +28,7 @@ Roadmap tidak memberikan estimasi waktu. Urutan didasarkan pada dependency dan r
 
 Kondisi repository setelah Phase 0-10:
 
-- branch aktif: `staging`;
+- branch aktif: `feat/typography-elements`;
 - `.agent/PRD.md` tersedia dan menjadi product contract;
 - dua puluh ADR dan delapan architecture/security baseline tersedia;
 - Node.js 22.23.1 + pnpm 11.16.0 ESM workspace tersedia;
@@ -68,13 +68,15 @@ Kondisi repository setelah Phase 0-10:
 - dua React/Vite frontend workspace, shared Henkaten Design System, typed browser API boundary,
   session-aware shells, seluruh Hosted Supplier workflow, dan seluruh TMMIN governance/monitoring
   workflow tersedia;
-- local full-stack Compose, centralized realtime outbox fan-out, dan isolated Playwright
-  Chromium/Edge E2E tersedia; production containers dan remote deployment belum ada;
+- local full-stack Compose, centralized realtime outbox fan-out, isolated Playwright Chromium/Edge
+  E2E, production containers, dan deployment workflows tersedia; aktivasi staging eksternal masih
+  berjalan;
 - materi slide tersedia sebagai reference-only input.
 
 Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8, Phase 9, Phase 10, Phase 11, Phase 12, Phase 13, dan Phase 14**
-Current phase: **Phase 15 - Production Containers, CI/CD, dan Staging (`planned`)**
-Next subphase: **15.1 Production Dockerfiles (`planned`)**
+Current phase: **Phase 15 - Production Containers, CI/CD, dan Staging (`in_progress`)**
+Current subphase: **15.9 Automatic Staging Deployment (`in_progress`)**
+Next subphase: **15.11 Staging Deployment Rehearsal (`planned`)**
 
 Tidak ada application behavior yang boleh ditandai implemented sampai source code dan acceptance checks terkait benar-benar tersedia di repository.
 
@@ -4609,6 +4611,42 @@ Data/migration impact:
 - Tidak ada perubahan database schema atau migration.
 - Phase 15 tetap `in_progress`; audit ini tidak mengklaim staging VM, backup/recovery, atau
   production activation.
+
+### 14.15 Cross-application 4M and Typography Refinement
+
+Status: **done**
+
+Dependency: 14.10-14.14.
+
+Execution:
+
+- Kontrak warna shared 4M dikunci menjadi Man merah, Machine biru, Material amber/kuning, dan
+  Method hijau melalui typed registry, CSS custom properties, indicator tint, serta regression
+  contract test.
+- Shared `FourMLegend` ditambahkan dengan urutan tetap, nama kategori aksesibel, dot dekoratif,
+  dan hanya huruf awal M yang bold; kedua halaman login memakainya tanpa mengubah behavior auth.
+- Seluruh typography token dan literal font size Supplier/TMMIN dinaikkan secara adaptif, sementara
+  layout desktop minimum 1280×720, control alignment, truncation, dan overflow tetap stabil.
+- Public design-system showcase disinkronkan dengan resolved typography scale baru.
+
+Verification:
+
+- Unit/contract coverage membuktikan exact token mapping, tint, typed/CSS synchronization,
+  typography scale, urutan legend, accessible names, dan markup bold M.
+- Auth E2E Chromium dan Edge membuktikan computed dot colors, keyboard flow, zero Axe violation,
+  serta screenshot pada 1280×720 dan 1672×941.
+- Browser QA mencakup kedua login, `/design`, Supplier Overview/Board/Create/Detail/Shift/dense
+  master data, serta TMMIN Overview/Explorer/governance/monitoring tanpa page-level horizontal
+  overflow, clipping, overlap, atau hidden action.
+- Frozen install, format, lint, typecheck, seluruh unit test, OpenAPI drift, production build,
+  Compose, disposable PostgreSQL migrations/integration, Chromium/Edge E2E, Gitleaks, dan diff
+  check lulus pada Node.js 22.23.1 dan pnpm 11.16.0.
+
+Data/migration impact:
+
+- Tidak ada perubahan API, OpenAPI, Prisma schema, database migration, routing, atau lifecycle
+  Henkaten.
+- Phase 15.9 tetap `in_progress`; refinement ini tidak mengklaim staging deployment.
 
 Phase 14 exit criteria:
 
