@@ -84,6 +84,10 @@ workflow/shell/Dockerfile checks, Gitleaks, Dependency Review, `pnpm audit`, Cod
 and Trivy filesystem/runtime-image scans. Scanner exceptions must identify one exact finding,
 provide rationale, and have an unexpired registry entry.
 
+Patchable transitive JavaScript advisories are resolved centrally with pnpm overrides scoped to
+the vulnerable version range. The lockfile is regenerated and verified by both the complete-lockfile
+audit and Trivy; an ignore or exception is not accepted when a compatible fixed release exists.
+
 Deployment verifies that the candidate is still branch head before SSH. GitHub deployment
 concurrency never cancels an active release; remote `flock` covers the complete critical section,
 and a high-water GitHub run number rejects late workflows. Source is an exact checksummed
@@ -129,6 +133,12 @@ On 2026-07-30, the PR release gate detected CVE-2026-56852 in the custom Caddy b
 transitive `golang.org/x/text` 0.37.0 module. The builder now selects the fixed 0.39.0 module
 explicitly, and the filesystem scan passes its exact exception registry through the supported
 `trivyignores` action input.
+
+On 2026-08-04, staging run `30891976462` detected CVE-2026-18446 in `fast-uri 3.1.4`; the complete
+lockfile audit additionally detected patched advisories affecting `undici 7.28.0` and
+`brace-expansion 5.0.8`. Vulnerable-range overrides now resolve `fast-uri 3.1.5`, `undici 7.29.0`,
+and `brace-expansion 5.0.9`. Clean-worktree Trivy filesystem, `pnpm audit`, production-like
+acceptance, and all five rebuilt runtime image scans passed without adding an exception.
 
 The production-like stack passed exact-SHA API readiness and both `/release.json` checks,
 three-domain Host routing, supplier SPA deep-link fallback, same-origin session and SSE routing,

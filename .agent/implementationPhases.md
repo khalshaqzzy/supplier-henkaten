@@ -4828,6 +4828,10 @@ Verification:
   `trivyignores` yang didukung action. Clean Caddy build dan Trivy 0.70.0 scan melaporkan zero
   High/Critical findings pada Debian runtime maupun Go binary; actionlint, Hadolint,
   env/Compose, deployment harness, dan exact security-exception validation lulus.
+- Staging run `30891976462` remediation memaksa patched transitive floors `fast-uri 3.1.5`,
+  `undici 7.29.0`, dan `brace-expansion 5.0.9` melalui vulnerable-range pnpm overrides. Audit,
+  clean-worktree Trivy filesystem, dan kelima rebuilt production image lulus tanpa ignore atau
+  exception baru.
 
 Data/migration impact:
 
@@ -5026,6 +5030,11 @@ Current implementation evidence (2026-07-27):
   exists.
 - 15.11 remains planned until first deploy, second-release upgrade, close-candidate race, and
   controlled rollback evidence are captured on the staging VM.
+- Pada 2026-08-04, local parity untuk staging dependency remediation kembali membuktikan frozen
+  install, quality/build, fresh dan previous-SHA migrations, integration, Chromium/Edge E2E,
+  deployment tooling, production-like routing/persistence, Gitleaks, audit, filesystem scan, dan
+  seluruh runtime image scan. Phase 15.9 tetap `in_progress` sampai hosted push/deploy evidence
+  tersedia.
 
 ---
 
