@@ -11,7 +11,7 @@ try {
 export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
-    path: 'prisma/migrations',
+    path: process.env['PRISMA_MIGRATIONS_PATH'] ?? 'prisma/migrations',
   },
   datasource: {
     // Generation does not connect. Runtime and migration commands still validate the real URL.

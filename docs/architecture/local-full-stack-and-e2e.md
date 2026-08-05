@@ -71,6 +71,32 @@ The protected TMMIN administrator remains operator-owned. Local Compose reads it
 from an untracked `.env`, and `local:bootstrap` invokes the normal operator CLI. No credentials are
 tracked or invented by Compose.
 
+Two explicit developer-data commands extend this runtime without changing production behavior:
+
+- `local:start:clean` destroys both named local volumes, starts the database and API, invokes the
+  operator bootstrap with an ephemeral password, provisions the comprehensive dataset, then starts
+  both web applications.
+- `local:reseed` stops all writers, recreates only the main database, removes only the private-photo
+  volume, and repeats migration/bootstrap/seed while preserving the `_test` database.
+
+The seeder is compiled into the development API image, requires an internal confirmation marker,
+and validates the Compose database, loopback API, empty bootstrap-only state, and development
+environment before writing. Domain state is created through authenticated production APIs. Direct
+Prisma access is limited to emptiness/invariant checks and a local-only historical timestamp
+normalization after the outbox drains. No fixture endpoint or runtime fallback is introduced.
+
+Historical generation is deterministic but intentionally non-uniform. Each supplier has its own
+category and outcome profile, shift loads range from one to six Henkaten, line and part usage are
+weighted, all jobs and parts remain represented, and event/finalization intervals vary within the
+scheduled shift. Master-data names and Henkaten narratives resemble automotive production
+operations while identities remain explicitly synthetic. Checklist answers remain all `YES`
+because the production workflow rejects incomplete readiness; rejection variance is represented
+through Supervisor and QC decisions.
+
+Each run creates random per-account passwords and atomically writes them to the bind-mounted,
+gitignored `.local/seed-credentials.json` with permission `0600`. Credential values are not emitted
+to process output or audit records.
+
 ## Journey Isolation
 
 The epoch runner selects unused loopback ports and a unique Compose project name. It starts only a

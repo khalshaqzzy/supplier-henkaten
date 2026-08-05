@@ -5,7 +5,15 @@ import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 
 import { ApiProblemError } from '@tmmin-henkaten/api-client';
-import { BrandLockup, Button, Card, Field, Input, KeyValueGrid } from '@tmmin-henkaten/ui';
+import {
+  BrandLockup,
+  Button,
+  Card,
+  Field,
+  FourMLegend,
+  Input,
+  KeyValueGrid,
+} from '@tmmin-henkaten/ui';
 
 import { consumeIntendedPath, useTmminSession } from '../app/session';
 import { PageHeader } from '../components/layout';
@@ -26,14 +34,13 @@ export function LoginPage() {
         <BrandLockup context="TMMIN Portal" />
         <div>
           <span className="tmmin-eyebrow">Enterprise Digital Henkaten</span>
-          <h1>Governance yang tenang, keputusan yang dapat ditelusuri.</h1>
-          <p>Pantau sumber Hosted dan External dalam satu boundary yang aman.</p>
+          <FourMLegend />
         </div>
-        <small>Akses internal TMMIN · Session terlindungi</small>
+        <small>Akses internal TMMIN</small>
       </section>
       <Card>
         <span className="tmmin-eyebrow">Akses aman</span>
-        <h2>Masuk ke TMMIN Portal</h2>
+        <h1>Masuk ke TMMIN Portal</h1>
         <p>Gunakan identitas internal TMMIN.</p>
         {problem && (
           <div className="tmmin-error" role="alert">

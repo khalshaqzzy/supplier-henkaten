@@ -1,3 +1,4 @@
+import { AxeBuilder } from '@axe-core/playwright';
 import { expect } from '@playwright/test';
 
 import {
@@ -13,7 +14,7 @@ import {
 
 test('proves Man cross-line reservation, donor vacancy, resolution, and realm cookie isolation', async ({
   trackedBrowser: browser,
-}) => {
+}, testInfo) => {
   const tmminContext = await browser.newContext();
   const tmminCsrf = await loginBootstrapThroughApi(tmminContext.request);
   const fixture = await createHostedFixture(
@@ -95,6 +96,18 @@ test('proves Man cross-line reservation, donor vacancy, resolution, and realm co
   const conflict = reservationRace.find((response) => response.status() === 409)!;
   expect((await conflict.json()).code).toBe('RESERVATION_CONFLICT');
 
+  const boardWithReservation = await leader.context.newPage();
+  await boardWithReservation.goto(`${runtime.supplierOrigin}/board`);
+  await expect(
+    boardWithReservation.getByRole('link', {
+      name: `MAN OPEN: ${accepted.identifier}`,
+    }),
+  ).toBeVisible();
+  await expect(
+    boardWithReservation.getByText(`Reservation aktif · ${accepted.identifier}`),
+  ).toBeVisible();
+  await boardWithReservation.close();
+
   const supervisorApproved = await decide(supervisor, accepted, 'APPROVED', 'e2e-man-supervisor');
   const approved = await decide(qc, supervisorApproved, 'APPROVED', 'e2e-man-qc');
   expect(approved.status).toBe('APPROVED');
@@ -119,6 +132,51 @@ test('proves Man cross-line reservation, donor vacancy, resolution, and realm co
   );
   const donorIssue = donorIssues.items.find(({ status }) => status === 'OPEN');
   expect(donorIssue).toBeTruthy();
+
+  const donorResolutionPage = await donorLeader.context.newPage();
+  await donorResolutionPage.goto(`${runtime.supplierOrigin}/board`);
+  const openResolution = donorResolutionPage.getByRole('link', { name: 'Buka resolusi' });
+  await expect(openResolution).toHaveAttribute('href', `/shifts/${donor.id}/resolve`);
+  await openResolution.click();
+  await expect(
+    donorResolutionPage.getByRole('heading', { name: 'Selesaikan vacancy dan conflict' }),
+  ).toBeVisible();
+  await expect(donorResolutionPage.locator('.resolution-overview')).toBeVisible();
+  await expect(donorResolutionPage.locator('.resolution-workspace')).toBeVisible();
+  const createResolution = donorResolutionPage.getByRole('link', { name: 'Buat Man Henkaten' });
+  await expect(createResolution).toHaveClass(/hds-button--primary/);
+  await expect(createResolution).toHaveAttribute(
+    'href',
+    `/henkatens/new?shiftRunId=${donor.id}&jobId=${fixture.donorJob.id}&resolutionIssueId=${donorIssue!.id}`,
+  );
+  const createResolutionBox = await createResolution.boundingBox();
+  expect(createResolutionBox?.width ?? 0).toBeGreaterThan(150);
+  expect(createResolutionBox?.height ?? 0).toBeGreaterThan(28);
+  if (process.env.E2E_VISUAL_CAPTURE === '1') {
+    for (const viewport of [
+      { width: 1672, height: 941 },
+      { width: 1280, height: 720 },
+    ]) {
+      await donorResolutionPage.setViewportSize(viewport);
+      await donorResolutionPage.evaluate(() => window.scrollTo(0, 0));
+      await expect
+        .poll(() =>
+          donorResolutionPage.evaluate(
+            () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+          ),
+        )
+        .toBe(true);
+      if (viewport.width === 1280) {
+        const accessibility = await new AxeBuilder({ page: donorResolutionPage }).analyze();
+        expect(accessibility.violations).toEqual([]);
+      }
+      await donorResolutionPage.screenshot({
+        path: testInfo.outputPath(`shift-resolution-${viewport.width}x${viewport.height}.png`),
+        fullPage: true,
+      });
+    }
+  }
+  await donorResolutionPage.close();
 
   await expect
     .poll(
@@ -221,6 +279,7 @@ type Shift = {
 };
 type Henkaten = {
   id: string;
+  identifier: string;
   version: number;
   status: string;
   man: { reservationActive: boolean };

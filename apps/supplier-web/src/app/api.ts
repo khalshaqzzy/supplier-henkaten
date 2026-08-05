@@ -14,6 +14,10 @@ export const supplierClient = new ApiClient({
 export const supplierApi = new SupplierApi(supplierClient);
 export const supplierApiOrigin = apiOrigin;
 
+export function supplierAssetUrl(path: string): string {
+  return new URL(path, `${supplierApiOrigin.replace(/\/+$/, '')}/`).toString();
+}
+
 export function setCsrfToken(value: string | null): void {
   csrfToken = value;
 }

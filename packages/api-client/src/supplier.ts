@@ -28,7 +28,6 @@ import {
   sessionResponseSchema,
   shiftRunDetailSchema,
   shiftRunPageSchema,
-  shiftRunSchema,
   shiftTemplatePageSchema,
   shiftTemplateSchema,
   supplierDashboardSchema,
@@ -50,7 +49,10 @@ import { ApiClient } from './core';
 
 const versionsSchema = z.object({ items: z.array(checklistVersionSchema) }).strict();
 const transitionsSchema = z.array(henkatenTransitionSchema);
-const assignmentsSchema = z.array(workingAssignmentSchema);
+const assignmentsSchema = z
+  .object({ items: z.array(workingAssignmentSchema) })
+  .strict()
+  .transform(({ items }) => items);
 
 export class SupplierApi {
   constructor(private readonly client: ApiClient) {}
@@ -444,7 +446,7 @@ export class SupplierApi {
   currentShift(query: { lineId?: string } = {}) {
     return this.client.request('/api/v1/supplier/shifts/current', {
       query,
-      responseSchema: shiftRunSchema.nullable(),
+      responseSchema: shiftRunDetailSchema.nullable(),
     });
   }
 

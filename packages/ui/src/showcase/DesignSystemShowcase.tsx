@@ -239,25 +239,25 @@ function TokenVisual({ entry }: { entry: TokenEntry }) {
 
 function TypographyTokens() {
   const sizes = [
-    ['11', 'Utility label'],
-    ['12', 'Caption dan metadata'],
-    ['13', 'Default interface copy'],
-    ['14', 'Body copy'],
-    ['16', 'Lead copy'],
-    ['18', 'Section heading'],
-    ['20', 'Compact page heading'],
-    ['24', 'Page heading'],
-    ['30', 'Documentation display'],
+    ['11', '12', 'Utility label'],
+    ['12', '13', 'Caption dan metadata'],
+    ['13', '14', 'Default interface copy'],
+    ['14', '15', 'Body copy'],
+    ['16', '17', 'Lead copy'],
+    ['18', '19', 'Section heading'],
+    ['20', '22', 'Compact page heading'],
+    ['24', '26', 'Page heading'],
+    ['30', '32', 'Documentation display'],
   ] as const;
   return (
     <div className="hds-type-list">
-      {sizes.map(([size, label]) => (
-        <div key={size}>
-          <code>{size}px</code>
+      {sizes.map(([token, resolvedSize, label]) => (
+        <div key={token}>
+          <code>{resolvedSize}px</code>
           <span
             style={{
-              fontSize: `var(--hds-type-${size}-size)`,
-              lineHeight: `var(--hds-type-${size}-line)`,
+              fontSize: `var(--hds-type-${token}-size)`,
+              lineHeight: `var(--hds-type-${token}-line)`,
             }}
           >
             {label}

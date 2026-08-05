@@ -64,6 +64,8 @@ services:
       REALTIME_POLL_MS: ${REALTIME_POLL_MS:-1000}
       SESSION_CSRF_SECRET: ${SESSION_CSRF_SECRET:-local-development-csrf-secret-change-me}
       AUTH_THROTTLE_SECRET: ${AUTH_THROTTLE_SECRET:-local-development-throttle-secret-change-me}
+      AUTH_IP_LOGIN_LIMIT: ${AUTH_IP_LOGIN_LIMIT:-50}
+      AUTH_GLOBAL_LIMIT_PER_MINUTE: ${AUTH_GLOBAL_LIMIT_PER_MINUTE:-300}
       ARGON2_MEMORY_KIB: ${ARGON2_MEMORY_KIB:-19456}
       ARGON2_ITERATIONS: ${ARGON2_ITERATIONS:-2}
       ARGON2_PARALLELISM: ${ARGON2_PARALLELISM:-1}
@@ -75,6 +77,7 @@ services:
       - '127.0.0.1:${API_PORT:-3000}:3000'
     volumes:
       - member-photos:/var/lib/supplier-henkaten/member-photos
+      - ./.local:/workspace/.local
     depends_on:
       migrate:
         condition: service_completed_successfully

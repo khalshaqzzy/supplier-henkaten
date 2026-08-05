@@ -91,6 +91,19 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
     'create-henkaten',
     testInfo,
   );
+  const createHenkatenPage = await leader.context.newPage();
+  await createHenkatenPage.goto(`${runtime.supplierOrigin}/henkatens/new`);
+  await expectCategoryDots(createHenkatenPage);
+  await expect(
+    createHenkatenPage.getByRole('region', { name: 'Konteks Shift untuk Henkaten' }),
+  ).toBeVisible();
+  await expect(
+    createHenkatenPage.getByRole('status', { name: 'Shift Run read-only' }),
+  ).toContainText('Shift lifecycle');
+  await expect(
+    createHenkatenPage.getByLabel('Target job').locator(`option[value="${fixture.job.id}"]`),
+  ).toHaveCount(1);
+  await createHenkatenPage.close();
 
   const blockedLine = await post<{ id: string }>(
     fixture.request,
@@ -186,6 +199,13 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
       { timeout: 5_000 },
     )
     .toBe(1);
+  const machineIndicator = boardPage.locator('.four-m .hds-4m-dot--machine');
+  await expect(machineIndicator).toHaveCount(1);
+  await expect(machineIndicator).toHaveCSS('background-color', 'rgb(47, 111, 237)');
+  const indicatorLink = boardPage.locator('.four-m');
+  await expect(indicatorLink).toHaveCount(1);
+  expect(await indicatorLink.evaluate((element) => element.getBoundingClientRect().width)).toBe(28);
+  await captureSupplierVisuals(boardPage, 'assignment-board-indicator', testInfo);
   await captureSupplierPage(
     fixture.context,
     `${runtime.supplierOrigin}/`,
@@ -373,6 +393,21 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
   ]);
 });
 
+async function expectCategoryDots(page: Page) {
+  const expected = [
+    ['man', 'rgb(220, 38, 38)'],
+    ['machine', 'rgb(47, 111, 237)'],
+    ['material', 'rgb(217, 119, 6)'],
+    ['method', 'rgb(22, 163, 74)'],
+  ] as const;
+
+  for (const [category, color] of expected) {
+    const dot = page.locator(`.category-picker .hds-4m-dot--${category}`);
+    await expect(dot).toHaveCount(1);
+    await expect(dot).toHaveCSS('background-color', color);
+  }
+}
+
 type Shift = {
   id: string;
   status: string;
@@ -435,10 +470,21 @@ async function captureSupplierPage(
   slug: string,
   testInfo: TestInfo,
 ) {
-  if (process.env.E2E_VISUAL_CAPTURE !== '1') return;
+  if (process.env.E2E_VISUAL_CAPTURE !== '1' && slug !== 'supplier-overview') return;
   const page = await context.newPage();
   await page.goto(url);
   await expect(page.locator('h1')).toBeVisible();
+  if (slug === 'supplier-overview') {
+    const chart = page.locator('.overview-widget--trend .recharts-wrapper');
+    await expect(chart).toBeVisible();
+    const chartBox = await chart.boundingBox();
+    expect(chartBox?.width ?? 0).toBeGreaterThan(400);
+    expect(chartBox?.height ?? 0).toBeGreaterThan(150);
+    expect(
+      await page.locator('.overview-widget--trend .recharts-line-dot').count(),
+    ).toBeGreaterThan(0);
+    expect(await page.locator('#overview-recent-activity > li').count()).toBeLessThanOrEqual(5);
+  }
   await captureSupplierVisuals(page, slug, testInfo);
   await page.close();
 }
@@ -451,6 +497,7 @@ async function captureSupplierVisuals(page: Page, slug: string, testInfo: TestIn
     { width: 1280, height: 720 },
   ]) {
     await page.setViewportSize(viewport);
+    await page.evaluate(() => window.scrollTo(0, 0));
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       viewport.width,
     );
@@ -459,6 +506,20 @@ async function captureSupplierVisuals(page: Page, slug: string, testInfo: TestIn
       animations: 'disabled',
       fullPage: false,
     });
+    if (slug === 'supplier-overview') {
+      const activity = page.locator('.overview-widget--activity');
+      const grid = page.locator('.overview-grid');
+      await activity.scrollIntoViewIfNeeded();
+      const [activityBox, gridBox] = await Promise.all([
+        activity.boundingBox(),
+        grid.boundingBox(),
+      ]);
+      expect(Math.abs((activityBox?.width ?? 0) - (gridBox?.width ?? 0))).toBeLessThanOrEqual(2);
+      await activity.screenshot({
+        path: testInfo.outputPath(`${slug}-activity-${viewport.width}x${viewport.height}.png`),
+        animations: 'disabled',
+      });
+    }
     if (viewport.width === 1280) {
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     }

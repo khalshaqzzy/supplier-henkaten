@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 
 import { AdministrationModule } from './administration/administration.module.js';
@@ -7,6 +7,12 @@ import { CsrfGuard, GlobalRateLimitGuard, SessionAuthenticationGuard } from './a
 import { AuthModule } from './auth/auth.module.js';
 import { ProblemExceptionFilter } from './common/problem.js';
 import { RoutePolicyGuard } from './common/policy.js';
+import {
+  completedRequestLog,
+  failedRequestLog,
+  serializeLoggedRequest,
+} from './common/request-logging.js';
+import { RequestRouteInterceptor } from './common/request-route.interceptor.js';
 import { APP_CONFIG, type AppConfig } from './config/app-config.js';
 import { RuntimeConfigModule } from './config/runtime-config.module.js';
 import { HealthController } from './health/health.controller.js';
@@ -28,6 +34,8 @@ import { ExternalModule } from './external/external.module.js';
       useFactory: (config: AppConfig) => ({
         pinoHttp: {
           level: config.logLevel,
+          quietReqLogger: true,
+          quietResLogger: true,
           ...(config.logPretty
             ? {
                 transport: {
@@ -51,14 +59,15 @@ import { ExternalModule } from './external/external.module.js';
             censor: '[REDACTED]',
           },
           serializers: {
-            req: (request: { method?: string; route?: { path?: string } }) => ({
-              method: request.method,
-              route: request.route?.path,
-            }),
+            req: serializeLoggedRequest,
             res: (response: { statusCode?: number }) => ({
               statusCode: response.statusCode,
             }),
           },
+          customSuccessObject: (request, _response, loggable) =>
+            completedRequestLog(request, loggable as Record<string, unknown>),
+          customErrorObject: (request, _response, error, loggable) =>
+            failedRequestLog(request, error, loggable as Record<string, unknown>),
         },
       }),
     }),
@@ -78,6 +87,7 @@ import { ExternalModule } from './external/external.module.js';
     { provide: APP_GUARD, useExisting: SessionAuthenticationGuard },
     { provide: APP_GUARD, useExisting: CsrfGuard },
     { provide: APP_GUARD, useClass: RoutePolicyGuard },
+    { provide: APP_INTERCEPTOR, useClass: RequestRouteInterceptor },
     { provide: APP_FILTER, useClass: ProblemExceptionFilter },
   ],
 })

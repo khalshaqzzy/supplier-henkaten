@@ -1,112 +1,84 @@
-name: CI
+name: Staging CI
 
 on:
   push:
-    branches:
-      - staging
-      - main
+    branches: [staging]
   pull_request:
-    branches:
-      - staging
-      - main
-  workflow_dispatch:
-
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    branches: [staging]
 
 permissions:
   contents: read
 
+env:
+  NODE_VERSION: 22.23.1
+  PNPM_VERSION: 11.16.0
+
 jobs:
   quality:
-    name: quality
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
+    name: Quality and contracts
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
-          version: 11.16.0
+          version: ${{ env.PNPM_VERSION }}
           run_install: false
-
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22.23.1
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
       - name: Check formatting
         run: pnpm format:check
-
       - name: Lint
         run: pnpm lint
-
       - name: Typecheck
         run: pnpm typecheck
-
-      - name: Test
+      - name: Unit tests
         run: pnpm test:unit
-
-      - name: Check OpenAPI contract
+      - name: OpenAPI and generated-client drift
         run: pnpm openapi:check
-
-      - name: Build
+      - name: Production application builds
         env:
           VITE_API_ORIGIN: https://api.example.invalid
         run: pnpm build
 
   database-integration:
-    name: database-integration
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
+    name: PostgreSQL integration
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
           version: 11.16.0
           run_install: false
-
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22.23.1
           cache: pnpm
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Validate Compose configuration
+      - name: Validate local Compose
         run: docker compose config --quiet
-
-      - name: Start PostgreSQL
-        run: pnpm db:up
-
-      - name: Wait for PostgreSQL
-        run: pnpm db:wait
-
-      - name: Verify PostgreSQL and pgvector
-        run: pnpm db:verify
-
-      - name: Reset disposable test database
-        run: pnpm db:test:reset
-
-      - name: Apply fresh test migrations
-        run: pnpm db:test:migrate
-
-      - name: Run PostgreSQL integration tests
-        run: pnpm test:integration
+      - name: Start and verify PostgreSQL
+        run: |
+          pnpm db:up
+          pnpm db:wait
+          pnpm db:verify
+      - name: Apply fresh migrations
+        run: |
+          pnpm db:test:reset
+          pnpm db:test:migrate
+      - name: Run integration tests
         env:
           NODE_ENV: test
           DATABASE_URL: postgresql://supplier_henkaten:supplier_henkaten_local_only@127.0.0.1:55432/supplier_henkaten_test
@@ -114,44 +86,101 @@ jobs:
           SESSION_CSRF_SECRET: integration-test-csrf-secret-at-least-32
           AUTH_THROTTLE_SECRET: integration-test-throttle-secret-32
           OUTBOX_ENABLED: 'false'
+        run: pnpm test:integration
+      - name: Stop PostgreSQL
+        if: always()
+        run: pnpm db:down
 
+  migration-upgrade:
+    name: Fresh and previous-SHA migration upgrade
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 11.16.0
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.23.1
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Resolve migration base
+        id: base
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base_sha="$PR_BASE"
+          else
+            base_sha="$PUSH_BEFORE"
+          fi
+          git cat-file -e "$base_sha^{commit}"
+          echo "sha=$base_sha" >> "$GITHUB_OUTPUT"
+      - name: Reject destructive migration SQL
+        run: pnpm migrations:destructive-check "${{ steps.base.outputs.sha }}"
+      - name: Start PostgreSQL
+        run: |
+          pnpm db:up
+          pnpm db:wait
+      - name: Test current fresh migration
+        run: |
+          pnpm db:test:reset
+          pnpm db:test:migrate
+      - name: Create upgrade database
+        run: |
+          docker compose exec -T postgres dropdb --if-exists --username supplier_henkaten supplier_henkaten_upgrade_test
+          docker compose exec -T postgres createdb --username supplier_henkaten supplier_henkaten_upgrade_test
+      - name: Apply previous SHA then current migrations
+        env:
+          DATABASE_URL: postgresql://supplier_henkaten:supplier_henkaten_local_only@127.0.0.1:55432/supplier_henkaten_upgrade_test
+        run: |
+          previous_root="$RUNNER_TEMP/previous"
+          mkdir -p "$previous_root"
+          git archive "${{ steps.base.outputs.sha }}" apps/api/prisma | tar -x -C "$previous_root"
+          PRISMA_MIGRATIONS_PATH="$previous_root/apps/api/prisma/migrations" \
+            pnpm --filter @tmmin-henkaten/api run prisma:migrate:deploy
+          pnpm --filter @tmmin-henkaten/api run prisma:migrate:deploy
+          pnpm --filter @tmmin-henkaten/api exec prisma migrate status --config prisma.config.ts
       - name: Stop PostgreSQL
         if: always()
         run: pnpm db:down
 
   browser-e2e:
-    name: browser-e2e
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-
+    name: Chromium and Edge journeys
+    runs-on: ubuntu-22.04
+    timeout-minutes: 50
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
           version: 11.16.0
           run_install: false
-
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22.23.1
           cache: pnpm
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Install pinned Chromium and Microsoft Edge
+      - name: Install pinned browsers
         run: pnpm --filter @tmmin-henkaten/e2e exec playwright install --with-deps chromium msedge
-
-      - name: Run isolated full-stack browser journeys
+      - name: Run isolated journeys
         run: pnpm test:e2e
-
-      - name: Upload browser failure artifacts
+      - name: Upload failure artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: browser-e2e-artifacts
           if-no-files-found: warn
@@ -161,22 +190,263 @@ jobs:
             playwright-report/
             test-results/e2e/
 
+  deployment-quality:
+    name: Workflow, Dockerfile, and deployment scripts
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Set up pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 11.16.0
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.23.1
+      - name: Validate GitHub Actions
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7@sha256:887a259a5a534f3c4f36cb02dca341673c6089431057242cdc931e9f133147e9
+      - name: Run ShellCheck
+        run: docker run --rm -v "$PWD:/repo" -w /repo koalaman/shellcheck-alpine:v0.11.0@sha256:9955be09ea7f0dbf7ae942ac1f2094355bb30d96fffba0ec09f5432207544002 shellcheck deploy/scripts/*.sh deploy/tests/*.sh
+      - name: Run Hadolint
+        run: |
+          for dockerfile in apps/api/Dockerfile apps/supplier-web/Dockerfile apps/tmmin-web/Dockerfile deploy/caddy/Dockerfile deploy/postgres/Dockerfile; do
+            docker run --rm -i hadolint/hadolint:v2.14.0-alpine@sha256:7aba693c1442eb31c0b015c129697cb3b6cb7da589d85c7562f9deb435a6657c < "$dockerfile"
+          done
+      - name: Validate env, Compose, and deployment harness
+        run: |
+          pnpm run deployment:validate
+          pnpm run test:deployment
+          pnpm run security:exceptions:check
+      - name: Validate Ubuntu 22.04 bootstrap inputs
+        run: |
+          docker run --rm -v "$PWD:/repo:ro" ubuntu:22.04@sha256:0e0a0fc6d18feda9db1590da249ac93e8d5abfea8f4c3c0c849ce512b5ef8982 \
+            bash /repo/deploy/scripts/bootstrap-vm.sh --check staging henkaten-deploy \
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGZha2VidXR2YWxpZGJhc2U2NGtleWJ5dGVzZm9ydGVzdA ci" 22
+
+  containers:
+    name: Production containers and routing
+    runs-on: ubuntu-22.04
+    timeout-minutes: 55
+    env:
+      RUNTIME_ENV: deploy/env/runtime.staging.env.example
+      REMOTE_COMPOSE: deploy/compose/docker-compose.remote.yml
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Prepare bind mounts
+        run: |
+          mkdir -p /tmp/supplier-henkaten-staging/shared/{postgres-data,member-photos,caddy-data,caddy-config,deployment-state}
+          chmod 0777 /tmp/supplier-henkaten-staging/shared/{postgres-data,member-photos,caddy-data,caddy-config}
+      - name: Validate and build images
+        run: |
+          docker compose --env-file "$RUNTIME_ENV" -f "$REMOTE_COMPOSE" --profile operations config --quiet
+          docker compose --env-file "$RUNTIME_ENV" -f "$REMOTE_COMPOSE" build --pull postgres api supplier-web tmmin-web caddy
+      - name: Start production-like stack
+        run: |
+          compose=(docker compose --env-file "$RUNTIME_ENV" -f "$REMOTE_COMPOSE")
+          "${compose[@]}" up -d --no-deps postgres
+          "${compose[@]}" --profile operations run --rm migrate
+          "${compose[@]}" --profile operations run --rm bootstrap-admin
+          "${compose[@]}" up -d api supplier-web tmmin-web caddy
+          "${compose[@]}" up --wait --wait-timeout 240 api supplier-web tmmin-web caddy
+      - name: Verify routing, release identity, headers, and non-root apps
+        run: |
+          release_sha=0000000000000000000000000000000000000000
+          curl -fsS -H 'Host: supplier-henkaten.qd-tmmin.site' http://127.0.0.1:18080/release.json | jq -e --arg sha "$release_sha" '.application == "supplier-web" and .releaseSha == $sha'
+          curl -fsS -H 'Host: henkaten.qd-tmmin.site' http://127.0.0.1:18080/release.json | jq -e --arg sha "$release_sha" '.application == "tmmin-web" and .releaseSha == $sha'
+          curl -fsS -H 'Host: supplier-henkaten-api.qd-tmmin.site' http://127.0.0.1:18080/ready | jq -e --arg sha "$release_sha" '.status == "ready" and .releaseSha == $sha'
+          curl -fsS -H 'Host: supplier-henkaten.qd-tmmin.site' http://127.0.0.1:18080/a/deep/link | grep -F '<div id="root">' >/dev/null
+          [[ "$(curl -sS -o /dev/null -w '%{http_code}' -H 'Host: supplier-henkaten.qd-tmmin.site' http://127.0.0.1:18080/api/v1/auth/supplier/session)" == '401' ]]
+          [[ "$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' -H 'Host: supplier-henkaten.qd-tmmin.site' http://127.0.0.1:18080/api/v1/supplier/realtime || true)" == '401' ]]
+          curl -fsSI -H 'Host: supplier-henkaten.qd-tmmin.site' http://127.0.0.1:18080/deep/link | grep -Eiq '^strict-transport-security:'
+          curl -fsSI -H 'Host: supplier-henkaten.qd-tmmin.site' http://127.0.0.1:18080/ | grep -Eiq '^content-security-policy:'
+          curl -fsSI -H 'Host: supplier-henkaten-api.qd-tmmin.site' http://127.0.0.1:18080/health | grep -Eiq '^content-security-policy:'
+          if curl -fsSI -H 'Host: supplier-henkaten.qd-tmmin.site' http://127.0.0.1:18080/ | grep -Eiq '^(server|via):'; then
+            echo 'Public response leaked a server-identifying header.' >&2
+            exit 1
+          fi
+          compose=(docker compose --env-file "$RUNTIME_ENV" -f "$REMOTE_COMPOSE")
+          for service in api supplier-web tmmin-web caddy postgres; do
+            container_id="$("${compose[@]}" ps -q "$service")"
+            [[ "$(docker inspect --format '{{.Config.User}}' "$container_id")" != "0" ]]
+          done
+          [[ -z "$(docker port "$("${compose[@]}" ps -q postgres)")" ]]
+          "${compose[@]}" --profile operations run --rm bootstrap-admin | grep -F 'already exists; no changes made'
+      - name: Verify persistence across restart
+        run: |
+          marker=/tmp/supplier-henkaten-staging/shared/member-photos/ci-persistence
+          touch "$marker"
+          compose=(docker compose --env-file "$RUNTIME_ENV" -f "$REMOTE_COMPOSE")
+          database_identity="$("${compose[@]}" exec -T postgres psql --username supplier_henkaten --dbname supplier_henkaten --tuples-only --no-align --command 'SELECT system_identifier FROM pg_control_system();')"
+          "${compose[@]}" restart postgres api
+          "${compose[@]}" up --wait --wait-timeout 240 postgres api
+          test -f "$marker"
+          [[ "$("${compose[@]}" exec -T postgres psql --username supplier_henkaten --dbname supplier_henkaten --tuples-only --no-align --command 'SELECT system_identifier FROM pg_control_system();')" == "$database_identity" ]]
+      - name: Scan filesystem
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          trivyignores: .trivyignore
+          exit-code: '1'
+      - name: Scan API image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: supplier-henkaten-api:0000000000000000000000000000000000000000
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'
+      - name: Scan Supplier image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: supplier-henkaten-supplier-web:0000000000000000000000000000000000000000
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'
+      - name: Scan TMMIN image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: supplier-henkaten-tmmin-web:0000000000000000000000000000000000000000
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'
+      - name: Scan PostgreSQL image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: supplier-henkaten-postgres:18.4-pgvector-0.8.5
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'
+      - name: Scan Caddy image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: supplier-henkaten-caddy:0000000000000000000000000000000000000000
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'
+      - name: Stop production-like stack
+        if: always()
+        run: docker compose --env-file "$RUNTIME_ENV" -f "$REMOTE_COMPOSE" --profile operations down --remove-orphans
+
   secret-scan:
-    name: secret-scan
+    name: Gitleaks
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
     steps:
       - name: Checkout full history
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-
-      - name: Scan repository for secrets
-        uses: gitleaks/gitleaks-action@v2
+      - name: Scan repository
+        uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_VERSION: 8.24.3
+
+  dependency-security:
+    name: Dependency security
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Review dependency changes
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: high
+      - name: Set up pnpm for push audit
+        if: github.event_name == 'push'
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 11.16.0
+          run_install: false
+      - name: Set up Node.js for push audit
+        if: github.event_name == 'push'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.23.1
+          cache: pnpm
+      - name: Audit complete lockfile
+        if: github.event_name == 'push'
+        run: pnpm run security:audit
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@adfda868f108ac4222129de456ea554034a27db7 # v4
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-extended
+      - name: Analyze
+        uses: github/codeql-action/analyze@adfda868f108ac4222129de456ea554034a27db7 # v4
+
+  release-gate:
+    name: Release candidate gate
+    if: always()
+    needs:
+      - quality
+      - database-integration
+      - migration-upgrade
+      - browser-e2e
+      - deployment-quality
+      - containers
+      - secret-scan
+      - dependency-security
+      - codeql
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Require every gate
+        env:
+          RESULTS: ${{ join(needs.*.result, ',') }}
+        run: |
+          echo "Gate results: $RESULTS"
+          [[ "$RESULTS" != *failure* ]]
+          [[ "$RESULTS" != *cancelled* ]]
+          [[ "$RESULTS" != *skipped* ]]
+
+  deploy-staging:
+    name: Deploy staging
+    if: github.event_name == 'push'
+    needs: release-gate
+    uses: ./.github/workflows/deploy-reusable.yml
+    with:
+      app_env: staging
+      expected_branch: staging
+      release_sha: ${{ github.sha }}
+      deploy_run_number: ${{ github.run_number }}
+      environment_url: https://supplier-henkaten.qd-tmmin.site
+      remote_base_dir: /opt/supplier-henkaten/staging
+      supplier_domain: supplier-henkaten.qd-tmmin.site
+      tmmin_domain: henkaten.qd-tmmin.site
+      api_domain: supplier-henkaten-api.qd-tmmin.site
+    secrets: inherit

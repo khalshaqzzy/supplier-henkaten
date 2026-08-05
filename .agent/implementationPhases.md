@@ -2,7 +2,7 @@
 
 Document status: Active implementation roadmap
 Created: 2026-07-23
-Last updated: 2026-07-24
+Last updated: 2026-08-04
 Source of truth: `.agent/PRD.md`
 Implementation approach: Backend-first
 Workspace tooling: Node.js 22 + pnpm workspaces, tanpa Turborepo
@@ -28,7 +28,7 @@ Roadmap tidak memberikan estimasi waktu. Urutan didasarkan pada dependency dan r
 
 Kondisi repository setelah Phase 0-10:
 
-- branch aktif: `staging`;
+- branch aktif: `feat/typography-elements`;
 - `.agent/PRD.md` tersedia dan menjadi product contract;
 - dua puluh ADR dan delapan architecture/security baseline tersedia;
 - Node.js 22.23.1 + pnpm 11.16.0 ESM workspace tersedia;
@@ -68,13 +68,15 @@ Kondisi repository setelah Phase 0-10:
 - dua React/Vite frontend workspace, shared Henkaten Design System, typed browser API boundary,
   session-aware shells, seluruh Hosted Supplier workflow, dan seluruh TMMIN governance/monitoring
   workflow tersedia;
-- local full-stack Compose, centralized realtime outbox fan-out, dan isolated Playwright
-  Chromium/Edge E2E tersedia; production containers dan remote deployment belum ada;
+- local full-stack Compose, centralized realtime outbox fan-out, isolated Playwright Chromium/Edge
+  E2E, production containers, dan deployment workflows tersedia; aktivasi staging eksternal masih
+  berjalan;
 - materi slide tersedia sebagai reference-only input.
 
 Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8, Phase 9, Phase 10, Phase 11, Phase 12, Phase 13, dan Phase 14**
-Current phase: **Phase 15 - Production Containers, CI/CD, dan Staging (`planned`)**
-Next subphase: **15.1 Production Dockerfiles (`planned`)**
+Current phase: **Phase 15 - Production Containers, CI/CD, dan Staging (`in_progress`)**
+Current subphase: **15.9 Automatic Staging Deployment (`in_progress`)**
+Next subphase: **15.11 Staging Deployment Rehearsal (`planned`)**
 
 Tidak ada application behavior yang boleh ditandai implemented sampai source code dan acceptance checks terkait benar-benar tersedia di repository.
 
@@ -4408,6 +4410,33 @@ Execution:
   TMMIN tidak diubah.
 - API, lifecycle, URL state, authority, field order, capability boundary, source epoch, dan
   optimistic-version behavior dipertahankan.
+- Targeted evolution berikutnya memoles Create/Clone Henkaten menjadi operational workspace dengan
+  semantic 4M selector, selected-part confirmation, Man movement preview, numbered checklist, dan
+  readiness rail tanpa membuat client-side state menjadi authoritative.
+- Henkaten Detail/Approval memakai change-evidence untuk penyebab/narasi dan before-to-after object
+  atau reservation/completed Man movement. Approve, Reject, Reroute, dan Withdraw memakai shared
+  `AlertDialog` dengan focus management, sementara visibility tetap capability/lifecycle gated.
+- Presentational helper baru tetap lokal di samping `HenkatenPages.tsx`; public contract
+  `packages/ui`, API, OpenAPI, Prisma, dan migration tidak berubah.
+- Follow-up corrective pass meniadakan SVG auto-margin yang menggeser glyph 4M, menambahkan rhythm
+  antar-field pada panel konteks/pergerakan, dan mempersempit legacy checklist selector agar hanya
+  number marker yang menerima fixed square sizing.
+- Supplier Overview refinement memperbaiki `ChartFrame` dengan definite plot height, explicit empty
+  state, visible single-point marker, labelled tooltip, serta line dan grouped-bar rendering tanpa
+  double-card.
+- Overview memakai komposisi 12 kolom untuk approval aging, 4M trend, ranked line/part,
+  outcome, assignment issue, emergency override, dan full-width activity. Breakpoint 1280
+  mempertahankan Trend dan Activity full-width serta merapikan widget lain menjadi dua kolom.
+- `recentActivity` tetap newest-first dan dibatasi 20, tetapi diperkaya secara additive dengan actor
+  dan current Henkaten context melalui dua bounded batch query. Tenant dan line scope yang sama
+  diterapkan pada enrichment; cause dan freeform detail tidak dipaparkan.
+- Activity menampilkan lima event pertama, toggle inline seluruh batch, collapse ulang setelah
+  filter diterapkan, detail line/job/part, localized actor/time, badge 4M/status, serta deep-link
+  yang capability-aware.
+- Shift Detail dan Assignment Resolution memakai CTA yang capability-aware: Line Leader mendapat
+  primary resolve/create action, sedangkan role lain hanya mendapat read-only guidance. Resolution
+  workspace menampilkan authoritative line, open/total issue count, job, origin, dan linked
+  Henkaten tanpa menambah mutation, API contract, atau client-side resolution authority.
 
 Verification:
 
@@ -4418,19 +4447,211 @@ Verification:
   serta 1280×720 untuk enam halaman prioritas.
 - Visual journey memeriksa page-level overflow, reduced motion, dan axe; temuan accessible naming,
   prohibited ARIA, serta contrast diperbaiki pada source.
+- Targeted component regression mencakup 4M radio state, checklist Yes/No/unanswered, readiness,
+  reserved donor preview, object transition, parallel approval/Not Required, dan decision dialog.
+- Create dan QC-pending detail ditangkap ulang pada 1672×941 serta 1280×720. Explicit 1280 fallback,
+  keyboard semantics, reduced-motion capture, zero horizontal overflow, dan zero axe violations
+  lulus; contrast microcopy serta badge 4M yang ditemukan pada iterasi awal diperbaiki.
+- Follow-up Hosted lifecycle Chromium 1/1 dengan visual capture mengonfirmasi centering kategori dan
+  spacing preview pada 1672×941 serta 1280×720; minimum viewport tetap tanpa page-level overflow dan
+  zero axe violations. Supplier lint, typecheck, 20 unit tests, production build, CSS formatting,
+  dan diff check juga lulus.
+- Shift resolution action matrix mencakup create, wait, linked-Henkaten, dan closed states.
+  Man-concurrency Chromium journey memverifikasi Board-to-resolution navigation, primary CTA,
+  unchanged linked Man create URL, non-zero button geometry, visual capture 1672×941 dan 1280×720,
+  zero page-level horizontal overflow, serta zero axe violations pada minimum viewport.
 - Full repository parity checks selesai: clean install, format, lint, typecheck, 92 unit tests,
   OpenAPI drift, production build, PostgreSQL verification, 32 integration tests, empat Chromium
   dan dua Edge journeys, containerized Gitleaks, dan diff check lulus.
+- Contract, UI, shared-chart, dan PostgreSQL integration regression untuk Overview mencakup complete
+  atau null enrichment, unknown-field rejection, ordering/limit 20, actor fallback, tenant/line
+  isolation, tepat lima initial activities, expand/collapse/filter reset, detail/fallback,
+  capability-aware link, empty chart, serta single-point chart.
+- Hosted lifecycle browser journey memvalidasi non-zero chart bounding box, visible single-point
+  marker, activity width/count, visual capture 1672×941 dan 1280×720, reduced motion, zero
+  page-level horizontal overflow, serta zero axe violations.
 
 Data/migration impact:
 
-- Tidak ada database migration, endpoint, backend lifecycle, atau breaking contract baru.
+- Tidak ada database migration, mutation endpoint, atau backend lifecycle change.
+- Supplier dashboard response bertambah secara additive; OpenAPI dan typed API client diregenerasi.
 
 Exit criteria:
 
 - Seluruh Supplier role tetap melihat dan mengubah hanya capability/scope yang diizinkan.
 - Keenam halaman prioritas mencapai fidelity enterprise yang padat dan stabil pada kedua viewport.
 - Phase 15.1 kembali menjadi next recommended subphase setelah validation lengkap.
+
+### 14.12 Comprehensive Local Seed Lifecycle
+
+Status: **done**
+
+Dependency: 14.4-14.11.
+
+Execution:
+
+- `local:start:clean` menghapus volume PostgreSQL/foto lalu menjalankan migration, protected
+  bootstrap, comprehensive seed, verification, API, dan kedua frontend.
+- `local:reseed` mereset hanya main database serta volume foto dan mempertahankan disposable test
+  database.
+- Seeder development-only membuat tepat dua supplier Hosted melalui production API, menormalisasi
+  timeline historis setelah outbox drain, dan memverifikasi seluruh invariant akhir.
+- Per supplier tersedia 3 line, 12 job, 22 member, 8 part, 3 Shift Template, 39 Shift Run, dan 120
+  Henkaten dengan live warning/reservation/issue serta histori padat 30 hari yang berlanjut sampai
+  sekitar satu tahun.
+- Profil supplier sengaja berbeda: distribusi kategori/status, beban 1-6 Henkaten per historical
+  shift, konsentrasi line/part, job, narasi operasional, waktu kejadian, dan durasi keputusan tidak
+  seragam tetapi tetap deterministic.
+- Credential acak disimpan atomik hanya pada `.local/seed-credentials.json` mode `0600`.
+
+Verification:
+
+- Seed planner/guard unit tests, API typecheck, clean-start Compose acceptance, serta reseed
+  preservation/rotation acceptance lulus.
+- Full parity lulus dengan Node.js 22.23.1: clean install, format, lint, typecheck, 97 unit tests,
+  OpenAPI drift, build, PostgreSQL 18.4/pgvector 0.8.5, 32 integration tests, empat Chromium dan dua
+  Edge journeys, Gitleaks, serta diff check.
+- Tidak ada endpoint, OpenAPI, schema migration, External projection, tracked credential, atau
+  production fixture fallback.
+- QA seeded runtime 2026-07-27 dilakukan berurutan Supplier Admin → clean reseed → TMMIN Admin
+  dengan triangulasi database/API/UI pada kedua viewport. Tidak ditemukan `SEED_DEFECT` atau
+  `CONTRACT_DOC_MISMATCH`; tujuh `APP_DEFECT` pada presenter Shift, asset origin, UI Problem
+  Details, TMMIN nested snapshot, request observability, dan freshness image lokal telah diperbaiki
+  pada lapisan pemiliknya beserta regression test.
+- Evidence akhir mencakup invariant 2 Hosted/240 Henkaten, credential rotation dan mode `0600`,
+  preservasi test database, targeted regression, seluruh unit suite, 33 PostgreSQL integration test
+  serial, empat Chromium journey, dua Edge smoke journey, OpenAPI/build, Gitleaks, dan diff check.
+  Detail reproduksi dan root cause tersedia di `docs/audits/seededAppQaAudit.md`.
+
+Data/migration impact:
+
+- Tidak ada database schema migration.
+- Operasi destruktif dibatasi pada command lokal eksplisit dan target Compose yang tervalidasi.
+
+Exit criteria:
+
+- Kedua command menghasilkan stack sehat dengan tepat dua supplier Hosted dan invariant seed yang
+  dikunci.
+- Phase 15 runtime/deployment implementation dapat dimulai dari baseline ini.
+
+### 14.13 Seeded Supervisor dan Line Leader Henkaten QA
+
+Status: **done**
+
+Dependency: 14.12.
+
+Execution:
+
+- Clean deterministic seed diaudit pada role Supervisor multi-line/single-line dan tiga profil Line
+  Leader per supplier, dengan tambahan explicit coverage seluruh Line Leader NPM khusus Henkaten.
+- Decision Supervisor mencakup approve-first/final, reject-fast, comment, terminal immutability,
+  stale version, exact idempotent retry, idempotency conflict, warning closure, notification,
+  outbox, serta audit.
+- Line Leader mencakup scope dashboard/board/Shift/Henkaten/audit/notification, empat kategori 4M,
+  checklist, part/job, validation, realtime board, Withdraw + Clone, reservation/assignment, terminal
+  immutability, End Shift cancellation, dan negative cross-line/cross-tenant checks.
+- Audit menemukan nol `SEED_DEFECT`, enam `APP_DEFECT`, dan nol `CONTRACT_DOC_MISMATCH`. Defect
+  berada pada local portal origin, dua API-client wire adapter, risk rail reservation,
+  distinguishability badge 4M, dan navigation gap active assignment resolution.
+- Fix ditempatkan pada layer pemilik tanpa public API, OpenAPI, Prisma schema, migration, production
+  fallback, atau business rule React baru.
+
+Verification:
+
+- Targeted regression lulus: local planner 2/2, API client 10/10, Supplier web 16/16.
+- Full parity lulus: format, lint, typecheck, 115 Vitest + 2 Node test, OpenAPI/client drift,
+  production build, 33 PostgreSQL integration serial, empat Chromium journey, dua Edge journey,
+  clean reseed, Gitleaks, dan diff check.
+- Browser QA 1280×720 tidak menemukan horizontal overflow. Deep-link line/tenant lain tidak
+  membocorkan resource.
+- Detail reproduksi, evidence DB/API/UI, root cause, fix, dan risiko residual tersedia di
+  `docs/audits/seededAppSupervisorLineLeaderQaAudit.md`.
+
+Data/migration impact:
+
+- Tidak ada perubahan public contract, schema, atau migration.
+- Phase 15 tetap `in_progress`; evidence ini hanya melanjutkan penutupan QA Phase 14.
+
+### 14.14 Comprehensive Seeded Role dan Client-surface QA
+
+Status: **done**
+
+Dependency: 14.12-14.13.
+
+Execution:
+
+- Matriks PRD ditutup untuk seluruh role bercredential: Supplier Admin, Supervisor, Line Leader, QC,
+  TMMIN Admin, dan TMMIN Quality. MP tetap diverifikasi sebagai member/assignment actor tanpa akun.
+- Kedua client surface diaudit interaktif pada 1280×720, termasuk capability navigation, seluruh
+  route Quality/QC, scope line/tenant, protected route, Board, dashboard, Henkaten/approval,
+  Hosted support, source governance, External health, notification, audit, system status,
+  console, dan horizontal overflow.
+- State mutatif yang dapat menghabiskan shared fixture tetap diverifikasi pada isolated
+  Playwright/PostgreSQL epoch: onboarding, 4M lifecycle, parallel approval, reject-fast,
+  Withdraw+Clone, Man cascade/concurrency, External ingestion, cutover, dan read-only Quality.
+- Database, API, dan UI membuktikan seed tetap tepat dua Hosted/240 Henkaten, 16 Open/warning,
+  dua active reservation, dan dua open assignment issue.
+- Audit menemukan nol `SEED_DEFECT`, dua `APP_DEFECT`, dan nol `CONTRACT_DOC_MISMATCH`.
+- Fix membersihkan Henkaten action error saat record direfresh serta menyembunyikan credential
+  action dan privileged-admin false absence dari TMMIN Quality.
+
+Verification:
+
+- Regression frontend lulus: Supplier 17/17 dan TMMIN 11/11.
+- Full parity lulus: format, lint, typecheck, 117 Vitest + 2 Node test, OpenAPI/client drift,
+  production build dengan explicit API origin, 33 PostgreSQL integration serial, empat Chromium
+  journey, dua Edge journey, clean reseed, dan live browser re-verification.
+- Tidak ada public API, OpenAPI, Prisma schema, migration, production fallback, atau perubahan
+  domain policy.
+- Detail matriks, reproduksi, root cause, fix, evidence, dan risiko residual tersedia di
+  `docs/audits/seededAppAllRolesQaAudit.md`.
+
+Data/migration impact:
+
+- Tidak ada perubahan database schema atau migration.
+- Phase 15 tetap `in_progress`; audit ini tidak mengklaim staging VM, backup/recovery, atau
+  production activation.
+
+### 14.15 Cross-application 4M and Typography Refinement
+
+Status: **done**
+
+Dependency: 14.10-14.14.
+
+Execution:
+
+- Kontrak warna shared 4M dikunci menjadi Man merah, Machine biru, Material amber/kuning, dan
+  Method hijau melalui typed registry, CSS custom properties, indicator tint, serta regression
+  contract test.
+- Shared `FourMLegend` ditambahkan dengan urutan tetap, nama kategori aksesibel, dot dekoratif,
+  dan hanya huruf awal M yang bold; kedua halaman login memakainya tanpa mengubah behavior auth.
+- Shared `FourMDot` menjadi primitive warna kategori untuk indicator Assignment Board dan category
+  input Henkaten; pill singkatan serta ikon objek pada input diganti dot token-driven yang konsisten.
+- Seluruh typography token dan literal font size Supplier/TMMIN dinaikkan secara adaptif, sementara
+  layout desktop minimum 1280×720, control alignment, truncation, dan overflow tetap stabil.
+- Public design-system showcase disinkronkan dengan resolved typography scale baru.
+
+Verification:
+
+- Unit/contract coverage membuktikan exact token mapping, tint, typed/CSS synchronization,
+  typography scale, urutan legend, accessible names, dan markup bold M.
+- Auth E2E Chromium dan Edge membuktikan computed dot colors, keyboard flow, zero Axe violation,
+  serta screenshot pada 1280×720 dan 1672×941.
+- Hosted lifecycle E2E membuktikan exact computed color keempat dot pada category input, dot Machine
+  pada Assignment Board, target link 28 px, zero horizontal overflow/Axe violation, dan visual
+  capture pada 1280×720 serta 1672×941.
+- Browser QA mencakup kedua login, `/design`, Supplier Overview/Board/Create/Detail/Shift/dense
+  master data, serta TMMIN Overview/Explorer/governance/monitoring tanpa page-level horizontal
+  overflow, clipping, overlap, atau hidden action.
+- Frozen install, format, lint, typecheck, seluruh unit test, OpenAPI drift, production build,
+  Compose, disposable PostgreSQL migrations/integration, Chromium/Edge E2E, Gitleaks, dan diff
+  check lulus pada Node.js 22.23.1 dan pnpm 11.16.0.
+
+Data/migration impact:
+
+- Tidak ada perubahan API, OpenAPI, Prisma schema, database migration, routing, atau lifecycle
+  Henkaten.
+- Phase 15.9 tetap `in_progress`; refinement ini tidak mengklaim staging deployment.
 
 Phase 14 exit criteria:
 
@@ -4440,7 +4661,7 @@ Phase 14 exit criteria:
 
 ## 23. Phase 15 - Production Containers, CI/CD, dan Staging
 
-Status: **planned**
+Status: **in_progress**
 
 Goal: membuat production-like containers, full CI/security workflows, release scripts, dan staging deployment setelah local E2E stabil.
 
@@ -4459,7 +4680,7 @@ Sequencing decision:
 
 ### 15.1 Production Dockerfiles
 
-Status: **planned**
+Status: **done**
 
 Dependency: Phase 14.
 
@@ -4490,7 +4711,7 @@ Exit criteria:
 
 ### 15.2 Remote Docker Compose Runtime
 
-Status: **planned**
+Status: **done**
 
 Dependency: 15.1.
 
@@ -4524,7 +4745,7 @@ Exit criteria:
 
 ### 15.3 Caddy Three-domain Routing
 
-Status: **planned**
+Status: **done**
 
 Dependency: 15.2.
 
@@ -4554,7 +4775,7 @@ Exit criteria:
 
 ### 15.4 Runtime Environment dan Secret Validation
 
-Status: **planned**
+Status: **done**
 
 Dependency: 15.2-15.3.
 
@@ -4581,7 +4802,7 @@ Exit criteria:
 
 ### 15.5 Full GitHub CI dan Security Workflows
 
-Status: **planned**
+Status: **done**
 
 Dependency: 15.1-15.4 dan baseline CI.
 
@@ -4602,6 +4823,15 @@ Verification:
 
 - Intentional failure blocks workflow.
 - Security scan artifacts/action results visible.
+- PR #7 release-gate regression memverifikasi bahwa custom Caddy builder memakai
+  `golang.org/x/text` 0.39.0 untuk menutup CVE-2026-56852 dan Trivy filesystem scan memakai input
+  `trivyignores` yang didukung action. Clean Caddy build dan Trivy 0.70.0 scan melaporkan zero
+  High/Critical findings pada Debian runtime maupun Go binary; actionlint, Hadolint,
+  env/Compose, deployment harness, dan exact security-exception validation lulus.
+- Staging run `30891976462` remediation memaksa patched transitive floors `fast-uri 3.1.5`,
+  `undici 7.29.0`, dan `brace-expansion 5.0.9` melalui vulnerable-range pnpm overrides. Audit,
+  clean-worktree Trivy filesystem, dan kelima rebuilt production image lulus tanpa ignore atau
+  exception baru.
 
 Data/migration impact:
 
@@ -4613,7 +4843,7 @@ Exit criteria:
 
 ### 15.6 Release-by-SHA Deploy Scripts
 
-Status: **planned**
+Status: **done**
 
 Dependency: 15.2-15.5.
 
@@ -4647,7 +4877,7 @@ Exit criteria:
 
 ### 15.7 Smoke dan Readiness Checks
 
-Status: **planned**
+Status: **done**
 
 Dependency: 15.6.
 
@@ -4674,7 +4904,7 @@ Exit criteria:
 
 ### 15.8 Schema-compatible Automatic Rollback
 
-Status: **planned**
+Status: **done**
 
 Dependency: 15.6-15.7.
 
@@ -4701,7 +4931,7 @@ Exit criteria:
 
 ### 15.9 Automatic Staging Deployment
 
-Status: **planned**
+Status: **in_progress**
 
 Dependency: 15.5-15.8.
 
@@ -4729,22 +4959,22 @@ Exit criteria:
 
 ### 15.10 Automatic Production Workflow
 
-Status: **planned**
+Status: **implementation-ready, activation deferred**
 
 Dependency: 15.5-15.8.
 
 Execution:
 
-- Trigger after successful CI on `main`.
-- No manual approval gate.
-- Support manual dispatch by git ref for recovery/operator use.
-- Validate production domains/secrets/VM.
-- Deploy exact SHA.
-- Smoke/readiness/rollback.
+- Reuse the exact-SHA hosted deployment workflow shared with staging.
+- Keep production domain/secret/VM validation capability in the reusable contract.
+- Do not configure `main`, `workflow_dispatch`, or any active production caller until production
+  activation is explicitly authorized.
+- Preserve smoke/readiness/rollback behavior for the future caller.
 
 Verification:
 
-- Workflow syntax and dry/preflight validation.
+- Reusable workflow syntax and staging caller validation.
+- Repository search confirms that no production trigger or caller is active.
 - Actual production deployment deferred until Phase 16 blockers resolved.
 
 Data/migration impact:
@@ -4787,6 +5017,24 @@ Phase 15 exit criteria:
 - Automatic staging deploy works.
 - Full CI/security checks work.
 - Production workflow waits only on external production readiness.
+
+Current implementation evidence (2026-07-27):
+
+- 15.1-15.8 passed local CI parity: pinned multi-stage application images, hardened non-root
+  PostgreSQL/Caddy runtime images, seven-service Compose, exact-SHA release identity, three-domain
+  routing, fresh/upgrade migrations, security headers, private database exposure, persistence,
+  scanner gates, and deployment-script failure/race/rollback/retention harnesses.
+- 15.9 is implementation-complete in the repository but remains `in_progress` until an actual push
+  to `staging` succeeds after the VM and GitHub Environment are provisioned.
+- 15.10 is reusable and production-capable, but activation is deferred; no `main` or manual trigger
+  exists.
+- 15.11 remains planned until first deploy, second-release upgrade, close-candidate race, and
+  controlled rollback evidence are captured on the staging VM.
+- Pada 2026-08-04, local parity untuk staging dependency remediation kembali membuktikan frozen
+  install, quality/build, fresh dan previous-SHA migrations, integration, Chromium/Edge E2E,
+  deployment tooling, production-like routing/persistence, Gitleaks, audit, filesystem scan, dan
+  seluruh runtime image scan. Phase 15.9 tetap `in_progress` sampai hosted push/deploy evidence
+  tersedia.
 
 ---
 

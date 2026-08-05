@@ -77,11 +77,11 @@ textarea {
 .tmmin-workspace span,
 .tmmin-workspace small {
   color: #626b7b;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.04em;
 }
 .tmmin-workspace strong {
-  font-size: 13px;
+  font-size: 14px;
 }
 .tmmin-sidebar nav {
   display: grid;
@@ -96,7 +96,7 @@ textarea {
 .tmmin-nav-group__label {
   padding: 0 10px 4px;
   color: #667085;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -110,7 +110,7 @@ textarea {
   padding: 7px 10px;
   border-radius: 7px;
   color: #555e70;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   text-decoration: none;
   transition:
@@ -139,7 +139,7 @@ textarea {
   padding: 10px;
   border-top: 1px solid #e8eaee;
   color: #6a7282;
-  font-size: 10px;
+  font-size: 11px;
 }
 .tmmin-sidebar__footer button,
 .tmmin-sidebar__footer > div {
@@ -216,12 +216,12 @@ textarea {
   gap: 1px;
   padding-right: 16px;
   border-right: 1px solid #e2e5ea;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
 }
 .tmmin-topbar__area small {
   color: #667085;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -229,7 +229,7 @@ textarea {
 .tmmin-global-filters select {
   height: 32px;
   max-width: 210px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .tmmin-topbar__actions .hds-icon-button {
   position: relative;
@@ -245,7 +245,7 @@ textarea {
   border-radius: 10px;
   background: #d53f12;
   color: white;
-  font-size: 9px;
+  font-size: 10px;
   font-style: normal;
 }
 .tmmin-account {
@@ -267,7 +267,7 @@ textarea {
   border-radius: 8px;
   background: #182234;
   color: white;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
 }
 .tmmin-account > span:last-child {
@@ -275,11 +275,11 @@ textarea {
   line-height: 1.15;
 }
 .tmmin-account strong {
-  font-size: 11px;
+  font-size: 12px;
 }
 .tmmin-account small {
   color: #626b7b;
-  font-size: 9px;
+  font-size: 10px;
 }
 .tmmin-content {
   width: 100%;
@@ -317,7 +317,7 @@ textarea {
   gap: 6px;
   margin-bottom: 6px;
   color: #667085;
-  font-size: 9px;
+  font-size: 10px;
 }
 .tmmin-breadcrumbs a {
   color: #5b6472;
@@ -328,7 +328,7 @@ textarea {
 }
 .tmmin-eyebrow {
   color: #b43a0c;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -336,7 +336,7 @@ textarea {
 .tmmin-page-header h1 {
   margin: 4px 0 5px;
   color: #131b2a;
-  font-size: 28px;
+  font-size: 30px;
   line-height: 1.1;
   letter-spacing: -0.035em;
   outline: 0;
@@ -344,7 +344,7 @@ textarea {
 .tmmin-page-header p {
   margin: 0;
   color: #687182;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
   text-wrap: pretty;
 }
@@ -353,7 +353,7 @@ textarea {
   align-items: center;
   gap: 8px;
   color: #626b7b;
-  font-size: 10px;
+  font-size: 11px;
 }
 .tmmin-filter-strip {
   min-height: 48px;
@@ -373,7 +373,7 @@ textarea {
   display: grid;
   gap: 4px;
   color: #626b7b;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
 }
 .tmmin-filter-strip select {
@@ -409,7 +409,7 @@ textarea {
 }
 .tmmin-dashboard-filters label > span {
   color: #6f7787;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
 }
 .tmmin-dashboard-filters input,
@@ -423,7 +423,7 @@ textarea {
   background: #fff;
   color: #293244;
   font: inherit;
-  font-size: 10px;
+  font-size: 11px;
 }
 .tmmin-dashboard-filters input:hover,
 .tmmin-dashboard-filters select:hover {
@@ -466,7 +466,7 @@ textarea {
   align-items: center;
   gap: 7px;
   color: #2c3444;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
 }
 .tmmin-source-kpi > header svg {
@@ -491,7 +491,7 @@ textarea {
 }
 .tmmin-source-metric > span {
   color: #5c6576;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -499,7 +499,7 @@ textarea {
 .tmmin-source-metric > strong {
   grid-row: 2;
   color: #121a2a;
-  font-size: 24px;
+  font-size: 26px;
   letter-spacing: -0.04em;
 }
 .tmmin-source-metric > small {
@@ -508,7 +508,7 @@ textarea {
   align-self: end;
   padding-bottom: 4px;
   color: #667085;
-  font-size: 9px;
+  font-size: 10px;
 }
 .tmmin-source-metric > i {
   grid-column: 1 / -1;
@@ -559,7 +559,7 @@ textarea {
   display: block;
   margin-top: 6px;
   color: #101828;
-  font-size: 24px;
+  font-size: 26px;
   line-height: 1;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
@@ -569,7 +569,7 @@ textarea {
   margin-top: 6px;
   overflow: hidden;
   color: #667085;
-  font-size: 8.5px;
+  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -617,7 +617,7 @@ textarea {
   border-radius: 4px;
   background: transparent;
   color: #5f6877;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -655,12 +655,12 @@ textarea {
   text-align: center;
 }
 .tmmin-freshness-summary__total strong {
-  font-size: 19px;
+  font-size: 22px;
   line-height: 1;
 }
 .tmmin-freshness-summary__total span {
   color: #667085;
-  font-size: 8px;
+  font-size: 10px;
 }
 .tmmin-freshness-summary > div:last-child {
   display: grid;
@@ -671,7 +671,7 @@ textarea {
   grid-template-columns: 7px 1fr auto 27px;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  font-size: 10px;
 }
 .tmmin-freshness-summary i,
 .tmmin-health-list i {
@@ -708,17 +708,17 @@ textarea {
   padding: 8px 9px;
   border-radius: 5px;
   background: #f8f9fb;
-  font-size: 9px;
+  font-size: 10px;
 }
 .tmmin-health-list strong {
-  font-size: 13px;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
 .tmmin-panel-link {
   display: inline-flex;
   margin-top: 10px;
   color: #c53d0c;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   text-decoration: none;
 }
@@ -743,13 +743,13 @@ textarea {
   display: grid;
 }
 .tmmin-override-summary strong {
-  font-size: 22px;
+  font-size: 24px;
   line-height: 1;
 }
 .tmmin-override-summary span {
   margin-top: 3px;
   color: #667085;
-  font-size: 8.5px;
+  font-size: 10px;
 }
 .tmmin-compact-link {
   display: grid;
@@ -757,7 +757,7 @@ textarea {
   padding: 5px 0;
   border-top: 1px solid #eceef2;
   color: #333c4d;
-  font-size: 9px;
+  font-size: 10px;
   text-decoration: none;
 }
 .tmmin-compact-link small {
@@ -777,10 +777,10 @@ textarea {
 }
 .tmmin-external-activity span {
   color: #667085;
-  font-size: 9px;
+  font-size: 10px;
 }
 .tmmin-external-activity strong {
-  font-size: 21px;
+  font-size: 22px;
 }
 .tmmin-inline-empty {
   min-height: 120px;
@@ -799,10 +799,10 @@ textarea {
 }
 .tmmin-inline-empty strong {
   color: #394253;
-  font-size: 11px;
+  font-size: 12px;
 }
 .tmmin-inline-empty span {
-  font-size: 9px;
+  font-size: 10px;
 }
 .tmmin-emphasis {
   color: #df4715 !important;
@@ -855,10 +855,10 @@ textarea {
   padding: 13px 16px;
 }
 .hds-panel__header h2 {
-  font-size: 13px;
+  font-size: 14px;
 }
 .hds-panel__header p {
-  font-size: 10px;
+  font-size: 11px;
 }
 .hds-panel__body {
   padding: 14px 16px;
@@ -882,10 +882,10 @@ textarea {
 .tmmin-aging span,
 .tmmin-checks small {
   color: #626b7b;
-  font-size: 10px;
+  font-size: 11px;
 }
 .tmmin-aging strong {
-  font-size: 18px;
+  font-size: 19px;
   font-variant-numeric: tabular-nums;
 }
 .tmmin-checks > div > span {
@@ -910,12 +910,12 @@ textarea {
   border-right: 0;
 }
 .tmmin-ingestion-stats strong {
-  font-size: 28px;
+  font-size: 30px;
   font-variant-numeric: tabular-nums;
 }
 .tmmin-ingestion-stats span {
   color: #626b7b;
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
 }
 .tmmin-rank {
@@ -930,7 +930,7 @@ textarea {
   grid-template-columns: 22px 1fr 32px;
   gap: 8px;
   align-items: center;
-  font-size: 10px;
+  font-size: 11px;
 }
 .tmmin-rank li > span {
   color: #969daa;
@@ -957,7 +957,7 @@ textarea {
 .tmmin-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
 }
 .tmmin-table th {
@@ -966,7 +966,7 @@ textarea {
   border-bottom: 1px solid #d8dde5;
   background: #f6f7f9;
   color: #697284;
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 0.04em;
   text-align: left;
   text-transform: uppercase;
@@ -988,14 +988,14 @@ textarea {
 .tmmin-table td > small {
   margin-top: 2px;
   color: #626b7b;
-  font-size: 9px;
+  font-size: 10px;
 }
 .tmmin-table code {
   max-width: 190px;
   display: block;
   overflow: hidden;
   color: #5f6878;
-  font-size: 9px;
+  font-size: 10px;
   text-overflow: ellipsis;
 }
 .tmmin-table svg {
@@ -1030,7 +1030,7 @@ textarea {
 }
 .tmmin-query-state p {
   color: #667085;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .tmmin-detail-layout {
@@ -1098,19 +1098,19 @@ textarea {
 }
 .tmmin-governance-summary span {
   color: #737c8b;
-  font-size: 9px;
+  font-size: 10px;
   text-transform: uppercase;
 }
 .tmmin-governance-summary strong {
   overflow: hidden;
-  font-size: 12px;
+  font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .tmmin-governance-summary small {
   overflow: hidden;
   color: #7d8594;
-  font-size: 8.5px;
+  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1134,7 +1134,7 @@ textarea {
 .tmmin-governance-hero > section > span,
 .tmmin-governance-hero > section > div > span {
   color: #626b7b;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
 }
 .tmmin-governance-hero > section:first-child > div {
@@ -1150,7 +1150,7 @@ textarea {
 .tmmin-governance-hero p {
   margin: 10px 0 0;
   color: #6c7585;
-  font-size: 9px;
+  font-size: 10px;
 }
 .tmmin-governance-hero > section:last-child {
   border-color: #f1c5b8;
@@ -1175,12 +1175,12 @@ textarea {
 }
 .tmmin-governance-hero dt {
   color: #7c8492;
-  font-size: 8px;
+  font-size: 10px;
 }
 .tmmin-governance-hero dd {
   margin: 3px 0 0;
   color: #192132;
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -1241,7 +1241,7 @@ textarea {
 }
 .tmmin-chooser button span {
   color: #b43a0c;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
 }
 .tmmin-chooser button small {
@@ -1275,13 +1275,13 @@ textarea {
   margin: 2px 0;
 }
 .tmmin-notifications h2 {
-  font-size: 13px;
+  font-size: 14px;
 }
 .tmmin-notifications p,
 .tmmin-notifications small,
 .tmmin-notifications span {
   color: #717a8a;
-  font-size: 10px;
+  font-size: 11px;
 }
 .tmmin-notifications > .hds-card > div:last-child {
   display: grid;
@@ -1336,16 +1336,13 @@ textarea {
 .tmmin-auth > section > div {
   max-width: 650px;
 }
-.tmmin-auth h1 {
-  margin: 12px 0 16px;
-  font-size: clamp(44px, 5vw, 74px);
-  line-height: 0.98;
-  letter-spacing: -0.065em;
+.tmmin-auth > section .tmmin-eyebrow {
+  color: var(--hds-color-orange-300);
 }
 .tmmin-auth > section p {
   max-width: 510px;
   color: #b7c0ce;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.7;
 }
 .tmmin-auth > section small {
@@ -1361,17 +1358,17 @@ textarea {
   border-radius: 8px;
   box-shadow: 0 14px 40px rgb(15 23 42 / 9%);
 }
-.tmmin-auth h2,
+.tmmin-auth h1,
 .tmmin-auth p {
   margin: 0;
 }
-.tmmin-auth h2 {
-  font-size: 24px;
+.tmmin-auth h1 {
+  font-size: 26px;
   letter-spacing: -0.025em;
 }
 .tmmin-auth > .hds-card > p {
   color: #667085;
-  font-size: 12px;
+  font-size: 13px;
 }
 .tmmin-auth form,
 .tmmin-compact form {
@@ -1385,7 +1382,7 @@ textarea {
   border-radius: 6px;
   background: var(--hds-state-danger-bg);
   color: var(--hds-state-danger-fg);
-  font-size: 11px;
+  font-size: 12px;
 }
 .tmmin-compact > .hds-card {
   width: min(560px, 100%);
@@ -1399,7 +1396,7 @@ textarea {
 }
 .tmmin-compact p {
   color: #747d8c;
-  font-size: 12px;
+  font-size: 13px;
 }
 .tmmin-route-state > .hds-card {
   width: min(560px, 100%);
@@ -1433,7 +1430,7 @@ textarea {
 }
 .tmmin-unsupported h1 {
   margin: 0;
-  font-size: 42px;
+  font-size: 44px;
   line-height: 1.08;
   letter-spacing: -0.04em;
 }
@@ -1473,7 +1470,7 @@ textarea {
     padding-inline: 10px;
   }
   .tmmin-dashboard-metric > header {
-    font-size: 9px;
+    font-size: 10px;
   }
   .tmmin-signal-grid {
     grid-template-columns: repeat(2, 1fr);

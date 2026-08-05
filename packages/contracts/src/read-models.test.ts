@@ -4,6 +4,7 @@ import {
   assignmentBoardSchema,
   notificationListQuerySchema,
   notificationReadRequestSchema,
+  supplierDashboardActivitySchema,
 } from './read-models.js';
 
 describe('read-model contracts', () => {
@@ -65,5 +66,39 @@ describe('read-model contracts', () => {
       ],
     });
     expect(parsed.lines[0]?.jobs[0]?.indicators[0]?.status).toBe('OPEN');
+  });
+
+  it('requires scoped actor and optional Henkaten evidence for dashboard activity', () => {
+    const activity = {
+      id: '00000000-0000-4000-8000-000000000001',
+      action: 'HENKATEN_APPROVED',
+      resourceType: 'Henkaten',
+      resourceId: '00000000-0000-4000-8000-000000000002',
+      occurredAt: '2026-07-28T00:00:00.000Z',
+      actor: { kind: 'USER', displayName: 'Supervisor Test', role: 'SUPERVISOR' },
+      henkaten: {
+        id: '00000000-0000-4000-8000-000000000002',
+        identifier: 'HEN-SUP-20260728-0001',
+        category: 'MAN',
+        status: 'APPROVED',
+        line: { code: 'L1', name: 'Assembly' },
+        jobName: 'Torque',
+        part: { number: 'PART-1', name: 'Part One' },
+      },
+    };
+    expect(supplierDashboardActivitySchema.parse(activity).henkaten?.identifier).toBe(
+      'HEN-SUP-20260728-0001',
+    );
+    expect(
+      supplierDashboardActivitySchema.parse({
+        ...activity,
+        actor: { kind: 'SYSTEM', displayName: null, role: null },
+        henkaten: null,
+      }).henkaten,
+    ).toBeNull();
+    expect(
+      supplierDashboardActivitySchema.safeParse({ ...activity, narrative: 'must not leak' })
+        .success,
+    ).toBe(false);
   });
 });

@@ -13,6 +13,7 @@ import {
   Button,
   Card,
   Field,
+  FourMLegend,
   FormErrorSummary,
   Input,
   KeyValueGrid,
@@ -72,19 +73,16 @@ export function LoginPage() {
         <BrandLockup context="Supplier Portal" />
         <div>
           <span className="product-eyebrow">Enterprise Digital Henkaten</span>
-          <h1>Keputusan operasional yang bisa ditelusuri.</h1>
-          <p>
-            Kelola shift, perubahan 4M, approval, dan assignment dalam satu alur yang terkontrol.
-          </p>
+          <FourMLegend />
+          <p>Kelola shift, perubahan 4M, approval, dan assignment.</p>
         </div>
-        <small>Desktop minimum 1280 × 720</small>
       </section>
       <section className="auth-form">
         <div>
           <span className="auth-icon" aria-hidden="true">
             <KeyRound />
           </span>
-          <h2>Masuk ke Supplier Portal</h2>
+          <h1>Masuk ke Supplier Portal</h1>
           <p>Gunakan identitas yang diberikan oleh Supplier Admin.</p>
         </div>
         {problem && <FormErrorSummary errors={[{ field: 'login', message: problem }]} />}

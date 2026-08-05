@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
+import type { HenkatenCategory, HenkatenStatus } from '@tmmin-henkaten/contracts';
 import {
   createSupplierRealtimeClient,
   type RealtimeConnectionState,
@@ -12,12 +13,13 @@ import {
   Button,
   EmptyState,
   ErrorState,
+  FourMDot,
   LastUpdated,
   NativeSelect,
   Skeleton,
 } from '@tmmin-henkaten/ui';
 
-import { supplierApi, supplierApiOrigin } from '../app/api';
+import { supplierApi, supplierApiOrigin, supplierAssetUrl } from '../app/api';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { PageHeader } from '../components/layout';
@@ -80,9 +82,7 @@ export function BoardPage() {
     .flatMap((job) => job.indicators)
     .filter((item) => item.status === 'OPEN').length;
   const issues = jobs.filter((job) => job.state === 'VACANT' || job.state === 'CONFLICTED').length;
-  const criticalJobs = jobs.filter(
-    (job) => job.state === 'VACANT' || job.state === 'CONFLICTED' || job.state === 'RESERVED',
-  );
+  const operationalRisks = boardOperationalRisks(lines);
   const contextLine = lines[0];
 
   return (
@@ -245,7 +245,7 @@ export function BoardPage() {
                         <div className="board-job__person">
                           <i>
                             {job.mp.photoThumbnailUrl ? (
-                              <img src={job.mp.photoThumbnailUrl} alt="" />
+                              <img src={supplierAssetUrl(job.mp.photoThumbnailUrl)} alt="" />
                             ) : job.mp.initials ? (
                               job.mp.initials
                             ) : (
@@ -261,14 +261,10 @@ export function BoardPage() {
                           <span>{humanize(job.state)}</span>
                           <div role="group" aria-label={`${job.indicators.length} Henkaten aktif`}>
                             {job.indicators.map((indicator) => (
-                              <Link
+                              <BoardHenkatenIndicator
                                 key={indicator.henkatenId}
-                                to={`/henkatens/${indicator.henkatenId}`}
-                                className={`four-m is-${indicator.category.toLowerCase()} is-${indicator.status.toLowerCase()}`}
-                                title={`${indicator.identifier}: ${indicator.category} ${indicator.status}`}
-                              >
-                                {indicator.category[0]}
-                              </Link>
+                                indicator={indicator}
+                              />
                             ))}
                           </div>
                         </div>
@@ -293,19 +289,23 @@ export function BoardPage() {
               )
             }
           >
-            {criticalJobs.length ? (
+            {operationalRisks.length ? (
               <section className="board-critical">
                 <h3>Issue dan reservation</h3>
-                {criticalJobs.slice(0, 6).map((job) => (
-                  <div key={job.assignmentId}>
+                {operationalRisks.slice(0, 6).map((risk) => (
+                  <div key={risk.key}>
                     <AlertTriangle aria-hidden="true" />
                     <span>
-                      <strong>{job.jobName}</strong>
-                      <small>{humanize(job.state)}</small>
+                      <strong>{risk.jobName}</strong>
+                      <small>{risk.label}</small>
                     </span>
+                    {risk.henkatenId ? (
+                      <Link to={`/henkatens/${risk.henkatenId}`}>Buka Henkaten</Link>
+                    ) : risk.resolutionShiftRunId ? (
+                      <Link to={`/shifts/${risk.resolutionShiftRunId}/resolve`}>Buka resolusi</Link>
+                    ) : null}
                   </div>
                 ))}
-                <Link to="/shifts">Buka resolusi Shift</Link>
               </section>
             ) : (
               <Alert tone="success" title="Assignment stabil">
@@ -346,6 +346,58 @@ export function BoardPage() {
         </div>
       )}
     </div>
+  );
+}
+
+type BoardLines = NonNullable<Awaited<ReturnType<typeof supplierApi.board>>>['lines'];
+
+export function boardOperationalRisks(lines: BoardLines) {
+  return lines.flatMap((line) =>
+    line.jobs.flatMap((job) => [
+      ...(job.state === 'VACANT' || job.state === 'CONFLICTED' || job.state === 'RESERVED'
+        ? [
+            {
+              key: `assignment:${job.assignmentId}`,
+              jobName: job.jobName,
+              label: humanize(job.state),
+              henkatenId: null,
+              resolutionShiftRunId:
+                job.state === 'VACANT' || job.state === 'CONFLICTED' ? line.shiftRunId : null,
+            },
+          ]
+        : []),
+      ...job.indicators
+        .filter((indicator) => indicator.category === 'MAN' && indicator.status === 'OPEN')
+        .map((indicator) => ({
+          key: `reservation:${indicator.henkatenId}`,
+          jobName: job.jobName,
+          label: `Reservation aktif · ${indicator.identifier}`,
+          henkatenId: indicator.henkatenId,
+          resolutionShiftRunId: null,
+        })),
+    ]),
+  );
+}
+
+export function BoardHenkatenIndicator({
+  indicator,
+}: {
+  indicator: {
+    henkatenId: string;
+    identifier: string;
+    category: HenkatenCategory;
+    status: HenkatenStatus;
+  };
+}) {
+  return (
+    <Link
+      to={`/henkatens/${indicator.henkatenId}`}
+      className={`four-m is-${indicator.status.toLowerCase()}`}
+      title={`${indicator.identifier}: ${indicator.category} ${indicator.status}`}
+      aria-label={`${indicator.category} ${indicator.status}: ${indicator.identifier}`}
+    >
+      <FourMDot category={indicator.category} />
+    </Link>
   );
 }
 

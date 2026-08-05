@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -26,6 +26,7 @@ function session(
   purpose: 'NORMAL' | 'HOSTED_PREPARATION',
   capabilities: SessionResponse['capabilities'],
   mustChangePassword = false,
+  role: SessionResponse['principal']['role'] = 'SUPPLIER_ADMIN',
 ): SessionResponse {
   return {
     principal: {
@@ -33,7 +34,7 @@ function session(
       supplierId: supplierContext.id,
       displayName: 'Admin Test',
       realm: 'SUPPLIER',
-      role: 'SUPPLIER_ADMIN',
+      role,
       purpose,
       mustChangePassword,
     },
@@ -73,6 +74,26 @@ describe('Supplier application foundation', () => {
     expect(document.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe(
       'noindex,nofollow',
     );
+  });
+
+  it('shows the shared 4M legend on the Supplier login without changing its form', async () => {
+    vi.spyOn(supplierApi, 'session').mockRejectedValue(new Error('anonymous'));
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Masuk ke Supplier Portal' })).toBeTruthy();
+    const legend = screen.getByRole('list', { name: 'Kategori Henkaten 4M' });
+    expect(
+      within(legend)
+        .getAllByRole('listitem')
+        .map((item) => item.getAttribute('aria-label')),
+    ).toEqual(['Man', 'Machine', 'Material', 'Method']);
+    expect(screen.getByLabelText(/^Supplier Code/)).toBeTruthy();
+    expect(screen.getByLabelText(/^Username/)).toBeTruthy();
+    expect(screen.getByLabelText(/^Password/)).toBeTruthy();
   });
 
   it('redirects Hosted Preparation home to authoritative setup progress', async () => {
@@ -174,6 +195,11 @@ describe('Supplier application foundation', () => {
 
     expect(await screen.findByRole('heading', { name: 'Overview Supplier' })).toBeTruthy();
     expect(screen.getByLabelText('Status')).toHaveProperty('value', 'OPEN');
+    expect(
+      screen.queryByRole('link', {
+        name: 'HEN-E2E-20260726-0012',
+      }),
+    ).toBeNull();
     await user.selectOptions(screen.getByLabelText('Status'), 'APPROVED');
     await user.click(screen.getByRole('button', { name: 'Terapkan' }));
     await waitFor(() =>
@@ -183,6 +209,52 @@ describe('Supplier application foundation', () => {
     );
     expect(screen.queryByRole('link', { name: 'Assignment Board' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Antrean Approval' })).toBeNull();
+  });
+
+  it('shows five rich dashboard activities and expands the bounded batch inline', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(supplierApi, 'session').mockResolvedValue(
+      session('NORMAL', [
+        'SUPPLIER_SELF_SERVICE',
+        'SUPPLIER_DASHBOARD_READ',
+        'SUPPLIER_HENKATEN_READ',
+      ]),
+    );
+    vi.spyOn(supplierApi, 'dashboard').mockResolvedValue(supplierDashboardVisualFixture);
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Aktivitas terbaru' })).toBeTruthy();
+    expect(document.querySelectorAll('#overview-recent-activity > li')).toHaveLength(5);
+    const firstActivityLink = screen.getByRole('link', {
+      name: 'HEN-E2E-20260726-0012',
+    });
+    expect(firstActivityLink.getAttribute('href')).toBe(
+      '/henkatens/10000000-0000-4000-8000-000000000010',
+    );
+    expect(firstActivityLink.closest('li')?.textContent).toContain('SR-CS');
+    expect(firstActivityLink.closest('li')?.textContent).toContain('Steering Knuckle');
+    expect(firstActivityLink.closest('li')?.textContent).toContain('Daniel Arifin');
+    expect(screen.getAllByText('Sistem').length).toBeGreaterThanOrEqual(2);
+
+    const expand = screen.getByRole('button', { name: 'Tampilkan lebih banyak (2)' });
+    expect(expand.getAttribute('aria-expanded')).toBe('false');
+    await user.click(expand);
+    expect(document.querySelectorAll('#overview-recent-activity > li')).toHaveLength(7);
+    expect(
+      screen.getByRole('button', { name: 'Tampilkan lebih sedikit' }).getAttribute('aria-expanded'),
+    ).toBe('true');
+    expect(screen.getAllByText(/Shift run/).length).toBeGreaterThan(0);
+
+    await user.selectOptions(screen.getByLabelText('Status'), 'OPEN');
+    await user.click(screen.getByRole('button', { name: 'Terapkan' }));
+    await waitFor(() =>
+      expect(document.querySelectorAll('#overview-recent-activity > li')).toHaveLength(5),
+    );
   });
 
   it('renders forbidden for a valid route without its capability', async () => {
@@ -197,6 +269,108 @@ describe('Supplier application foundation', () => {
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: /tidak memiliki akses/i })).toBeTruthy(),
     );
+  });
+
+  it('clears a failed decision when the user refreshes the Henkaten record', async () => {
+    const user = userEvent.setup();
+    const id = '00000000-0000-4000-8000-000000000010';
+    const route = (name: 'SUPERVISOR' | 'QC', status: 'APPROVED' | 'PENDING') => ({
+      route: name,
+      status,
+      initialResponsibleMemberId: null,
+      initialResponsibleName: null,
+      currentResponsibleMemberId: null,
+      currentResponsibleName: null,
+      version: 1,
+      decision: null,
+    });
+    vi.spyOn(supplierApi, 'session').mockResolvedValue(
+      session(
+        'NORMAL',
+        ['SUPPLIER_SELF_SERVICE', 'SUPPLIER_HENKATEN_READ', 'SUPPLIER_HENKATEN_DECIDE'],
+        false,
+        'QC',
+      ),
+    );
+    const henkaten = vi.spyOn(supplierApi, 'henkaten').mockResolvedValue({
+      id,
+      identifier: 'HEN-SUP-001-20260728-0001',
+      shiftRunId: '00000000-0000-4000-8000-000000000011',
+      lineId: '00000000-0000-4000-8000-000000000012',
+      jobId: '00000000-0000-4000-8000-000000000013',
+      partId: '00000000-0000-4000-8000-000000000014',
+      status: 'OPEN',
+      sourceMode: 'HOSTED',
+      sourceEpoch: 1,
+      category: 'MATERIAL',
+      businessDate: '2026-07-28',
+      occurredAt: '2026-07-28T01:00:00.000Z',
+      line: { code: 'SUP-L1', name: 'Line Satu' },
+      jobName: 'Job Satu',
+      part: { number: 'PART-1', name: 'Part Satu' },
+      routes: {
+        supervisor: route('SUPERVISOR', 'APPROVED'),
+        qc: route('QC', 'PENDING'),
+      },
+      version: 2,
+      timezone: 'Asia/Jakarta',
+      shiftName: 'Shift Pagi',
+      creatorName: 'Line Leader',
+      cause: 'Pergantian lot',
+      detail: 'Lot baru telah diverifikasi.',
+      affectedObject: 'Lot lama',
+      replacementObject: 'Lot baru',
+      cancellationReason: null,
+      withdrawalReason: null,
+      clonedFromHenkatenId: null,
+      checklist: {
+        checklistVersionId: '00000000-0000-4000-8000-000000000015',
+        versionNumber: 1,
+        category: 'MATERIAL',
+        answers: [
+          {
+            sourceItemId: '00000000-0000-4000-8000-000000000016',
+            label: 'Traceability diverifikasi',
+            displayOrder: 1,
+            answer: 'YES',
+          },
+        ],
+      },
+      man: null,
+      movement: null,
+      history: [
+        {
+          id: '00000000-0000-4000-8000-000000000017',
+          fromStatus: null,
+          toStatus: 'OPEN',
+          actorName: 'Line Leader',
+          actorRole: 'LINE_LEADER',
+          reason: null,
+          occurredAt: '2026-07-28T01:00:00.000Z',
+        },
+      ],
+    });
+    vi.spyOn(supplierApi, 'notificationCount').mockResolvedValue({ count: 0 });
+    vi.spyOn(supplierApi, 'decideHenkaten').mockRejectedValue(new Error('network failed'));
+
+    render(
+      <MemoryRouter initialEntries={[`/henkatens/${id}`]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'HEN-SUP-001-20260728-0001' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Penyebab & detail' })).toBeTruthy();
+    expect(screen.getByText('Lot lama')).toBeTruthy();
+    expect(screen.getByText('Lot baru')).toBeTruthy();
+    expect(screen.getByText(/Data immutable/i)).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Approve' }));
+    expect(screen.getByRole('dialog', { name: /Approve route QC/i })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Konfirmasi Approve' }));
+    expect(await screen.findByText('Action tidak dapat diproses')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Refresh record' }));
+    await waitFor(() => expect(screen.queryByText('Action tidak dapat diproses')).toBeNull());
+    await waitFor(() => expect(henkaten).toHaveBeenCalledTimes(2));
   });
 
   it('forces a temporary-password session into the password-change route', async () => {

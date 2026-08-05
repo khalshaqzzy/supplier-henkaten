@@ -1,4 +1,12 @@
-import { AlertTriangle, ArrowRight, Play, Square } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Play,
+  Square,
+  Wrench,
+} from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -296,8 +304,15 @@ export function ShiftDetailPage() {
     queryKey: scopedKey(scope, 'shift-detail', shiftRunId),
     queryFn: () => supplierApi.shift(shiftRunId),
   });
+  const resolution = useQuery({
+    queryKey: scopedKey(scope, 'shift-resolution', shiftRunId),
+    queryFn: () => supplierApi.resolutionContext(shiftRunId),
+  });
   const refresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'shift-detail', shiftRunId) });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'shift-detail', shiftRunId) }),
+      queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'shift-resolution', shiftRunId) }),
+    ]);
     setIntentKey(createIdempotencyKey());
   };
   const action = useMutation({
@@ -332,6 +347,7 @@ export function ShiftDetailPage() {
     );
   const current = shift.data;
   const blockers = current.checks.filter((check) => check.blocking);
+  const openIssues = openAssignmentIssues(resolution.data?.issues ?? []);
   const canOperate = session!.principal.role === 'LINE_LEADER';
   const canEmergency = session!.principal.role === 'SUPPLIER_ADMIN';
   return (
@@ -402,6 +418,25 @@ export function ShiftDetailPage() {
           {current.overrideReason}
         </Alert>
       )}
+      {openIssues.length > 0 && (
+        <Alert
+          tone="danger"
+          title={`${openIssues.length} assignment issue perlu resolusi`}
+          className="shift-resolution-alert"
+        >
+          <span>Vacancy atau conflict hanya selesai melalui Man Henkaten yang terhubung.</span>
+          <Link
+            className={`hds-button ${
+              canOperate ? 'hds-button--primary' : 'hds-button--secondary'
+            } hds-button--sm shift-resolution-button`}
+            to={`/shifts/${current.id}/resolve`}
+          >
+            <Wrench aria-hidden="true" />
+            {canOperate ? 'Selesaikan assignment issue' : 'Lihat detail resolusi'}
+            <ArrowRight aria-hidden="true" />
+          </Link>
+        </Alert>
+      )}
       <FactStrip label="Konteks Shift">
         <FactItem label="Business date" value={current.businessDate} />
         <FactItem label="Supervisor" value={current.supervisor?.name ?? 'Belum tersedia'} />
@@ -428,8 +463,13 @@ export function ShiftDetailPage() {
                       <code>{check.code}</code>
                     </span>
                     {check.resourceId && (
-                      <Link to={`/shifts/${current.id}/resolve`}>
-                        Buka resolusi <ArrowRight />
+                      <Link
+                        className="hds-button hds-button--secondary hds-button--sm shift-resolution-button"
+                        to={`/shifts/${current.id}/resolve`}
+                      >
+                        <Wrench aria-hidden="true" />
+                        Tinjau resolusi
+                        <ArrowRight aria-hidden="true" />
                       </Link>
                     )}
                   </article>
@@ -471,9 +511,14 @@ export function ShiftDetailPage() {
           eyebrow="Preflight"
           title={current.eligible ? 'Shift siap dimulai' : `${blockers.length} blocker aktif`}
           footer={
-            current.status === 'NOT_STARTED' ? (
-              <Link to={`/shifts/${current.id}/resolve`}>
-                Buka panduan resolusi <ArrowRight />
+            current.status === 'NOT_STARTED' && (blockers.length > 0 || openIssues.length > 0) ? (
+              <Link
+                className="hds-button hds-button--secondary hds-button--sm shift-resolution-button"
+                to={`/shifts/${current.id}/resolve`}
+              >
+                <Wrench aria-hidden="true" />
+                {canOperate ? 'Buka resolusi' : 'Lihat panduan resolusi'}
+                <ArrowRight aria-hidden="true" />
               </Link>
             ) : undefined
           }
@@ -546,51 +591,178 @@ export function ShiftResolutionPage() {
   const { shiftRunId = '' } = useParams();
   const { session } = useSession();
   const scope = scopeOf(session!);
+  const canResolve = session!.principal.role === 'LINE_LEADER';
   const context = useQuery({
     queryKey: scopedKey(scope, 'shift-resolution', shiftRunId),
     queryFn: () => supplierApi.resolutionContext(shiftRunId),
   });
+  const openIssues = openAssignmentIssues(context.data?.issues ?? []);
+  const jobNames = new Map(
+    context.data?.shift.workingAssignments.map((assignment) => [
+      assignment.jobId,
+      assignment.jobName,
+    ]) ?? [],
+  );
   return (
-    <div className="product-page">
+    <div className="product-page shift-resolution-page">
       <PageHeader
         eyebrow="Assignment Resolution"
         title="Selesaikan vacancy dan conflict"
         description="Issue hanya dianggap selesai setelah perpindahan Approved atau Shift berakhir."
+        actions={
+          <Link
+            className="hds-button hds-button--secondary hds-button--md"
+            to={`/shifts/${shiftRunId}`}
+          >
+            <ArrowLeft aria-hidden="true" />
+            Kembali ke detail Shift
+          </Link>
+        }
       />
       {context.isLoading && <ShiftSkeleton />}
+      {context.isError && (
+        <ErrorState
+          title="Konteks resolusi tidak dapat dimuat"
+          description="Muat ulang state Shift sebelum menentukan tindakan berikutnya."
+          action={<Button onClick={() => void context.refetch()}>Coba lagi</Button>}
+        />
+      )}
       {context.data?.issues.length === 0 && (
         <EmptyState
           title="Tidak ada issue terbuka"
           description="Preflight dapat dijalankan kembali dari detail Shift."
+          action={<Link to={`/shifts/${shiftRunId}`}>Kembali ke detail Shift</Link>}
         />
       )}
       {context.data && context.data.issues.length > 0 && (
-        <div className="resolution-list">
-          {context.data.issues.map((issue) => (
-            <article key={issue.id}>
-              <AlertTriangle />
-              <div>
-                <span>{humanize(issue.type)}</span>
-                <strong>Job {issue.jobId}</strong>
-                <small>Dibuka {new Date(issue.openedAt).toLocaleString('id-ID')}</small>
-              </div>
-              {issue.resolutionHenkatenId ? (
-                <Link to={`/henkatens/${issue.resolutionHenkatenId}`}>
-                  Lihat resolution Henkaten
-                </Link>
+        <>
+          <section className="resolution-overview" aria-label="Ringkasan resolusi">
+            <span className={openIssues.length ? 'is-danger' : 'is-success'}>
+              {openIssues.length ? (
+                <AlertTriangle aria-hidden="true" />
               ) : (
-                <Link
-                  to={`/henkatens/new?shiftRunId=${shiftRunId}&jobId=${issue.jobId}&resolutionIssueId=${issue.id}`}
-                >
-                  Buat Man Henkaten
-                </Link>
+                <CheckCircle2 aria-hidden="true" />
               )}
-            </article>
-          ))}
-        </div>
+            </span>
+            <div>
+              <small>{context.data.shift.line.code}</small>
+              <strong>{context.data.shift.line.name}</strong>
+              <p>
+                {openIssues.length
+                  ? `${openIssues.length} dari ${context.data.issues.length} issue masih memerlukan tindakan.`
+                  : 'Seluruh assignment issue pada Shift ini sudah ditutup.'}
+              </p>
+            </div>
+            <dl>
+              <div>
+                <dt>Issue terbuka</dt>
+                <dd>{openIssues.length}</dd>
+              </div>
+              <div>
+                <dt>Total tercatat</dt>
+                <dd>{context.data.issues.length}</dd>
+              </div>
+            </dl>
+          </section>
+          <section className="resolution-workspace" aria-labelledby="resolution-list-title">
+            <header>
+              <div>
+                <h2 id="resolution-list-title">Assignment issue</h2>
+                <p>Pilih tindakan berdasarkan status dan kewenangan Anda.</p>
+              </div>
+              <span>{openIssues.length} perlu tindakan</span>
+            </header>
+            <div className="resolution-list">
+              {context.data.issues.map((issue) => {
+                const action = resolutionIssueAction(issue, canResolve);
+                return (
+                  <article
+                    key={issue.id}
+                    className={issue.status === 'OPEN' ? 'is-open' : 'is-closed'}
+                  >
+                    <span className="resolution-list__icon">
+                      {issue.status === 'OPEN' ? (
+                        <AlertTriangle aria-hidden="true" />
+                      ) : (
+                        <CheckCircle2 aria-hidden="true" />
+                      )}
+                    </span>
+                    <div className="resolution-list__content">
+                      <div className="resolution-list__badges">
+                        <span className={`is-${issue.type.toLowerCase()}`}>
+                          {humanize(issue.type)}
+                        </span>
+                        <span className={`is-${issue.status.toLowerCase()}`}>
+                          {issue.status === 'OPEN' ? 'Perlu tindakan' : humanize(issue.status)}
+                        </span>
+                      </div>
+                      <strong>{jobNames.get(issue.jobId) ?? `Job ${issue.jobId}`}</strong>
+                      <small>
+                        Dibuka {new Date(issue.openedAt).toLocaleString('id-ID')} · Sumber{' '}
+                        {humanize(issue.originKind)}
+                      </small>
+                      {issue.originHenkatenId && (
+                        <Link
+                          className="resolution-list__origin"
+                          to={`/henkatens/${issue.originHenkatenId}`}
+                        >
+                          Lihat Henkaten asal
+                        </Link>
+                      )}
+                    </div>
+                    <div className="resolution-list__action">
+                      {action === 'VIEW_HENKATEN' ? (
+                        <Link
+                          className="hds-button hds-button--secondary hds-button--sm shift-resolution-button"
+                          to={`/henkatens/${issue.resolutionHenkatenId}`}
+                        >
+                          Lihat Henkaten resolusi
+                          <ArrowRight aria-hidden="true" />
+                        </Link>
+                      ) : action === 'CREATE_HENKATEN' ? (
+                        <>
+                          <small>Langkah berikutnya</small>
+                          <Link
+                            className="hds-button hds-button--primary hds-button--sm shift-resolution-button"
+                            to={`/henkatens/new?shiftRunId=${shiftRunId}&jobId=${issue.jobId}&resolutionIssueId=${issue.id}`}
+                          >
+                            <Wrench aria-hidden="true" />
+                            Buat Man Henkaten
+                            <ArrowRight aria-hidden="true" />
+                          </Link>
+                        </>
+                      ) : (
+                        <span className={`resolution-list__state is-${issue.status.toLowerCase()}`}>
+                          {action === 'WAIT'
+                            ? 'Menunggu Line Leader'
+                            : issue.status === 'CLOSED_SHIFT_ENDED'
+                              ? 'Ditutup saat Shift berakhir'
+                              : 'Resolusi selesai'}
+                        </span>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        </>
       )}
     </div>
   );
+}
+
+export function openAssignmentIssues<T extends { status: string }>(issues: T[]) {
+  return issues.filter(({ status }) => status === 'OPEN');
+}
+
+export function resolutionIssueAction(
+  issue: { status: string; resolutionHenkatenId: string | null },
+  canResolve: boolean,
+) {
+  if (issue.resolutionHenkatenId) return 'VIEW_HENKATEN' as const;
+  if (issue.status === 'OPEN') return canResolve ? ('CREATE_HENKATEN' as const) : ('WAIT' as const);
+  return 'CLOSED' as const;
 }
 
 function ShiftSkeleton() {

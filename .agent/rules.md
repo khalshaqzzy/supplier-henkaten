@@ -109,6 +109,27 @@ docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.24.3 \
 git diff --check
 ```
 
+For staging release work, the baseline above is extended by the commands and assertions in
+`.github/workflows/ci.yml`. Local parity must additionally cover:
+
+```text
+pnpm migrations:destructive-check <staging-base-sha>
+pnpm deployment:validate
+pnpm test:deployment
+pnpm security:exceptions:check
+pnpm security:audit
+actionlint, ShellCheck, Hadolint, and bash -n using the workflow-pinned tool images
+bootstrap-vm.sh --check inside the workflow-pinned Ubuntu 22.04 image
+fresh and previous-SHA-to-current migration execution
+the production Compose build/start/routing/non-root/persistence acceptance sequence
+Trivy filesystem plus every production runtime image at HIGH,CRITICAL
+```
+
+The deployment-script harness must run on Linux before commit so real `flock` contention is tested;
+a macOS run that reports `flock` unavailable is supplemental only. Trivy must use the committed
+exact ignore file, and every ignore entry must have a rationale and future expiry in
+`.agent/securityExceptions.json`.
+
 The directory-mode Gitleaks command is the mandatory pre-commit scan because it includes
 uncommitted files. After committing and before pushing, also mirror the current GitHub Action
 commit scan:

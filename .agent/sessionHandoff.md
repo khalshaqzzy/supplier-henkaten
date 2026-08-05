@@ -1,209 +1,96 @@
-# Session Handoff — Supplier Visual Refinement
+# Session Handoff — Staging CI Dependency Remediation
 
-Tanggal: 2026-07-26
+Tanggal: 2026-08-04
 
-Branch: `feat/supplier-visual-refinement`
+Branch: `staging`
 
-Status: Phase 14.11 `done`; Phase 15.1 adalah next
+Status: failed staging CI root cause telah diperbaiki dan local parity **done**. Phase 15.9 tetap
+`in_progress` sampai push ini melewati release gate dan automatic staging deployment pada GitHub.
 
 ## 1. Objective dan Outcome
 
-Supplier Portal direfinement dalam preserve mode tanpa mengubah React/Vite, shared Henkaten Design
-System, typed API client, route, field/lifecycle order, authorization, atau backend authority.
-Bahasa visualnya enterprise, light-only, padat, stabil, dan berorientasi workflow dengan fidelity
-tertinggi pada enam referensi Supplier:
+Objective sesi ini adalah memperbaiki failure pada run Staging CI `30891976462` untuk SHA
+`622cc8f212f728c8defe494f02fc5d4c7c40ee70` tanpa melemahkan scanner atau menambah security
+exception.
 
-- Overview;
-- Assignment Board;
-- Default Assignment;
-- Create Henkaten;
-- Henkaten Detail/Approval;
-- Blocked Shift.
+Root cause:
 
-Seluruh referensi `.agent/design/` dibuka pada resolusi asli sebelum implementasi dan setelah
-context compaction. Hasil visual aktual juga diperiksa pada 1672×941 dan 1280×720.
+- Trivy filesystem menemukan `fast-uri 3.1.4` / CVE-2026-18446 (High), fixed di `3.1.5`;
+- `pnpm audit --audit-level high` juga menemukan `undici 7.28.0` dan `brace-expansion 5.0.8`
+  pada rentang rentan yang memiliki patch tersedia;
+- release candidate gate gagal sebagai konsekuensi dari job `Production containers and routing`
+  dan `Dependency security` tersebut; quality, migrations, integration, E2E, CodeQL, dan Gitleaks
+  pada run yang sama telah lulus.
 
-## 2. Shell dan Composition
+Outcome:
 
-- Navigation dikelompokkan menjadi Operasional, Data & Konfigurasi, dan Sistem setelah capability
-  serta Hosted Preparation filtering.
-- Sidebar 236px dapat diciutkan menjadi 72px; collapsed links mempertahankan accessible name/title.
-- Supplier workspace, timezone, source mode/epoch, notification count, identity, role, dan logout
-  tetap terlihat pada konteks yang relevan.
-- Topbar memakai active-area dan Supplier context satu baris.
-- `PageHeader` mendukung breadcrumb, status, metadata, action grouping, dan focus restoration.
-- Komponen app-local baru menyediakan summary strip, metric tile, fact strip, dan contextual rail.
-- Shared `@tmmin-henkaten/ui` dan visual TMMIN tidak berubah.
+- root pnpm overrides sekarang memaksa `fast-uri 3.1.5`, `undici 7.29.0`, dan
+  `brace-expansion 5.0.9` untuk seluruh dependency graph;
+- lockfile tersinkron dan tetap lolos supply-chain policy;
+- tidak ada `.trivyignore`, audit ignore, atau security-exception baru;
+- clean-worktree Trivy filesystem dan kelima production image melaporkan zero High/Critical;
+- auth, API, database schema, migration, OpenAPI, routing, dan application behavior tidak berubah.
 
-## 3. Priority Workflows
+## 2. Files Changed
 
-Overview:
-
-- filter memakai draft state dengan explicit `Terapkan`/`Reset`, lalu URL menjadi authority;
-- KPI memakai server totals tanpa synthetic period delta;
-- aging, 4M trend, assignment issues, line/part ranking, outcome, override, activity, dan
-  capability-aware quick links disusun menjadi dense dashboard grid.
-
-Assignment Board:
-
-- summary strip, authoritative line/Shift facts, realtime freshness, job cards, 4M indicators,
-  issue/override state, legend, dan contextual rail diterapkan;
-- board/table density tetap contained secara internal.
-
-Default Assignment:
-
-- Supervisor, Line Leader, job/MP hierarchy, missing state, active-shift warning, dan assignment
-  status dipertegas;
-- edit memakai accessible side sheet dengan current/new comparison, atomic-move consequence,
-  optimistic conflict message, dan deterministic focus return.
-
-Create Henkaten:
-
-- field dan submission contract dipertahankan dalam numbered operational sections;
-- Shift context, Man/non-Man layout, checklist progress, readiness message, dan sticky summary rail
-  memakai data/form state nyata;
-- tidak ada Save Draft atau synthetic wizard state.
-
-Henkaten Detail/Approval:
-
-- lifecycle/source/approval status ditempatkan bersama identifier;
-- fact strip, affected/replacement comparison, parallel approval stepper, immutable checklist,
-  history, dan sticky capability-gated decision rail diterapkan;
-- reject-fast, reroute, withdraw, clone, expected-version refresh, dan immutable history tidak
-  berubah.
-
-Shift Detail:
-
-- Not Started, Active, dan Ended memakai composition yang sama;
-- blocking cards, Working Assignment preview, preflight rail, freshness, resolution link, dan
-  terminal summary mengikuti status authoritative;
-- Emergency Start tetap Admin-only, danger-styled, memerlukan alasan, dan selalu dinyatakan sebagai
-  blocked exception.
-
-## 4. Portal Consistency
-
-- Setup disusun sebagai readiness journey dengan summary, progress area, next area, blocker evidence,
-  dan direct route action.
-- Master Data, Shift/Henkaten lists, Notifikasi, Audit, auth, forced reset, account, viewport
-  unsupported, 403, 404, dan route error mewarisi shell, toolbar, panel, table/list, empty/error, dan
-  focus behavior baru.
-- Visible copy dinormalisasi ke Bahasa Indonesia sambil mempertahankan istilah domain Henkaten,
-  Man/Machine/Material/Method, Hosted, External, Shift, Supervisor, Line Leader, QC, dan source
-  epoch.
-
-Tidak ada migration, endpoint baru, production fixture fallback, client-derived lifecycle,
-global search, Export, Save Draft, fake Live state, dark mode, atau mobile operational UI.
-
-## 5. Files Changed
-
-Supplier frontend:
-
-- `apps/supplier-web/src/components/layout.tsx`
-- `apps/supplier-web/src/components/OperationalUI.tsx`
-- `apps/supplier-web/src/pages/OverviewPage.tsx`
-- `apps/supplier-web/src/pages/BoardPage.tsx`
-- `apps/supplier-web/src/pages/DefaultAssignmentsPage.tsx`
-- `apps/supplier-web/src/pages/HenkatenPages.tsx`
-- `apps/supplier-web/src/pages/ShiftPages.tsx`
-- `apps/supplier-web/src/pages/SetupPage.tsx`
-- `apps/supplier-web/src/pages/MasterDataPages.tsx`
-- `apps/supplier-web/src/pages/ActivityPages.tsx`
-- `apps/supplier-web/src/pages/AuthPages.tsx`
-- `apps/supplier-web/src/app.css`
-
-Tests:
-
-- `apps/supplier-web/src/App.test.tsx`
-- `apps/supplier-web/src/test/visualFixtures.ts`
-- `apps/e2e/tests/hosted-lifecycle.spec.ts`
-
-Records:
-
+- `pnpm-workspace.yaml`
+- `pnpm-lock.yaml`
 - `.agent/implementationPhases.md`
 - `.agent/sessionHandoff.md`
-- `docs/adr/0024-supplier-application-composition.md`
+- `docs/adr/0008-single-vm-environment-and-release-constraints.md`
 
-User-owned `.DS_Store` tetap tidak disentuh dan tidak boleh dimasukkan ke hasil kerja.
+## 3. Decisions
 
-## 6. Validation dan Visual Evidence
+- Advisory yang memiliki patched release diselesaikan melalui root pnpm override dan lockfile,
+  bukan melalui ignore atau exception.
+- Selector override dibatasi ke vulnerable range agar dependency yang kelak sudah memilih versi
+  lebih baru tidak diturunkan.
+- Existing exact exception registry dipertahankan tanpa perubahan; `pnpm audit` masih melaporkan
+  satu High yang sudah di-ignore secara formal dan dua Moderate, tetapi command gate exit 0.
+- Tiga local full-stack container yang telah berjalan sebelum sesi tidak dihentikan atau dimutasi.
 
-Perintah terfokus telah dijalankan memakai Node.js 22.23.1 dari pnpm cache dan pnpm 11.16.0:
+## 4. QA Commands dan Results
 
-```text
-pnpm --filter @tmmin-henkaten/supplier-web lint
-pnpm --filter @tmmin-henkaten/supplier-web typecheck
-pnpm --filter @tmmin-henkaten/supplier-web test:unit
-pnpm --filter @tmmin-henkaten/e2e lint
-pnpm --filter @tmmin-henkaten/e2e typecheck
-E2E_VISUAL_CAPTURE=1 pnpm --filter @tmmin-henkaten/e2e exec node \
-  scripts/run.mjs --chromium-only --spec=hosted-lifecycle
-```
+Runtime parity menggunakan Node.js `22.23.1` dan pnpm `11.16.0`.
 
-Current results:
+Semua gate berikut lulus:
 
-- Supplier lint dan typecheck lulus;
-- 8 Supplier unit tests lulus;
-- E2E lint/typecheck lulus;
-- deterministic Hosted lifecycle Chromium journey lulus;
-- 12 screenshots untuk enam priority pages pada 1672×941 dan 1280×720 berhasil dibuat;
-- semua capture bebas page-level horizontal overflow;
-- reduced-motion mode digunakan;
-- axe bersih pada seluruh priority page di 1280×720.
+- clean-artifact `pnpm clean`, `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`,
+  `pnpm typecheck`, `pnpm test:unit`, `pnpm openapi:check`, dan production `pnpm build`;
+- `pnpm security:audit`: exit 0; 2 Moderate dan 1 formally ignored High tersisa;
+- `pnpm migrations:destructive-check 622cc8f...`: no migration SQL changed;
+- `pnpm deployment:validate`, `pnpm test:deployment`, dan
+  `pnpm security:exceptions:check`;
+- disposable PostgreSQL 18.4 + pgvector verification, fresh nine-migration apply, previous-SHA to
+  current upgrade, dan migration status;
+- `pnpm test:integration`: 33/33;
+- `pnpm test:e2e`: seluruh Chromium dan Microsoft Edge journeys lulus;
+- pinned actionlint 1.7.7, ShellCheck 0.11.0, Hadolint 2.14.0, `bash -n`, dan Ubuntu 22.04
+  bootstrap input check;
+- production-like Compose build/start, idempotent bootstrap, three-domain routing, release
+  identity, security headers, non-root/private-database assertions, dan persistence restart;
+- Trivy 0.70.0 clean-worktree filesystem: lockfile 0 High/Critical, no secret/misconfiguration;
+- Trivy 0.70.0 kelima production images: 0 High/Critical;
+- Gitleaks 8.24.3 clean-worktree directory scan: no leaks;
+- `git diff --check`.
 
-Visual QA sebelumnya menemukan dan kemudian memperbaiki:
+Playwright browser install helper meminta host sudo untuk Edge, sehingga tidak digunakan; existing
+pinned browser binaries tersedia dan full E2E tetap lulus. Vite large-chunk dan PostgreSQL pg@9
+deprecation warnings tetap existing, non-blocking, dan tidak terkait perubahan ini.
 
-- duplicate unnamed complementary landmarks;
-- checklist select tanpa accessible name;
-- prohibited `aria-label` pada role-less board group;
-- borderline contrast pada approval route metadata.
+## 5. Cleanup dan Residual Risk
 
-Disposable E2E PostgreSQL container, volume, network, API, dan Vite processes telah dibersihkan oleh
-harness setelah setiap run.
+- Disposable integration/E2E/production-like containers, volumes, networks, staging bind mounts,
+  Trivy cache, dan temporary clean worktree sudah dibersihkan.
+- Existing ignored `.local/.ssh/supplier-henkaten-staging-ci` terdeteksi hanya ketika scan pertama
+  dijalankan pada working directory; file tersebut tidak dibaca, dimutasi, atau di-ignore. Rerun
+  dari clean Git worktree setara CI tidak memuat file lokal tersebut dan lulus.
+- Existing Supplier/TMMIN/API local containers tetap berjalan seperti sebelum sesi.
+- Risiko tersisa adalah validasi hosted run dan deployment staging; local parity tidak menggantikan
+  GitHub runner maupun VM evidence.
 
-## 7. Full Validation dan Next Action
+## 6. Next Action
 
-Parity suite penuh dari `.agent/rules.md` selesai:
-
-```text
-pnpm clean
-pnpm install --frozen-lockfile
-pnpm format:check
-pnpm lint
-pnpm typecheck
-pnpm test:unit
-pnpm openapi:check
-VITE_API_ORIGIN=https://api.example.invalid pnpm build
-docker compose config --quiet
-docker compose --profile fullstack config --quiet
-pnpm db:up
-pnpm db:wait
-pnpm db:verify
-pnpm db:test:reset
-pnpm db:test:migrate
-pnpm test:integration
-pnpm db:down
-pnpm test:e2e
-docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.24.3 \
-  dir /repo --config=/repo/.gitleaks.toml --redact --verbose
-git diff --check
-```
-
-Results:
-
-- clean install, format, lint, typecheck, OpenAPI/generated-client drift, dan seluruh production
-  build lulus;
-- 92 unit/contract/client/UI/API/frontend tests lulus;
-- PostgreSQL 18.4, pgvector 0.8.5, sembilan fresh migrations, dan 32 integration tests lulus;
-- empat Chromium dan dua Microsoft Edge isolated E2E journeys lulus;
-- visual capture journey untuk enam halaman prioritas lulus pada dua viewport dengan overflow,
-  reduced-motion, dan axe assertions;
-- Gitleaks memindai 61.65 MB tanpa finding;
-- `git diff --check` lulus;
-- seluruh agent-started database, Vite, API, browser, network, dan volume disposable dihentikan.
-
-Playwright berhasil memakai Chromium dan Edge yang sudah terpasang. Perintah reinstall Edge tetap
-memerlukan sudo interaktif macOS dan gagal sebelum meminta credential; ini bukan kegagalan test atau
-runtime karena kedua Edge journey lulus dengan binary terpasang.
-
-Seluruh `.agent/design/` dibuka kembali pada resolusi asli sebelum final acceptance. Next
-recommended work kembali ke Phase 15.1 Production Dockerfiles.
+Commit sebagai `fix: patch vulnerable transitive dependencies`, jalankan Gitleaks commit scan,
+push ke `origin/staging`, lalu inspect run baru sampai seluruh required job green sesuai repository
+rules. PR staging-to-main tetap tidak boleh dipromosikan sebelum staging CI/deployment berhasil.

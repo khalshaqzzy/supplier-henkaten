@@ -895,10 +895,10 @@ Setiap line section menampilkan:
 
 ### 16.3 Indikator
 
-- Man: biru;
-- Machine: hijau;
+- Man: merah;
+- Machine: biru;
 - Material: kuning;
-- Method: merah.
+- Method: hijau.
 
 Warna selalu disertai label/icon/accessible text. Open menggunakan visual state berbeda dari Approved, misalnya pulsing/outlined vs solid. Rejected dan Cancelled tidak ditampilkan sebagai active change, tetapi tetap tersedia pada history.
 

@@ -39053,6 +39053,150 @@
                             "type": "string",
                             "format": "date-time",
                             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                          },
+                          "actor": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "USER",
+                                  "SYSTEM",
+                                  "EXTERNAL_CLIENT"
+                                ]
+                              },
+                              "displayName": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 150
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "role": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "TMMIN_ADMIN",
+                                      "TMMIN_QUALITY",
+                                      "SUPPLIER_ADMIN",
+                                      "SUPERVISOR",
+                                      "LINE_LEADER",
+                                      "QC"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "displayName",
+                              "role"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "henkaten": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "identifier": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 150
+                                  },
+                                  "category": {
+                                    "type": "string",
+                                    "enum": [
+                                      "MAN",
+                                      "MACHINE",
+                                      "MATERIAL",
+                                      "METHOD"
+                                    ]
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "OPEN",
+                                      "APPROVED",
+                                      "REJECTED",
+                                      "CANCELLED"
+                                    ]
+                                  },
+                                  "line": {
+                                    "type": "object",
+                                    "properties": {
+                                      "code": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 100
+                                      },
+                                      "name": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 150
+                                      }
+                                    },
+                                    "required": [
+                                      "code",
+                                      "name"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "jobName": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 150
+                                  },
+                                  "part": {
+                                    "type": "object",
+                                    "properties": {
+                                      "number": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 100
+                                      },
+                                      "name": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 200
+                                      }
+                                    },
+                                    "required": [
+                                      "number",
+                                      "name"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "identifier",
+                                  "category",
+                                  "status",
+                                  "line",
+                                  "jobName",
+                                  "part"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "required": [
@@ -39060,7 +39204,9 @@
                           "action",
                           "resourceType",
                           "resourceId",
-                          "occurredAt"
+                          "occurredAt",
+                          "actor",
+                          "henkaten"
                         ],
                         "additionalProperties": false
                       }

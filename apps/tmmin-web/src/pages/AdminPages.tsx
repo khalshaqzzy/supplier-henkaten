@@ -23,6 +23,8 @@ import {
   Timeline,
 } from '@tmmin-henkaten/ui';
 
+import { ApiProblemError } from '@tmmin-henkaten/api-client';
+
 import { tmminApi } from '../app/api';
 import { tmminKey } from '../app/query';
 import { useTmminSession } from '../app/session';
@@ -298,6 +300,7 @@ export function SupplierDetailPage() {
     username: string;
     temporaryPassword: string;
   } | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
   const result = useQuery({
     queryKey: tmminKey(session!.principal.userId, 'supplier', supplierId),
     queryFn: () => tmminApi.supplier(supplierId),
@@ -313,6 +316,7 @@ export function SupplierDetailPage() {
       void queryClient.invalidateQueries({
         queryKey: tmminKey(session!.principal.userId, 'supplier', supplierId),
       }),
+    onError: (error) => setProblem(tmminMutationProblem(error)),
   });
   if (result.isLoading) return <LoadingRows />;
   if (result.error || !result.data)
@@ -340,12 +344,20 @@ export function SupplierDetailPage() {
                 description="Tindakan ini mengubah akses dan ketersediaan operasional. Versi diverifikasi server."
                 confirmLabel={supplier.active ? 'Nonaktifkan' : 'Aktifkan'}
                 destructive={supplier.active}
-                onConfirm={() => action.mutate(supplier.active)}
+                onConfirm={() => {
+                  setProblem(null);
+                  action.mutate(supplier.active);
+                }}
               />
             </div>
           ) : undefined
         }
       />
+      {problem && (
+        <Alert tone="danger" title="Perubahan supplier gagal">
+          {problem}
+        </Alert>
+      )}
       {credential && (
         <Card className="tmmin-secret-card">
           <OneTimeCredentialPanel
@@ -412,12 +424,14 @@ export function SupplierDetailPage() {
               {dateTime(result.data.activePreparation.startedAt)}
             </Alert>
           )}
-          <Link
-            className="hds-button hds-button--secondary hds-button--md"
-            to={`/suppliers/${supplierId}/credentials`}
-          >
-            External credentials
-          </Link>
+          {admin && (
+            <Link
+              className="hds-button hds-button--secondary hds-button--md"
+              to={`/suppliers/${supplierId}/credentials`}
+            >
+              External credentials
+            </Link>
+          )}
           <Link
             className="hds-button hds-button--secondary hds-button--md"
             to={`/hosted-support?supplierId=${supplierId}`}
@@ -478,7 +492,11 @@ function SupplierAdminPanel({
           ]}
         />
       ) : (
-        <p>Belum ada Supplier Admin aktif.</p>
+        <p>
+          {admin
+            ? 'Belum ada Supplier Admin aktif.'
+            : 'Detail Supplier Admin hanya tersedia untuk TMMIN Admin.'}
+        </p>
       )}
       {admin && current && (
         <>
@@ -599,6 +617,7 @@ export function SourceGovernancePage() {
     username: string;
     temporaryPassword: string;
   } | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
   const result = useQuery({
     queryKey: tmminKey(session!.principal.userId, 'source', supplierId),
     queryFn: () => tmminApi.source(supplierId),
@@ -622,6 +641,7 @@ export function SourceGovernancePage() {
         queryKey: tmminKey(session!.principal.userId, 'source', supplierId),
       });
     },
+    onError: (error) => setProblem(tmminMutationProblem(error)),
   });
   const preparation = useMutation({
     mutationFn: (values: { reason: string; username: string; displayName: string }) =>
@@ -637,6 +657,7 @@ export function SourceGovernancePage() {
         queryKey: tmminKey(session!.principal.userId, 'source', supplierId),
       });
     },
+    onError: (error) => setProblem(tmminMutationProblem(error)),
   });
   if (!supplierId)
     return (
@@ -658,6 +679,11 @@ export function SourceGovernancePage() {
         title="Tata Kelola Sumber"
         description="Kelola persiapan dan cutover sumber tunggal berdasarkan preflight server."
       />
+      {problem && (
+        <Alert tone="danger" title="Perubahan sumber gagal">
+          {problem}
+        </Alert>
+      )}
       {admin && preparationCredential && (
         <Card className="tmmin-secret-card">
           <OneTimeCredentialPanel
@@ -796,15 +822,23 @@ export function SourceGovernancePage() {
             <PreparationPanel
               active={data.activePreparation}
               busy={preparation.isPending}
-              onStart={(values) => preparation.mutate(values)}
+              onStart={(values) => {
+                setProblem(null);
+                preparation.mutate(values);
+              }}
               onCancel={async (reason) => {
-                await tmminApi.cancelHostedPreparation(supplierId, {
-                  expectedVersion: data.supplier.version,
-                  reason,
-                });
-                await queryClient.invalidateQueries({
-                  queryKey: tmminKey(session!.principal.userId, 'source', supplierId),
-                });
+                try {
+                  setProblem(null);
+                  await tmminApi.cancelHostedPreparation(supplierId, {
+                    expectedVersion: data.supplier.version,
+                    reason,
+                  });
+                  await queryClient.invalidateQueries({
+                    queryKey: tmminKey(session!.principal.userId, 'source', supplierId),
+                  });
+                } catch (error) {
+                  setProblem(tmminMutationProblem(error));
+                }
               }}
             />
           )}
@@ -822,9 +856,10 @@ export function SourceGovernancePage() {
               </Alert>
               <form
                 className="tmmin-rail-form"
-                onSubmit={(event) =>
-                  void form.handleSubmit((values) => mutation.mutate(values))(event)
-                }
+                onSubmit={(event) => {
+                  setProblem(null);
+                  void form.handleSubmit((values) => mutation.mutate(values))(event);
+                }}
               >
                 <Field label="Alasan" errorText={form.formState.errors.reason?.message} required>
                   <Textarea rows={5} {...form.register('reason')} />
@@ -943,6 +978,7 @@ export function ExternalCredentialsPage() {
   const [credential, setCredential] = useState<{ clientId: string; clientSecret: string } | null>(
     null,
   );
+  const [problem, setProblem] = useState<string | null>(null);
   const result = useQuery({
     queryKey: tmminKey(session!.principal.userId, 'external-clients', supplierId),
     queryFn: () => tmminApi.externalClients(supplierId, { limit: 100 }),
@@ -966,6 +1002,7 @@ export function ExternalCredentialsPage() {
         queryKey: tmminKey(session!.principal.userId, 'external-clients', supplierId),
       });
     },
+    onError: (error) => setProblem(tmminMutationProblem(error)),
   });
   const action = useMutation({
     mutationFn: ({
@@ -984,6 +1021,7 @@ export function ExternalCredentialsPage() {
         queryKey: tmminKey(session!.principal.userId, 'external-clients', supplierId),
       });
     },
+    onError: (error) => setProblem(tmminMutationProblem(error)),
   });
   return (
     <>
@@ -992,6 +1030,11 @@ export function ExternalCredentialsPage() {
         title="Credential External"
         description="Client epoch, scope, IP allowlist, status, penggunaan terakhir, rotasi, dan pencabutan."
       />
+      {problem && (
+        <Alert tone="danger" title="Perubahan credential gagal">
+          {problem}
+        </Alert>
+      )}
       {credential && (
         <Card className="tmmin-secret-card">
           <OneTimeCredentialPanel
@@ -1007,7 +1050,10 @@ export function ExternalCredentialsPage() {
       >
         <form
           className="tmmin-inline-form"
-          onSubmit={(event) => void form.handleSubmit((values) => issue.mutate(values))(event)}
+          onSubmit={(event) => {
+            setProblem(null);
+            void form.handleSubmit((values) => issue.mutate(values))(event);
+          }}
         >
           <Field label="Client name" errorText={form.formState.errors.name?.message}>
             <Input {...form.register('name')} />
@@ -1071,13 +1117,14 @@ export function ExternalCredentialsPage() {
                           <>
                             <Button
                               size="sm"
-                              onClick={() =>
+                              onClick={() => {
+                                setProblem(null);
                                 action.mutate({
                                   id: row.id,
                                   version: row.version,
                                   action: 'rotate-secret',
-                                })
-                              }
+                                });
+                              }}
                             >
                               Rotasi
                             </Button>
@@ -1091,13 +1138,14 @@ export function ExternalCredentialsPage() {
                               description="Semua secret dan access token aktif untuk client ini akan dicabut."
                               confirmLabel="Cabut"
                               destructive
-                              onConfirm={() =>
+                              onConfirm={() => {
+                                setProblem(null);
                                 action.mutate({
                                   id: row.id,
                                   version: row.version,
                                   action: 'revoke',
-                                })
-                              }
+                                });
+                              }}
                             />
                           </>
                         )}
@@ -1344,6 +1392,12 @@ function dateTime(value?: string | null) {
   return value
     ? new Date(value).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
     : 'No data';
+}
+
+export function tmminMutationProblem(error: unknown): string {
+  return error instanceof ApiProblemError
+    ? error.problem.detail
+    : 'Perubahan tidak dapat disimpan. Muat ulang sebelum mencoba kembali.';
 }
 
 function sourceActionLabel(action: string) {
