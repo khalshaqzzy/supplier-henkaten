@@ -320,4 +320,9 @@ export function assertLocalSeedEnvironment(environment: NodeJS.ProcessEnv): void
   if (environment.CI === 'true') {
     throw new Error('Local interactive seed is disabled in CI.');
   }
+  if (environment.PUSH_ENABLED === 'true') {
+    throw new Error(
+      'Local seed requires PUSH_ENABLED=false; push subscriptions must be activated on a real browser installation.',
+    );
+  }
 }

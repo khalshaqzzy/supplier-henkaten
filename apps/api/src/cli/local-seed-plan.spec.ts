@@ -127,7 +127,7 @@ describe('local seed plan', () => {
     );
   });
 
-  it('rejects non-local, production, test-database, missing-confirmation, and CI execution', () => {
+  it('rejects non-local, production, test-database, missing-confirmation, CI, and push-enabled execution', () => {
     const valid = {
       NODE_ENV: 'development',
       LOCAL_SEED_CONFIRM: LOCAL_SEED_CONFIRMATION,
@@ -148,5 +148,8 @@ describe('local seed plan', () => {
       }),
     ).toThrow();
     expect(() => assertLocalSeedEnvironment({ ...valid, CI: 'true' })).toThrow();
+    expect(() => assertLocalSeedEnvironment({ ...valid, PUSH_ENABLED: 'true' })).toThrow(
+      'push subscriptions must be activated on a real browser installation',
+    );
   });
 });

@@ -1474,22 +1474,35 @@ async function verifySeed(prisma: PrismaClient) {
       );
     }
   }
-  const [externalClients, ingestionEvents, externalProjections, pendingOutbox, failedOutbox] =
-    await Promise.all([
-      prisma.externalApiClient.count(),
-      prisma.externalIngestionEvent.count(),
-      prisma.externalHenkatenProjection.count(),
-      prisma.outboxEvent.count({ where: { processedAt: null, failedAt: null } }),
-      prisma.outboxEvent.count({ where: { failedAt: { not: null } } }),
-    ]);
+  const [
+    externalClients,
+    ingestionEvents,
+    externalProjections,
+    pushSubscriptions,
+    pushDeliveries,
+    pendingOutbox,
+    failedOutbox,
+  ] = await Promise.all([
+    prisma.externalApiClient.count(),
+    prisma.externalIngestionEvent.count(),
+    prisma.externalHenkatenProjection.count(),
+    prisma.pushSubscription.count(),
+    prisma.pushDelivery.count(),
+    prisma.outboxEvent.count({ where: { processedAt: null, failedAt: null } }),
+    prisma.outboxEvent.count({ where: { failedAt: { not: null } } }),
+  ]);
   if (
     externalClients !== 0 ||
     ingestionEvents !== 0 ||
     externalProjections !== 0 ||
+    pushSubscriptions !== 0 ||
+    pushDeliveries !== 0 ||
     pendingOutbox !== 0 ||
     failedOutbox !== 0
   ) {
-    throw new Error('Post-seed invariant failed: External or unhealthy outbox state exists.');
+    throw new Error(
+      'Post-seed invariant failed: External, synthetic push, or unhealthy outbox state exists.',
+    );
   }
 }
 
