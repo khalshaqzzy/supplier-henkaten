@@ -34,7 +34,12 @@ export class PushSubscriptionService {
   async configFor(principal: RequestPrincipal, installationId: string | null) {
     const subscription = installationId
       ? await this.prisma.pushSubscription.findFirst({
-          where: { userId: principal.userId, installationId, status: 'ACTIVE' },
+          where: {
+            userId: principal.userId,
+            installationId,
+            status: 'ACTIVE',
+            OR: [{ expirationAt: null }, { expirationAt: { gt: new Date() } }],
+          },
           orderBy: { updatedAt: 'desc' },
         })
       : null;

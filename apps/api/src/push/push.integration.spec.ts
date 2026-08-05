@@ -164,6 +164,34 @@ describe('Supplier Web Push persistence and enforcement', () => {
     expect(allowed.status).toBe(200);
   });
 
+  it('keeps expired subscription status consistent with Line Leader enforcement', async () => {
+    const subscription = await prisma.pushSubscription.findFirstOrThrow({
+      where: { userId: first.userId, installationId: installationOne, endpoint: endpointOne },
+    });
+    await prisma.pushSubscription.update({
+      where: { id: subscription.id },
+      data: { expirationAt: new Date(Date.now() - 1_000) },
+    });
+    try {
+      const config = await supplierGet(first, '/api/v1/supplier/push/config', installationOne);
+      expect(config.status).toBe(200);
+      expect(config.body.subscription).toBeNull();
+
+      const blocked = await supplierGet(
+        first,
+        '/api/v1/supplier/notifications/unread-count',
+        installationOne,
+      );
+      expect(blocked.status).toBe(428);
+      expect(blocked.body.code).toBe('PUSH_SUBSCRIPTION_REQUIRED');
+    } finally {
+      await prisma.pushSubscription.update({
+        where: { id: subscription.id },
+        data: { expirationAt: null },
+      });
+    }
+  });
+
   it('reassigns a shared browser endpoint and denies cross-user revocation', async () => {
     const reassigned = await createSubscription(second, installationTwo, endpointOne);
     expect(reassigned.status).toBe(201);

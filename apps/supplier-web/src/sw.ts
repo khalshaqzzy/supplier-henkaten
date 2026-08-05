@@ -79,7 +79,16 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 self.addEventListener('message', (event) => {
-  if (event.data === 'SKIP_WAITING') void self.skipWaiting();
+  if (event.data !== 'SKIP_WAITING') return;
+  event.waitUntil(
+    (async () => {
+      const source = event.source;
+      if (!source || !('id' in source)) return;
+      const client = await self.clients.get(source.id);
+      if (!client || new URL(client.url).origin !== self.location.origin) return;
+      await self.skipWaiting();
+    })(),
+  );
 });
 
 function parsePayload(value: string | undefined) {
