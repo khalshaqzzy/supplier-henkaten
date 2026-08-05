@@ -145,6 +145,10 @@ export class AuthService {
           version: { increment: 1 },
         },
       });
+      await transaction.pushSubscription.updateMany({
+        where: { userId, status: 'ACTIVE' },
+        data: { status: 'REVOKED', revokedAt: this.clock.now(), version: { increment: 1 } },
+      });
     });
   }
 

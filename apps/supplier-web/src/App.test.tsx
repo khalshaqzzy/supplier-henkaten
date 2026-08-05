@@ -53,6 +53,17 @@ describe('Supplier application foundation', () => {
     queryClient.clear();
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
+    vi.spyOn(supplierApi, 'pushConfig').mockResolvedValue({
+      enabled: false,
+      mandatory: false,
+      applicationServerKey: null,
+      permissionGuidance: {
+        explicitGestureRequired: true,
+        iosHomeScreenRequired: true,
+        minimumIosVersion: '16.4',
+      },
+      subscription: null,
+    });
   });
 
   afterEach(() => {
@@ -385,7 +396,45 @@ describe('Supplier application foundation', () => {
     expect(await screen.findByRole('heading', { name: 'Ganti temporary password' })).toBeTruthy();
   });
 
-  it('keeps logout available when the viewport is unsupported', async () => {
+  it('blocks Line Leader operations per device while keeping Account available', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(supplierApi, 'session').mockResolvedValue(
+      session(
+        'NORMAL',
+        ['SUPPLIER_SELF_SERVICE', 'SUPPLIER_BOARD_READ', 'SUPPLIER_NOTIFICATION_READ'],
+        false,
+        'LINE_LEADER',
+      ),
+    );
+    vi.spyOn(supplierApi, 'notificationCount').mockResolvedValue({ count: 0 });
+    vi.spyOn(supplierApi, 'pushConfig').mockResolvedValue({
+      enabled: true,
+      mandatory: true,
+      applicationServerKey: 'A'.repeat(64),
+      permissionGuidance: {
+        explicitGestureRequired: true,
+        iosHomeScreenRequired: true,
+        minimumIosVersion: '16.4',
+      },
+      subscription: null,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/board']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Aktifkan push untuk melanjutkan' }),
+    ).toBeTruthy();
+    expect(screen.getByText(/workflow operasional akan terbuka/i)).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: /Admin Test/i }));
+    expect(await screen.findByRole('heading', { name: 'Akun' })).toBeTruthy();
+    expect(screen.getByText('Aktifkan push notification')).toBeTruthy();
+  });
+
+  it('keeps account navigation and logout available at tablet width', async () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 700 });
     vi.spyOn(supplierApi, 'session').mockResolvedValue(
@@ -396,8 +445,10 @@ describe('Supplier application foundation', () => {
         <App />
       </MemoryRouter>,
     );
-    expect(await screen.findByText(/layar desktop minimal 1280 × 720/i)).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Keluar' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Akun' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Buka navigasi' })).toBeTruthy();
+    expect(screen.queryByText(/layar desktop minimal 1280 × 720/i)).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Keluar' }).length).toBeGreaterThan(0);
   });
 
   it('stores only relative same-realm intended destinations', () => {

@@ -174,5 +174,6 @@ export const publicErrorCodeSchema = z.enum([
   'IMMUTABLE_FIELD',
   'INVALID_IMAGE',
   'CHECKLIST_NOT_PUBLISHED',
+  'PUSH_SUBSCRIPTION_REQUIRED',
 ]);
 export type PublicErrorCode = z.infer<typeof publicErrorCodeSchema>;

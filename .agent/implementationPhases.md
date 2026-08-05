@@ -5012,11 +5012,132 @@ Exit criteria:
 
 - Staging is stable enough for UAT.
 
+### 15.12 Responsive Supplier Experience
+
+Status: **implementation-complete, acceptance pending**
+
+Dependency: 15.9 deployment baseline; final exit also depends on 15.11 staging rehearsal.
+
+Execution:
+
+- Remove the unsupported-viewport gate and support mobile 360–767px, tablet 768–1279px, and
+  desktop at least 1280px in portrait/landscape.
+- Preserve the accepted desktop sidebar/topbar, density, board, dashboard, and tables.
+- Add mobile sticky header/drawer, tablet drawer/rail, stacked filters/actions/forms, contained
+  tables, mobile card rows, adaptive grids, full-screen mobile dialogs/sheets, and 44px targets.
+- Apply patterns to every supplier role and workflow including Hosted Preparation, master/default
+  assignment, board, shift, Henkaten, approval, notification, audit, setup, and account.
+
+Verification:
+
+- Chromium 390×844, 768×1024, 1024×768, 1280×720, and wide desktop; Edge desktop/tablet.
+- No document overflow/clipped action; keyboard/focus, non-color status, 44px, Axe, and screenshot
+  checks across all roles/navigation groups/major workflows.
+
+Data/migration impact:
+
+- No domain or authorization change.
+
+Exit criteria:
+
+- Responsive matrix and retained desktop regression are green on staging.
+
+### 15.13 Supplier PWA Foundation
+
+Status: **implementation-complete, acceptance pending**
+
+Dependency: 15.12 and deployed HTTPS staging.
+
+Execution:
+
+- Add stable root manifest, brand 192/512/maskable/Apple icons, and `injectManifest` TypeScript
+  service worker containing precache, offline navigation fallback, push, and safe click handling.
+- Precache only static shell assets/icons/offline document; keep API/session/photo/domain data and
+  every mutation network-only with no offline draft, IndexedDB, sync, or queued mutation.
+- Add offline/retry and prompted update UI. Add worker/manifest CSP and non-stale HTML/worker/
+  manifest headers plus immutable hashed-asset caching.
+- Extend deployment smoke for manifest, worker, icons, release identity, and cache headers.
+
+Verification:
+
+- Manifest/installability, worker registration/update, offline fallback, network-only exclusions,
+  expired-session click, tag/deep-link validation, and rollback/worker recovery.
+
+Data/migration impact:
+
+- Static frontend/runtime configuration only.
+
+Exit criteria:
+
+- PWA install/update/offline behavior is proven on staging without cached domain data.
+
+### 15.14 Supplier Web Push Backend and Line Leader Enforcement
+
+Status: **implementation and local integration complete; staging rehearsal pending**
+
+Dependency: 15.13 and environment-specific VAPID secrets.
+
+Execution:
+
+- Add shared contracts/OpenAPI/client for config, create, and owner-only expected-version revoke;
+  stable `X-Device-Installation-ID`; redacted device status; opt-in UI and iOS install guidance.
+- Add additive PushSubscription/PushDelivery schema, eligible event materialization, payload
+  allowlist/redaction, exact/suffix vendor endpoint validation, concurrency-safe worker, bounded
+  retry/Retry-After, 404/410 expiry, and safe audit/logging.
+- Hard-block NORMAL Line Leader operational endpoints and routes per installation until active;
+  keep activation/session/change-password/account/help/logout paths available. Other roles opt in.
+- Revoke subscriptions for logout, password/account/role/supplier/source/preparation lifecycle paths.
+- Validate push env/VAPID/allowlist/retry bounds and document forced re-subscription rotation.
+
+Verification:
+
+- Unit/contract and PostgreSQL integration for tenant/user isolation, idempotency/reassignment,
+  multi-device, concurrent claims, revocation paths, transient/permanent gateway results,
+  enforcement exemptions, payload redaction, and SSRF prevention.
+
+Data/migration impact:
+
+- Additive PushSubscription and PushDelivery tables/enums/indexes; code rollback requires no down
+  migration.
+
+Exit criteria:
+
+- Backend/UI enforcement and delivery semantics pass CI and staging vendor-service checks.
+
+### 15.15 Responsive PWA and Real-device Push Rehearsal
+
+Status: **planned**
+
+Dependency: 15.9, 15.11-15.14.
+
+Execution:
+
+- Rehearse Android Chrome/Edge plus iPhone/iPad Home Screen PWA on iOS/iPadOS 16.4+.
+- Cover foreground/background/app-closed push; granted/denied/reset; logout; multi-device;
+  shared-browser reassignment; expiry/delay; worker update/recovery; and offline fallback.
+- Prove Line Leader blocked before activation and fully usable afterward; obtain Supplier Line
+  Leader acceptance and record device/release-safe evidence.
+
+Verification:
+
+- Actual vendor push services and deployed staging release only; no public production test endpoint.
+- Staging redeploy and code-only rollback preserve Notification/domain state and additive schema.
+
+Data/migration impact:
+
+- Staging test data/subscriptions/deliveries only.
+
+Exit criteria:
+
+- Responsive matrix, real-device push, staging redeploy/rollback, and Supplier Line Leader
+  acceptance all pass before Phase 16 UAT.
+
 Phase 15 exit criteria:
 
 - Automatic staging deploy works.
 - Full CI/security checks work.
 - Production workflow waits only on external production readiness.
+- Responsive Supplier, PWA, Web Push/enforcement, and real-device staging rehearsal pass.
 
 Current implementation evidence (2026-07-27):
 
@@ -5046,7 +5167,7 @@ Goal: memenuhi performance/security/acceptance targets, memperoleh sign-off, dan
 
 Depends on:
 
-- Phase 15.
+- Phase 15 including 15.12-15.15.
 
 Unlocks:
 
@@ -5462,6 +5583,7 @@ PRD/ADRs
   -> Supplier + TMMIN Frontends
   -> Full E2E
   -> Containers/CI/CD/Staging
+  -> Responsive Supplier/PWA/Web Push/Device Rehearsal
   -> Hardening/UAT/Production
 ```
 
@@ -5521,6 +5643,9 @@ ADR minimum sebelum atau selama owning phase:
 | Two-frontend shared UI and API-client boundary | Phase 11 |
 | Single-VM Compose/Caddy release topology | Phase 15 |
 | Forward-only migration and code-only rollback | Phase 15 |
+| Responsive supplier shell and adaptive workflow patterns | Phase 15.12 |
+| Supplier service-worker cache/update policy | Phase 15.13 |
+| Web Push delivery, security, and Line Leader enforcement | Phase 15.14 |
 
 ADR harus dibuat ketika keputusan mulai diimplementasikan, bukan setelah implementation selesai.
 
@@ -5538,6 +5663,7 @@ ADR harus dibuat ketika keputusan mulai diimplementasikan, bukan setelah impleme
 | Supplier dashboard | 8 | 12, 14, 16 |
 | TMMIN dashboard/warnings | 8 | 13, 14, 16 |
 | Notification | 8 | 12, 14, 16 |
+| Supplier responsive/PWA/Web Push | 15.12-15.15 | 16 |
 | Audit | 2, 8 | 12, 13, 14, 16 |
 | External API | 9 | 13, 14, 16 |
 | Security/privacy | all backend phases | 10, 15, 16 |
@@ -5579,11 +5705,10 @@ Roadmap tidak mencakup:
 - material inventory/procurement;
 - quality execution di luar Henkaten checklist;
 - QC production integration;
-- email/SMS/push/Slack/Teams/webhook notifications;
+- email/SMS/native push/Slack/Teams/webhook notifications;
 - bulk CSV/Excel import/export;
 - Henkaten attachments selain member photo;
 - native mobile;
-- full tablet/mobile responsive;
 - AI/ML/vector search;
 - External supplier assignment board di TMMIN;
 - Hosted approval untuk External supplier;
@@ -5621,7 +5746,7 @@ Critical accepted constraints:
 - tidak ada RPO/RTO/HA;
 - automatic production deployment;
 - permanent Hosted PII retention;
-- in-app-only critical notifications.
+- best-effort Web Push remains non-authoritative; notification center is authoritative.
 
 Dokumen tidak boleh mengubah constraints tersebut tanpa PRD decision change.
 

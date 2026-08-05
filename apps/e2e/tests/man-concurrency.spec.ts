@@ -154,6 +154,9 @@ test('proves Man cross-line reservation, donor vacancy, resolution, and realm co
   expect(createResolutionBox?.height ?? 0).toBeGreaterThan(28);
   if (process.env.E2E_VISUAL_CAPTURE === '1') {
     for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 768, height: 1024 },
+      { width: 1024, height: 768 },
       { width: 1672, height: 941 },
       { width: 1280, height: 720 },
     ]) {
@@ -166,7 +169,7 @@ test('proves Man cross-line reservation, donor vacancy, resolution, and realm co
           ),
         )
         .toBe(true);
-      if (viewport.width === 1280) {
+      if (viewport.width <= 1280) {
         const accessibility = await new AxeBuilder({ page: donorResolutionPage }).analyze();
         expect(accessibility.violations).toEqual([]);
       }

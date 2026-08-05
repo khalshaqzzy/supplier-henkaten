@@ -22,6 +22,8 @@ import {
   notificationPageSchema,
   notificationSchema,
   notificationUnreadCountSchema,
+  pushConfigSchema,
+  pushSubscriptionSchema,
   partPageSchema,
   partSchema,
   preStartResolutionContextSchema,
@@ -35,6 +37,7 @@ import {
   workingAssignmentSchema,
   type AuditQuery,
   type BoardQuery,
+  type CreatePushSubscriptionRequest,
   type CreateHenkatenRequest,
   type DashboardQuery,
   type HenkatenFormOptionsQuery,
@@ -125,6 +128,28 @@ export class SupplierApi {
       method: 'PATCH',
       body,
       responseSchema: notificationSchema,
+    });
+  }
+
+  pushConfig() {
+    return this.client.request('/api/v1/supplier/push/config', {
+      responseSchema: pushConfigSchema,
+    });
+  }
+
+  createPushSubscription(body: CreatePushSubscriptionRequest) {
+    return this.client.request('/api/v1/supplier/push-subscriptions', {
+      method: 'POST',
+      body,
+      responseSchema: pushSubscriptionSchema,
+    });
+  }
+
+  deletePushSubscription(id: string, expectedVersion: number) {
+    return this.client.request(`/api/v1/supplier/push-subscriptions/${id}`, {
+      method: 'DELETE',
+      body: { expectedVersion },
+      responseSchema: pushSubscriptionSchema,
     });
   }
 

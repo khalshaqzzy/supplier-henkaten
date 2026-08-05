@@ -118,6 +118,11 @@ import {
   externalTokenResponseSchema,
   ingestionResultSchema,
   ingestionStatusSchema,
+  createPushSubscriptionRequestSchema,
+  deletePushSubscriptionRequestSchema,
+  installationIdSchema,
+  pushConfigSchema,
+  pushSubscriptionSchema,
 } from '@tmmin-henkaten/contracts';
 
 const noContent = { description: 'No content' };
@@ -134,6 +139,12 @@ const body = (schema: z.ZodType) => ({
   content: { 'application/json': { schema } },
 });
 const idPath = { path: z.object({ id: z.string().uuid() }) };
+const optionalInstallationHeader = {
+  header: z.object({ 'X-Device-Installation-ID': installationIdSchema.optional() }),
+};
+const installationHeader = {
+  header: z.object({ 'X-Device-Installation-ID': installationIdSchema }),
+};
 const preparationResponseSchema = z
   .object({
     preparation: hostedPreparationSchema,
@@ -185,6 +196,36 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       '/api/v1/auth/tmmin/change-password': passwordPath(),
       '/api/v1/auth/supplier/logout': logoutPath(),
       '/api/v1/auth/tmmin/logout': logoutPath(),
+      '/api/v1/supplier/push/config': {
+        get: {
+          requestParams: optionalInstallationHeader,
+          responses: { '200': json('Supplier push configuration', pushConfigSchema) },
+        },
+      },
+      '/api/v1/supplier/push-subscriptions': {
+        post: {
+          requestParams: installationHeader,
+          requestBody: body(createPushSubscriptionRequestSchema),
+          responses: {
+            '201': json('Push subscription', pushSubscriptionSchema),
+            '400': problem,
+          },
+        },
+      },
+      '/api/v1/supplier/push-subscriptions/{id}': {
+        delete: {
+          requestParams: {
+            ...idPath,
+            ...installationHeader,
+          },
+          requestBody: body(deletePushSubscriptionRequestSchema),
+          responses: {
+            '200': json('Revoked push subscription', pushSubscriptionSchema),
+            '404': problem,
+            '409': problem,
+          },
+        },
+      },
       '/api/v1/tmmin/quality-users': {
         get: {
           requestParams: { query: qualityUserListQuerySchema },

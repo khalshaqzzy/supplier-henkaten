@@ -280,7 +280,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -430,7 +431,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -571,7 +573,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -714,7 +717,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -800,7 +804,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -844,7 +849,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -928,7 +934,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -972,7 +979,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -1049,7 +1057,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -1126,7 +1135,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -1139,6 +1149,317 @@ export interface paths {
       };
     };
     delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/push/config': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: {
+          'X-Device-Installation-ID'?: string;
+        };
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Supplier push configuration */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              enabled: boolean;
+              mandatory: boolean;
+              applicationServerKey: string | null;
+              permissionGuidance: {
+                /** @constant */
+                explicitGestureRequired: true;
+                /** @constant */
+                iosHomeScreenRequired: true;
+                /** @constant */
+                minimumIosVersion: '16.4';
+              };
+              subscription: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                status: 'ACTIVE' | 'REVOKED' | 'EXPIRED';
+                expirationAt: string | null;
+                lastAcceptedAt: string | null;
+                version: number;
+              } | null;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/push-subscriptions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header: {
+          'X-Device-Installation-ID': string;
+        };
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** Format: uri */
+            endpoint: string;
+            expirationTime: number | null;
+            keys: {
+              p256dh: string;
+              auth: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Push subscription */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: uuid */
+              id: string;
+              /** @enum {string} */
+              status: 'ACTIVE' | 'REVOKED' | 'EXPIRED';
+              expirationAt: string | null;
+              lastAcceptedAt: string | null;
+              version: number;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Problem Details */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/push-subscriptions/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header: {
+          'X-Device-Installation-ID': string;
+        };
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Revoked push subscription */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: uuid */
+              id: string;
+              /** @enum {string} */
+              status: 'ACTIVE' | 'REVOKED' | 'EXPIRED';
+              expirationAt: string | null;
+              lastAcceptedAt: string | null;
+              version: number;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Problem Details */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
     options?: never;
     head?: never;
     patch?: never;
@@ -1353,7 +1674,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -1465,7 +1787,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -1575,7 +1898,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -1691,7 +2015,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -1884,7 +2209,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -2022,7 +2348,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -2116,7 +2443,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -2214,7 +2542,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -2258,7 +2587,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -2360,7 +2690,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -2404,7 +2735,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -2522,7 +2854,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -2566,7 +2899,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -2682,7 +3016,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -2726,7 +3061,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -2866,7 +3202,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -3034,7 +3371,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -3139,7 +3477,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -3183,7 +3522,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -3284,7 +3624,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -3391,7 +3732,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -3662,7 +4004,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -3771,7 +4114,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -3884,7 +4228,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -4001,7 +4346,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -4123,7 +4469,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -4242,7 +4589,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -4365,7 +4713,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -4488,7 +4837,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -4606,7 +4956,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -4691,7 +5042,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -4769,7 +5121,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -4911,7 +5264,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -5002,7 +5356,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -5093,7 +5448,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -5188,7 +5544,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -5287,7 +5644,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -5481,7 +5839,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -5573,7 +5932,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -5670,7 +6030,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -5771,7 +6132,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -5860,7 +6222,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -5998,7 +6361,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -6088,7 +6452,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -6178,7 +6543,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -6272,7 +6638,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -6370,7 +6737,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -6518,7 +6886,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -6612,7 +6981,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -6708,7 +7078,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -6806,7 +7177,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -6908,7 +7280,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -6995,7 +7368,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -7136,7 +7510,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -7233,7 +7608,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -7386,7 +7762,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -7486,7 +7863,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -7668,7 +8046,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -7786,7 +8165,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -7904,7 +8284,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -8025,7 +8406,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -8146,7 +8528,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -8262,7 +8645,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -8382,7 +8766,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -8494,7 +8879,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -8575,7 +8961,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -8679,7 +9066,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -8785,7 +9173,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -8888,7 +9277,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -8995,7 +9385,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -9093,7 +9484,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -9203,7 +9595,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -9659,7 +10052,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -9902,7 +10296,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -10083,7 +10478,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -10561,7 +10957,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -10751,7 +11148,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -10940,7 +11338,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -11111,7 +11510,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -11293,7 +11693,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -11777,7 +12178,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -12098,7 +12500,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -12400,7 +12803,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -12652,7 +13056,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -12903,7 +13308,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -13029,7 +13435,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -13322,7 +13729,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -13564,7 +13972,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -13720,7 +14129,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -13948,7 +14358,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -14719,7 +15130,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -15057,7 +15469,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -15281,7 +15694,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -15390,7 +15804,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -15496,7 +15911,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -15721,7 +16137,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -15908,7 +16325,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -15952,7 +16370,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -16358,7 +16777,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -16402,7 +16822,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -16446,7 +16867,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -16542,7 +16964,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -16586,7 +17009,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -16630,7 +17054,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;
@@ -16729,7 +17154,8 @@ export interface paths {
                 | 'RESOURCE_IN_USE'
                 | 'IMMUTABLE_FIELD'
                 | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED';
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
               correlationId: string;
               fieldErrors?: {
                 path: string;

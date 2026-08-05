@@ -12,7 +12,7 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
   await expectFourMLegend(tmmin);
   await expectKeyboardSequence(tmmin, ['Username', 'Password'], 'Masuk');
   expect((await new AxeBuilder({ page: tmmin }).analyze()).violations).toEqual([]);
-  await captureAuthEvidence(tmmin, 'tmmin-login', testInfo);
+  await captureAuthEvidence(tmmin, 'tmmin-login', testInfo, false);
   await loginBootstrapThroughUi(tmmin);
 
   const tmminA11y = await new AxeBuilder({ page: tmmin }).analyze();
@@ -129,9 +129,8 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
 
   const supplierA11y = await new AxeBuilder({ page: supplier }).analyze();
   expect(supplierA11y.violations).toEqual([]);
-  expect(await supplier.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
-    await supplier.evaluate(() => document.documentElement.clientWidth),
-  );
+  await assertSupplierResponsiveMatrix(supplier, 'supplier-setup', testInfo);
+  await assertSupplierPwa(supplier);
 
   await supplierContext.close();
   await tmminContext.close();
@@ -172,11 +171,25 @@ async function expectKeyboardSequence(page: Page, fieldLabels: string[], submitN
   await expect(page.getByRole('button', { name: submitName })).toBeFocused();
 }
 
-async function captureAuthEvidence(page: Page, name: string, testInfo: TestInfo) {
-  for (const viewport of [
-    { width: 1280, height: 720 },
-    { width: 1672, height: 941 },
-  ]) {
+async function captureAuthEvidence(
+  page: Page,
+  name: string,
+  testInfo: TestInfo,
+  responsiveSupplier = true,
+) {
+  const viewports = responsiveSupplier
+    ? [
+        { width: 390, height: 844 },
+        { width: 768, height: 1024 },
+        { width: 1024, height: 768 },
+        { width: 1280, height: 720 },
+        { width: 1672, height: 941 },
+      ]
+    : [
+        { width: 1280, height: 720 },
+        { width: 1672, height: 941 },
+      ];
+  for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       await page.evaluate(() => document.documentElement.clientWidth),
@@ -187,6 +200,80 @@ async function captureAuthEvidence(page: Page, name: string, testInfo: TestInfo)
     });
   }
   await page.setViewportSize({ width: 1280, height: 720 });
+}
+
+async function assertSupplierResponsiveMatrix(page: Page, name: string, testInfo: TestInfo) {
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 1024, height: 768 },
+    { width: 1280, height: 720 },
+    { width: 1672, height: 941 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      await page.evaluate(() => document.documentElement.clientWidth),
+    );
+    await expect(page.locator('h1')).toBeVisible();
+    const menu = page.getByRole('button', { name: 'Buka navigasi' });
+    if (viewport.width < 1280) {
+      await expect(menu).toBeVisible();
+      const box = await menu.boundingBox();
+      expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+      expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    } else {
+      await expect(menu).toBeHidden();
+      await expect(page.getByRole('navigation', { name: 'Navigasi utama' })).toBeVisible();
+    }
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await page.screenshot({
+      path: testInfo.outputPath(`${name}-${viewport.width}x${viewport.height}.png`),
+      animations: 'disabled',
+      fullPage: false,
+    });
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
+}
+
+async function assertSupplierPwa(page: Page) {
+  const manifestResponse = await page.request.get(`${runtime.supplierOrigin}/manifest.webmanifest`);
+  expect(manifestResponse.ok()).toBe(true);
+  expect(await manifestResponse.json()).toMatchObject({
+    id: '/',
+    start_url: '/',
+    scope: '/',
+    display: 'standalone',
+  });
+  for (const icon of ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png']) {
+    expect((await page.request.get(`${runtime.supplierOrigin}/icons/${icon}`)).ok()).toBe(true);
+  }
+
+  await page.evaluate(async () => {
+    if (!('serviceWorker' in navigator)) throw new Error('Service worker API unavailable.');
+    await navigator.serviceWorker.ready;
+  });
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Setup Supplier' })).toBeVisible();
+  const cacheUrls = await page.evaluate(async () => {
+    const urls: string[] = [];
+    for (const name of await caches.keys()) {
+      for (const cached of await (await caches.open(name)).keys()) urls.push(cached.url);
+    }
+    return urls;
+  });
+  expect(cacheUrls.some((url) => new URL(url).pathname.startsWith('/api/'))).toBe(false);
+  expect(cacheUrls.some((url) => new URL(url).pathname.includes('/member-photos/'))).toBe(false);
+  expect(cacheUrls.some((url) => new URL(url).pathname === '/offline.html')).toBe(true);
+
+  await page.context().setOffline(true);
+  try {
+    await page.goto(`${runtime.supplierOrigin}/offline-probe`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: 'Koneksi tidak tersedia' })).toBeVisible();
+    await expect(page.getByText(/Data operasional tidak disimpan offline/i)).toBeVisible();
+  } finally {
+    await page.context().setOffline(false);
+  }
 }
 
 async function createResource(

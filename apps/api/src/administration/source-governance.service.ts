@@ -277,6 +277,10 @@ export class SourceGovernanceService {
           version: { increment: 1 },
         },
       });
+      await transaction.pushSubscription.updateMany({
+        where: { supplierId, status: 'ACTIVE' },
+        data: { status: 'REVOKED', revokedAt: new Date(), version: { increment: 1 } },
+      });
       const updated = await transaction.supplier.update({
         where: { id: supplier.id },
         data: {

@@ -6,23 +6,27 @@ import {
   History,
   LayoutDashboard,
   LogOut,
+  Menu,
   PanelLeftClose,
   PanelLeftOpen,
   Settings2,
   ShieldCheck,
   UserRound,
   UsersRound,
+  X,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import type { Capability } from '@tmmin-henkaten/contracts';
-import { BrandLockup, Button, IconButton, Spinner } from '@tmmin-henkaten/ui';
+import { BrandLockup, IconButton, Spinner } from '@tmmin-henkaten/ui';
 
 import { supplierApi } from '../app/api';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
+import { usePush } from '../app/push';
+import { PushRequiredPage } from './PushSettings';
 
 const roleLabels = {
   SUPPLIER_ADMIN: 'Supplier Admin',
@@ -126,10 +130,12 @@ export function ProductLayout() {
   const { session, hasCapability, logout } = useSession();
   const navigate = useNavigate();
   const location = useLocation();
-  const [supported, setSupported] = useState(
-    () => window.innerWidth >= 1280 && window.innerHeight >= 720,
-  );
   const [collapsed, setCollapsed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [compactNavigation, setCompactNavigation] = useState(() => window.innerWidth < 1280);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const push = usePush();
   const identity = session?.principal;
   const supplier = session?.supplier;
   const preparation = identity?.purpose === 'HOSTED_PREPARATION';
@@ -158,44 +164,89 @@ export function ProductLayout() {
   });
 
   useEffect(() => {
-    const update = () => setSupported(window.innerWidth >= 1280 && window.innerHeight >= 720);
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
-  useEffect(() => {
+    setMenuOpen(false);
     document.querySelector<HTMLElement>('#main-content h1')?.focus();
   }, [location.pathname]);
 
+  useEffect(() => {
+    const update = () => setCompactNavigation(window.innerWidth < 1280);
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  useEffect(() => {
+    if (!menuOpen || !compactNavigation) return;
+    const sidebar = sidebarRef.current;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    sidebar?.querySelector<HTMLElement>('.product-sidebar-close')?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMenuOpen(false);
+        return;
+      }
+      if (event.key !== 'Tab' || !sidebar) return;
+      const focusable = [
+        ...sidebar.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
+      ];
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+      menuButtonRef.current?.focus();
+    };
+  }, [compactNavigation, menuOpen]);
+
   if (!identity || !supplier) return <Spinner label="Memuat konteks Supplier" />;
-  if (!supported) {
-    return (
-      <main className="product-unsupported">
-        <BrandLockup context="Supplier Portal" />
-        <div>
-          <span className="product-eyebrow">Viewport belum didukung</span>
-          <h1>Gunakan layar desktop minimal 1280 × 720.</h1>
-          <p>
-            Workflow operasional membutuhkan ruang untuk tabel, assignment, dan detail keputusan.
-            Perbesar jendela atau buka aplikasi pada desktop.
-          </p>
-          <Button
-            variant="secondary"
-            leadingIcon={<LogOut />}
-            onClick={() => void logout().then(() => navigate('/login'))}
-          >
-            Keluar
-          </Button>
-        </div>
-      </main>
-    );
-  }
+  const pushRequiredByRole = identity.role === 'LINE_LEADER' && identity.purpose === 'NORMAL';
+  const pushRequired = push.config
+    ? push.config.enabled && push.config.mandatory
+    : pushRequiredByRole;
+  const pushActive =
+    push.config?.subscription?.status === 'ACTIVE' && push.permission === 'granted';
+  const showPushGate =
+    pushRequired && !push.loading && !pushActive && location.pathname !== '/account';
 
   return (
-    <div className={`product-shell${collapsed ? ' is-sidebar-collapsed' : ''}`}>
+    <div
+      className={`product-shell${collapsed ? ' is-sidebar-collapsed' : ''}${menuOpen ? ' is-menu-open' : ''}`}
+    >
       <a className="product-skip" href="#main-content">
         Lewati ke konten
       </a>
-      <aside className="product-sidebar" aria-label="Navigasi Supplier">
+      <button
+        type="button"
+        className="product-sidebar-backdrop"
+        aria-label="Tutup navigasi"
+        onClick={() => setMenuOpen(false)}
+      />
+      <aside
+        ref={sidebarRef}
+        id="supplier-navigation"
+        className="product-sidebar"
+        aria-label="Navigasi Supplier"
+        aria-hidden={compactNavigation && !menuOpen}
+        inert={compactNavigation && !menuOpen ? true : undefined}
+      >
+        <IconButton
+          label="Tutup navigasi"
+          className="product-sidebar-close"
+          onClick={() => setMenuOpen(false)}
+        >
+          <X />
+        </IconButton>
         <BrandLockup context={preparation ? 'Hosted Preparation' : 'Supplier Portal'} />
         <div className="product-workspace">
           <span>{supplier.code}</span>
@@ -255,6 +306,16 @@ export function ProductLayout() {
       <div className="product-shell__main">
         <header className="product-topbar">
           <div>
+            <IconButton
+              ref={menuButtonRef}
+              label="Buka navigasi"
+              className="product-menu-button"
+              aria-controls="supplier-navigation"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen(true)}
+            >
+              <Menu />
+            </IconButton>
             <span className="product-topbar__path">
               <small>Area aktif</small>
               {pageArea(location.pathname)}
@@ -274,6 +335,7 @@ export function ProductLayout() {
             <button
               type="button"
               className="product-account"
+              aria-label={`Buka akun ${identity.displayName}`}
               onClick={() => void navigate('/account')}
             >
               <span aria-hidden="true">{initials(identity.displayName)}</span>
@@ -288,7 +350,13 @@ export function ProductLayout() {
           </div>
         </header>
         <main id="main-content" className="product-content" tabIndex={-1}>
-          <Outlet />
+          {push.loading && pushRequired ? (
+            <Spinner label="Memeriksa status push perangkat" />
+          ) : showPushGate ? (
+            <PushRequiredPage />
+          ) : (
+            <Outlet />
+          )}
         </main>
       </div>
     </div>

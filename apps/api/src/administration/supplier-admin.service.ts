@@ -235,6 +235,10 @@ export class SupplierAdminService {
           version: { increment: 1 },
         },
       });
+      await transaction.pushSubscription.updateMany({
+        where: { supplierId: id, status: 'ACTIVE' },
+        data: { status: 'REVOKED', revokedAt: new Date(), version: { increment: 1 } },
+      });
       await this.audit.write(
         supplierAudit(context, updated, active ? 'SUPPLIER_ACTIVATED' : 'SUPPLIER_DEACTIVATED'),
         transaction,
@@ -274,6 +278,10 @@ export class SupplierAdminService {
             revocationReason: 'ADMIN_REPLACED',
             version: { increment: 1 },
           },
+        });
+        await transaction.pushSubscription.updateMany({
+          where: { userId: current.id, status: 'ACTIVE' },
+          data: { status: 'REVOKED', revokedAt: new Date(), version: { increment: 1 } },
         });
       }
       const admin = await this.createSupplierAdmin(
@@ -332,6 +340,10 @@ export class SupplierAdminService {
           revocationReason: 'PASSWORD_RESET',
           version: { increment: 1 },
         },
+      });
+      await transaction.pushSubscription.updateMany({
+        where: { userId: admin.id, status: 'ACTIVE' },
+        data: { status: 'REVOKED', revokedAt: new Date(), version: { increment: 1 } },
       });
       await transaction.supplier.update({
         where: { id: supplierId },
@@ -465,6 +477,10 @@ export class SupplierAdminService {
           revocationReason: 'PREPARATION_CANCELLED',
           version: { increment: 1 },
         },
+      });
+      await transaction.pushSubscription.updateMany({
+        where: { userId: preparation.adminUserId, status: 'ACTIVE' },
+        data: { status: 'REVOKED', revokedAt: new Date(), version: { increment: 1 } },
       });
       const updated = await transaction.supplier.update({
         where: { id: supplierId },

@@ -47,6 +47,7 @@ export interface ApiClientOptions {
   baseUrl: string;
   realm: ApiRealm;
   getCsrfToken?: () => string | null;
+  getInstallationId?: () => string | null;
   onSessionExpired?: () => void;
   fetch?: typeof fetch;
 }
@@ -69,6 +70,7 @@ export class ApiClient {
   private readonly baseUrl: string;
   private readonly fetchImplementation: typeof fetch;
   private readonly getCsrfToken: () => string | null;
+  private readonly getInstallationId: () => string | null;
   private readonly onSessionExpired: () => void;
 
   constructor(options: ApiClientOptions) {
@@ -76,6 +78,7 @@ export class ApiClient {
     this.realm = options.realm;
     this.fetchImplementation = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.getCsrfToken = options.getCsrfToken ?? (() => null);
+    this.getInstallationId = options.getInstallationId ?? (() => null);
     this.onSessionExpired = options.onSessionExpired ?? (() => undefined);
   }
 
@@ -103,6 +106,10 @@ export class ApiClient {
     });
     if (options.body !== undefined) headers.set('Content-Type', 'application/json');
     if (options.idempotencyKey) headers.set('Idempotency-Key', options.idempotencyKey);
+    if (this.realm === 'SUPPLIER' && options.authenticated !== false) {
+      const installationId = this.getInstallationId();
+      if (installationId) headers.set('X-Device-Installation-ID', installationId);
+    }
     if (method !== 'GET' && options.authenticated !== false) {
       const csrfToken = this.getCsrfToken();
       if (csrfToken) headers.set('X-CSRF-Token', csrfToken);

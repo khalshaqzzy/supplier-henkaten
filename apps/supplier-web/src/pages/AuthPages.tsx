@@ -21,6 +21,7 @@ import {
 
 import { consumeIntendedPath, useSession } from '../app/session';
 import { PageHeader } from '../components/layout';
+import { PushSettings } from '../components/PushSettings';
 
 type LoginValues = z.input<typeof supplierLoginRequestSchema>;
 type PasswordValues = z.input<typeof passwordChangeRequestSchema> & { confirmation: string };
@@ -263,6 +264,7 @@ export function AccountPage() {
           </Button>
         </div>
       </Card>
+      <PushSettings required={principal.role === 'LINE_LEADER' && principal.purpose === 'NORMAL'} />
     </div>
   );
 }

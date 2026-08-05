@@ -284,40 +284,40 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
               <tbody>
                 {list.data.items.map((item) => (
                   <tr key={item.id}>
-                    <td>
+                    <td data-label="Identifier">
                       <strong>{item.identifier}</strong>
                       <small>
                         {item.sourceMode} · epoch {item.sourceEpoch}
                       </small>
                     </td>
-                    <td>
+                    <td data-label="4M">
                       <span className={`category-badge is-${item.category.toLowerCase()}`}>
                         {humanize(item.category)}
                       </span>
                     </td>
-                    <td>
+                    <td data-label="Line / Job">
                       {item.line.code} · {item.jobName}
                     </td>
-                    <td>
+                    <td data-label="Part">
                       <strong>{item.part.number}</strong>
                       <small>{item.part.name}</small>
                     </td>
-                    <td>
+                    <td data-label="Business date">
                       {item.businessDate}
                       <small>{formatDate(item.occurredAt, session!.supplier!.timezone)}</small>
                     </td>
-                    <td>
+                    <td data-label="Supervisor">
                       <RouteStatus value={item.routes.supervisor.status} />
                     </td>
-                    <td>
+                    <td data-label="QC">
                       <RouteStatus value={item.routes.qc.status} />
                     </td>
-                    <td>
+                    <td data-label="Status">
                       <span className={`status-label is-${item.status.toLowerCase()}`}>
                         {humanize(item.status)}
                       </span>
                     </td>
-                    <td>
+                    <td data-label="Aksi">
                       <Link to={`/henkatens/${item.id}`}>Buka</Link>
                     </td>
                   </tr>
