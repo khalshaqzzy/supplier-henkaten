@@ -108,6 +108,10 @@ export class UserAdminService {
           version: { increment: 1 },
         },
       });
+      await transaction.pushSubscription.updateMany({
+        where: { userId: user.id, status: 'ACTIVE' },
+        data: { status: 'REVOKED', revokedAt: new Date(), version: { increment: 1 } },
+      });
       return { response: presentUser(updated), action: active ? 'REACTIVATED' : 'DEACTIVATED' };
     });
   }
@@ -141,6 +145,10 @@ export class UserAdminService {
             revocationReason: 'PASSWORD_RESET',
             version: { increment: 1 },
           },
+        });
+        await transaction.pushSubscription.updateMany({
+          where: { userId: current.id, status: 'ACTIVE' },
+          data: { status: 'REVOKED', revokedAt: new Date(), version: { increment: 1 } },
         });
         return { response: updated, action: 'PASSWORD_RESET' };
       },

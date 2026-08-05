@@ -490,17 +490,49 @@ async function captureSupplierPage(
 }
 
 async function captureSupplierVisuals(page: Page, slug: string, testInfo: TestInfo) {
-  if (process.env.E2E_VISUAL_CAPTURE !== '1') return;
+  if (process.env.E2E_VISUAL_CAPTURE !== '1' && slug !== 'supplier-overview') return;
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 1024, height: 768 },
     { width: 1672, height: 941 },
     { width: 1280, height: 720 },
   ]) {
     await page.setViewportSize(viewport);
     await page.evaluate(() => window.scrollTo(0, 0));
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    const overflow = await page.evaluate((viewportWidth) => {
+      const scrollWidth = document.documentElement.scrollWidth;
+      const offenders = [...document.querySelectorAll<HTMLElement>('body *')]
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            element: `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}${[
+              ...element.classList,
+            ]
+              .map((name) => `.${name}`)
+              .join('')}`,
+            left: Math.round(rect.left * 10) / 10,
+            right: Math.round(rect.right * 10) / 10,
+          };
+        })
+        .filter(({ left, right }) => left < -0.5 || right > viewportWidth + 0.5)
+        .slice(0, 10);
+      return { scrollWidth, offenders };
+    }, viewport.width);
+    expect(overflow.scrollWidth, JSON.stringify(overflow.offenders)).toBeLessThanOrEqual(
       viewport.width,
     );
+    const menu = page.getByRole('button', { name: 'Buka navigasi' });
+    if (viewport.width < 1280) {
+      await expect(menu).toBeVisible();
+      const menuBox = await menu.boundingBox();
+      expect(menuBox?.width ?? 0).toBeGreaterThanOrEqual(44);
+      expect(menuBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+    } else {
+      await expect(menu).toBeHidden();
+      await expect(page.getByRole('navigation', { name: 'Navigasi utama' })).toBeVisible();
+    }
     await page.screenshot({
       path: testInfo.outputPath(`${slug}-${viewport.width}x${viewport.height}.png`),
       animations: 'disabled',
@@ -520,7 +552,7 @@ async function captureSupplierVisuals(page: Page, slug: string, testInfo: TestIn
         animations: 'disabled',
       });
     }
-    if (viewport.width === 1280) {
+    if (slug === 'supplier-overview') {
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     }
   }

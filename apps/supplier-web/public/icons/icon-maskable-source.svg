@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="TMMIN Henkaten">
+  <rect width="512" height="512" fill="#e34d19"/>
+  <rect x="76" y="76" width="360" height="360" rx="84" fill="#e34d19"/>
+  <path d="M142 151h228v46H142zm0 82h228v46H142zm0 82h142v46H142z" fill="#fff"/>
+  <circle cx="342" cy="338" r="44" fill="#172033"/>
+  <path d="M342 315v46m-23-23h46" stroke="#fff" stroke-width="18" stroke-linecap="round"/>
+</svg>

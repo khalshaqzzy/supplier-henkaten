@@ -33,7 +33,13 @@ async function bootstrap(): Promise<void> {
   app.enableCors({
     credentials: true,
     origin: [...config.corsAllowedOrigins],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Correlation-ID', 'X-CSRF-Token'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Correlation-ID',
+      'X-CSRF-Token',
+      'X-Device-Installation-ID',
+    ],
     exposedHeaders: ['X-Correlation-ID', 'Retry-After'],
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });

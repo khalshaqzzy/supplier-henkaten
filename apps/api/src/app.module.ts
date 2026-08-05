@@ -24,6 +24,7 @@ import { OperationsModule } from './operations/operations.module.js';
 import { ShiftsModule } from './shifts/shifts.module.js';
 import { ReadModelModule } from './read-models/read-model.module.js';
 import { ExternalModule } from './external/external.module.js';
+import { PushModule } from './push/push.module.js';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { ExternalModule } from './external/external.module.js';
     HenkatenModule,
     ReadModelModule,
     ExternalModule,
+    PushModule,
   ],
   controllers: [HealthController, OpenApiController],
   providers: [

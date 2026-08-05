@@ -603,6 +603,22 @@ export class ShiftService {
           }),
           tx,
         );
+        await this.outbox.enqueue(
+          {
+            eventType: 'SHIFT_START_BLOCKED',
+            aggregateType: 'ShiftRun',
+            aggregateId: plan.id,
+            aggregateVersion: plan.version,
+            supplierId: scope.supplierId,
+            actor: { userId: context.actorUserId, role: context.actorRole },
+            correlationId: context.correlationId,
+            payload: {
+              lineId: plan.lineId,
+              blockerCodes: blockers.map(({ code }) => code),
+            },
+          },
+          tx,
+        );
         return { blocked: true as const };
       }
 

@@ -34,6 +34,23 @@ done
 [[ "${CADDY_EMAIL:-}" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || die "CADDY_EMAIL is invalid."
 [[ "${CADDY_SCHEME:-}" == "" || "${CADDY_SCHEME}" == "http://" ]] || die "CADDY_SCHEME must be empty or http://."
 [[ "${PUBLISHED_HTTP_PORT:-}" =~ ^[0-9]+$ && "${PUBLISHED_HTTPS_PORT:-}" =~ ^[0-9]+$ ]] || die "Published Caddy ports must be numeric."
+[[ "${PUSH_ENABLED:-false}" =~ ^(true|false)$ ]] || die "PUSH_ENABLED must be true or false."
+if [[ "${PUSH_ENABLED:-false}" == "true" ]]; then
+  [[ "${PUSH_VAPID_PUBLIC_KEY:-}" =~ ^[A-Za-z0-9_-]{40,512}$ ]] || die "PUSH_VAPID_PUBLIC_KEY is invalid."
+  [[ "${PUSH_VAPID_PRIVATE_KEY:-}" =~ ^[A-Za-z0-9_-]{20,512}$ ]] || die "PUSH_VAPID_PRIVATE_KEY is invalid."
+  [[ "${PUSH_VAPID_SUBJECT:-}" =~ ^(mailto:|https://) ]] || die "PUSH_VAPID_SUBJECT must use mailto: or https:."
+fi
+PUSH_ENDPOINT_HOSTS="${PUSH_ENDPOINT_HOSTS:-.googleapis.com,.push.apple.com,.notify.windows.com,.push.services.mozilla.com}"
+[[ "${PUSH_ENDPOINT_HOSTS}" =~ ^(\.?[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+)(,\.?[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+)*$ ]] || die "PUSH_ENDPOINT_HOSTS must be a comma-separated exact/suffix hostname allowlist."
+for name in PUSH_DELIVERY_TTL_SECONDS PUSH_DELIVERY_MAX_ATTEMPTS PUSH_DELIVERY_BATCH_SIZE PUSH_DELIVERY_POLL_MS; do
+  case "${name}" in
+    PUSH_DELIVERY_TTL_SECONDS) value="${!name:-3600}" ;;
+    PUSH_DELIVERY_MAX_ATTEMPTS) value="${!name:-5}" ;;
+    PUSH_DELIVERY_BATCH_SIZE) value="${!name:-50}" ;;
+    PUSH_DELIVERY_POLL_MS) value="${!name:-1000}" ;;
+  esac
+  [[ "${value}" =~ ^[1-9][0-9]*$ ]] || die "${name} must be a positive integer."
+done
 if [[ "${SHARED_DIR}" == /opt/* ]]; then
   [[ "${CADDY_SCHEME}" == "" && "${PUBLISHED_HTTP_PORT}" == "80" && "${PUBLISHED_HTTPS_PORT}" == "443" ]] || die "Hosted runtime must use automatic HTTPS on ports 80/443."
 fi

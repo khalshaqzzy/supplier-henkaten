@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#e34d19" />
+    <title>Henkaten sedang offline</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, system-ui, sans-serif;
+        color: #172033;
+        background: #f7f8fa;
+      }
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+      main {
+        width: min(100%, 520px);
+        padding: 32px;
+        border: 1px solid #dde1e8;
+        border-radius: 12px;
+        background: white;
+        box-shadow: 0 12px 32px rgb(23 32 51 / 8%);
+      }
+      i {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border-radius: 9px;
+        background: #e34d19;
+        color: white;
+        font-style: normal;
+        font-weight: 800;
+      }
+      h1 {
+        margin: 24px 0 8px;
+        font-size: 24px;
+      }
+      p {
+        color: #596275;
+        line-height: 1.55;
+      }
+      button {
+        min-height: 44px;
+        padding: 0 18px;
+        border: 0;
+        border-radius: 8px;
+        background: #172033;
+        color: white;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <i aria-hidden="true">4M</i>
+      <h1>Koneksi tidak tersedia</h1>
+      <p>
+        Data operasional tidak disimpan offline. Sambungkan perangkat ke jaringan lalu coba kembali.
+      </p>
+      <button type="button" onclick="location.reload()">Coba lagi</button>
+    </main>
+  </body>
+</html>

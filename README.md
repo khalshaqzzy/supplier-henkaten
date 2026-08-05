@@ -112,6 +112,11 @@ suppliers deliberately have different 4M/status profiles, uneven 1-6 Henkaten sh
 line/part concentration, operational narratives, and event/decision timing instead of uniform demo
 rows.
 
+Local seed keeps Web Push disabled so its Line Leader accounts remain usable without a fabricated
+device subscription. Push subscriptions and deliveries are intentionally never seeded: enablement
+must be completed from each real browser installation, and real-device push rehearsal belongs in
+staging.
+
 Passwords are generated independently on every run and written only to the ignored
 `.local/seed-credentials.json` file with mode `0600`. The terminal prints the file path but never
 the credential values. These commands are guarded for the local Compose project and cannot be used

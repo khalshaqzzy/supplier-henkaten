@@ -62,6 +62,7 @@ services:
       OUTBOX_LOCK_LEASE_MS: ${OUTBOX_LOCK_LEASE_MS:-30000}
       OUTBOX_MAX_ATTEMPTS: ${OUTBOX_MAX_ATTEMPTS:-10}
       REALTIME_POLL_MS: ${REALTIME_POLL_MS:-1000}
+      PUSH_ENABLED: 'false'
       SESSION_CSRF_SECRET: ${SESSION_CSRF_SECRET:-local-development-csrf-secret-change-me}
       AUTH_THROTTLE_SECRET: ${AUTH_THROTTLE_SECRET:-local-development-throttle-secret-change-me}
       AUTH_IP_LOGIN_LIMIT: ${AUTH_IP_LOGIN_LIMIT:-50}

@@ -461,7 +461,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -767,7 +768,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -1046,7 +1048,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -1325,7 +1328,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -1462,7 +1466,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -1563,7 +1568,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -1700,7 +1706,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -1801,7 +1808,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -1911,7 +1919,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -2021,7 +2030,721 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/supplier/push/config": {
+      "get": {
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Device-Installation-ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Supplier push configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "mandatory": {
+                      "type": "boolean"
+                    },
+                    "applicationServerKey": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9_-]{40,512}$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "permissionGuidance": {
+                      "type": "object",
+                      "properties": {
+                        "explicitGestureRequired": {
+                          "type": "boolean",
+                          "const": true
+                        },
+                        "iosHomeScreenRequired": {
+                          "type": "boolean",
+                          "const": true
+                        },
+                        "minimumIosVersion": {
+                          "type": "string",
+                          "const": "16.4"
+                        }
+                      },
+                      "required": [
+                        "explicitGestureRequired",
+                        "iosHomeScreenRequired",
+                        "minimumIosVersion"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "subscription": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "ACTIVE",
+                                "REVOKED",
+                                "EXPIRED"
+                              ]
+                            },
+                            "expirationAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "lastAcceptedAt": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "version": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "status",
+                            "expirationAt",
+                            "lastAcceptedAt",
+                            "version"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "enabled",
+                    "mandatory",
+                    "applicationServerKey",
+                    "permissionGuidance",
+                    "subscription"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/supplier/push-subscriptions": {
+      "post": {
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Device-Installation-ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "endpoint": {
+                    "type": "string",
+                    "maxLength": 4096,
+                    "format": "uri"
+                  },
+                  "expirationTime": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 8640000000000000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "keys": {
+                    "type": "object",
+                    "properties": {
+                      "p256dh": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_-]{20,512}$"
+                      },
+                      "auth": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_-]{8,256}$"
+                      }
+                    },
+                    "required": [
+                      "p256dh",
+                      "auth"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "endpoint",
+                  "expirationTime",
+                  "keys"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Push subscription",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ACTIVE",
+                        "REVOKED",
+                        "EXPIRED"
+                      ]
+                    },
+                    "expirationAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "lastAcceptedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "version": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status",
+                    "expirationAt",
+                    "lastAcceptedAt",
+                    "version",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/supplier/push-subscriptions/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          },
+          {
+            "in": "header",
+            "name": "X-Device-Installation-ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "expectedVersion"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Revoked push subscription",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ACTIVE",
+                        "REVOKED",
+                        "EXPIRED"
+                      ]
+                    },
+                    "expirationAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "lastAcceptedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "version": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status",
+                    "expirationAt",
+                    "lastAcceptedAt",
+                    "version",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -2574,7 +3297,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -2806,7 +3530,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -3038,7 +3763,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -3300,7 +4026,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -3878,7 +4605,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -4304,7 +5032,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -4528,7 +5257,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -4744,7 +5474,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -4845,7 +5576,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -5061,7 +5793,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -5162,7 +5895,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -5436,7 +6170,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -5537,7 +6272,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -5799,7 +6535,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -5900,7 +6637,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -6256,7 +6994,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -6804,7 +7543,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -7026,7 +7766,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -7127,7 +7868,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -7340,7 +8082,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -7575,7 +8318,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -8385,7 +9129,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -8680,7 +9425,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -8967,7 +9713,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -9254,7 +10001,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -9547,7 +10295,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -9863,7 +10612,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -10179,7 +10929,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -10495,7 +11246,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -10782,7 +11534,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -10925,7 +11678,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -11059,7 +11813,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -11400,7 +12155,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -11580,7 +12336,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -11789,7 +12546,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -11990,7 +12748,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -12191,7 +12950,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -12637,7 +13397,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -12852,7 +13613,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -13063,7 +13825,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -13274,7 +14037,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -13437,7 +14201,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -13766,7 +14531,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -13940,7 +14706,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -14143,7 +14910,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -14338,7 +15106,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -14533,7 +15302,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -14912,7 +15682,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -15106,7 +15877,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -15337,7 +16109,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -15552,7 +16325,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -15767,7 +16541,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -15918,7 +16693,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -16242,7 +17018,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -16460,7 +17237,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -16783,7 +17561,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -16998,7 +17777,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -17407,7 +18187,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -17681,7 +18462,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -17955,7 +18737,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -18241,7 +19024,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -18527,7 +19311,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -18796,7 +19581,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -19141,7 +19927,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -19417,7 +20204,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -19561,7 +20349,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -19820,7 +20609,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -20089,7 +20879,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -20342,7 +21133,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -20615,7 +21407,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -20834,7 +21627,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -21082,7 +21876,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -22625,7 +23420,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -23428,7 +24224,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -24015,7 +24812,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -25673,7 +26471,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -26292,7 +27091,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -26910,7 +27710,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -27464,7 +28265,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -28061,7 +28863,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -30186,7 +30989,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -31490,7 +32294,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -32689,7 +33494,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -33789,7 +34595,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -34882,7 +35689,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -35254,7 +36062,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -36211,7 +37020,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -37277,7 +38087,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -37607,7 +38418,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -38064,7 +38876,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -40891,7 +41704,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -41731,7 +42545,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -42473,7 +43288,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -42747,7 +43563,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -43007,7 +43824,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -43640,7 +44458,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -44189,7 +45008,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -44290,7 +45110,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -45868,7 +46689,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -45969,7 +46791,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -46070,7 +46893,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -46283,7 +47107,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -46384,7 +47209,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -46485,7 +47311,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {
@@ -46681,7 +47508,8 @@
                         "RESOURCE_IN_USE",
                         "IMMUTABLE_FIELD",
                         "INVALID_IMAGE",
-                        "CHECKLIST_NOT_PUBLISHED"
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
                       ]
                     },
                     "correlationId": {

@@ -152,55 +152,70 @@ enum ExternalClientStatus {
   REVOKED
 }
 
+enum PushSubscriptionStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum PushDeliveryStatus {
+  PENDING
+  ACCEPTED
+  PERMANENT_FAILURE
+  EXPIRED
+}
+
 model Supplier {
-  id                     String                  @id @default(uuid()) @db.Uuid
-  code                   String                  @db.VarChar(50)
-  normalizedCode         String                  @db.VarChar(50)
-  name                   String                  @db.VarChar(200)
-  timezone               String                  @db.VarChar(100)
-  sourceMode             SourceMode
-  sourceEpoch            Int                     @default(1)
-  active                 Boolean                 @default(true)
-  version                Int                     @default(1)
-  sourceModeChangedAt    DateTime?               @db.Timestamptz(3)
-  sourceModeChangedById  String?                 @db.Uuid
-  createdAt              DateTime                @default(now()) @db.Timestamptz(3)
-  createdById            String?                 @db.Uuid
-  updatedAt              DateTime                @updatedAt @db.Timestamptz(3)
-  updatedById            String?                 @db.Uuid
-  users                  User[]
-  sessions               UserSession[]
-  hostedPreparations     HostedPreparation[]
-  auditEvents            AuditEvent[]
-  outboxEvents           OutboxEvent[]
-  notifications          Notification[]
-  members                Member[]
-  memberPhotos           MemberPhoto[]
-  lines                  Line[]
-  jobs                   Job[]
-  parts                  Part[]
-  shiftTemplates         ShiftTemplate[]
-  checklistTemplates     ChecklistTemplate[]
-  checklistVersions      ChecklistVersion[]
-  defaultAssignmentSet   DefaultAssignmentSet?
-  defaultLineSupervisors DefaultLineSupervisor[]
-  defaultLineLeaders     DefaultLineLeader[]
-  defaultJobMps          DefaultJobMp[]
-  shiftRuns              ShiftRun[]
-  workingAssignments     WorkingAssignment[]
-  assignmentIssues       AssignmentIssue[]
-  henkatenDailySequences HenkatenDailySequence[]
-  henkatens              Henkaten[]
-  mpReservations         MPReservation[]
-  warningInstances       WarningInstance[]
-  approvalRoutes         HenkatenApprovalRoute[]
-  approvalDecisions      ApprovalDecision[]
-  approvalRouteRoutings  ApprovalRouteRouting[]
-  assignmentMovements    AssignmentMovement[]
-  externalApiClients     ExternalApiClient[]
-  externalAccessTokens   ExternalAccessToken[]
+  id                      String                       @id @default(uuid()) @db.Uuid
+  code                    String                       @db.VarChar(50)
+  normalizedCode          String                       @db.VarChar(50)
+  name                    String                       @db.VarChar(200)
+  timezone                String                       @db.VarChar(100)
+  sourceMode              SourceMode
+  sourceEpoch             Int                          @default(1)
+  active                  Boolean                      @default(true)
+  version                 Int                          @default(1)
+  sourceModeChangedAt     DateTime?                    @db.Timestamptz(3)
+  sourceModeChangedById   String?                      @db.Uuid
+  createdAt               DateTime                     @default(now()) @db.Timestamptz(3)
+  createdById             String?                      @db.Uuid
+  updatedAt               DateTime                     @updatedAt @db.Timestamptz(3)
+  updatedById             String?                      @db.Uuid
+  users                   User[]
+  sessions                UserSession[]
+  hostedPreparations      HostedPreparation[]
+  auditEvents             AuditEvent[]
+  outboxEvents            OutboxEvent[]
+  notifications           Notification[]
+  members                 Member[]
+  memberPhotos            MemberPhoto[]
+  lines                   Line[]
+  jobs                    Job[]
+  parts                   Part[]
+  shiftTemplates          ShiftTemplate[]
+  checklistTemplates      ChecklistTemplate[]
+  checklistVersions       ChecklistVersion[]
+  defaultAssignmentSet    DefaultAssignmentSet?
+  defaultLineSupervisors  DefaultLineSupervisor[]
+  defaultLineLeaders      DefaultLineLeader[]
+  defaultJobMps           DefaultJobMp[]
+  shiftRuns               ShiftRun[]
+  workingAssignments      WorkingAssignment[]
+  assignmentIssues        AssignmentIssue[]
+  henkatenDailySequences  HenkatenDailySequence[]
+  henkatens               Henkaten[]
+  mpReservations          MPReservation[]
+  warningInstances        WarningInstance[]
+  approvalRoutes          HenkatenApprovalRoute[]
+  approvalDecisions       ApprovalDecision[]
+  approvalRouteRoutings   ApprovalRouteRouting[]
+  assignmentMovements     AssignmentMovement[]
+  externalApiClients      ExternalApiClient[]
+  externalAccessTokens    ExternalAccessToken[]
   externalIngestionEvents ExternalIngestionEvent[]
-  externalProjections    ExternalHenkatenProjection[]
+  externalProjections     ExternalHenkatenProjection[]
+  pushSubscriptions       PushSubscription[]
+  pushDeliveries          PushDelivery[]
 
   @@unique([normalizedCode], map: "Supplier_normalizedCode_key")
   @@index([sourceMode, active])
@@ -235,6 +250,7 @@ model User {
   passwordHistory            PasswordHistory[]
   hostedPreparations         HostedPreparation[]
   notifications              Notification[]
+  pushSubscriptions          PushSubscription[]
 
   @@unique([memberId])
   @@index([supplierId, role, status])
@@ -357,43 +373,96 @@ model OutboxEvent {
 }
 
 model Notification {
-  id              String   @id @default(uuid()) @db.Uuid
-  supplierId      String   @db.Uuid
-  recipientUserId String   @db.Uuid
-  sourceEventId   String   @db.Uuid
-  kind            String   @db.VarChar(50)
-  title           String   @db.VarChar(200)
-  body            String   @db.VarChar(1000)
-  resourceType    String   @db.VarChar(100)
-  resourceId      String   @db.VarChar(200)
-  deepLink        String?  @db.VarChar(500)
-  readAt          DateTime? @db.Timestamptz(3)
-  version         Int      @default(1)
-  createdAt       DateTime @default(now()) @db.Timestamptz(3)
-  supplier        Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  recipient       User     @relation(fields: [recipientUserId], references: [id], onDelete: Restrict)
+  id              String         @id @default(uuid()) @db.Uuid
+  supplierId      String         @db.Uuid
+  recipientUserId String         @db.Uuid
+  sourceEventId   String         @db.Uuid
+  kind            String         @db.VarChar(50)
+  title           String         @db.VarChar(200)
+  body            String         @db.VarChar(1000)
+  resourceType    String         @db.VarChar(100)
+  resourceId      String         @db.VarChar(200)
+  deepLink        String?        @db.VarChar(500)
+  readAt          DateTime?      @db.Timestamptz(3)
+  version         Int            @default(1)
+  createdAt       DateTime       @default(now()) @db.Timestamptz(3)
+  supplier        Supplier       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  recipient       User           @relation(fields: [recipientUserId], references: [id], onDelete: Restrict)
+  pushDeliveries  PushDelivery[]
 
   @@unique([sourceEventId, recipientUserId])
   @@index([recipientUserId, readAt, createdAt(sort: Desc), id(sort: Desc)])
   @@index([supplierId, createdAt(sort: Desc)])
 }
 
+model PushSubscription {
+  id               String                 @id @default(uuid()) @db.Uuid
+  supplierId       String                 @db.Uuid
+  userId           String                 @db.Uuid
+  installationId   String                 @db.Uuid
+  endpointHash     String                 @unique @db.Char(64)
+  endpoint         String                 @db.Text
+  p256dh           String                 @db.VarChar(512)
+  auth             String                 @db.VarChar(256)
+  status           PushSubscriptionStatus @default(ACTIVE)
+  expirationAt     DateTime?              @db.Timestamptz(3)
+  lastAcceptedAt   DateTime?              @db.Timestamptz(3)
+  lastFailureAt    DateTime?              @db.Timestamptz(3)
+  lastFailureClass String?                @db.VarChar(100)
+  revokedAt        DateTime?              @db.Timestamptz(3)
+  version          Int                    @default(1)
+  createdAt        DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime               @updatedAt @db.Timestamptz(3)
+  supplier         Supplier               @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  deliveries       PushDelivery[]
+
+  @@index([userId, installationId, status])
+  @@index([supplierId, status])
+}
+
+model PushDelivery {
+  id               String             @id @default(uuid()) @db.Uuid
+  supplierId       String             @db.Uuid
+  notificationId   String             @db.Uuid
+  subscriptionId   String             @db.Uuid
+  status           PushDeliveryStatus @default(PENDING)
+  payload          Json
+  attemptCount     Int                @default(0)
+  nextAttemptAt    DateTime           @default(now()) @db.Timestamptz(3)
+  expiresAt        DateTime           @db.Timestamptz(3)
+  lockedAt         DateTime?          @db.Timestamptz(3)
+  lockedBy         String?            @db.VarChar(100)
+  acceptedAt       DateTime?          @db.Timestamptz(3)
+  failedAt         DateTime?          @db.Timestamptz(3)
+  safeFailureClass String?            @db.VarChar(100)
+  createdAt        DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime           @updatedAt @db.Timestamptz(3)
+  supplier         Supplier           @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  notification     Notification       @relation(fields: [notificationId], references: [id], onDelete: Restrict)
+  subscription     PushSubscription   @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+
+  @@unique([notificationId, subscriptionId])
+  @@index([status, nextAttemptAt, lockedAt])
+  @@index([supplierId, createdAt(sort: Desc)])
+}
+
 model ExternalApiClient {
-  id                        String               @id @default(uuid()) @db.Uuid
-  supplierId                String               @db.Uuid
-  clientId                  String               @unique @db.VarChar(100)
-  name                      String               @db.VarChar(150)
+  id                        String                   @id @default(uuid()) @db.Uuid
+  supplierId                String                   @db.Uuid
+  clientId                  String                   @unique @db.VarChar(100)
+  name                      String                   @db.VarChar(150)
   sourceEpoch               Int
   scopes                    String[]
   ipAllowlist               String[]
-  status                    ExternalClientStatus @default(ACTIVE)
-  lastSuccessfulIngestionAt DateTime?            @db.Timestamptz(3)
-  version                   Int                  @default(1)
-  createdAt                 DateTime             @default(now()) @db.Timestamptz(3)
-  createdById               String               @db.Uuid
-  updatedAt                 DateTime             @updatedAt @db.Timestamptz(3)
-  updatedById               String?              @db.Uuid
-  supplier                  Supplier             @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  status                    ExternalClientStatus     @default(ACTIVE)
+  lastSuccessfulIngestionAt DateTime?                @db.Timestamptz(3)
+  version                   Int                      @default(1)
+  createdAt                 DateTime                 @default(now()) @db.Timestamptz(3)
+  createdById               String                   @db.Uuid
+  updatedAt                 DateTime                 @updatedAt @db.Timestamptz(3)
+  updatedById               String?                  @db.Uuid
+  supplier                  Supplier                 @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   secrets                   ExternalApiSecret[]
   tokens                    ExternalAccessToken[]
   ingestionEvents           ExternalIngestionEvent[]
@@ -435,22 +504,22 @@ model ExternalAccessToken {
 }
 
 model ExternalIngestionEvent {
-  id                String                     @id @default(uuid()) @db.Uuid
-  supplierId        String                     @db.Uuid
-  clientId          String                     @db.Uuid
-  sourceEpoch       Int
-  eventId           String                     @db.VarChar(200)
-  sourceHenkatenId  String                     @db.VarChar(200)
-  sourceVersion     Int
-  eventType         String                     @db.VarChar(50)
-  payloadHash       String                     @db.Char(64)
-  canonicalPayload  Json
-  correlationId     String                     @db.VarChar(128)
-  receivedAt        DateTime                   @default(now()) @db.Timestamptz(3)
-  projectionId      String?                    @db.Uuid
-  supplier          Supplier                   @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  client            ExternalApiClient          @relation(fields: [clientId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  projection        ExternalHenkatenProjection? @relation(fields: [projectionId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  id               String                      @id @default(uuid()) @db.Uuid
+  supplierId       String                      @db.Uuid
+  clientId         String                      @db.Uuid
+  sourceEpoch      Int
+  eventId          String                      @db.VarChar(200)
+  sourceHenkatenId String                      @db.VarChar(200)
+  sourceVersion    Int
+  eventType        String                      @db.VarChar(50)
+  payloadHash      String                      @db.Char(64)
+  canonicalPayload Json
+  correlationId    String                      @db.VarChar(128)
+  receivedAt       DateTime                    @default(now()) @db.Timestamptz(3)
+  projectionId     String?                     @db.Uuid
+  supplier         Supplier                    @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  client           ExternalApiClient           @relation(fields: [clientId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  projection       ExternalHenkatenProjection? @relation(fields: [projectionId, supplierId], references: [id, supplierId], onDelete: Restrict)
 
   @@unique([supplierId, sourceEpoch, eventId])
   @@unique([supplierId, sourceEpoch, sourceHenkatenId, sourceVersion])
@@ -459,27 +528,27 @@ model ExternalIngestionEvent {
 }
 
 model ExternalHenkatenProjection {
-  id                         String                   @id @default(uuid()) @db.Uuid
-  supplierId                 String                   @db.Uuid
-  sourceEpoch                Int
-  sourceHenkatenId           String                   @db.VarChar(200)
-  sourceVersion              Int
-  status                     HenkatenStatus
-  category                   HenkatenCategory
-  occurredAt                 DateTime                 @db.Timestamptz(3)
-  lineSnapshot               Json
-  shiftSnapshot              Json
-  jobSnapshot                Json
-  partSnapshot               Json
-  changeSnapshot             Json
-  checklistSnapshot          Json
-  decisionsSnapshot          Json
-  lastEventId                String                   @db.VarChar(200)
-  createdAt                  DateTime                 @default(now()) @db.Timestamptz(3)
-  updatedAt                  DateTime                 @updatedAt @db.Timestamptz(3)
-  supplier                   Supplier                 @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  ingestionEvents            ExternalIngestionEvent[]
-  warning                    WarningInstance?
+  id                String                   @id @default(uuid()) @db.Uuid
+  supplierId        String                   @db.Uuid
+  sourceEpoch       Int
+  sourceHenkatenId  String                   @db.VarChar(200)
+  sourceVersion     Int
+  status            HenkatenStatus
+  category          HenkatenCategory
+  occurredAt        DateTime                 @db.Timestamptz(3)
+  lineSnapshot      Json
+  shiftSnapshot     Json
+  jobSnapshot       Json
+  partSnapshot      Json
+  changeSnapshot    Json
+  checklistSnapshot Json
+  decisionsSnapshot Json
+  lastEventId       String                   @db.VarChar(200)
+  createdAt         DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime                 @updatedAt @db.Timestamptz(3)
+  supplier          Supplier                 @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  ingestionEvents   ExternalIngestionEvent[]
+  warning           WarningInstance?
 
   @@unique([id, supplierId])
   @@unique([supplierId, sourceEpoch, sourceHenkatenId])
@@ -576,8 +645,8 @@ model Line {
   workingAssignments WorkingAssignment[]
   assignmentIssues   AssignmentIssue[]
   henkatens          Henkaten[]
-  targetMovements    AssignmentMovement[] @relation("AssignmentMovementTargetLine")
-  sourceMovements    AssignmentMovement[] @relation("AssignmentMovementSourceLine")
+  targetMovements    AssignmentMovement[]   @relation("AssignmentMovementTargetLine")
+  sourceMovements    AssignmentMovement[]   @relation("AssignmentMovementSourceLine")
 
   @@unique([supplierId, normalizedCode])
   @@unique([id, supplierId])
@@ -585,20 +654,20 @@ model Line {
 }
 
 model Job {
-  id                 String              @id @default(uuid()) @db.Uuid
-  supplierId         String              @db.Uuid
-  lineId             String              @db.Uuid
-  name               String              @db.VarChar(150)
-  normalizedName     String              @db.VarChar(150)
+  id                 String               @id @default(uuid()) @db.Uuid
+  supplierId         String               @db.Uuid
+  lineId             String               @db.Uuid
+  name               String               @db.VarChar(150)
+  normalizedName     String               @db.VarChar(150)
   displayOrder       Int
-  active             Boolean             @default(true)
-  version            Int                 @default(1)
-  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
-  createdById        String?             @db.Uuid
-  updatedAt          DateTime            @updatedAt @db.Timestamptz(3)
-  updatedById        String?             @db.Uuid
-  supplier           Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  line               Line                @relation(fields: [lineId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  active             Boolean              @default(true)
+  version            Int                  @default(1)
+  createdAt          DateTime             @default(now()) @db.Timestamptz(3)
+  createdById        String?              @db.Uuid
+  updatedAt          DateTime             @updatedAt @db.Timestamptz(3)
+  updatedById        String?              @db.Uuid
+  supplier           Supplier             @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  line               Line                 @relation(fields: [lineId, supplierId], references: [id, supplierId], onDelete: Restrict)
   defaultMp          DefaultJobMp?
   workingAssignments WorkingAssignment[]
   assignmentIssues   AssignmentIssue[]
@@ -784,48 +853,48 @@ model DefaultJobMp {
 }
 
 model ShiftRun {
-  id                          String              @id @default(uuid()) @db.Uuid
-  supplierId                  String              @db.Uuid
-  lineId                      String              @db.Uuid
-  shiftTemplateId             String              @db.Uuid
-  status                      ShiftRunStatus      @default(NOT_STARTED)
-  businessDate                DateTime            @db.Date
-  scheduledStartAt            DateTime            @db.Timestamptz(3)
-  scheduledEndAt              DateTime            @db.Timestamptz(3)
-  timezoneSnapshot            String              @db.VarChar(100)
-  lineCodeSnapshot            String              @db.VarChar(100)
-  lineNameSnapshot            String              @db.VarChar(150)
-  shiftNameSnapshot           String              @db.VarChar(150)
+  id                          String               @id @default(uuid()) @db.Uuid
+  supplierId                  String               @db.Uuid
+  lineId                      String               @db.Uuid
+  shiftTemplateId             String               @db.Uuid
+  status                      ShiftRunStatus       @default(NOT_STARTED)
+  businessDate                DateTime             @db.Date
+  scheduledStartAt            DateTime             @db.Timestamptz(3)
+  scheduledEndAt              DateTime             @db.Timestamptz(3)
+  timezoneSnapshot            String               @db.VarChar(100)
+  lineCodeSnapshot            String               @db.VarChar(100)
+  lineNameSnapshot            String               @db.VarChar(150)
+  shiftNameSnapshot           String               @db.VarChar(150)
   shiftStartMinuteSnapshot    Int
   shiftEndMinuteSnapshot      Int
   defaultAssignmentSetVersion Int
   sourceEpoch                 Int
-  supervisorMemberId          String?             @db.Uuid
-  supervisorNameSnapshot      String?             @db.VarChar(150)
-  lineLeaderMemberId          String?             @db.Uuid
-  lineLeaderNameSnapshot      String?             @db.VarChar(150)
+  supervisorMemberId          String?              @db.Uuid
+  supervisorNameSnapshot      String?              @db.VarChar(150)
+  lineLeaderMemberId          String?              @db.Uuid
+  lineLeaderNameSnapshot      String?              @db.VarChar(150)
   latestPreflight             Json
-  latestPreflightAt           DateTime            @db.Timestamptz(3)
-  startedAt                   DateTime?           @db.Timestamptz(3)
-  startedById                 String?             @db.Uuid
-  startedWithOverride         Boolean             @default(false)
-  overrideReason              String?             @db.VarChar(1000)
+  latestPreflightAt           DateTime             @db.Timestamptz(3)
+  startedAt                   DateTime?            @db.Timestamptz(3)
+  startedById                 String?              @db.Uuid
+  startedWithOverride         Boolean              @default(false)
+  overrideReason              String?              @db.VarChar(1000)
   overrideFailedChecks        Json?
-  endedAt                     DateTime?           @db.Timestamptz(3)
-  endedById                   String?             @db.Uuid
+  endedAt                     DateTime?            @db.Timestamptz(3)
+  endedById                   String?              @db.Uuid
   endSummary                  Json?
-  endCommandKey               String?             @db.VarChar(128)
-  endCommandPayloadHash       String?             @db.Char(64)
-  version                     Int                 @default(1)
-  createdAt                   DateTime            @default(now()) @db.Timestamptz(3)
-  createdById                 String?             @db.Uuid
-  updatedAt                   DateTime            @updatedAt @db.Timestamptz(3)
-  updatedById                 String?             @db.Uuid
-  supplier                    Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  line                        Line                @relation(fields: [lineId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  shiftTemplate               ShiftTemplate       @relation(fields: [shiftTemplateId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  supervisor                  Member?             @relation("ShiftRunSupervisor", fields: [supervisorMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  lineLeader                  Member?             @relation("ShiftRunLineLeader", fields: [lineLeaderMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  endCommandKey               String?              @db.VarChar(128)
+  endCommandPayloadHash       String?              @db.Char(64)
+  version                     Int                  @default(1)
+  createdAt                   DateTime             @default(now()) @db.Timestamptz(3)
+  createdById                 String?              @db.Uuid
+  updatedAt                   DateTime             @updatedAt @db.Timestamptz(3)
+  updatedById                 String?              @db.Uuid
+  supplier                    Supplier             @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  line                        Line                 @relation(fields: [lineId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  shiftTemplate               ShiftTemplate        @relation(fields: [shiftTemplateId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  supervisor                  Member?              @relation("ShiftRunSupervisor", fields: [supervisorMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  lineLeader                  Member?              @relation("ShiftRunLineLeader", fields: [lineLeaderMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
   workingAssignments          WorkingAssignment[]
   assignmentIssues            AssignmentIssue[]
   henkatens                   Henkaten[]
@@ -881,31 +950,31 @@ model WorkingAssignment {
 }
 
 model AssignmentIssue {
-  id                    String                @id @default(uuid()) @db.Uuid
-  supplierId            String                @db.Uuid
-  shiftRunId            String?               @db.Uuid
-  lineId                String                @db.Uuid
-  jobId                 String                @db.Uuid
-  type                  AssignmentIssueType
-  status                AssignmentIssueStatus @default(OPEN)
-  originKind            String                @db.VarChar(50)
-  originReferenceId     String?               @db.Uuid
-  resolutionKind        String?               @db.VarChar(50)
-  resolutionReferenceId String?               @db.Uuid
-  originHenkatenId      String?               @db.Uuid
-  originMovementId      String?               @db.Uuid
-  resolutionHenkatenId  String?               @db.Uuid
-  openedAt              DateTime              @default(now()) @db.Timestamptz(3)
-  resolvedAt            DateTime?             @db.Timestamptz(3)
-  resolvedById          String?               @db.Uuid
-  version               Int                   @default(1)
-  supplier              Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  shiftRun              ShiftRun?             @relation(fields: [shiftRunId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  line                  Line                  @relation(fields: [lineId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  job                   Job                   @relation(fields: [jobId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  originHenkaten        Henkaten?             @relation("AssignmentIssueOriginHenkaten", fields: [originHenkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  originMovement        AssignmentMovement?   @relation("AssignmentIssueOriginMovement", fields: [originMovementId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  resolutionHenkaten    Henkaten?             @relation("AssignmentIssueResolutionHenkaten", fields: [resolutionHenkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  id                     String                @id @default(uuid()) @db.Uuid
+  supplierId             String                @db.Uuid
+  shiftRunId             String?               @db.Uuid
+  lineId                 String                @db.Uuid
+  jobId                  String                @db.Uuid
+  type                   AssignmentIssueType
+  status                 AssignmentIssueStatus @default(OPEN)
+  originKind             String                @db.VarChar(50)
+  originReferenceId      String?               @db.Uuid
+  resolutionKind         String?               @db.VarChar(50)
+  resolutionReferenceId  String?               @db.Uuid
+  originHenkatenId       String?               @db.Uuid
+  originMovementId       String?               @db.Uuid
+  resolutionHenkatenId   String?               @db.Uuid
+  openedAt               DateTime              @default(now()) @db.Timestamptz(3)
+  resolvedAt             DateTime?             @db.Timestamptz(3)
+  resolvedById           String?               @db.Uuid
+  version                Int                   @default(1)
+  supplier               Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  shiftRun               ShiftRun?             @relation(fields: [shiftRunId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  line                   Line                  @relation(fields: [lineId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  job                    Job                   @relation(fields: [jobId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  originHenkaten         Henkaten?             @relation("AssignmentIssueOriginHenkaten", fields: [originHenkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  originMovement         AssignmentMovement?   @relation("AssignmentIssueOriginMovement", fields: [originMovementId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  resolutionHenkaten     Henkaten?             @relation("AssignmentIssueResolutionHenkaten", fields: [resolutionHenkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
   resolutionManHenkatens ManHenkatenDetail[]
 
   @@unique([id, supplierId])
@@ -979,8 +1048,8 @@ model Henkaten {
   approvalDecisions            ApprovalDecision[]
   approvalRoutingHistory       ApprovalRouteRouting[]
   movement                     AssignmentMovement?
-  originatedAssignmentIssues   AssignmentIssue[]       @relation("AssignmentIssueOriginHenkaten")
-  resolvedAssignmentIssues     AssignmentIssue[]       @relation("AssignmentIssueResolutionHenkaten")
+  originatedAssignmentIssues   AssignmentIssue[]           @relation("AssignmentIssueOriginHenkaten")
+  resolvedAssignmentIssues     AssignmentIssue[]           @relation("AssignmentIssueResolutionHenkaten")
 
   @@unique([id, supplierId])
   @@unique([supplierId, identifier])
@@ -1050,24 +1119,24 @@ model ManHenkatenDetail {
 }
 
 model HenkatenApprovalRoute {
-  id                              String                @id @default(uuid()) @db.Uuid
-  supplierId                      String                @db.Uuid
-  henkatenId                      String                @db.Uuid
-  route                           ApprovalRoute
-  status                          ApprovalRouteStatus   @default(PENDING)
-  initialResponsibleMemberId      String?               @db.Uuid
-  initialResponsibleNameSnapshot  String?               @db.VarChar(150)
-  currentResponsibleMemberId      String?               @db.Uuid
-  currentResponsibleNameSnapshot  String?               @db.VarChar(150)
-  version                         Int                   @default(1)
-  createdAt                       DateTime              @default(now()) @db.Timestamptz(3)
-  updatedAt                       DateTime              @updatedAt @db.Timestamptz(3)
-  supplier                        Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  henkaten                        Henkaten              @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  initialResponsibleMember        Member?               @relation("ApprovalInitialSupervisor", fields: [initialResponsibleMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  currentResponsibleMember        Member?               @relation("ApprovalCurrentSupervisor", fields: [currentResponsibleMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  decision                        ApprovalDecision?
-  routingHistory                  ApprovalRouteRouting[]
+  id                             String                 @id @default(uuid()) @db.Uuid
+  supplierId                     String                 @db.Uuid
+  henkatenId                     String                 @db.Uuid
+  route                          ApprovalRoute
+  status                         ApprovalRouteStatus    @default(PENDING)
+  initialResponsibleMemberId     String?                @db.Uuid
+  initialResponsibleNameSnapshot String?                @db.VarChar(150)
+  currentResponsibleMemberId     String?                @db.Uuid
+  currentResponsibleNameSnapshot String?                @db.VarChar(150)
+  version                        Int                    @default(1)
+  createdAt                      DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt                      DateTime               @updatedAt @db.Timestamptz(3)
+  supplier                       Supplier               @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  henkaten                       Henkaten               @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  initialResponsibleMember       Member?                @relation("ApprovalInitialSupervisor", fields: [initialResponsibleMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  currentResponsibleMember       Member?                @relation("ApprovalCurrentSupervisor", fields: [currentResponsibleMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  decision                       ApprovalDecision?
+  routingHistory                 ApprovalRouteRouting[]
 
   @@unique([id, supplierId])
   @@unique([henkatenId, route])
@@ -1076,27 +1145,27 @@ model HenkatenApprovalRoute {
 }
 
 model ApprovalDecision {
-  id                       String                  @id @default(uuid()) @db.Uuid
-  supplierId               String                  @db.Uuid
-  routeId                  String                  @unique @db.Uuid
-  henkatenId               String                  @db.Uuid
-  decision                 ApprovalDecisionValue
-  actorUserId              String                  @db.Uuid
-  actorMemberId            String?                 @db.Uuid
-  actorNameSnapshot        String                  @db.VarChar(150)
-  actorRole                UserRole
-  comment                  String?                 @db.VarChar(2000)
-  decidedAt                DateTime                @default(now()) @db.Timestamptz(3)
-  sourceIp                 String?                 @db.VarChar(45)
-  correlationId            String                  @db.VarChar(128)
-  expectedHenkatenVersion  Int
-  resultHenkatenVersion    Int
-  idempotencyKey           String                  @db.VarChar(128)
-  commandPayloadHash       String                  @db.Char(64)
-  supplier                 Supplier                @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  route                    HenkatenApprovalRoute   @relation(fields: [routeId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  henkaten                 Henkaten                @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  actorMember              Member?                 @relation("ApprovalDecisionActorMember", fields: [actorMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  id                      String                @id @default(uuid()) @db.Uuid
+  supplierId              String                @db.Uuid
+  routeId                 String                @unique @db.Uuid
+  henkatenId              String                @db.Uuid
+  decision                ApprovalDecisionValue
+  actorUserId             String                @db.Uuid
+  actorMemberId           String?               @db.Uuid
+  actorNameSnapshot       String                @db.VarChar(150)
+  actorRole               UserRole
+  comment                 String?               @db.VarChar(2000)
+  decidedAt               DateTime              @default(now()) @db.Timestamptz(3)
+  sourceIp                String?               @db.VarChar(45)
+  correlationId           String                @db.VarChar(128)
+  expectedHenkatenVersion Int
+  resultHenkatenVersion   Int
+  idempotencyKey          String                @db.VarChar(128)
+  commandPayloadHash      String                @db.Char(64)
+  supplier                Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  route                   HenkatenApprovalRoute @relation(fields: [routeId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  henkaten                Henkaten              @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  actorMember             Member?               @relation("ApprovalDecisionActorMember", fields: [actorMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
 
   @@unique([id, supplierId])
   @@unique([routeId, supplierId])
@@ -1105,26 +1174,26 @@ model ApprovalDecision {
 }
 
 model ApprovalRouteRouting {
-  id                       String                 @id @default(uuid()) @db.Uuid
-  supplierId               String                 @db.Uuid
-  routeId                  String                 @db.Uuid
-  henkatenId               String                 @db.Uuid
-  fromMemberId             String?                @db.Uuid
-  fromNameSnapshot         String?                @db.VarChar(150)
-  toMemberId               String                 @db.Uuid
-  toNameSnapshot           String                 @db.VarChar(150)
-  actorUserId              String                 @db.Uuid
-  assignedAt               DateTime               @default(now()) @db.Timestamptz(3)
-  correlationId            String                 @db.VarChar(128)
-  expectedHenkatenVersion  Int
-  resultHenkatenVersion    Int
-  idempotencyKey           String                 @db.VarChar(128)
-  commandPayloadHash       String                 @db.Char(64)
-  supplier                 Supplier               @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  route                    HenkatenApprovalRoute  @relation(fields: [routeId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  henkaten                 Henkaten               @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  fromMember               Member?                @relation("ApprovalRoutingFromMember", fields: [fromMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  toMember                 Member                 @relation("ApprovalRoutingToMember", fields: [toMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  id                      String                @id @default(uuid()) @db.Uuid
+  supplierId              String                @db.Uuid
+  routeId                 String                @db.Uuid
+  henkatenId              String                @db.Uuid
+  fromMemberId            String?               @db.Uuid
+  fromNameSnapshot        String?               @db.VarChar(150)
+  toMemberId              String                @db.Uuid
+  toNameSnapshot          String                @db.VarChar(150)
+  actorUserId             String                @db.Uuid
+  assignedAt              DateTime              @default(now()) @db.Timestamptz(3)
+  correlationId           String                @db.VarChar(128)
+  expectedHenkatenVersion Int
+  resultHenkatenVersion   Int
+  idempotencyKey          String                @db.VarChar(128)
+  commandPayloadHash      String                @db.Char(64)
+  supplier                Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  route                   HenkatenApprovalRoute @relation(fields: [routeId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  henkaten                Henkaten              @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  fromMember              Member?               @relation("ApprovalRoutingFromMember", fields: [fromMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  toMember                Member                @relation("ApprovalRoutingToMember", fields: [toMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
 
   @@unique([id, supplierId])
   @@unique([supplierId, actorUserId, idempotencyKey])
@@ -1132,41 +1201,41 @@ model ApprovalRouteRouting {
 }
 
 model AssignmentMovement {
-  id                             String              @id @default(uuid()) @db.Uuid
-  supplierId                     String              @db.Uuid
-  henkatenId                     String              @unique @db.Uuid
-  targetShiftRunId               String              @db.Uuid
-  sourceShiftRunId               String?             @db.Uuid
-  targetWorkingAssignmentId      String              @db.Uuid
-  sourceWorkingAssignmentId      String?             @db.Uuid
-  targetLineId                   String              @db.Uuid
-  targetJobId                    String              @db.Uuid
-  sourceLineId                   String?             @db.Uuid
-  sourceJobId                    String?             @db.Uuid
-  movedMpMemberId                String              @db.Uuid
-  movedMpNameSnapshot            String              @db.VarChar(150)
-  replacedMpMemberId             String?             @db.Uuid
-  replacedMpNameSnapshot         String?             @db.VarChar(150)
+  id                            String             @id @default(uuid()) @db.Uuid
+  supplierId                    String             @db.Uuid
+  henkatenId                    String             @unique @db.Uuid
+  targetShiftRunId              String             @db.Uuid
+  sourceShiftRunId              String?            @db.Uuid
+  targetWorkingAssignmentId     String             @db.Uuid
+  sourceWorkingAssignmentId     String?            @db.Uuid
+  targetLineId                  String             @db.Uuid
+  targetJobId                   String             @db.Uuid
+  sourceLineId                  String?            @db.Uuid
+  sourceJobId                   String?            @db.Uuid
+  movedMpMemberId               String             @db.Uuid
+  movedMpNameSnapshot           String             @db.VarChar(150)
+  replacedMpMemberId            String?            @db.Uuid
+  replacedMpNameSnapshot        String?            @db.VarChar(150)
   targetAssignmentVersionBefore Int
   targetAssignmentVersionAfter  Int
   sourceAssignmentVersionBefore Int?
   sourceAssignmentVersionAfter  Int?
-  movedAt                        DateTime            @default(now()) @db.Timestamptz(3)
-  movedById                      String              @db.Uuid
-  correlationId                  String              @db.VarChar(128)
-  supplier                       Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  henkaten                       Henkaten            @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  targetShiftRun                 ShiftRun            @relation("AssignmentMovementTargetShift", fields: [targetShiftRunId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  sourceShiftRun                 ShiftRun?           @relation("AssignmentMovementSourceShift", fields: [sourceShiftRunId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  targetWorkingAssignment        WorkingAssignment   @relation("AssignmentMovementTargetWorking", fields: [targetWorkingAssignmentId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  sourceWorkingAssignment        WorkingAssignment?  @relation("AssignmentMovementSourceWorking", fields: [sourceWorkingAssignmentId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  targetLine                     Line                @relation("AssignmentMovementTargetLine", fields: [targetLineId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  sourceLine                     Line?               @relation("AssignmentMovementSourceLine", fields: [sourceLineId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  targetJob                      Job                 @relation("AssignmentMovementTargetJob", fields: [targetJobId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  sourceJob                      Job?                @relation("AssignmentMovementSourceJob", fields: [sourceJobId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  movedMp                        Member              @relation("AssignmentMovementMp", fields: [movedMpMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  replacedMp                     Member?             @relation("AssignmentMovementReplacedMp", fields: [replacedMpMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  originatedIssues               AssignmentIssue[]   @relation("AssignmentIssueOriginMovement")
+  movedAt                       DateTime           @default(now()) @db.Timestamptz(3)
+  movedById                     String             @db.Uuid
+  correlationId                 String             @db.VarChar(128)
+  supplier                      Supplier           @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  henkaten                      Henkaten           @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  targetShiftRun                ShiftRun           @relation("AssignmentMovementTargetShift", fields: [targetShiftRunId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  sourceShiftRun                ShiftRun?          @relation("AssignmentMovementSourceShift", fields: [sourceShiftRunId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  targetWorkingAssignment       WorkingAssignment  @relation("AssignmentMovementTargetWorking", fields: [targetWorkingAssignmentId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  sourceWorkingAssignment       WorkingAssignment? @relation("AssignmentMovementSourceWorking", fields: [sourceWorkingAssignmentId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  targetLine                    Line               @relation("AssignmentMovementTargetLine", fields: [targetLineId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  sourceLine                    Line?              @relation("AssignmentMovementSourceLine", fields: [sourceLineId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  targetJob                     Job                @relation("AssignmentMovementTargetJob", fields: [targetJobId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  sourceJob                     Job?               @relation("AssignmentMovementSourceJob", fields: [sourceJobId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  movedMp                       Member             @relation("AssignmentMovementMp", fields: [movedMpMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  replacedMp                    Member?            @relation("AssignmentMovementReplacedMp", fields: [replacedMpMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  originatedIssues              AssignmentIssue[]  @relation("AssignmentIssueOriginMovement")
 
   @@unique([id, supplierId])
   @@unique([henkatenId, supplierId])
@@ -1205,21 +1274,21 @@ model MPReservation {
 }
 
 model WarningInstance {
-  id                           String        @id @default(uuid()) @db.Uuid
-  supplierId                   String        @db.Uuid
-  henkatenId                   String?       @unique @db.Uuid
-  externalProjectionId         String?       @unique @db.Uuid
-  sourceMode                   SourceMode    @default(HOSTED)
-  status                       WarningStatus @default(OPEN)
-  partNumberSnapshot           String        @db.VarChar(100)
-  normalizedPartNumberSnapshot String        @db.VarChar(100)
-  partNameSnapshot             String        @db.VarChar(200)
-  openedAt                     DateTime      @default(now()) @db.Timestamptz(3)
-  closedAt                     DateTime?     @db.Timestamptz(3)
-  closeReason                  String?       @db.VarChar(50)
-  version                      Int           @default(1)
-  supplier                     Supplier      @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  henkaten                     Henkaten?     @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  id                           String                      @id @default(uuid()) @db.Uuid
+  supplierId                   String                      @db.Uuid
+  henkatenId                   String?                     @unique @db.Uuid
+  externalProjectionId         String?                     @unique @db.Uuid
+  sourceMode                   SourceMode                  @default(HOSTED)
+  status                       WarningStatus               @default(OPEN)
+  partNumberSnapshot           String                      @db.VarChar(100)
+  normalizedPartNumberSnapshot String                      @db.VarChar(100)
+  partNameSnapshot             String                      @db.VarChar(200)
+  openedAt                     DateTime                    @default(now()) @db.Timestamptz(3)
+  closedAt                     DateTime?                   @db.Timestamptz(3)
+  closeReason                  String?                     @db.VarChar(50)
+  version                      Int                         @default(1)
+  supplier                     Supplier                    @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  henkaten                     Henkaten?                   @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
   externalProjection           ExternalHenkatenProjection? @relation(fields: [externalProjectionId, supplierId], references: [id, supplierId], onDelete: Restrict)
 
   @@unique([id, supplierId])

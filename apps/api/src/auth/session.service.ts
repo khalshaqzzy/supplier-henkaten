@@ -149,10 +149,17 @@ export class SessionService {
       | 'ADMIN_REPLACED'
       | 'OPERATOR_RECOVERY',
   ): Promise<void> {
-    await this.prisma.userSession.updateMany({
-      where: { userId, revokedAt: null },
-      data: { revokedAt: this.clock.now(), revocationReason: reason, version: { increment: 1 } },
-    });
+    const now = this.clock.now();
+    await this.prisma.$transaction([
+      this.prisma.userSession.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: now, revocationReason: reason, version: { increment: 1 } },
+      }),
+      this.prisma.pushSubscription.updateMany({
+        where: { userId, status: 'ACTIVE' },
+        data: { status: 'REVOKED', revokedAt: now, version: { increment: 1 } },
+      }),
+    ]);
   }
 
   csrfToken(rawToken: string, sessionId: string, realm: IdentityRealm): string {

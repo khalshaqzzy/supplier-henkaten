@@ -24,6 +24,7 @@ describe('ApiClient', () => {
       baseUrl: 'https://api.example.test',
       realm: 'SUPPLIER',
       getCsrfToken: () => 'csrf-value',
+      getInstallationId: () => '00000000-0000-4000-8000-000000000001',
       fetch: fetchMock,
     });
     await expect(
@@ -38,6 +39,9 @@ describe('ApiClient', () => {
     expect(url instanceof Request ? url.url : url.toString()).toContain('cursor=opaque');
     expect(init?.credentials).toBe('include');
     expect(new Headers(init?.headers).get('X-CSRF-Token')).toBe('csrf-value');
+    expect(new Headers(init?.headers).get('X-Device-Installation-ID')).toBe(
+      '00000000-0000-4000-8000-000000000001',
+    );
     expect(new Headers(init?.headers).get('X-Correlation-ID')).toBeTruthy();
   });
 

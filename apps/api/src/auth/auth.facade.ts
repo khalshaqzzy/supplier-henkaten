@@ -10,6 +10,7 @@ import { PrismaService } from '../persistence/prisma.service.js';
 import { cookieName } from './auth.guards.js';
 import { AuthService } from './auth.service.js';
 import { SessionService } from './session.service.js';
+import { PushSubscriptionService } from '../push/push.service.js';
 
 @Injectable()
 export class AuthControllerFacade {
@@ -18,6 +19,7 @@ export class AuthControllerFacade {
     private readonly sessions: SessionService,
     private readonly prisma: PrismaService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly push: PushSubscriptionService,
   ) {}
 
   async login(
@@ -104,6 +106,7 @@ export class AuthControllerFacade {
 
   async logout(request: ContextRequest, response: Response): Promise<void> {
     const principal = requirePrincipal(request);
+    await this.push.revokeInstallation(principal.userId, this.push.installationId(request));
     await this.sessions.revoke(principal.sessionId, 'LOGOUT');
     clearSessionCookie(response, principal.realm, this.config);
     response.status(204);

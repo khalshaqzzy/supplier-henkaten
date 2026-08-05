@@ -204,7 +204,7 @@ export function MasterListPage({ kind }: { kind: ResourceKind }) {
               </thead>
               <tbody>
                 {query.data.items.map((item) => (
-                  <MasterRow key={item.id} kind={kind} item={item} />
+                  <MasterRow key={item.id} kind={kind} item={item} columns={meta.columns} />
                 ))}
               </tbody>
             </table>
@@ -231,7 +231,15 @@ type MasterPage = {
   pageInfo: { nextCursor: string | null; hasNextPage: boolean };
 };
 
-function MasterRow({ kind, item }: { kind: ResourceKind; item: MasterItem }) {
+function MasterRow({
+  kind,
+  item,
+  columns,
+}: {
+  kind: ResourceKind;
+  item: MasterItem;
+  columns: readonly string[];
+}) {
   const values =
     kind === 'members' && 'fullName' in item
       ? [
@@ -259,9 +267,11 @@ function MasterRow({ kind, item }: { kind: ResourceKind; item: MasterItem }) {
   return (
     <tr>
       {values.map((value, index) => (
-        <td key={index}>{value}</td>
+        <td key={index} data-label={columns[index]}>
+          {value}
+        </td>
       ))}
-      <td>
+      <td data-label="Aksi">
         <Link to={`/master-data/${kind}/${item.id}`}>Buka</Link>
       </td>
     </tr>

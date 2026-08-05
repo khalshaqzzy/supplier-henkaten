@@ -18,6 +18,7 @@ import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { CursorPager } from '../components/CursorPager';
 import { PageHeader } from '../components/layout';
+import { PushSettings } from '../components/PushSettings';
 
 export function NotificationsPage() {
   const { session } = useSession();
@@ -76,6 +77,11 @@ export function NotificationsPage() {
           </NativeSelect>
         </label>
       </FilterBar>
+      <PushSettings
+        required={
+          session!.principal.role === 'LINE_LEADER' && session!.principal.purpose === 'NORMAL'
+        }
+      />
       {query.isLoading && <ListSkeleton />}
       {query.isError && (
         <ErrorState

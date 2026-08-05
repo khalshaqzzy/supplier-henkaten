@@ -11,6 +11,7 @@ import { AuditWriter } from '../persistence/audit-writer.js';
 import type { ClaimedOutboxEvent } from '../persistence/outbox.service.js';
 import { OutboxService } from '../persistence/outbox.service.js';
 import { PrismaService } from '../persistence/prisma.service.js';
+import { PushDeliveryService } from '../push/push-delivery.service.js';
 
 const NOTIFICATION_EVENTS = [
   'HENKATEN_OPENED',
@@ -20,6 +21,8 @@ const NOTIFICATION_EVENTS = [
   'ASSIGNMENT_ISSUE_OPENED',
   'NOTIFICATION_REQUESTED',
   'SHIFT_STARTED_WITH_OVERRIDE',
+  'SHIFT_START_BLOCKED',
+  'MP_RESERVED',
   'EXTERNAL_PROJECTION_UPDATED',
   'EXTERNAL_INGEST_REJECTED',
 ] as const;
@@ -30,6 +33,7 @@ export class NotificationService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly outbox: OutboxService,
     private readonly audit: AuditWriter,
+    private readonly pushDeliveries: PushDeliveryService,
   ) {}
 
   onModuleInit(): void {
@@ -106,7 +110,7 @@ export class NotificationService implements OnModuleInit {
     if (!recipients.length) return;
     await this.prisma.$transaction(async (tx) => {
       for (const recipientUserId of recipients) {
-        await tx.notification.upsert({
+        const notification = await tx.notification.upsert({
           where: {
             sourceEventId_recipientUserId: {
               sourceEventId: event.id,
@@ -121,6 +125,7 @@ export class NotificationService implements OnModuleInit {
           },
           update: {},
         });
+        await this.pushDeliveries.materialize(notification, tx);
       }
       await this.audit.write(
         {
@@ -260,13 +265,27 @@ export class NotificationService implements OnModuleInit {
           body: 'A Supplier Admin started a shift despite preflight blockers.',
           ...link(`/shifts/${event.aggregateId}`),
         };
+      case 'SHIFT_START_BLOCKED':
+        return {
+          kind: 'SHIFT_START_BLOCKED',
+          title: 'Start Shift blocked',
+          body: 'A planned shift has blocking readiness checks that require action.',
+          ...link(`/shifts/${event.aggregateId}`),
+        };
+      case 'MP_RESERVED':
+        return {
+          kind: 'MP_RESERVATION',
+          title: 'MP reservation requires attention',
+          body: 'A Man Henkaten has reserved an MP while approval is pending.',
+          ...link(`/henkatens/${event.aggregateId}`),
+        };
       case 'ASSIGNMENT_ISSUE_OPENED':
       case 'NOTIFICATION_REQUESTED':
         return {
           kind: 'ASSIGNMENT_VACANCY',
           title: 'Assignment requires resolution',
           body: 'A job is vacant or conflicted and requires assignment action.',
-          ...link('/assignment-board'),
+          ...link('/board'),
         };
       case 'EXTERNAL_PROJECTION_UPDATED': {
         const payload = asRecord(event.payload);
