@@ -218,10 +218,11 @@ export class SupplierApi {
     });
   }
 
-  removeMemberPhoto(id: string) {
+  removeMemberPhoto(id: string, expectedVersion: number): Promise<void> {
     return this.client.request(`/api/v1/supplier/master-data/members/${id}/photo/remove`, {
       method: 'POST',
-      responseSchema: memberSchema,
+      body: { expectedVersion },
+      responseType: 'void',
     });
   }
 

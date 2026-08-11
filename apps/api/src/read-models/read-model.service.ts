@@ -51,6 +51,9 @@ export class ReadModelService {
     const updated = shifts.flatMap((shift) => [
       shift.updatedAt,
       ...shift.workingAssignments.map(({ updatedAt }) => updatedAt),
+      ...shift.workingAssignments.flatMap(
+        ({ effectiveMp }) => effectiveMp?.photos.map(({ createdAt }) => createdAt) ?? [],
+      ),
       ...shift.henkatens.map(({ updatedAt }) => updatedAt),
     ]);
     const lastUpdatedAt = updated.length
@@ -63,6 +66,12 @@ export class ReadModelService {
             `${shift.id}:${shift.version}`,
             ...shift.workingAssignments.map(
               ({ id, version: itemVersion }) => `${id}:${itemVersion}`,
+            ),
+            ...shift.workingAssignments.flatMap(
+              ({ effectiveMp }) =>
+                effectiveMp?.photos.map(
+                  ({ id, version: photoVersion }) => `${id}:${photoVersion}`,
+                ) ?? [],
             ),
             ...shift.henkatens.map(({ id, version: itemVersion }) => `${id}:${itemVersion}`),
           ])
@@ -108,7 +117,7 @@ export class ReadModelService {
             name: assignment.mpNameSnapshot,
             registrationNumber: assignment.mpRegistrationSnapshot,
             photoThumbnailUrl: assignment.effectiveMp?.photos[0]
-              ? `/api/v1/supplier/master-data/members/${assignment.effectiveMp.id}/photo/thumbnail`
+              ? `/api/v1/supplier/master-data/members/${assignment.effectiveMp.id}/photo/thumbnail?v=${assignment.effectiveMp.photos[0].version}`
               : null,
             initials: initials(assignment.mpNameSnapshot),
           },

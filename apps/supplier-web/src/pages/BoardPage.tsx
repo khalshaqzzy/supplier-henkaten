@@ -1,4 +1,14 @@
-import { AlertTriangle, CheckCircle2, Radio, RefreshCw, UserRound, Users } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  FileText,
+  Radio,
+  RefreshCw,
+  UserRound,
+  Users,
+  Wrench,
+} from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -244,13 +254,7 @@ export function BoardPage() {
                         </header>
                         <div className="board-job__person">
                           <i>
-                            {job.mp.photoThumbnailUrl ? (
-                              <img src={supplierAssetUrl(job.mp.photoThumbnailUrl)} alt="" />
-                            ) : job.mp.initials ? (
-                              job.mp.initials
-                            ) : (
-                              <UserRound />
-                            )}
+                            <BoardMpAvatar mp={job.mp} />
                           </i>
                           <span>
                             <strong>{job.mp.name ?? 'Vacant'}</strong>
@@ -299,11 +303,7 @@ export function BoardPage() {
                       <strong>{risk.jobName}</strong>
                       <small>{risk.label}</small>
                     </span>
-                    {risk.henkatenId ? (
-                      <Link to={`/henkatens/${risk.henkatenId}`}>Buka Henkaten</Link>
-                    ) : risk.resolutionShiftRunId ? (
-                      <Link to={`/shifts/${risk.resolutionShiftRunId}/resolve`}>Buka resolusi</Link>
-                    ) : null}
+                    <BoardRiskAction risk={risk} />
                   </div>
                 ))}
               </section>
@@ -351,18 +351,30 @@ export function BoardPage() {
 
 type BoardLines = NonNullable<Awaited<ReturnType<typeof supplierApi.board>>>['lines'];
 
+function BoardMpAvatar({ mp }: { mp: BoardLines[number]['jobs'][number]['mp'] }) {
+  const photoUrl = mp.photoThumbnailUrl ? supplierAssetUrl(mp.photoThumbnailUrl) : null;
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  return photoUrl && failedUrl !== photoUrl ? (
+    <img src={photoUrl} alt="" onError={() => setFailedUrl(photoUrl)} />
+  ) : mp.initials ? (
+    mp.initials
+  ) : (
+    <UserRound aria-hidden="true" />
+  );
+}
+
 export function boardOperationalRisks(lines: BoardLines) {
   return lines.flatMap((line) =>
     line.jobs.flatMap((job) => [
-      ...(job.state === 'VACANT' || job.state === 'CONFLICTED' || job.state === 'RESERVED'
+      ...(job.state === 'VACANT' || job.state === 'CONFLICTED'
         ? [
             {
               key: `assignment:${job.assignmentId}`,
+              kind: 'ISSUE' as const,
               jobName: job.jobName,
-              label: humanize(job.state),
+              label: `Assignment issue · ${humanize(job.state)}`,
               henkatenId: null,
-              resolutionShiftRunId:
-                job.state === 'VACANT' || job.state === 'CONFLICTED' ? line.shiftRunId : null,
+              resolutionShiftRunId: line.shiftRunId,
             },
           ]
         : []),
@@ -370,12 +382,39 @@ export function boardOperationalRisks(lines: BoardLines) {
         .filter((indicator) => indicator.category === 'MAN' && indicator.status === 'OPEN')
         .map((indicator) => ({
           key: `reservation:${indicator.henkatenId}`,
+          kind: 'RESERVATION' as const,
           jobName: job.jobName,
           label: `Reservation aktif · ${indicator.identifier}`,
           henkatenId: indicator.henkatenId,
           resolutionShiftRunId: null,
         })),
     ]),
+  );
+}
+
+export function BoardRiskAction({
+  risk,
+}: {
+  risk: ReturnType<typeof boardOperationalRisks>[number];
+}) {
+  return risk.kind === 'RESERVATION' ? (
+    <Link
+      className="hds-button hds-button--secondary hds-button--sm board-risk-action"
+      to={`/henkatens/${risk.henkatenId}`}
+    >
+      <FileText aria-hidden="true" />
+      Buka Henkaten
+      <ArrowRight aria-hidden="true" />
+    </Link>
+  ) : (
+    <Link
+      className="hds-button hds-button--primary hds-button--sm board-risk-action"
+      to={`/shifts/${risk.resolutionShiftRunId}/resolve`}
+    >
+      <Wrench aria-hidden="true" />
+      Buka resolusi
+      <ArrowRight aria-hidden="true" />
+    </Link>
   );
 }
 

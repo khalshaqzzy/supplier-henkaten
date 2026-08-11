@@ -1,103 +1,94 @@
-# Session Handoff — Responsive Supplier PWA and Web Push
+# Session Handoff — Member Photo and Board Risk Actions
 
-Date: 2026-08-05
+Date: 2026-08-11
 
-Branch: `feat/responsive-supplier-pwa-push`
+Branch: `staging`
 
-Status: repository implementation and local automated verification are complete. Phase 15.9 remains
-`in_progress`; no hosted staging deploy, real-device push, or Phase 16 UAT claim has been made. The
-accepted desktop Supplier view remains the baseline at `>=1280px`.
+Status: member-photo management and polished Assignment Board risk actions are implementation- and
+local-verification-complete in the working tree. Phase 15.9 remains `in_progress`; no hosted staging
+deploy, real-device push, or Phase 16 UAT claim has been made.
 
 ## 1. Objective and Locked Decisions
 
-Implement every Supplier workflow for mobile/tablet while preserving desktop, add an online-only
-installable PWA, and add best-effort Supplier Web Push. Notification center remains authoritative.
-NORMAL Line Leaders are hard-blocked per browser installation until push is active; Supplier Admin,
-Supervisor, and QC are opt-in. TMMIN web and external credentials are unchanged.
+- Complete optional member-photo management in Supplier Master Data with preview, set/replace,
+  removal, validation, optimistic concurrency, and reliable cache refresh.
+- Keep `/board` read-only for photos. Supplier Admin remains the only role with master-data mutation
+  capability; other Supplier roles only consume photo/avatar output.
+- Present actionable Assignment Issues and Open Man reservations as polished, accessible buttons
+  linking to the existing authoritative resolution and Henkaten routes.
+- Do not add an endpoint, table, migration, or new lifecycle authority.
 
-Official breakpoints are mobile 360–767px, tablet 768–1279px, and desktop at least 1280px. Browser
-targets are current/previous Chrome and Edge on desktop/Android plus iOS/iPadOS 16.4+ Home Screen
-PWA. There is no offline domain data, draft, background sync, or queued mutation.
+## 2. Implementation Completed
 
-## 2. Implementation Completed in the Working Tree
+- Member responses and board thumbnail URLs now include a monotonically increasing `?v=` token.
+  Photo upload locks the member row, derives the next generation across current/superseded/deleted
+  records, and preserves a single `CURRENT` photo.
+- Replacement compares normalized full and thumbnail checksums under the member lock. An identical
+  file is rejected as `STATE_CONFLICT` instead of creating a misleading new generation, while the
+  successful upload response is written into the detail query cache before dependent refetches.
+- Assignment Board `version` and `lastUpdatedAt` now include the effective MP photo generation, so
+  downstream consumers can observe a photo-only read-model change.
+- Upload, replacement, removal, and cleanup remain transactional/audited. A non-PII
+  `MEMBER_PHOTO_CHANGED` outbox event is emitted for every successful change so an open board is
+  invalidated even on the first upload; cleanup remains a separate event.
+- The typed client removal operation now sends `expectedVersion` and accepts the endpoint's `204`
+  response.
+- Supplier Master Data provides a thumbnail/initials preview, contextual Set/Ganti Foto control,
+  client-side type/size feedback, loading and success/error states, confirmed optimistic removal,
+  repeat-file selection, list thumbnails, and member/list/board query invalidation.
+- Board risks no longer create a duplicate dead-end row from generic `RESERVED` state. Vacancy and
+  conflict rows expose primary `Buka resolusi`; Open Man reservations expose secondary
+  `Buka Henkaten`.
+- Board risk actions use design-system treatment, icons with clean accessible names, responsive
+  grid layout, visible focus behavior, and 44 px mobile targets. Mobile board toolbar constraints
+  were corrected to eliminate horizontal overflow at 390 px.
 
-- Responsive Supplier shell removes the unsupported viewport gate, adds mobile/tablet navigation,
-  adaptive grids/forms/tables/board/dialog patterns and 44px targets while restricting layout
-  overrides below 1280px.
-- PWA uses Vite `injectManifest`, a custom TypeScript worker, stable root manifest, brand icons,
-  network-first navigation/offline page, strict cache exclusions, safe push click handling,
-  prompted updates, and offline status UI.
-- Shared contracts/API client/OpenAPI add push config, create, and owner-only expected-version
-  revoke plus `PUSH_SUBSCRIPTION_REQUIRED` and stable `X-Device-Installation-ID`.
-- Additive Prisma migration adds PushSubscription/PushDelivery with endpoint/delivery uniqueness,
-  lifecycle/failure metadata, and concurrency indexes.
-- Backend validates VAPID/runtime bounds and vendor exact/suffix HTTPS endpoints; derives tenant,
-  user, and installation from authenticated context; never returns endpoint/key material.
-- Eligible durable Notifications materialize idempotent delivery rows. A PostgreSQL SKIP LOCKED
-  worker implements VAPID send, TTL/attempt bounds, Retry-After, 404/410 expiry, accepted semantics,
-  and safe failure logging. Push never mutates Notification/Henkaten lifecycle.
-- Frontend Account/Notifications show device state, explicit activation/disable, iOS installation
-  guidance, permission troubleshooting, and Line Leader activation gate. Backend independently
-  enforces the same gate while exempting activation/session/password/logout paths.
-- Logout and account/session/supplier/source lifecycle paths revoke affected server subscriptions;
-  browser subscription is removed on logout/password change.
-- Caddy/nginx, Compose/env validation, deployment smoke, three ADRs, and the operational runbook are
-  updated for worker/manifest CSP, cache headers, VAPID, icons, and recovery.
+## 3. Contracts and Data
 
-## 3. Data and Contract Changes
-
-- Migration: `20260805001000_supplier_web_push` is additive/backward-compatible. Do not create or
-  run a down migration for rollback.
-- API:
-  - `GET /api/v1/supplier/push/config`
-  - `POST /api/v1/supplier/push-subscriptions`
-  - `DELETE /api/v1/supplier/push-subscriptions/:id`
-- Authenticated Supplier requests carry `X-Device-Installation-ID`; body input never chooses user,
-  supplier, or installation.
-- Required environment: `PUSH_ENABLED`, environment-specific VAPID public/private/subject,
-  `PUSH_ENDPOINT_HOSTS`, and bounded delivery TTL/max-attempt/batch/poll settings.
+- No database migration and no public endpoint were added.
+- Existing photo URL fields remain strings; their values now carry the cache generation query.
+- Internal client signature: `removeMemberPhoto(id, expectedVersion): Promise<void>`.
+- Internal outbox event: `MEMBER_PHOTO_CHANGED`, scoped by supplier/member and containing only the
+  opaque member ID.
+- OpenAPI and generated client checks remain clean without regeneration diff.
 
 ## 4. Verification Completed Locally
 
-- Exact runtime Node.js 22.23.1, formatting, ESLint, TypeScript, generated OpenAPI/client, and
-  production builds pass. The Supplier PWA build emits the manifest, `sw.js`, and a 24-entry static
-  precache.
-- Repository unit suite passes: 157 tests total, including 32 contracts, 44 API, 32 Supplier web,
-  12 TMMIN web, 19 UI, 10 API client, 6 fixtures, and 2 script tests.
-- PostgreSQL integration passes 37/37, including Line Leader blocking/activation, cross-user denial,
-  shared endpoint reassignment, multi-device idempotency, concurrent claims, retry/expiry, and
-  installation-scoped logout revocation.
-- Fresh migration deploy passes all 10 migrations. Compact backend baseline passes 2/2; measured
-  p95 remains below every configured target.
-- Browser E2E passes all six isolated journeys: four Chromium plus the two `@edge` journeys in
-  Microsoft Edge. Supplier checks cover 390×844, 768×1024, 1024×768, 1280×720, and 1672×941,
-  including retained desktop UI, no document overflow, 44px menu target, Axe, deterministic
-  screenshots, manifest/worker registration, offline fallback, and API/photo cache exclusions.
-- Deployment environment/Compose validation and the deployment script harness pass all topology,
-  first deploy, failure, lock, stale-run, rollback, atomic activation, and retention scenarios.
-- Security exception registry is exact/unexpired; `pnpm audit --audit-level high` exits successfully
-  with the repository's one ignored high advisory and two moderate advisories; `git diff --check`
-  passes.
+- API client unit: 11/11.
+- Supplier web unit/component: 39/39, including file validation, repeated upload, preview/removal,
+  route/class checks, and reserved-row deduplication.
+- Targeted PostgreSQL integration after fresh 10-migration deploy: 19/19, including first upload,
+  distinct replacement, identical-replacement rejection, stale/current removal, monotonic restore,
+  single-current invariant, event count, versioned board thumbnail, and initials fallback.
+- Relevant API/API-client/Supplier TypeScript checks pass; OpenAPI check passes.
+- Full repository formatting, lint, TypeScript, 165 unit tests, OpenAPI/generated-client check,
+  production builds, and `git diff --check` pass. Frontend builds used the required explicit
+  production API origin.
+- All 38 API integration tests and all 6 isolated Chromium/Edge E2E runs pass. Deployment
+  validation/harness, migration destructive check, actionlint, ShellCheck, Hadolint, Ubuntu
+  bootstrap validation, Gitleaks, production-like container routing, and Trivy filesystem/image
+  scans pass.
+- New high-severity transitive advisories discovered during the pre-commit audit were resolved by
+  pinning `js-yaml` 4.3.1 and `nanoid` 3.3.17; `pnpm audit --audit-level high` passes with only the
+  repository's existing explicit exception remaining ignored.
+- Browser inspection against the worktree confirms one primary resolution CTA and one secondary
+  Henkaten CTA in seeded data, no console error on board, zero horizontal overflow, and 44 px CTA
+  height at 390×844. Member photo detail confirms Set and Ganti/Hapus states, versioned thumbnail,
+  96 px mobile preview, 44 px actions, and zero overflow.
+- Agent-started API/Vite preview processes were stopped. Existing local Compose containers predated
+  this session and were deliberately left running.
 
-These checks are local evidence. Hosted HTTPS staging, actual vendor push delivery, real-device
-Android/iPhone/iPad rehearsal, and Supplier Line Leader acceptance remain required launch gates.
+## 5. Remaining Release Work
 
-## 5. Required Next Actions
+1. Complete Phase 15.9/15.11 hosted staging baseline and stable staging VAPID provisioning.
+2. Execute Android Chrome/Edge and iPhone/iPad Home Screen real-device push rehearsal, deployed
+   cache-header validation, redeploy/rollback, and Supplier Line Leader acceptance.
+3. Start Phase 16 UAT only after all staging launch gates pass.
 
-1. Complete Phase 15.9/15.11 hosted staging baseline, provision a stable staging VAPID pair, then
-   execute Android Chrome/Edge and iPhone/iPad Home Screen real-device rehearsal.
-2. Verify actual vendor delivery, permission grant/deny/reset, app background/closed behavior,
-   multi-device/logout/expiry, service-worker update/recovery, and deployed cache headers.
-3. Start Phase 16 UAT only after responsive matrix, vendor push, redeploy/rollback, and Supplier
-   Line Leader acceptance pass.
+## 6. Operational Boundaries
 
-## 6. Operational Boundaries and Residual Risk
-
-- Do not log/audit endpoint, `p256dh`, `auth`, payload PII, VAPID private key, token, or credential.
-- Push `ACCEPTED` is vendor acceptance, not display proof. A failed push never changes domain state.
-- VAPID rotation in v1 requires disabling/revoking old subscriptions and explicit re-subscription.
-- Service-worker recovery and key-compromise response are documented in
-  `docs/operations/supplier-pwa-web-push-runbook.md`.
+- Member photos and registration data remain private Hosted data and are never cached by the PWA or
+  sent through External API.
+- Photo event/audit payloads must not contain image bytes, paths, registration numbers, names, or
+  credentials.
 - Existing no-backup/no-PITR/no-HA and automatic production deployment risks remain unchanged.
-- Existing local containers/processes that predate this session must not be stopped as cleanup for
-  this implementation.

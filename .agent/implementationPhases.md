@@ -2,7 +2,7 @@
 
 Document status: Active implementation roadmap
 Created: 2026-07-23
-Last updated: 2026-08-04
+Last updated: 2026-08-11
 Source of truth: `.agent/PRD.md`
 Implementation approach: Backend-first
 Workspace tooling: Node.js 22 + pnpm workspaces, tanpa Turborepo
@@ -28,7 +28,7 @@ Roadmap tidak memberikan estimasi waktu. Urutan didasarkan pada dependency dan r
 
 Kondisi repository setelah Phase 0-10:
 
-- branch aktif: `feat/typography-elements`;
+- branch aktif: `staging`;
 - `.agent/PRD.md` tersedia dan menjadi product contract;
 - dua puluh ADR dan delapan architecture/security baseline tersedia;
 - Node.js 22.23.1 + pnpm 11.16.0 ESM workspace tersedia;
@@ -71,6 +71,9 @@ Kondisi repository setelah Phase 0-10:
 - local full-stack Compose, centralized realtime outbox fan-out, isolated Playwright Chromium/Edge
   E2E, production containers, dan deployment workflows tersedia; aktivasi staging eksternal masih
   berjalan;
+- refinement foto member menyediakan cache-generation URL, event invalidation realtime, editor
+  Set/Ganti/Hapus yang optimistic, dan thumbnail list/board; risk rail Assignment Board menyediakan
+  CTA resolusi/Henkaten yang accessible, tidak duplikat, dan bebas overflow pada mobile;
 - materi slide tersedia sebagai reference-only input.
 
 Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8, Phase 9, Phase 10, Phase 11, Phase 12, Phase 13, dan Phase 14**
@@ -5156,6 +5159,10 @@ Current implementation evidence (2026-07-27):
   deployment tooling, production-like routing/persistence, Gitleaks, audit, filesystem scan, dan
   seluruh runtime image scan. Phase 15.9 tetap `in_progress` sampai hosted push/deploy evidence
   tersedia.
+- Pada 2026-08-11, refinement foto member dan Assignment Board risk actions lulus unit/component,
+  targeted PostgreSQL integration, TypeScript, OpenAPI, dan inspeksi browser desktop/mobile. Tidak
+  ada migration atau endpoint baru; Phase 15.9 tetap `in_progress` karena evidence ini bukan hosted
+  staging deployment.
 
 ---
 

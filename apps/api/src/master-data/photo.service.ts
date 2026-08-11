@@ -105,14 +105,29 @@ export class PhotoService implements OnModuleInit {
       await rename(temporary, finalDirectory);
       const fullPath = join(finalDirectory, 'full.webp');
       const thumbnailPath = join(finalDirectory, 'thumbnail.webp');
+      const fullChecksum = sha256(full.data);
+      const thumbnailChecksum = sha256(thumbnail.data);
       await this.prisma.$transaction(async (tx) => {
-        const member = await tx.member.findFirst({
-          where: { id: memberId, supplierId: scope.supplierId, active: true },
-        });
-        if (!member) throw missing('Active member');
+        const members = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT id
+          FROM "Member"
+          WHERE id = ${memberId}::uuid
+            AND "supplierId" = ${scope.supplierId}::uuid
+            AND active = true
+          FOR UPDATE
+        `;
+        if (!members[0]) throw missing('Active member');
         const old = await tx.memberPhoto.findFirst({
           where: { memberId, supplierId: scope.supplierId, state: 'CURRENT' },
         });
+        if (old?.fullChecksum === fullChecksum && old.thumbnailChecksum === thumbnailChecksum) {
+          throw unchangedImage();
+        }
+        const latest = await tx.memberPhoto.findFirst({
+          where: { memberId, supplierId: scope.supplierId },
+          orderBy: [{ version: 'desc' }, { createdAt: 'desc' }],
+        });
+        const nextVersion = (latest?.version ?? 0) + 1;
         if (old) {
           await tx.memberPhoto.update({
             where: { id: old.id },
@@ -127,15 +142,17 @@ export class PhotoService implements OnModuleInit {
             memberId,
             fullPath,
             thumbnailPath,
-            fullChecksum: sha256(full.data),
-            thumbnailChecksum: sha256(thumbnail.data),
+            fullChecksum,
+            thumbnailChecksum,
             fullWidth: full.info.width,
             fullHeight: full.info.height,
             thumbnailWidth: thumbnail.info.width,
             thumbnailHeight: thumbnail.info.height,
             createdById: context.actorUserId,
+            version: nextVersion,
           },
         });
+        await this.enqueueChanged(tx, memberId, nextVersion, scope, context);
         await this.audit.write(
           masterAudit(context, scope.supplierId, 'MEMBER_PHOTO_REPLACED', 'Member', memberId, {
             photoId,
@@ -158,6 +175,14 @@ export class PhotoService implements OnModuleInit {
     context: MutationContext,
   ) {
     await this.prisma.$transaction(async (tx) => {
+      const members = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id
+        FROM "Member"
+        WHERE id = ${memberId}::uuid
+          AND "supplierId" = ${scope.supplierId}::uuid
+        FOR UPDATE
+      `;
+      if (!members[0]) throw missing('Member');
       const photo = await tx.memberPhoto.findFirst({
         where: { memberId, supplierId: scope.supplierId, state: 'CURRENT' },
       });
@@ -175,6 +200,7 @@ export class PhotoService implements OnModuleInit {
         data: { state: 'PENDING_DELETE', supersededAt: new Date(), version: { increment: 1 } },
       });
       await this.enqueueCleanup(tx, photo.id, photo.version + 1, scope, context);
+      await this.enqueueChanged(tx, memberId, photo.version + 1, scope, context);
       await this.audit.write(
         masterAudit(context, scope.supplierId, 'MEMBER_PHOTO_REMOVED', 'Member', memberId),
         tx,
@@ -210,6 +236,28 @@ export class PhotoService implements OnModuleInit {
         actor: { userId: context.actorUserId, role: context.actorRole },
         correlationId: context.correlationId,
         payload: { photoId },
+      },
+      tx,
+    );
+  }
+
+  private async enqueueChanged(
+    tx: Parameters<OutboxService['enqueue']>[1],
+    memberId: string,
+    version: number,
+    scope: TenantScope,
+    context: MutationContext,
+  ) {
+    await this.outbox.enqueue(
+      {
+        eventType: 'MEMBER_PHOTO_CHANGED',
+        aggregateType: 'Member',
+        aggregateId: memberId,
+        aggregateVersion: version,
+        supplierId: scope.supplierId,
+        actor: { userId: context.actorUserId, role: context.actorRole },
+        correlationId: context.correlationId,
+        payload: { memberId },
       },
       tx,
     );
@@ -254,5 +302,14 @@ function invalidImage(detail: string): ProblemException {
     code: 'INVALID_IMAGE',
     title: 'Invalid image',
     detail,
+  });
+}
+
+function unchangedImage(): ProblemException {
+  return new ProblemException({
+    status: 409,
+    code: 'STATE_CONFLICT',
+    title: 'Photo unchanged',
+    detail: 'Foto yang dipilih sama dengan foto aktif. Pilih file foto yang berbeda.',
   });
 }

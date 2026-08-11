@@ -1,6 +1,15 @@
-import { ArrowRight, Camera, Check, Clipboard, Database, Plus, UserRound } from 'lucide-react';
+import {
+  ArrowRight,
+  Camera,
+  Check,
+  Clipboard,
+  Database,
+  Plus,
+  Trash2,
+  UserRound,
+} from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import {
@@ -19,7 +28,7 @@ import {
 
 import { ApiProblemError } from '@tmmin-henkaten/api-client';
 
-import { supplierApi } from '../app/api';
+import { supplierApi, supplierAssetUrl } from '../app/api';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { CursorPager } from '../components/CursorPager';
@@ -244,7 +253,13 @@ function MasterRow({
     kind === 'members' && 'fullName' in item
       ? [
           <span className="person-summary" key="member">
-            <i>{item.initials}</i>
+            <i>
+              <PhotoWithFallback
+                src={item.photo ? supplierAssetUrl(item.photo.thumbnailUrl) : null}
+                alt=""
+                fallback={item.initials}
+              />
+            </i>
             <strong>{item.fullName}</strong>
           </span>,
           item.registrationNumber,
@@ -643,7 +658,7 @@ function MasterFields({
   );
 }
 
-function MemberLifecycle({
+export function MemberLifecycle({
   member,
   scope,
 }: {
@@ -655,6 +670,20 @@ function MemberLifecycle({
     null,
   );
   const [problem, setProblem] = useState<string | null>(null);
+  const [photoNotice, setPhotoNotice] = useState<string | null>(null);
+  const invalidatePhotoViews = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: scopedKey(scope, 'master-members-detail', member.id),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: scopedKey(scope, 'master-members').slice(0, -1),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: scopedKey(scope, 'assignment-board').slice(0, -1),
+      }),
+    ]);
+  };
   const action = useMutation({
     mutationFn: async (kind: 'status' | 'reset') => {
       if (kind === 'reset') {
@@ -676,12 +705,22 @@ function MemberLifecycle({
   });
   const photo = useMutation({
     mutationFn: (file: File) => supplierApi.uploadMemberPhoto(member.id, file),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: scopedKey(scope, 'master-members-detail', member.id),
-      }),
+    onSuccess: async (updatedMember) => {
+      queryClient.setQueryData(scopedKey(scope, 'master-members-detail', member.id), updatedMember);
+      setPhotoNotice(member.photo ? 'Foto berhasil diganti.' : 'Foto berhasil diset.');
+      await invalidatePhotoViews();
+    },
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
+  const removePhoto = useMutation({
+    mutationFn: () => supplierApi.removeMemberPhoto(member.id, member.photo!.version),
+    onSuccess: async () => {
+      setPhotoNotice('Foto berhasil dihapus. Initials kembali digunakan sebagai avatar.');
+      await invalidatePhotoViews();
+    },
+    onError: (error) => setProblem(masterMutationProblem(error)),
+  });
+  const photoPending = photo.isPending || removePhoto.isPending;
   return (
     <Panel
       title="Lifecycle & foto"
@@ -693,6 +732,71 @@ function MemberLifecycle({
           {problem}
         </Alert>
       )}
+      {photoNotice && (
+        <Alert tone="success" title="Foto member diperbarui">
+          {photoNotice}
+        </Alert>
+      )}
+      <div className="member-photo-editor">
+        <div className="member-photo-editor__preview">
+          <PhotoWithFallback
+            src={member.photo ? supplierAssetUrl(member.photo.thumbnailUrl) : null}
+            alt={`Foto ${member.fullName}`}
+            fallback={member.initials}
+            fallbackLabel={`Initials ${member.fullName}`}
+          />
+        </div>
+        <div className="member-photo-editor__content">
+          <strong>{member.photo ? 'Foto member aktif' : 'Foto belum diset'}</strong>
+          <p>Gunakan JPG, PNG, atau WebP dengan ukuran maksimum 2 MB.</p>
+          <div className="member-photo-editor__actions">
+            <label className={`photo-upload${photoPending ? ' is-disabled' : ''}`}>
+              <Camera aria-hidden="true" />
+              {photo.isPending ? 'Mengunggah…' : member.photo ? 'Ganti foto' : 'Set foto'}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={photoPending}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = '';
+                  if (!file) return;
+                  setProblem(null);
+                  setPhotoNotice(null);
+                  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                    setProblem('Format foto harus JPG, PNG, atau WebP.');
+                    return;
+                  }
+                  if (file.size > 2 * 1024 * 1024) {
+                    setProblem('Ukuran foto maksimal 2 MB.');
+                    return;
+                  }
+                  photo.mutate(file);
+                }}
+              />
+            </label>
+            {member.photo && (
+              <Button
+                variant="danger"
+                leadingIcon={<Trash2 />}
+                loading={removePhoto.isPending}
+                disabled={photoPending}
+                onClick={() => {
+                  setProblem(null);
+                  setPhotoNotice(null);
+                  if (
+                    window.confirm('Hapus foto member ini dan gunakan initials sebagai avatar?')
+                  ) {
+                    removePhoto.mutate();
+                  }
+                }}
+              >
+                Hapus foto
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
       <div className="lifecycle-actions">
         <Button
           variant="secondary"
@@ -716,26 +820,27 @@ function MemberLifecycle({
             Reset password
           </Button>
         )}
-        <label className="photo-upload">
-          <Camera aria-hidden="true" />
-          Ganti photo
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (!file) return;
-              setProblem(null);
-              if (file.size > 2 * 1024 * 1024) {
-                setProblem('Ukuran foto maksimal 2 MB.');
-                return;
-              }
-              photo.mutate(file);
-            }}
-          />
-        </label>
       </div>
     </Panel>
+  );
+}
+
+function PhotoWithFallback({
+  src,
+  alt,
+  fallback,
+  fallbackLabel,
+}: {
+  src: string | null;
+  alt: string;
+  fallback: ReactNode;
+  fallbackLabel?: string;
+}) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  return src && failedSrc !== src ? (
+    <img src={src} alt={alt} onError={() => setFailedSrc(src)} />
+  ) : (
+    <span {...(fallbackLabel ? { 'aria-label': fallbackLabel } : {})}>{fallback}</span>
   );
 }
 

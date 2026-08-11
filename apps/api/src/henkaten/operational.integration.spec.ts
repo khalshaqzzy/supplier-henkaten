@@ -871,6 +871,22 @@ describe('Hosted shift and Henkaten core', () => {
     expect(read.status).toBe(200);
     expect(read.body.readAt).toBeTypeOf('string');
 
+    await prisma.memberPhoto.create({
+      data: {
+        supplierId,
+        memberId: mp1Id,
+        fullPath: `/tmp/${mp1Id}/full.webp`,
+        thumbnailPath: `/tmp/${mp1Id}/thumbnail.webp`,
+        fullChecksum: 'a'.repeat(64),
+        thumbnailChecksum: 'b'.repeat(64),
+        fullWidth: 64,
+        fullHeight: 64,
+        thumbnailWidth: 64,
+        thumbnailHeight: 64,
+        version: 7,
+      },
+    });
+
     const board = await request(app.getHttpServer())
       .get('/api/v1/supplier/assignment-board')
       .set('Cookie', adminCookie);
@@ -879,7 +895,14 @@ describe('Hosted shift and Henkaten core', () => {
       lines: Array<{
         lineId: string;
         activeOverride: unknown;
-        jobs: Array<{ indicators: unknown[] }>;
+        jobs: Array<{
+          indicators: unknown[];
+          mp: {
+            memberId: string | null;
+            photoThumbnailUrl: string | null;
+            initials: string | null;
+          };
+        }>;
       }>;
     }>(board);
     expect(boardBody.lines.some((line) => line.lineId === lineId)).toBe(true);
@@ -887,6 +910,12 @@ describe('Hosted shift and Henkaten core', () => {
     expect(mainLine).toHaveProperty('activeOverride');
     expect(mainLine.jobs).toHaveLength(2);
     expect(mainLine.jobs.some((job) => job.indicators.length > 0)).toBe(true);
+    expect(mainLine.jobs.find((job) => job.mp.memberId === mp1Id)?.mp.photoThumbnailUrl).toBe(
+      `/api/v1/supplier/master-data/members/${mp1Id}/photo/thumbnail?v=7`,
+    );
+    expect(
+      mainLine.jobs.some((job) => job.mp.memberId !== mp1Id && job.mp.photoThumbnailUrl === null),
+    ).toBe(true);
 
     const activityBaseTime = Date.now() + 60_000;
     await prisma.auditEvent.createMany({

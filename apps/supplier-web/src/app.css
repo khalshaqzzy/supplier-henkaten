@@ -385,6 +385,12 @@ body {
   text-align: left;
 }
 
+.person-summary > i img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .product-account small,
 .person-summary small {
   color: var(--hds-text-tertiary);
@@ -1808,13 +1814,94 @@ a.overview-activity-identifier:hover {
   padding: 0 var(--hds-space-3);
   border: 1px solid var(--hds-border-default);
   border-radius: var(--hds-radius-md);
+  background: var(--hds-action-secondary);
+  box-shadow: var(--hds-shadow-card);
+  color: var(--hds-text-primary);
+  font-weight: var(--hds-weight-semibold);
   cursor: pointer;
+  transition:
+    background var(--hds-duration-fast) var(--hds-ease-standard),
+    border-color var(--hds-duration-fast) var(--hds-ease-standard);
 }
 
 .photo-upload input {
   position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
   opacity: 0;
-  pointer-events: none;
+}
+
+.photo-upload:hover {
+  border-color: var(--hds-border-strong);
+  background: var(--hds-action-ghost-hover);
+}
+
+.photo-upload:focus-within {
+  outline: 2px solid var(--hds-focus-ring);
+  outline-offset: 2px;
+}
+
+.photo-upload.is-disabled {
+  cursor: not-allowed;
+  opacity: var(--hds-disabled-opacity);
+}
+
+.photo-upload svg {
+  width: 16px;
+  height: 16px;
+}
+
+.member-photo-editor {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--hds-space-5);
+  padding: var(--hds-space-4);
+  border: 1px solid var(--hds-border-default);
+  border-radius: var(--hds-radius-lg);
+  background: var(--hds-surface-inset);
+}
+
+.member-photo-editor__preview {
+  width: 112px;
+  height: 112px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--hds-border-default);
+  border-radius: var(--hds-radius-lg);
+  background: #182234;
+  color: white;
+  font-size: var(--hds-type-24-size);
+  font-weight: var(--hds-weight-semibold);
+}
+
+.member-photo-editor__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.member-photo-editor__content {
+  min-width: 0;
+  display: grid;
+  gap: var(--hds-space-2);
+}
+
+.member-photo-editor__content p {
+  margin: 0;
+  color: var(--hds-text-tertiary);
+  font-size: var(--hds-type-12-size);
+}
+
+.member-photo-editor__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--hds-space-2);
+  flex-wrap: wrap;
 }
 
 .job-list li,
@@ -2116,7 +2203,8 @@ a.overview-activity-identifier:hover {
 }
 
 .board-critical > div {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   padding: 8px;
@@ -2131,7 +2219,14 @@ a.overview-activity-identifier:hover {
 }
 
 .board-critical > div > span {
+  min-width: 0;
   display: grid;
+}
+
+.board-critical > div > span strong,
+.board-critical > div > span small {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .board-critical small {
@@ -2139,11 +2234,15 @@ a.overview-activity-identifier:hover {
   font-size: 11px;
 }
 
-.board-critical > a {
-  color: #b43a0c;
-  font-size: 12px;
-  font-weight: 700;
+.board-risk-action {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-height: 36px;
   text-decoration: none;
+}
+
+.board-risk-action svg:last-child {
+  margin-left: auto;
 }
 
 .board-workspace .operational-facts {
@@ -4554,6 +4653,25 @@ a.overview-activity-identifier:hover {
     justify-content: center;
   }
 
+  .member-photo-editor {
+    grid-template-columns: 1fr;
+  }
+
+  .member-photo-editor__preview {
+    width: 96px;
+    height: 96px;
+  }
+
+  .member-photo-editor__actions {
+    align-items: stretch;
+  }
+
+  .member-photo-editor__actions > *,
+  .board-risk-action {
+    min-height: 44px;
+    justify-content: center;
+  }
+
   .auth-shell {
     min-height: 100dvh;
     grid-template-columns: 1fr;
@@ -4926,6 +5044,25 @@ a.overview-activity-identifier:hover {
 @media (max-width: 767px) {
   .product-content {
     padding: 14px 12px 88px;
+  }
+
+  .board-toolbar {
+    min-width: 0;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .board-toolbar label {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .board-toolbar > .hds-button,
+  .board-workspace,
+  .board-workspace > *,
+  .operational-rail {
+    width: 100%;
+    min-width: 0;
   }
 
   .overview-stats,
