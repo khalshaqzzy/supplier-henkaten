@@ -330,6 +330,7 @@
                           "TMMIN_HENKATEN_READ",
                           "SUPPLIER_NOTIFICATION_READ",
                           "SUPPLIER_BOARD_READ",
+                          "SUPPLIER_BOARD_LAYOUT_MANAGE",
                           "SUPPLIER_DASHBOARD_READ",
                           "SUPPLIER_AUDIT_READ",
                           "TMMIN_DASHBOARD_READ",
@@ -637,6 +638,7 @@
                           "TMMIN_HENKATEN_READ",
                           "SUPPLIER_NOTIFICATION_READ",
                           "SUPPLIER_BOARD_READ",
+                          "SUPPLIER_BOARD_LAYOUT_MANAGE",
                           "SUPPLIER_DASHBOARD_READ",
                           "SUPPLIER_AUDIT_READ",
                           "TMMIN_DASHBOARD_READ",
@@ -917,6 +919,7 @@
                           "TMMIN_HENKATEN_READ",
                           "SUPPLIER_NOTIFICATION_READ",
                           "SUPPLIER_BOARD_READ",
+                          "SUPPLIER_BOARD_LAYOUT_MANAGE",
                           "SUPPLIER_DASHBOARD_READ",
                           "SUPPLIER_AUDIT_READ",
                           "TMMIN_DASHBOARD_READ",
@@ -1197,6 +1200,7 @@
                           "TMMIN_HENKATEN_READ",
                           "SUPPLIER_NOTIFICATION_READ",
                           "SUPPLIER_BOARD_READ",
+                          "SUPPLIER_BOARD_LAYOUT_MANAGE",
                           "SUPPLIER_DASHBOARD_READ",
                           "SUPPLIER_AUDIT_READ",
                           "TMMIN_DASHBOARD_READ",
@@ -39331,6 +39335,1946 @@
         }
       }
     },
+    "/api/v1/supplier/assignment-board/layouts/{lineId}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lineId",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current line board canvas layout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "lineId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "SAVED",
+                        "GENERATED"
+                      ]
+                    },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "schemaVersion": {
+                      "type": "number",
+                      "const": 1
+                    },
+                    "canEdit": {
+                      "type": "boolean"
+                    },
+                    "updatedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "updatedBy": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "reconciliation": {
+                      "type": "object",
+                      "properties": {
+                        "addedJobIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        },
+                        "removedJobIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        }
+                      },
+                      "required": [
+                        "addedJobIds",
+                        "removedJobIds"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "document": {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "number",
+                          "const": 1
+                        },
+                        "canvas": {
+                          "type": "object",
+                          "properties": {
+                            "width": {
+                              "type": "integer",
+                              "minimum": 2400,
+                              "maximum": 12000
+                            },
+                            "height": {
+                              "type": "integer",
+                              "minimum": 1350,
+                              "maximum": 8000
+                            },
+                            "background": {
+                              "type": "string",
+                              "enum": [
+                                "LIGHT_GRID",
+                                "PLAIN"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "width",
+                            "height",
+                            "background"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "nodes": {
+                          "maxItems": 2000,
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100,
+                                    "pattern": "^[a-zA-Z0-9:_-]+$"
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "width": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "height": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "rotation": {
+                                        "default": 0,
+                                        "type": "number",
+                                        "minimum": -360,
+                                        "maximum": 360
+                                      },
+                                      "zIndex": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 2000
+                                      },
+                                      "locked": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "width",
+                                      "height",
+                                      "rotation",
+                                      "zIndex",
+                                      "locked"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "JOB_SLOT"
+                                  },
+                                  "jobId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "transform",
+                                  "type",
+                                  "jobId"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100,
+                                    "pattern": "^[a-zA-Z0-9:_-]+$"
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "width": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "height": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "rotation": {
+                                        "default": 0,
+                                        "type": "number",
+                                        "minimum": -360,
+                                        "maximum": 360
+                                      },
+                                      "zIndex": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 2000
+                                      },
+                                      "locked": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "width",
+                                      "height",
+                                      "rotation",
+                                      "zIndex",
+                                      "locked"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "MACHINE_ASSET"
+                                  },
+                                  "assetKey": {
+                                    "type": "string",
+                                    "enum": [
+                                      "PRESS_STAMPING",
+                                      "INJECTION_MOLDING",
+                                      "WELDING_ROBOT",
+                                      "SPOT_WELDING",
+                                      "CNC_MACHINING",
+                                      "STRAIGHT_CONVEYOR",
+                                      "ROLLER_CONVEYOR",
+                                      "ASSEMBLY_FIXTURE",
+                                      "INSPECTION_CMM",
+                                      "TORQUE_STATION",
+                                      "MATERIAL_RACK",
+                                      "PACKING_STATION",
+                                      "PRESS_STAMPING_2D",
+                                      "INJECTION_MOLDING_2D",
+                                      "WELDING_ROBOT_2D",
+                                      "SPOT_WELDING_2D",
+                                      "CNC_MACHINING_2D",
+                                      "STRAIGHT_CONVEYOR_2D",
+                                      "ROLLER_CONVEYOR_2D",
+                                      "ASSEMBLY_FIXTURE_2D",
+                                      "INSPECTION_CMM_2D",
+                                      "TORQUE_STATION_2D",
+                                      "MATERIAL_RACK_2D",
+                                      "PACKING_STATION_2D"
+                                    ]
+                                  },
+                                  "opacity": {
+                                    "default": 1,
+                                    "type": "number",
+                                    "minimum": 0.2,
+                                    "maximum": 1
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "transform",
+                                  "type",
+                                  "assetKey",
+                                  "opacity"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100,
+                                    "pattern": "^[a-zA-Z0-9:_-]+$"
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "width": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "height": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "rotation": {
+                                        "default": 0,
+                                        "type": "number",
+                                        "minimum": -360,
+                                        "maximum": 360
+                                      },
+                                      "zIndex": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 2000
+                                      },
+                                      "locked": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "width",
+                                      "height",
+                                      "rotation",
+                                      "zIndex",
+                                      "locked"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "RECTANGLE",
+                                      "OUTLINE"
+                                    ]
+                                  },
+                                  "fill": {
+                                    "type": "string",
+                                    "pattern": "^#[0-9a-f]{6}$"
+                                  },
+                                  "stroke": {
+                                    "type": "string",
+                                    "pattern": "^#[0-9a-f]{6}$"
+                                  },
+                                  "strokeWidth": {
+                                    "type": "number",
+                                    "minimum": 1,
+                                    "maximum": 20
+                                  },
+                                  "opacity": {
+                                    "type": "number",
+                                    "minimum": 0.1,
+                                    "maximum": 1
+                                  },
+                                  "cornerRadius": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 80
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "transform",
+                                  "type",
+                                  "fill",
+                                  "stroke",
+                                  "strokeWidth",
+                                  "opacity",
+                                  "cornerRadius"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100,
+                                    "pattern": "^[a-zA-Z0-9:_-]+$"
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "width": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "height": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "rotation": {
+                                        "default": 0,
+                                        "type": "number",
+                                        "minimum": -360,
+                                        "maximum": 360
+                                      },
+                                      "zIndex": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 2000
+                                      },
+                                      "locked": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "width",
+                                      "height",
+                                      "rotation",
+                                      "zIndex",
+                                      "locked"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "ARROW"
+                                  },
+                                  "color": {
+                                    "type": "string",
+                                    "pattern": "^#[0-9a-f]{6}$"
+                                  },
+                                  "strokeWidth": {
+                                    "type": "number",
+                                    "minimum": 2,
+                                    "maximum": 24
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "transform",
+                                  "type",
+                                  "color",
+                                  "strokeWidth"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100,
+                                    "pattern": "^[a-zA-Z0-9:_-]+$"
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "width": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "height": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "rotation": {
+                                        "default": 0,
+                                        "type": "number",
+                                        "minimum": -360,
+                                        "maximum": 360
+                                      },
+                                      "zIndex": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 2000
+                                      },
+                                      "locked": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "width",
+                                      "height",
+                                      "rotation",
+                                      "zIndex",
+                                      "locked"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "TEXT"
+                                  },
+                                  "text": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200
+                                  },
+                                  "color": {
+                                    "type": "string",
+                                    "pattern": "^#[0-9a-f]{6}$"
+                                  },
+                                  "fontSize": {
+                                    "type": "number",
+                                    "minimum": 12,
+                                    "maximum": 96
+                                  },
+                                  "align": {
+                                    "type": "string",
+                                    "enum": [
+                                      "left",
+                                      "center",
+                                      "right"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "transform",
+                                  "type",
+                                  "text",
+                                  "color",
+                                  "fontSize",
+                                  "align"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ],
+                            "type": "object"
+                          }
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "canvas",
+                        "nodes"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "lineId",
+                    "source",
+                    "version",
+                    "schemaVersion",
+                    "canEdit",
+                    "updatedAt",
+                    "updatedBy",
+                    "reconciliation",
+                    "document"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lineId",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedVersion": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "document": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "canvas": {
+                        "type": "object",
+                        "properties": {
+                          "width": {
+                            "type": "integer",
+                            "minimum": 2400,
+                            "maximum": 12000
+                          },
+                          "height": {
+                            "type": "integer",
+                            "minimum": 1350,
+                            "maximum": 8000
+                          },
+                          "background": {
+                            "type": "string",
+                            "enum": [
+                              "LIGHT_GRID",
+                              "PLAIN"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "width",
+                          "height",
+                          "background"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "nodes": {
+                        "maxItems": 2000,
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 100,
+                                  "pattern": "^[a-zA-Z0-9:_-]+$"
+                                },
+                                "transform": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 12000
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 12000
+                                    },
+                                    "width": {
+                                      "type": "number",
+                                      "minimum": 20,
+                                      "maximum": 12000
+                                    },
+                                    "height": {
+                                      "type": "number",
+                                      "minimum": 20,
+                                      "maximum": 12000
+                                    },
+                                    "rotation": {
+                                      "default": 0,
+                                      "type": "number",
+                                      "minimum": -360,
+                                      "maximum": 360
+                                    },
+                                    "zIndex": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2000
+                                    },
+                                    "locked": {
+                                      "default": false,
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "width",
+                                    "height",
+                                    "zIndex"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "const": "JOB_SLOT"
+                                },
+                                "jobId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "transform",
+                                "type",
+                                "jobId"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 100,
+                                  "pattern": "^[a-zA-Z0-9:_-]+$"
+                                },
+                                "transform": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 12000
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 12000
+                                    },
+                                    "width": {
+                                      "type": "number",
+                                      "minimum": 20,
+                                      "maximum": 12000
+                                    },
+                                    "height": {
+                                      "type": "number",
+                                      "minimum": 20,
+                                      "maximum": 12000
+                                    },
+                                    "rotation": {
+                                      "default": 0,
+                                      "type": "number",
+                                      "minimum": -360,
+                                      "maximum": 360
+                                    },
+                                    "zIndex": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2000
+                                    },
+                                    "locked": {
+                                      "default": false,
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "width",
+                                    "height",
+                                    "zIndex"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "const": "MACHINE_ASSET"
+                                },
+                                "assetKey": {
+                                  "type": "string",
+                                  "enum": [
+                                    "PRESS_STAMPING",
+                                    "INJECTION_MOLDING",
+                                    "WELDING_ROBOT",
+                                    "SPOT_WELDING",
+                                    "CNC_MACHINING",
+                                    "STRAIGHT_CONVEYOR",
+                                    "ROLLER_CONVEYOR",
+                                    "ASSEMBLY_FIXTURE",
+                                    "INSPECTION_CMM",
+                                    "TORQUE_STATION",
+                                    "MATERIAL_RACK",
+                                    "PACKING_STATION",
+                                    "PRESS_STAMPING_2D",
+                                    "INJECTION_MOLDING_2D",
+                                    "WELDING_ROBOT_2D",
+                                    "SPOT_WELDING_2D",
+                                    "CNC_MACHINING_2D",
+                                    "STRAIGHT_CONVEYOR_2D",
+                                    "ROLLER_CONVEYOR_2D",
+                                    "ASSEMBLY_FIXTURE_2D",
+                                    "INSPECTION_CMM_2D",
+                                    "TORQUE_STATION_2D",
+                                    "MATERIAL_RACK_2D",
+                                    "PACKING_STATION_2D"
+                                  ]
+                                },
+                                "opacity": {
+                                  "default": 1,
+                                  "type": "number",
+                                  "minimum": 0.2,
+                                  "maximum": 1
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "transform",
+                                "type",
+                                "assetKey"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 100,
+                                  "pattern": "^[a-zA-Z0-9:_-]+$"
+                                },
+                                "transform": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 12000
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 12000
+                                    },
+                                    "width": {
+                                      "type": "number",
+                                      "minimum": 20,
+                                      "maximum": 12000
+                                    },
+                                    "height": {
+                                      "type": "number",
+                                      "minimum": 20,
+                                      "maximum": 12000
+                                    },
+                                    "rotation": {
+                                      "default": 0,
+                                      "type": "number",
+                                      "minimum": -360,
+                                      "maximum": 360
+                                    },
+                                    "zIndex": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2000
+                                    },
+                                    "locked": {
+                                      "default": false,
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "width",
+                                    "height",
+                                    "zIndex"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "RECTANGLE",
+                                    "OUTLINE"
+                                  ]
+                                },
+                                "fill": {
+                                  "type": "string",
+                                  "pattern": "^#[0-9a-f]{6}$"
+                                },
+                                "stroke": {
+                                  "type": "string",
+                                  "pattern": "^#[0-9a-f]{6}$"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 1,
+                                  "maximum": 20
+                                },
+                                "opacity": {
+                                  "type": "number",
+                                  "minimum": 0.1,
+                                  "maximum": 1
+                                },
+                                "cornerRadius": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 80
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "transform",
+                                "type",
+                                "fill",
+                                "stroke",
+                                "strokeWidth",
+                                "opacity",
+                                "cornerRadius"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 100,
+                                  "pattern": "^[a-zA-Z0-9:_-]+$"
+                                },
+                                "transform": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 12000
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 12000
+                                    },
+                                    "width": {
+                                      "type": "number",
+                                      "minimum": 20,
+                                      "maximum": 12000
+                                    },
+                                    "height": {
+                                      "type": "number",
+                                      "minimum": 20,
+                                      "maximum": 12000
+                                    },
+                                    "rotation": {
+                                      "default": 0,
+                                      "type": "number",
+                                      "minimum": -360,
+                                      "maximum": 360
+                                    },
+                                    "zIndex": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2000
+                                    },
+                                    "locked": {
+                                      "default": false,
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "width",
+                                    "height",
+                                    "zIndex"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "const": "ARROW"
+                                },
+                                "color": {
+                                  "type": "string",
+                                  "pattern": "^#[0-9a-f]{6}$"
+                                },
+                                "strokeWidth": {
+                                  "type": "number",
+                                  "minimum": 2,
+                                  "maximum": 24
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "transform",
+                                "type",
+                                "color",
+                                "strokeWidth"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 100,
+                                  "pattern": "^[a-zA-Z0-9:_-]+$"
+                                },
+                                "transform": {
+                                  "type": "object",
+                                  "properties": {
+                                    "x": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 12000
+                                    },
+                                    "y": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 12000
+                                    },
+                                    "width": {
+                                      "type": "number",
+                                      "minimum": 20,
+                                      "maximum": 12000
+                                    },
+                                    "height": {
+                                      "type": "number",
+                                      "minimum": 20,
+                                      "maximum": 12000
+                                    },
+                                    "rotation": {
+                                      "default": 0,
+                                      "type": "number",
+                                      "minimum": -360,
+                                      "maximum": 360
+                                    },
+                                    "zIndex": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2000
+                                    },
+                                    "locked": {
+                                      "default": false,
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "x",
+                                    "y",
+                                    "width",
+                                    "height",
+                                    "zIndex"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "const": "TEXT"
+                                },
+                                "text": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "color": {
+                                  "type": "string",
+                                  "pattern": "^#[0-9a-f]{6}$"
+                                },
+                                "fontSize": {
+                                  "type": "number",
+                                  "minimum": 12,
+                                  "maximum": 96
+                                },
+                                "align": {
+                                  "type": "string",
+                                  "enum": [
+                                    "left",
+                                    "center",
+                                    "right"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "transform",
+                                "type",
+                                "text",
+                                "color",
+                                "fontSize",
+                                "align"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ],
+                          "type": "object"
+                        }
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "canvas",
+                      "nodes"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "expectedVersion",
+                  "document"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved line board canvas layout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "lineId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "SAVED",
+                        "GENERATED"
+                      ]
+                    },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "schemaVersion": {
+                      "type": "number",
+                      "const": 1
+                    },
+                    "canEdit": {
+                      "type": "boolean"
+                    },
+                    "updatedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "updatedBy": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "reconciliation": {
+                      "type": "object",
+                      "properties": {
+                        "addedJobIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        },
+                        "removedJobIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        }
+                      },
+                      "required": [
+                        "addedJobIds",
+                        "removedJobIds"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "document": {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "number",
+                          "const": 1
+                        },
+                        "canvas": {
+                          "type": "object",
+                          "properties": {
+                            "width": {
+                              "type": "integer",
+                              "minimum": 2400,
+                              "maximum": 12000
+                            },
+                            "height": {
+                              "type": "integer",
+                              "minimum": 1350,
+                              "maximum": 8000
+                            },
+                            "background": {
+                              "type": "string",
+                              "enum": [
+                                "LIGHT_GRID",
+                                "PLAIN"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "width",
+                            "height",
+                            "background"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "nodes": {
+                          "maxItems": 2000,
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100,
+                                    "pattern": "^[a-zA-Z0-9:_-]+$"
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "width": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "height": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "rotation": {
+                                        "default": 0,
+                                        "type": "number",
+                                        "minimum": -360,
+                                        "maximum": 360
+                                      },
+                                      "zIndex": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 2000
+                                      },
+                                      "locked": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "width",
+                                      "height",
+                                      "rotation",
+                                      "zIndex",
+                                      "locked"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "JOB_SLOT"
+                                  },
+                                  "jobId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "transform",
+                                  "type",
+                                  "jobId"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100,
+                                    "pattern": "^[a-zA-Z0-9:_-]+$"
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "width": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "height": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "rotation": {
+                                        "default": 0,
+                                        "type": "number",
+                                        "minimum": -360,
+                                        "maximum": 360
+                                      },
+                                      "zIndex": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 2000
+                                      },
+                                      "locked": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "width",
+                                      "height",
+                                      "rotation",
+                                      "zIndex",
+                                      "locked"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "MACHINE_ASSET"
+                                  },
+                                  "assetKey": {
+                                    "type": "string",
+                                    "enum": [
+                                      "PRESS_STAMPING",
+                                      "INJECTION_MOLDING",
+                                      "WELDING_ROBOT",
+                                      "SPOT_WELDING",
+                                      "CNC_MACHINING",
+                                      "STRAIGHT_CONVEYOR",
+                                      "ROLLER_CONVEYOR",
+                                      "ASSEMBLY_FIXTURE",
+                                      "INSPECTION_CMM",
+                                      "TORQUE_STATION",
+                                      "MATERIAL_RACK",
+                                      "PACKING_STATION",
+                                      "PRESS_STAMPING_2D",
+                                      "INJECTION_MOLDING_2D",
+                                      "WELDING_ROBOT_2D",
+                                      "SPOT_WELDING_2D",
+                                      "CNC_MACHINING_2D",
+                                      "STRAIGHT_CONVEYOR_2D",
+                                      "ROLLER_CONVEYOR_2D",
+                                      "ASSEMBLY_FIXTURE_2D",
+                                      "INSPECTION_CMM_2D",
+                                      "TORQUE_STATION_2D",
+                                      "MATERIAL_RACK_2D",
+                                      "PACKING_STATION_2D"
+                                    ]
+                                  },
+                                  "opacity": {
+                                    "default": 1,
+                                    "type": "number",
+                                    "minimum": 0.2,
+                                    "maximum": 1
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "transform",
+                                  "type",
+                                  "assetKey",
+                                  "opacity"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100,
+                                    "pattern": "^[a-zA-Z0-9:_-]+$"
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "width": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "height": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "rotation": {
+                                        "default": 0,
+                                        "type": "number",
+                                        "minimum": -360,
+                                        "maximum": 360
+                                      },
+                                      "zIndex": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 2000
+                                      },
+                                      "locked": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "width",
+                                      "height",
+                                      "rotation",
+                                      "zIndex",
+                                      "locked"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "RECTANGLE",
+                                      "OUTLINE"
+                                    ]
+                                  },
+                                  "fill": {
+                                    "type": "string",
+                                    "pattern": "^#[0-9a-f]{6}$"
+                                  },
+                                  "stroke": {
+                                    "type": "string",
+                                    "pattern": "^#[0-9a-f]{6}$"
+                                  },
+                                  "strokeWidth": {
+                                    "type": "number",
+                                    "minimum": 1,
+                                    "maximum": 20
+                                  },
+                                  "opacity": {
+                                    "type": "number",
+                                    "minimum": 0.1,
+                                    "maximum": 1
+                                  },
+                                  "cornerRadius": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 80
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "transform",
+                                  "type",
+                                  "fill",
+                                  "stroke",
+                                  "strokeWidth",
+                                  "opacity",
+                                  "cornerRadius"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100,
+                                    "pattern": "^[a-zA-Z0-9:_-]+$"
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "width": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "height": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "rotation": {
+                                        "default": 0,
+                                        "type": "number",
+                                        "minimum": -360,
+                                        "maximum": 360
+                                      },
+                                      "zIndex": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 2000
+                                      },
+                                      "locked": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "width",
+                                      "height",
+                                      "rotation",
+                                      "zIndex",
+                                      "locked"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "ARROW"
+                                  },
+                                  "color": {
+                                    "type": "string",
+                                    "pattern": "^#[0-9a-f]{6}$"
+                                  },
+                                  "strokeWidth": {
+                                    "type": "number",
+                                    "minimum": 2,
+                                    "maximum": 24
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "transform",
+                                  "type",
+                                  "color",
+                                  "strokeWidth"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100,
+                                    "pattern": "^[a-zA-Z0-9:_-]+$"
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "width": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "height": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "rotation": {
+                                        "default": 0,
+                                        "type": "number",
+                                        "minimum": -360,
+                                        "maximum": 360
+                                      },
+                                      "zIndex": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 2000
+                                      },
+                                      "locked": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "width",
+                                      "height",
+                                      "rotation",
+                                      "zIndex",
+                                      "locked"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "TEXT"
+                                  },
+                                  "text": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200
+                                  },
+                                  "color": {
+                                    "type": "string",
+                                    "pattern": "^#[0-9a-f]{6}$"
+                                  },
+                                  "fontSize": {
+                                    "type": "number",
+                                    "minimum": 12,
+                                    "maximum": 96
+                                  },
+                                  "align": {
+                                    "type": "string",
+                                    "enum": [
+                                      "left",
+                                      "center",
+                                      "right"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "transform",
+                                  "type",
+                                  "text",
+                                  "color",
+                                  "fontSize",
+                                  "align"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ],
+                            "type": "object"
+                          }
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "canvas",
+                        "nodes"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "lineId",
+                    "source",
+                    "version",
+                    "schemaVersion",
+                    "canEdit",
+                    "updatedAt",
+                    "updatedBy",
+                    "reconciliation",
+                    "document"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/supplier/dashboard": {
       "get": {
         "parameters": [
@@ -41649,6 +43593,770 @@
                     "version",
                     "lastUpdatedAt",
                     "lines"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tmmin/suppliers/{supplierId}/assignment-board/layouts/{lineId}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "supplierId",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "lineId",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hosted supplier board canvas layout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "lineId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "SAVED",
+                        "GENERATED"
+                      ]
+                    },
+                    "version": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "schemaVersion": {
+                      "type": "number",
+                      "const": 1
+                    },
+                    "canEdit": {
+                      "type": "boolean"
+                    },
+                    "updatedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "updatedBy": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "reconciliation": {
+                      "type": "object",
+                      "properties": {
+                        "addedJobIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        },
+                        "removedJobIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        }
+                      },
+                      "required": [
+                        "addedJobIds",
+                        "removedJobIds"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "document": {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "type": "number",
+                          "const": 1
+                        },
+                        "canvas": {
+                          "type": "object",
+                          "properties": {
+                            "width": {
+                              "type": "integer",
+                              "minimum": 2400,
+                              "maximum": 12000
+                            },
+                            "height": {
+                              "type": "integer",
+                              "minimum": 1350,
+                              "maximum": 8000
+                            },
+                            "background": {
+                              "type": "string",
+                              "enum": [
+                                "LIGHT_GRID",
+                                "PLAIN"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "width",
+                            "height",
+                            "background"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "nodes": {
+                          "maxItems": 2000,
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100,
+                                    "pattern": "^[a-zA-Z0-9:_-]+$"
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "width": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "height": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "rotation": {
+                                        "default": 0,
+                                        "type": "number",
+                                        "minimum": -360,
+                                        "maximum": 360
+                                      },
+                                      "zIndex": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 2000
+                                      },
+                                      "locked": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "width",
+                                      "height",
+                                      "rotation",
+                                      "zIndex",
+                                      "locked"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "JOB_SLOT"
+                                  },
+                                  "jobId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "transform",
+                                  "type",
+                                  "jobId"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100,
+                                    "pattern": "^[a-zA-Z0-9:_-]+$"
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "width": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "height": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "rotation": {
+                                        "default": 0,
+                                        "type": "number",
+                                        "minimum": -360,
+                                        "maximum": 360
+                                      },
+                                      "zIndex": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 2000
+                                      },
+                                      "locked": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "width",
+                                      "height",
+                                      "rotation",
+                                      "zIndex",
+                                      "locked"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "MACHINE_ASSET"
+                                  },
+                                  "assetKey": {
+                                    "type": "string",
+                                    "enum": [
+                                      "PRESS_STAMPING",
+                                      "INJECTION_MOLDING",
+                                      "WELDING_ROBOT",
+                                      "SPOT_WELDING",
+                                      "CNC_MACHINING",
+                                      "STRAIGHT_CONVEYOR",
+                                      "ROLLER_CONVEYOR",
+                                      "ASSEMBLY_FIXTURE",
+                                      "INSPECTION_CMM",
+                                      "TORQUE_STATION",
+                                      "MATERIAL_RACK",
+                                      "PACKING_STATION",
+                                      "PRESS_STAMPING_2D",
+                                      "INJECTION_MOLDING_2D",
+                                      "WELDING_ROBOT_2D",
+                                      "SPOT_WELDING_2D",
+                                      "CNC_MACHINING_2D",
+                                      "STRAIGHT_CONVEYOR_2D",
+                                      "ROLLER_CONVEYOR_2D",
+                                      "ASSEMBLY_FIXTURE_2D",
+                                      "INSPECTION_CMM_2D",
+                                      "TORQUE_STATION_2D",
+                                      "MATERIAL_RACK_2D",
+                                      "PACKING_STATION_2D"
+                                    ]
+                                  },
+                                  "opacity": {
+                                    "default": 1,
+                                    "type": "number",
+                                    "minimum": 0.2,
+                                    "maximum": 1
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "transform",
+                                  "type",
+                                  "assetKey",
+                                  "opacity"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100,
+                                    "pattern": "^[a-zA-Z0-9:_-]+$"
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "width": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "height": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "rotation": {
+                                        "default": 0,
+                                        "type": "number",
+                                        "minimum": -360,
+                                        "maximum": 360
+                                      },
+                                      "zIndex": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 2000
+                                      },
+                                      "locked": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "width",
+                                      "height",
+                                      "rotation",
+                                      "zIndex",
+                                      "locked"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "RECTANGLE",
+                                      "OUTLINE"
+                                    ]
+                                  },
+                                  "fill": {
+                                    "type": "string",
+                                    "pattern": "^#[0-9a-f]{6}$"
+                                  },
+                                  "stroke": {
+                                    "type": "string",
+                                    "pattern": "^#[0-9a-f]{6}$"
+                                  },
+                                  "strokeWidth": {
+                                    "type": "number",
+                                    "minimum": 1,
+                                    "maximum": 20
+                                  },
+                                  "opacity": {
+                                    "type": "number",
+                                    "minimum": 0.1,
+                                    "maximum": 1
+                                  },
+                                  "cornerRadius": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 80
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "transform",
+                                  "type",
+                                  "fill",
+                                  "stroke",
+                                  "strokeWidth",
+                                  "opacity",
+                                  "cornerRadius"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100,
+                                    "pattern": "^[a-zA-Z0-9:_-]+$"
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "width": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "height": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "rotation": {
+                                        "default": 0,
+                                        "type": "number",
+                                        "minimum": -360,
+                                        "maximum": 360
+                                      },
+                                      "zIndex": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 2000
+                                      },
+                                      "locked": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "width",
+                                      "height",
+                                      "rotation",
+                                      "zIndex",
+                                      "locked"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "ARROW"
+                                  },
+                                  "color": {
+                                    "type": "string",
+                                    "pattern": "^#[0-9a-f]{6}$"
+                                  },
+                                  "strokeWidth": {
+                                    "type": "number",
+                                    "minimum": 2,
+                                    "maximum": 24
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "transform",
+                                  "type",
+                                  "color",
+                                  "strokeWidth"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100,
+                                    "pattern": "^[a-zA-Z0-9:_-]+$"
+                                  },
+                                  "transform": {
+                                    "type": "object",
+                                    "properties": {
+                                      "x": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "y": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 12000
+                                      },
+                                      "width": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "height": {
+                                        "type": "number",
+                                        "minimum": 20,
+                                        "maximum": 12000
+                                      },
+                                      "rotation": {
+                                        "default": 0,
+                                        "type": "number",
+                                        "minimum": -360,
+                                        "maximum": 360
+                                      },
+                                      "zIndex": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 2000
+                                      },
+                                      "locked": {
+                                        "default": false,
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "x",
+                                      "y",
+                                      "width",
+                                      "height",
+                                      "rotation",
+                                      "zIndex",
+                                      "locked"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "TEXT"
+                                  },
+                                  "text": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200
+                                  },
+                                  "color": {
+                                    "type": "string",
+                                    "pattern": "^#[0-9a-f]{6}$"
+                                  },
+                                  "fontSize": {
+                                    "type": "number",
+                                    "minimum": 12,
+                                    "maximum": 96
+                                  },
+                                  "align": {
+                                    "type": "string",
+                                    "enum": [
+                                      "left",
+                                      "center",
+                                      "right"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "transform",
+                                  "type",
+                                  "text",
+                                  "color",
+                                  "fontSize",
+                                  "align"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ],
+                            "type": "object"
+                          }
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "canvas",
+                        "nodes"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "lineId",
+                    "source",
+                    "version",
+                    "schemaVersion",
+                    "canEdit",
+                    "updatedAt",
+                    "updatedBy",
+                    "reconciliation",
+                    "document"
                   ],
                   "additionalProperties": false
                 }

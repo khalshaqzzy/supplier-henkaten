@@ -222,6 +222,7 @@ export interface paths {
                 | 'TMMIN_HENKATEN_READ'
                 | 'SUPPLIER_NOTIFICATION_READ'
                 | 'SUPPLIER_BOARD_READ'
+                | 'SUPPLIER_BOARD_LAYOUT_MANAGE'
                 | 'SUPPLIER_DASHBOARD_READ'
                 | 'SUPPLIER_AUDIT_READ'
                 | 'TMMIN_DASHBOARD_READ'
@@ -373,6 +374,7 @@ export interface paths {
                 | 'TMMIN_HENKATEN_READ'
                 | 'SUPPLIER_NOTIFICATION_READ'
                 | 'SUPPLIER_BOARD_READ'
+                | 'SUPPLIER_BOARD_LAYOUT_MANAGE'
                 | 'SUPPLIER_DASHBOARD_READ'
                 | 'SUPPLIER_AUDIT_READ'
                 | 'TMMIN_DASHBOARD_READ'
@@ -515,6 +517,7 @@ export interface paths {
                 | 'TMMIN_HENKATEN_READ'
                 | 'SUPPLIER_NOTIFICATION_READ'
                 | 'SUPPLIER_BOARD_READ'
+                | 'SUPPLIER_BOARD_LAYOUT_MANAGE'
                 | 'SUPPLIER_DASHBOARD_READ'
                 | 'SUPPLIER_AUDIT_READ'
                 | 'TMMIN_DASHBOARD_READ'
@@ -659,6 +662,7 @@ export interface paths {
                 | 'TMMIN_HENKATEN_READ'
                 | 'SUPPLIER_NOTIFICATION_READ'
                 | 'SUPPLIER_BOARD_READ'
+                | 'SUPPLIER_BOARD_LAYOUT_MANAGE'
                 | 'SUPPLIER_DASHBOARD_READ'
                 | 'SUPPLIER_AUDIT_READ'
                 | 'TMMIN_DASHBOARD_READ'
@@ -14478,6 +14482,549 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/supplier/assignment-board/layouts/{lineId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          lineId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Current line board canvas layout */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: string | null;
+              /** Format: uuid */
+              lineId: string;
+              /** @enum {string} */
+              source: 'SAVED' | 'GENERATED';
+              version: number | null;
+              /** @constant */
+              schemaVersion: 1;
+              canEdit: boolean;
+              updatedAt: string | null;
+              updatedBy: string | null;
+              reconciliation: {
+                addedJobIds: string[];
+                removedJobIds: string[];
+              };
+              document: {
+                /** @constant */
+                schemaVersion: 1;
+                canvas: {
+                  width: number;
+                  height: number;
+                  /** @enum {string} */
+                  background: 'LIGHT_GRID' | 'PLAIN';
+                };
+                nodes: (
+                  | {
+                      id: string;
+                      transform: {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                        /** @default 0 */
+                        rotation: number;
+                        zIndex: number;
+                        /** @default false */
+                        locked: boolean;
+                      };
+                      /** @constant */
+                      type: 'JOB_SLOT';
+                      /** Format: uuid */
+                      jobId: string;
+                    }
+                  | {
+                      id: string;
+                      transform: {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                        /** @default 0 */
+                        rotation: number;
+                        zIndex: number;
+                        /** @default false */
+                        locked: boolean;
+                      };
+                      /** @constant */
+                      type: 'MACHINE_ASSET';
+                      /** @enum {string} */
+                      assetKey:
+                        | 'PRESS_STAMPING'
+                        | 'INJECTION_MOLDING'
+                        | 'WELDING_ROBOT'
+                        | 'SPOT_WELDING'
+                        | 'CNC_MACHINING'
+                        | 'STRAIGHT_CONVEYOR'
+                        | 'ROLLER_CONVEYOR'
+                        | 'ASSEMBLY_FIXTURE'
+                        | 'INSPECTION_CMM'
+                        | 'TORQUE_STATION'
+                        | 'MATERIAL_RACK'
+                        | 'PACKING_STATION'
+                        | 'PRESS_STAMPING_2D'
+                        | 'INJECTION_MOLDING_2D'
+                        | 'WELDING_ROBOT_2D'
+                        | 'SPOT_WELDING_2D'
+                        | 'CNC_MACHINING_2D'
+                        | 'STRAIGHT_CONVEYOR_2D'
+                        | 'ROLLER_CONVEYOR_2D'
+                        | 'ASSEMBLY_FIXTURE_2D'
+                        | 'INSPECTION_CMM_2D'
+                        | 'TORQUE_STATION_2D'
+                        | 'MATERIAL_RACK_2D'
+                        | 'PACKING_STATION_2D';
+                      /** @default 1 */
+                      opacity: number;
+                    }
+                  | {
+                      id: string;
+                      transform: {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                        /** @default 0 */
+                        rotation: number;
+                        zIndex: number;
+                        /** @default false */
+                        locked: boolean;
+                      };
+                      /** @enum {string} */
+                      type: 'RECTANGLE' | 'OUTLINE';
+                      fill: string;
+                      stroke: string;
+                      strokeWidth: number;
+                      opacity: number;
+                      cornerRadius: number;
+                    }
+                  | {
+                      id: string;
+                      transform: {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                        /** @default 0 */
+                        rotation: number;
+                        zIndex: number;
+                        /** @default false */
+                        locked: boolean;
+                      };
+                      /** @constant */
+                      type: 'ARROW';
+                      color: string;
+                      strokeWidth: number;
+                    }
+                  | {
+                      id: string;
+                      transform: {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                        /** @default 0 */
+                        rotation: number;
+                        zIndex: number;
+                        /** @default false */
+                        locked: boolean;
+                      };
+                      /** @constant */
+                      type: 'TEXT';
+                      text: string;
+                      color: string;
+                      fontSize: number;
+                      /** @enum {string} */
+                      align: 'left' | 'center' | 'right';
+                    }
+                )[];
+              };
+            };
+          };
+        };
+      };
+    };
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          lineId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number | null;
+            document: {
+              /** @constant */
+              schemaVersion: 1;
+              canvas: {
+                width: number;
+                height: number;
+                /** @enum {string} */
+                background: 'LIGHT_GRID' | 'PLAIN';
+              };
+              nodes: (
+                | {
+                    id: string;
+                    transform: {
+                      x: number;
+                      y: number;
+                      width: number;
+                      height: number;
+                      /** @default 0 */
+                      rotation?: number;
+                      zIndex: number;
+                      /** @default false */
+                      locked?: boolean;
+                    };
+                    /** @constant */
+                    type: 'JOB_SLOT';
+                    /** Format: uuid */
+                    jobId: string;
+                  }
+                | {
+                    id: string;
+                    transform: {
+                      x: number;
+                      y: number;
+                      width: number;
+                      height: number;
+                      /** @default 0 */
+                      rotation?: number;
+                      zIndex: number;
+                      /** @default false */
+                      locked?: boolean;
+                    };
+                    /** @constant */
+                    type: 'MACHINE_ASSET';
+                    /** @enum {string} */
+                    assetKey:
+                      | 'PRESS_STAMPING'
+                      | 'INJECTION_MOLDING'
+                      | 'WELDING_ROBOT'
+                      | 'SPOT_WELDING'
+                      | 'CNC_MACHINING'
+                      | 'STRAIGHT_CONVEYOR'
+                      | 'ROLLER_CONVEYOR'
+                      | 'ASSEMBLY_FIXTURE'
+                      | 'INSPECTION_CMM'
+                      | 'TORQUE_STATION'
+                      | 'MATERIAL_RACK'
+                      | 'PACKING_STATION'
+                      | 'PRESS_STAMPING_2D'
+                      | 'INJECTION_MOLDING_2D'
+                      | 'WELDING_ROBOT_2D'
+                      | 'SPOT_WELDING_2D'
+                      | 'CNC_MACHINING_2D'
+                      | 'STRAIGHT_CONVEYOR_2D'
+                      | 'ROLLER_CONVEYOR_2D'
+                      | 'ASSEMBLY_FIXTURE_2D'
+                      | 'INSPECTION_CMM_2D'
+                      | 'TORQUE_STATION_2D'
+                      | 'MATERIAL_RACK_2D'
+                      | 'PACKING_STATION_2D';
+                    /** @default 1 */
+                    opacity?: number;
+                  }
+                | {
+                    id: string;
+                    transform: {
+                      x: number;
+                      y: number;
+                      width: number;
+                      height: number;
+                      /** @default 0 */
+                      rotation?: number;
+                      zIndex: number;
+                      /** @default false */
+                      locked?: boolean;
+                    };
+                    /** @enum {string} */
+                    type: 'RECTANGLE' | 'OUTLINE';
+                    fill: string;
+                    stroke: string;
+                    strokeWidth: number;
+                    opacity: number;
+                    cornerRadius: number;
+                  }
+                | {
+                    id: string;
+                    transform: {
+                      x: number;
+                      y: number;
+                      width: number;
+                      height: number;
+                      /** @default 0 */
+                      rotation?: number;
+                      zIndex: number;
+                      /** @default false */
+                      locked?: boolean;
+                    };
+                    /** @constant */
+                    type: 'ARROW';
+                    color: string;
+                    strokeWidth: number;
+                  }
+                | {
+                    id: string;
+                    transform: {
+                      x: number;
+                      y: number;
+                      width: number;
+                      height: number;
+                      /** @default 0 */
+                      rotation?: number;
+                      zIndex: number;
+                      /** @default false */
+                      locked?: boolean;
+                    };
+                    /** @constant */
+                    type: 'TEXT';
+                    text: string;
+                    color: string;
+                    fontSize: number;
+                    /** @enum {string} */
+                    align: 'left' | 'center' | 'right';
+                  }
+              )[];
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Saved line board canvas layout */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: string | null;
+              /** Format: uuid */
+              lineId: string;
+              /** @enum {string} */
+              source: 'SAVED' | 'GENERATED';
+              version: number | null;
+              /** @constant */
+              schemaVersion: 1;
+              canEdit: boolean;
+              updatedAt: string | null;
+              updatedBy: string | null;
+              reconciliation: {
+                addedJobIds: string[];
+                removedJobIds: string[];
+              };
+              document: {
+                /** @constant */
+                schemaVersion: 1;
+                canvas: {
+                  width: number;
+                  height: number;
+                  /** @enum {string} */
+                  background: 'LIGHT_GRID' | 'PLAIN';
+                };
+                nodes: (
+                  | {
+                      id: string;
+                      transform: {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                        /** @default 0 */
+                        rotation: number;
+                        zIndex: number;
+                        /** @default false */
+                        locked: boolean;
+                      };
+                      /** @constant */
+                      type: 'JOB_SLOT';
+                      /** Format: uuid */
+                      jobId: string;
+                    }
+                  | {
+                      id: string;
+                      transform: {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                        /** @default 0 */
+                        rotation: number;
+                        zIndex: number;
+                        /** @default false */
+                        locked: boolean;
+                      };
+                      /** @constant */
+                      type: 'MACHINE_ASSET';
+                      /** @enum {string} */
+                      assetKey:
+                        | 'PRESS_STAMPING'
+                        | 'INJECTION_MOLDING'
+                        | 'WELDING_ROBOT'
+                        | 'SPOT_WELDING'
+                        | 'CNC_MACHINING'
+                        | 'STRAIGHT_CONVEYOR'
+                        | 'ROLLER_CONVEYOR'
+                        | 'ASSEMBLY_FIXTURE'
+                        | 'INSPECTION_CMM'
+                        | 'TORQUE_STATION'
+                        | 'MATERIAL_RACK'
+                        | 'PACKING_STATION'
+                        | 'PRESS_STAMPING_2D'
+                        | 'INJECTION_MOLDING_2D'
+                        | 'WELDING_ROBOT_2D'
+                        | 'SPOT_WELDING_2D'
+                        | 'CNC_MACHINING_2D'
+                        | 'STRAIGHT_CONVEYOR_2D'
+                        | 'ROLLER_CONVEYOR_2D'
+                        | 'ASSEMBLY_FIXTURE_2D'
+                        | 'INSPECTION_CMM_2D'
+                        | 'TORQUE_STATION_2D'
+                        | 'MATERIAL_RACK_2D'
+                        | 'PACKING_STATION_2D';
+                      /** @default 1 */
+                      opacity: number;
+                    }
+                  | {
+                      id: string;
+                      transform: {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                        /** @default 0 */
+                        rotation: number;
+                        zIndex: number;
+                        /** @default false */
+                        locked: boolean;
+                      };
+                      /** @enum {string} */
+                      type: 'RECTANGLE' | 'OUTLINE';
+                      fill: string;
+                      stroke: string;
+                      strokeWidth: number;
+                      opacity: number;
+                      cornerRadius: number;
+                    }
+                  | {
+                      id: string;
+                      transform: {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                        /** @default 0 */
+                        rotation: number;
+                        zIndex: number;
+                        /** @default false */
+                        locked: boolean;
+                      };
+                      /** @constant */
+                      type: 'ARROW';
+                      color: string;
+                      strokeWidth: number;
+                    }
+                  | {
+                      id: string;
+                      transform: {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                        /** @default 0 */
+                        rotation: number;
+                        zIndex: number;
+                        /** @default false */
+                        locked: boolean;
+                      };
+                      /** @constant */
+                      type: 'TEXT';
+                      text: string;
+                      color: string;
+                      fontSize: number;
+                      /** @enum {string} */
+                      align: 'left' | 'center' | 'right';
+                    }
+                )[];
+              };
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/supplier/dashboard': {
     parameters: {
       query?: never;
@@ -15093,6 +15640,239 @@ export interface paths {
                   }[];
                 }[];
               }[];
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tmmin/suppliers/{supplierId}/assignment-board/layouts/{lineId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          supplierId: string;
+          lineId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Hosted supplier board canvas layout */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: string | null;
+              /** Format: uuid */
+              lineId: string;
+              /** @enum {string} */
+              source: 'SAVED' | 'GENERATED';
+              version: number | null;
+              /** @constant */
+              schemaVersion: 1;
+              canEdit: boolean;
+              updatedAt: string | null;
+              updatedBy: string | null;
+              reconciliation: {
+                addedJobIds: string[];
+                removedJobIds: string[];
+              };
+              document: {
+                /** @constant */
+                schemaVersion: 1;
+                canvas: {
+                  width: number;
+                  height: number;
+                  /** @enum {string} */
+                  background: 'LIGHT_GRID' | 'PLAIN';
+                };
+                nodes: (
+                  | {
+                      id: string;
+                      transform: {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                        /** @default 0 */
+                        rotation: number;
+                        zIndex: number;
+                        /** @default false */
+                        locked: boolean;
+                      };
+                      /** @constant */
+                      type: 'JOB_SLOT';
+                      /** Format: uuid */
+                      jobId: string;
+                    }
+                  | {
+                      id: string;
+                      transform: {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                        /** @default 0 */
+                        rotation: number;
+                        zIndex: number;
+                        /** @default false */
+                        locked: boolean;
+                      };
+                      /** @constant */
+                      type: 'MACHINE_ASSET';
+                      /** @enum {string} */
+                      assetKey:
+                        | 'PRESS_STAMPING'
+                        | 'INJECTION_MOLDING'
+                        | 'WELDING_ROBOT'
+                        | 'SPOT_WELDING'
+                        | 'CNC_MACHINING'
+                        | 'STRAIGHT_CONVEYOR'
+                        | 'ROLLER_CONVEYOR'
+                        | 'ASSEMBLY_FIXTURE'
+                        | 'INSPECTION_CMM'
+                        | 'TORQUE_STATION'
+                        | 'MATERIAL_RACK'
+                        | 'PACKING_STATION'
+                        | 'PRESS_STAMPING_2D'
+                        | 'INJECTION_MOLDING_2D'
+                        | 'WELDING_ROBOT_2D'
+                        | 'SPOT_WELDING_2D'
+                        | 'CNC_MACHINING_2D'
+                        | 'STRAIGHT_CONVEYOR_2D'
+                        | 'ROLLER_CONVEYOR_2D'
+                        | 'ASSEMBLY_FIXTURE_2D'
+                        | 'INSPECTION_CMM_2D'
+                        | 'TORQUE_STATION_2D'
+                        | 'MATERIAL_RACK_2D'
+                        | 'PACKING_STATION_2D';
+                      /** @default 1 */
+                      opacity: number;
+                    }
+                  | {
+                      id: string;
+                      transform: {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                        /** @default 0 */
+                        rotation: number;
+                        zIndex: number;
+                        /** @default false */
+                        locked: boolean;
+                      };
+                      /** @enum {string} */
+                      type: 'RECTANGLE' | 'OUTLINE';
+                      fill: string;
+                      stroke: string;
+                      strokeWidth: number;
+                      opacity: number;
+                      cornerRadius: number;
+                    }
+                  | {
+                      id: string;
+                      transform: {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                        /** @default 0 */
+                        rotation: number;
+                        zIndex: number;
+                        /** @default false */
+                        locked: boolean;
+                      };
+                      /** @constant */
+                      type: 'ARROW';
+                      color: string;
+                      strokeWidth: number;
+                    }
+                  | {
+                      id: string;
+                      transform: {
+                        x: number;
+                        y: number;
+                        width: number;
+                        height: number;
+                        /** @default 0 */
+                        rotation: number;
+                        zIndex: number;
+                        /** @default false */
+                        locked: boolean;
+                      };
+                      /** @constant */
+                      type: 'TEXT';
+                      text: string;
+                      color: string;
+                      fontSize: number;
+                      /** @enum {string} */
+                      align: 'left' | 'center' | 'right';
+                    }
+                )[];
+              };
             };
           };
         };

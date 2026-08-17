@@ -2,7 +2,7 @@
 
 Document status: Active implementation roadmap
 Created: 2026-07-23
-Last updated: 2026-08-11
+Last updated: 2026-08-17
 Source of truth: `.agent/PRD.md`
 Implementation approach: Backend-first
 Workspace tooling: Node.js 22 + pnpm workspaces, tanpa Turborepo
@@ -74,6 +74,9 @@ Kondisi repository setelah Phase 0-10:
 - refinement foto member menyediakan cache-generation URL, event invalidation realtime, editor
   Set/Ganti/Hapus yang optimistic, dan thumbnail list/board; risk rail Assignment Board menyediakan
   CTA resolusi/Henkaten yang accessible, tidak duplikat, dan bebas overflow pada mobile;
+- Assignment Board memiliki refinement Canvas per-line yang lazy-loaded, versioned, reconciled
+  terhadap live Working Assignment, editable oleh Supplier Admin/active Line Leader, read-only
+  untuk role lain/TMMIN, serta memakai curated transparent machine asset catalog;
 - materi slide tersedia sebagai reference-only input.
 
 Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8, Phase 9, Phase 10, Phase 11, Phase 12, Phase 13, dan Phase 14**
@@ -2379,6 +2382,41 @@ Data/migration impact:
 Exit criteria:
 
 - One stable board payload supports supplier frontend without client-side joins.
+
+### 8.3A Versioned Assignment Board Canvas
+
+Status: **done**
+
+Dependency: 8.3, Hosted authorization, member photo read model, dan transactional outbox.
+
+Execution:
+
+- Persist shared versioned `LineBoardLayout` JSON per supplier/line tanpa menyimpan live MP/PII.
+- Add strict schemas, generated/reconciled GET, optimistic PUT, redacted audit, safe outbox event,
+  Supplier/TMMIN read access, dan Admin/active-Line-Leader mutation scope.
+- Add lazy Konva editor, viewport Stage, curated machine catalog dengan family soft-isometric dan
+  simple generic 2D, required MP/photo job cards, spatial tools, DOM Layers/Properties fallback,
+  explicit draft/save flow, dan 4M-only legend.
+- Preserve the existing default board as mobile/accessibility fallback and keep assignment/Henkaten
+  lifecycle read-only from Canvas.
+
+Verification:
+
+- Contract and service unit tests cover strict validation, catalog closure, bounds, deterministic
+  generation, and reconciliation.
+- Hosted integration covers generated/read-only/editable responses, optimistic conflict,
+  authorization, TMMIN read, audit summary, and outbox payload.
+- Frontend unit/build checks cover transform normalization, unique style-aware labels, and the
+  complete 24-entry curated asset manifest.
+
+Data/migration impact:
+
+- Add `LineBoardLayout` with tenant/line uniqueness, schema/version, audit actors, and timestamps.
+
+Exit criteria:
+
+- Every active job is rendered exactly once with live MP content while saved coordinates remain
+  stable across assignment/photo/4M changes.
 
 ### 8.4 SSE Realtime Stream dan Stale Fallback
 

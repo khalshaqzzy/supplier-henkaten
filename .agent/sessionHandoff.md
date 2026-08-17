@@ -1,94 +1,107 @@
-# Session Handoff — Member Photo and Board Risk Actions
+# Session Handoff — Customizable Assignment Board Canvas
 
-Date: 2026-08-11
+Date: 2026-08-17
 
-Branch: `staging`
+Branch: `feat/canvas-board`
 
-Status: member-photo management and polished Assignment Board risk actions are implementation- and
-local-verification-complete in the working tree. Phase 15.9 remains `in_progress`; no hosted staging
-deploy, real-device push, or Phase 16 UAT claim has been made.
+Status: the versioned per-line Assignment Board Canvas is implementation- and local-verification-
+complete and delivered on `feat/canvas-board`. No staging deployment or UAT claim has been made.
+Phase 15.9 remains `in_progress`.
 
 ## 1. Objective and Locked Decisions
 
-- Complete optional member-photo management in Supplier Master Data with preview, set/replace,
-  removal, validation, optimistic concurrency, and reliable cache refresh.
-- Keep `/board` read-only for photos. Supplier Admin remains the only role with master-data mutation
-  capability; other Supplier roles only consume photo/avatar output.
-- Present actionable Assignment Issues and Open Man reservations as polished, accessible buttons
-  linking to the existing authoritative resolution and Henkaten routes.
-- Do not add an endpoint, table, migration, or new lifecycle authority.
+- Preserve the current Assignment Board as the default, canonical mobile/accessibility fallback.
+- Add an explicitly selected, single-line Canvas using the hybrid editor/spatial/card direction
+  approved in planning.
+- Keep layout shared by line and independent of user, Line Leader turnover, and Shift Run.
+- Keep Working Assignment and Henkaten lifecycle authoritative; layout JSON must not persist member
+  name, registration number, photo URL, assignment state, or Henkaten content.
+- Render MP photos on job cards when available and initials only when the live thumbnail is absent or
+  fails to load. Render only the four Man/Machine/Material/Method dots as a legend.
 
 ## 2. Implementation Completed
 
-- Member responses and board thumbnail URLs now include a monotonically increasing `?v=` token.
-  Photo upload locks the member row, derives the next generation across current/superseded/deleted
-  records, and preserves a single `CURRENT` photo.
-- Replacement compares normalized full and thumbnail checksums under the member lock. An identical
-  file is rejected as `STATE_CONFLICT` instead of creating a misleading new generation, while the
-  successful upload response is written into the detail query cache before dependent refetches.
-- Assignment Board `version` and `lastUpdatedAt` now include the effective MP photo generation, so
-  downstream consumers can observe a photo-only read-model change.
-- Upload, replacement, removal, and cleanup remain transactional/audited. A non-PII
-  `MEMBER_PHOTO_CHANGED` outbox event is emitted for every successful change so an open board is
-  invalidated even on the first upload; cleanup remains a separate event.
-- The typed client removal operation now sends `expectedVersion` and accepts the endpoint's `204`
-  response.
-- Supplier Master Data provides a thumbnail/initials preview, contextual Set/Ganti Foto control,
-  client-side type/size feedback, loading and success/error states, confirmed optimistic removal,
-  repeat-file selection, list thumbnails, and member/list/board query invalidation.
-- Board risks no longer create a duplicate dead-end row from generic `RESERVED` state. Vacancy and
-  conflict rows expose primary `Buka resolusi`; Open Man reservations expose secondary
-  `Buka Henkaten`.
-- Board risk actions use design-system treatment, icons with clean accessible names, responsive
-  grid layout, visible focus behavior, and 44 px mobile targets. Mobile board toolbar constraints
-  were corrected to eliminate horizontal overflow at 390 px.
+- Added strict shared Canvas contracts for bounds, transforms, `JOB_SLOT`, curated machine,
+  rectangle, outline, arrow, and text nodes, document/node limits, optimistic save, response, and
+  reconciliation metadata.
+- Added `LineBoardLayout` and forward-only migration `20260817001100_assignment_board_canvas` with
+  supplier/line uniqueness, schema/version, audit actors, and timestamps.
+- Added Supplier GET/PUT and TMMIN Hosted read-only GET endpoints, capability wiring, OpenAPI 3.1,
+  and generated clients. Supplier Admin and the active Line Leader can edit; Supervisor, QC, other
+  roles, and TMMIN are read-only. PUT remains Hosted-only.
+- Added deterministic generated layout and reconciliation: every active included job appears once,
+  new jobs enter the overflow grid, inactive slots leave runtime output, decorative nodes survive,
+  and existing job coordinates remain stable when live assignment/photo/4M data changes.
+- Added transactional optimistic save, redacted node-count audit, safe
+  `BOARD_LAYOUT_UPDATED` outbox event, and realtime `assignment-board-layout` invalidation.
+- Added lazy `konva@10.3.1` / `react-konva@19.2.5` Canvas with viewport Stage, non-listening grid
+  layer, interactive layer, pan, 25–200% zoom, fit, fullscreen, snapping, 50-step undo/redo,
+  explicit draft/save/discard/conflict flows, resize/rotate/lock/reorder/duplicate/delete rules,
+  numeric Canvas/node properties, Layers DOM, keyboard movement, and reset auto-layout.
+- Required job cards cannot be deleted, duplicated, or rotated. They render live job name, MP photo
+  with credentialed image loading and initials fallback, MP name/registration, direct state
+  text/icon/border, and current 4M dots.
+- Added two generated transparent machine families: twelve polished soft-isometric cutouts and
+  twelve simple generic 2D icons. The 24-entry typed manifest carries distinct stable keys,
+  style-aware labels, ImageGen source, aspect ratio, default size, and accessible description. All
+  assets have alpha; the simple 2D family is optimized to a maximum 512 px dimension.
+- Machine PNGs and the Konva editor are loaded only with the lazy Canvas route chunk. Machine PNGs
+  are excluded from the PWA shell precache and remain network-on-demand.
+- Added URL-backed `Default | Canvas` toggle, single-line selection, dirty-state confirmations,
+  mobile read-only Canvas behavior, risk rail retention, and 4M-only legend on both views.
+- Final QA fixed tablet document overflow by containing the Stage's intrinsic inline size and using
+  a viewport-bounded initial measurement. Arrow selection now exposes explicit left/right endpoint
+  handles.
+- Added ADR 0031 and updated PRD/roadmap. Security dependency pins now resolve the current nanoid and
+  deepmerge-ts high-severity advisories.
 
-## 3. Contracts and Data
+## 3. Verification Completed Locally
 
-- No database migration and no public endpoint were added.
-- Existing photo URL fields remain strings; their values now carry the cache generation query.
-- Internal client signature: `removeMemberPhoto(id, expectedVersion): Promise<void>`.
-- Internal outbox event: `MEMBER_PHOTO_CHANGED`, scoped by supplier/member and containing only the
-  opaque member ID.
-- OpenAPI and generated client checks remain clean without regeneration diff.
+- Clean 11-migration deploy on the disposable PostgreSQL 18/pgvector test database passed.
+- All 38 API integration tests passed. New evidence covers generated/saved layouts, active Line
+  Leader and Admin editing, Supervisor/TMMIN read-only access, version conflict, reconciliation,
+  redacted audit, and outbox payload.
+- Repository unit tests passed after the final dependency update: contracts 36, API 46, API client
+  11, UI 19, fixture 6, TMMIN web 12, and Supplier web 42.
+- Follow-up 2D asset validation confirmed all twelve files have transparent corner alpha, unique
+  style-aware catalog labels, closed-contract keys, and successful Contracts/Supplier unit,
+  Supplier/E2E TypeScript, targeted lint, OpenAPI regeneration/check, and production build checks.
+- Formatting, lint, full TypeScript, OpenAPI document check, generated-client regeneration,
+  production build, frozen lockfile install, Compose config, and `git diff --check` passed.
+- Production build emits a separate `BoardCanvas` chunk (about 452 kB minified / 134 kB gzip). PWA
+  precache remains 26 entries / about 2.51 MiB and excludes all 24 machine PNGs, which remain lazy
+  network assets.
+- Final Chromium passed all four isolated journeys after the 768 px overflow correction. The Canvas
+  journey saves as active Line Leader, reads as Supervisor, verifies default fallback, and captures
+  responsive evidence at 390×844, 768×1024, 1024×768, 1280×720, 1440×900, and 1672×941 with reduced
+  motion, zero document overflow, responsive navigation assertions, and zero axe violations. Edge
+  smoke passed both tagged journeys; every E2E-owned database, process, network, volume, and photo
+  root was cleaned by the harness.
+- Codex Security diff scan `294aa57f-73ec-453d-a727-c12311e1f2c4` reviewed the complete 27-file
+  source inventory with complete coverage and no reportable findings. The final endpoint-handle and
+  responsive-containment refinement was additionally reviewed as a UI-only diff and revalidated by
+  typecheck, unit tests, production build, and full Chromium E2E.
+- Security exception validation and `pnpm audit --audit-level high` passed (only the registered high
+  exception remains ignored; two moderate advisories remain below the configured threshold).
+  Gitleaks v8.24.3 directory scan passed after the pre-existing git-ignored staging key was moved to
+  a temporary directory without reading it and restored immediately afterward.
+- Deployment environment validation and script harness passed; local macOS lacks `flock`, so Linux
+  lock contention remains a CI-only check. The new migration also passed a direct forward-only SQL
+  scan because the repository helper cannot see an untracked migration until it is staged.
+- E2E-owned processes, containers, networks, volumes, and temporary photo roots were removed. The
+  existing local PostgreSQL container predated this task and remains untouched.
 
-## 4. Verification Completed Locally
+## 4. Delivery Notes
 
-- API client unit: 11/11.
-- Supplier web unit/component: 39/39, including file validation, repeated upload, preview/removal,
-  route/class checks, and reserved-row deduplication.
-- Targeted PostgreSQL integration after fresh 10-migration deploy: 19/19, including first upload,
-  distinct replacement, identical-replacement rejection, stale/current removal, monotonic restore,
-  single-current invariant, event count, versioned board thumbnail, and initials fallback.
-- Relevant API/API-client/Supplier TypeScript checks pass; OpenAPI check passes.
-- Full repository formatting, lint, TypeScript, 165 unit tests, OpenAPI/generated-client check,
-  production builds, and `git diff --check` pass. Frontend builds used the required explicit
-  production API origin.
-- All 38 API integration tests and all 6 isolated Chromium/Edge E2E runs pass. Deployment
-  validation/harness, migration destructive check, actionlint, ShellCheck, Hadolint, Ubuntu
-  bootstrap validation, Gitleaks, production-like container routing, and Trivy filesystem/image
-  scans pass.
-- New high-severity transitive advisories discovered during the pre-commit audit were resolved by
-  pinning `js-yaml` 4.3.1 and `nanoid` 3.3.17; `pnpm audit --audit-level high` passes with only the
-  repository's existing explicit exception remaining ignored.
-- Browser inspection against the worktree confirms one primary resolution CTA and one secondary
-  Henkaten CTA in seeded data, no console error on board, zero horizontal overflow, and 44 px CTA
-  height at 390×844. Member photo detail confirms Set and Ganti/Hapus states, versioned thumbnail,
-  96 px mobile preview, 44 px actions, and zero overflow.
-- Agent-started API/Vite preview processes were stopped. Existing local Compose containers predated
-  this session and were deliberately left running.
+- Commit-state OpenAPI/generated-client parity is required and was rerun after the delivery commit.
+- No user upload/media-storage API is included in the v1 machine catalog.
+- The TMMIN endpoint exposes the same reconciled Hosted layout read-only; TMMIN UI continues using
+  its existing operational board while the API is available for monitoring integration.
 
-## 5. Remaining Release Work
+## 5. Next Recommended Action
 
-1. Complete Phase 15.9/15.11 hosted staging baseline and stable staging VAPID provisioning.
-2. Execute Android Chrome/Edge and iPhone/iPad Home Screen real-device push rehearsal, deployed
-   cache-header validation, redeploy/rollback, and Supplier Line Leader acceptance.
-3. Start Phase 16 UAT only after all staging launch gates pass.
-
-## 6. Operational Boundaries
-
-- Member photos and registration data remain private Hosted data and are never cached by the PWA or
-  sent through External API.
-- Photo event/audit payloads must not contain image bytes, paths, registration numbers, names, or
-  credentials.
-- Existing no-backup/no-PITR/no-HA and automatic production deployment risks remain unchanged.
+1. Review the pushed branch and open a PR into `staging` when ready.
+2. Run workflow-pinned Linux static-analysis checks in CI; local macOS cannot exercise the mandatory
+   `flock` contention branch.
+3. Deploy to staging under the existing Phase 15.9 process and conduct touch-device UAT before any
+   production claim.

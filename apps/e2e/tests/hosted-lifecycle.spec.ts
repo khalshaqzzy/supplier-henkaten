@@ -175,6 +175,34 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
   await expect(boardPage.getByText('Open Henkaten').locator('..').getByText('0')).toBeVisible();
   await captureSupplierVisuals(boardPage, 'assignment-board', testInfo);
 
+  await boardPage.getByLabel('Line dalam scope').selectOption(fixture.line.id);
+  await boardPage.getByRole('button', { name: 'Canvas' }).click();
+  const canvasRegion = boardPage.getByRole('region', { name: /^Canvas / });
+  await expect(canvasRegion).toBeVisible();
+  await expect(canvasRegion.locator('canvas')).toHaveCount(2);
+  await expect(canvasRegion.getByLabel('Legenda 4M')).toContainText('ManMachineMaterialMethod');
+  await expect(canvasRegion.getByText('Auto-layout belum disimpan')).toBeVisible();
+  await canvasRegion.getByRole('button', { name: 'Edit layout' }).click();
+  await expect(canvasRegion.getByRole('complementary', { name: 'Asset palette' })).toBeVisible();
+  await expect(
+    canvasRegion.getByRole('complementary', { name: 'Layers dan properties' }),
+  ).toBeVisible();
+  await canvasRegion.getByRole('button', { name: 'Press / stamping · Isometric' }).first().click();
+  await expect(
+    canvasRegion.getByRole('button', { name: 'Press / stamping · Isometric' }),
+  ).toHaveCount(2);
+  await canvasRegion.getByRole('button', { name: 'Simpan' }).click();
+  await expect(canvasRegion.getByText('Layout v1')).toBeVisible();
+  const savedCanvas = await get<{ source: string; version: number; canEdit: boolean }>(
+    supervisor.context.request,
+    `/api/v1/supplier/assignment-board/layouts/${fixture.line.id}`,
+  );
+  expect(savedCanvas).toMatchObject({ source: 'SAVED', version: 1, canEdit: false });
+  await captureSupplierVisuals(boardPage, 'assignment-board-canvas', testInfo);
+
+  await boardPage.getByRole('button', { name: 'Default' }).click();
+  await expect(boardPage.locator('.board-job')).toHaveCount(1);
+
   const invalid = await leader.context.request.post(
     `${runtime.apiOrigin}/api/v1/supplier/henkatens`,
     {
@@ -490,12 +518,18 @@ async function captureSupplierPage(
 }
 
 async function captureSupplierVisuals(page: Page, slug: string, testInfo: TestInfo) {
-  if (process.env.E2E_VISUAL_CAPTURE !== '1' && slug !== 'supplier-overview') return;
+  if (
+    process.env.E2E_VISUAL_CAPTURE !== '1' &&
+    slug !== 'supplier-overview' &&
+    slug !== 'assignment-board-canvas'
+  )
+    return;
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const viewport of [
     { width: 390, height: 844 },
     { width: 768, height: 1024 },
     { width: 1024, height: 768 },
+    { width: 1440, height: 900 },
     { width: 1672, height: 941 },
     { width: 1280, height: 720 },
   ]) {
@@ -552,7 +586,7 @@ async function captureSupplierVisuals(page: Page, slug: string, testInfo: TestIn
         animations: 'disabled',
       });
     }
-    if (slug === 'supplier-overview') {
+    if (slug === 'supplier-overview' || slug === 'assignment-board-canvas') {
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     }
   }

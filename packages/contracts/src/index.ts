@@ -1,4 +1,5 @@
 export * from './auth.js';
+export * from './board-layout.js';
 export * from './administration.js';
 export * from './common.js';
 export * from './enums.js';

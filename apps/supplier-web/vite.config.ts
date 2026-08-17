@@ -17,6 +17,8 @@ export default defineConfig(({ mode }) => {
         registerType: 'prompt',
         injectManifest: {
           globPatterns: ['**/*.{js,css,png,svg,ico,webp,woff2}', 'offline.html'],
+          // Large route-level Canvas imagery stays network-on-demand with its lazy chunk.
+          globIgnores: ['assets/*.png'],
         },
         manifest: {
           id: '/',
