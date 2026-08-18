@@ -140,6 +140,11 @@ lockfile audit additionally detected patched advisories affecting `undici 7.28.0
 and `brace-expansion 5.0.9`. Clean-worktree Trivy filesystem, `pnpm audit`, production-like
 acceptance, and all five rebuilt runtime image scans passed without adding an exception.
 
+On 2026-08-18, PR CI run `32101378423` detected Go stdlib vulnerabilities (CVE-2026-33818, CVE-2026-39821,
+CVE-2026-56853, CVE-2026-56858, CVE-2026-56859, CVE-2026-56860, CVE-2026-56862) in the Go 1.25.12
+stdlib of the custom Caddy binary. The builder base image was updated to `golang:1.25.13-alpine@sha256:1e0126852075c9c60731c8ba49088448b91f63e2aed97ca9d1a9791622a05946`
+with `go mod tidy` dependency resolution, restoring clean Trivy scans across all runtime images without exceptions.
+
 The production-like stack passed exact-SHA API readiness and both `/release.json` checks,
 three-domain Host routing, supplier SPA deep-link fallback, same-origin session and SSE routing,
 surface-specific CSP/HSTS/anti-framing/nosniff policy, removal of `Server`/`Via`, non-root runtime

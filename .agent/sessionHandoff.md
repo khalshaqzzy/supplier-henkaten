@@ -97,6 +97,10 @@ Phase 15.9 remains `in_progress`.
 - Deployment environment validation and script harness passed; local macOS lacks `flock`, so Linux
   lock contention remains a CI-only check. The new migration also passed a direct forward-only SQL
   scan because the repository helper cannot see an untracked migration until it is staged.
+- CI PR #12 run 32101378423 failed at the Caddy image Trivy scan due to 7 Go stdlib vulnerabilities
+  in Go v1.25.12. Upgraded `deploy/caddy/Dockerfile` builder image to `golang:1.25.13-alpine@sha256:1e0126852075c9c60731c8ba49088448b91f63e2aed97ca9d1a9791622a05946`
+  with explicit `main.go` and `go mod tidy`. Hadolint, deployment validation, deployment test harness,
+  security exception check, remote Compose Caddy build, and Trivy image vulnerability scan all passed locally with 0 findings.
 - E2E-owned processes, containers, networks, volumes, and temporary photo roots were removed. The
   existing local PostgreSQL container predated this task and remains untouched.
 
@@ -109,8 +113,7 @@ Phase 15.9 remains `in_progress`.
 
 ## 5. Next Recommended Action
 
-1. Review the pushed branch and open a PR into `staging` when ready.
-2. Run workflow-pinned Linux static-analysis checks in CI; local macOS cannot exercise the mandatory
-   `flock` contention branch.
+1. Commit and push the Caddy builder fix to `feat/canvas-board` to re-trigger PR #12 CI.
+2. Verify all CI jobs (including Production containers and routing & Release candidate gate) are green.
 3. Deploy to staging under the existing Phase 15.9 process and conduct touch-device UAT before any
    production claim.
