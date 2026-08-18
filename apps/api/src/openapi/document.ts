@@ -86,6 +86,8 @@ import {
   withdrawHenkatenRequestSchema,
   workingAssignmentSchema,
   assignmentBoardSchema,
+  boardLayoutResponseSchema,
+  boardLayoutSaveRequestSchema,
   auditPageSchema,
   auditQuerySchema,
   boardQuerySchema,
@@ -476,6 +478,20 @@ function readModelPaths() {
         responses: { '200': json('Current assignment board', assignmentBoardSchema) },
       },
     },
+    '/api/v1/supplier/assignment-board/layouts/{lineId}': {
+      get: {
+        requestParams: { path: z.object({ lineId: z.string().uuid() }) },
+        responses: { '200': json('Current line board canvas layout', boardLayoutResponseSchema) },
+      },
+      put: {
+        requestParams: { path: z.object({ lineId: z.string().uuid() }) },
+        requestBody: body(boardLayoutSaveRequestSchema),
+        responses: {
+          '200': json('Saved line board canvas layout', boardLayoutResponseSchema),
+          '409': problem,
+        },
+      },
+    },
     '/api/v1/supplier/dashboard': {
       get: {
         requestParams: { query: dashboardQuerySchema },
@@ -521,6 +537,17 @@ function readModelPaths() {
         },
         responses: {
           '200': json('Hosted supplier assignment board', assignmentBoardSchema),
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/assignment-board/layouts/{lineId}': {
+      get: {
+        requestParams: {
+          path: z.object({ supplierId: z.string().uuid(), lineId: z.string().uuid() }),
+        },
+        responses: {
+          '200': json('Hosted supplier board canvas layout', boardLayoutResponseSchema),
           '409': problem,
         },
       },

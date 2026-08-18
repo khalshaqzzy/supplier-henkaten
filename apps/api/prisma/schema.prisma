@@ -216,6 +216,7 @@ model Supplier {
   externalProjections     ExternalHenkatenProjection[]
   pushSubscriptions       PushSubscription[]
   pushDeliveries          PushDelivery[]
+  boardLayouts            LineBoardLayout[]
 
   @@unique([normalizedCode], map: "Supplier_normalizedCode_key")
   @@index([sourceMode, active])
@@ -647,10 +648,30 @@ model Line {
   henkatens          Henkaten[]
   targetMovements    AssignmentMovement[]   @relation("AssignmentMovementTargetLine")
   sourceMovements    AssignmentMovement[]   @relation("AssignmentMovementSourceLine")
+  boardLayout        LineBoardLayout?
 
   @@unique([supplierId, normalizedCode])
   @@unique([id, supplierId])
   @@index([supplierId, active, displayOrder])
+}
+
+model LineBoardLayout {
+  id            String   @id @default(uuid()) @db.Uuid
+  supplierId    String   @db.Uuid
+  lineId        String   @db.Uuid
+  schemaVersion Int      @default(1)
+  document      Json
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  createdById   String?  @db.Uuid
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+  updatedById   String?  @db.Uuid
+  supplier      Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  line          Line     @relation(fields: [lineId, supplierId], references: [id, supplierId], onDelete: Restrict)
+
+  @@unique([id, supplierId])
+  @@unique([lineId, supplierId])
+  @@index([supplierId, updatedAt(sort: Desc)])
 }
 
 model Job {

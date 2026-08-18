@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import {
   assignmentBoardSchema,
+  boardLayoutResponseSchema,
   assignmentIssuePageSchema,
   auditPageSchema,
   checklistDraftSchema,
@@ -37,6 +38,7 @@ import {
   workingAssignmentSchema,
   type AuditQuery,
   type BoardQuery,
+  type BoardLayoutSaveRequest,
   type CreatePushSubscriptionRequest,
   type CreateHenkatenRequest,
   type DashboardQuery,
@@ -107,6 +109,20 @@ export class SupplierApi {
     return this.client.request('/api/v1/supplier/assignment-board', {
       query,
       responseSchema: assignmentBoardSchema,
+    });
+  }
+
+  boardLayout(lineId: string) {
+    return this.client.request(`/api/v1/supplier/assignment-board/layouts/${lineId}`, {
+      responseSchema: boardLayoutResponseSchema,
+    });
+  }
+
+  saveBoardLayout(lineId: string, body: BoardLayoutSaveRequest) {
+    return this.client.request(`/api/v1/supplier/assignment-board/layouts/${lineId}`, {
+      method: 'PUT',
+      body,
+      responseSchema: boardLayoutResponseSchema,
     });
   }
 

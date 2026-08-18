@@ -390,7 +390,9 @@ export const realtimeInvalidationSchema = z
     aggregateId: opaqueIdSchema,
     aggregateVersion: optimisticVersionSchema,
     occurredAt: utcTimestampSchema,
-    refresh: z.array(z.enum(['assignment-board', 'notifications', 'dashboard'])),
+    refresh: z.array(
+      z.enum(['assignment-board', 'assignment-board-layout', 'notifications', 'dashboard']),
+    ),
   })
   .strict();
 export type RealtimeInvalidation = z.infer<typeof realtimeInvalidationSchema>;

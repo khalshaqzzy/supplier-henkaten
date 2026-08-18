@@ -2,6 +2,7 @@ import {
   affectedPartDetailSchema,
   affectedPartPageSchema,
   assignmentBoardSchema,
+  boardLayoutResponseSchema,
   auditPageSchema,
   createExternalClientRequestSchema,
   externalClientCredentialSchema,
@@ -350,6 +351,13 @@ export class TmminApi {
       query: { lineId },
       responseSchema: assignmentBoardSchema,
     });
+  }
+
+  assignmentBoardLayout(supplierId: string, lineId: string) {
+    return this.client.request(
+      `/api/v1/tmmin/suppliers/${supplierId}/assignment-board/layouts/${lineId}`,
+      { responseSchema: boardLayoutResponseSchema },
+    );
   }
 
   hostedMembers(supplierId: string, query: QueryRecord = {}) {

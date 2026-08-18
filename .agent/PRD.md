@@ -3,7 +3,7 @@
 | Atribut | Nilai |
 |---|---|
 | Status dokumen | **Approved product contract for v1 planning** |
-| Status implementasi | **Phase 0-10 implemented; Phase 11+ planned** |
+| Status implementasi | **Phase 0-14 implemented; Phase 15 in progress** |
 | Versi dokumen | 1.0 |
 | Tanggal | 23 Juli 2026 |
 | Product owner | TMMIN |
@@ -921,6 +921,38 @@ Approved Henkaten pada Shift Run aktif tetap terlihat sebagai active change samp
 - UI wajib menampilkan `lastUpdatedAt`.
 
 Process difficulty, skill level, health, attendance, dan schedule tidak boleh muncul.
+
+### 16.6 Customizable Line Canvas
+
+- Assignment Board default tetap menjadi canonical fallback, termasuk untuk mobile dan kebutuhan
+  accessibility. Canvas dipilih eksplisit melalui toggle `Default | Canvas` setelah satu line
+  dipilih.
+- Layout Canvas shared per supplier/line dan tidak mengikuti user, pergantian Line Leader, atau
+  Shift Run. Layout hanya menyimpan job ID, geometri, style allowlist, lock/z-index, dan curated
+  machine asset key; nama, foto, nomor registrasi, assignment state, serta data Henkaten selalu
+  diambil dari Working Assignment saat ini.
+- Setiap active job wajib memiliki tepat satu `JOB_SLOT`. Job baru direkonsiliasi ke overflow grid,
+  job inactive dihapus dari runtime layout, sedangkan perpindahan MP, perubahan foto, vacancy,
+  reservation, conflict, dan perubahan 4M tidak boleh mengubah koordinat card.
+- Card memakai format vertikal dan menampilkan foto portrait MP sebagai elemen visual dominan,
+  dengan initials fallback, nama job, nama MP, registration number, state text/icon/border, dan dot
+  4M. Legend hanya berisi dot Man, Machine, Material, dan Method; status assignment tidak memiliki
+  legend terpisah.
+- Editor desktop dan tablet landscape menyediakan palette, Layers/Properties DOM, pan/zoom,
+  fit/fullscreen, grid/snapping, 50-step undo/redo, numeric transforms, keyboard movement,
+  lock/reorder, reset, dan explicit save. Mobile hanya baca dengan pan/zoom bila Canvas dibuka.
+- `JOB_SLOT` dapat dipindah dan di-resize tetapi tidak dapat dihapus, diduplikasi, atau dirotasi.
+  Rectangle, outline, arrow, text, dan curated machine assets dapat dipindah, resize, rotate,
+  duplicate, delete, lock, dan reorder.
+- Curated machine catalog menyediakan dua visual family untuk dua belas tipe equipment yang sama:
+  polished soft-isometric cutout dan ikon 2D simple/generic. Keduanya memakai transparent alpha,
+  stable asset key terpisah, serta label style yang eksplisit di palette dan Layers panel.
+- Supplier Admin dapat mengubah seluruh layout line; active Line Leader hanya line aktifnya.
+  Supervisor, QC, role lain, serta TMMIN support hanya membaca. Mutation tetap Hosted-only dan
+  tidak mengubah assignment atau lifecycle Henkaten.
+- Save memakai optimistic layout version dan menghasilkan audit redacted plus outbox invalidation
+  tanpa PII. Konflik mempertahankan local draft sampai pengguna memilih mempertahankan draft atau
+  memuat versi authoritative terbaru.
 
 ---
 

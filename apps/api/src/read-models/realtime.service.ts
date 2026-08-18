@@ -140,7 +140,7 @@ export class RealtimeService {
         aggregateId: event.aggregateId,
         aggregateVersion: event.aggregateVersion,
         occurredAt: event.occurredAt.toISOString(),
-        refresh: ['assignment-board', 'notifications', 'dashboard'],
+        refresh: ['assignment-board', 'assignment-board-layout', 'notifications', 'dashboard'],
         lineId: this.eventLineId(event),
       },
     };
