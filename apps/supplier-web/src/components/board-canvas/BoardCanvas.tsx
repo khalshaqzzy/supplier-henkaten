@@ -34,11 +34,13 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 
-import type {
-  BoardLayoutDocument,
-  BoardLayoutNode,
-  BoardMachineAssetKey,
-  HenkatenCategory,
+import {
+  BOARD_JOB_CARD_DEFAULT_HEIGHT,
+  BOARD_JOB_CARD_DEFAULT_WIDTH,
+  type BoardLayoutDocument,
+  type BoardLayoutNode,
+  type BoardMachineAssetKey,
+  type HenkatenCategory,
 } from '@tmmin-henkaten/contracts';
 import { ApiProblemError } from '@tmmin-henkaten/api-client';
 import { Alert, Button, EmptyState, ErrorState, Skeleton } from '@tmmin-henkaten/ui';
@@ -371,9 +373,9 @@ export default function BoardCanvas({
       jobId: job.jobId,
       transform: {
         x: 100 + (index % 4) * 570,
-        y: 140 + Math.floor(index / 4) * 250,
-        width: 360,
-        height: 190,
+        y: 100 + Math.floor(index / 4) * 500,
+        width: BOARD_JOB_CARD_DEFAULT_WIDTH,
+        height: BOARD_JOB_CARD_DEFAULT_HEIGHT,
         rotation: 0,
         zIndex: 10 + index,
         locked: false,
@@ -713,10 +715,30 @@ function Inspector({
                 <input
                   type="number"
                   step={GRID}
+                  {...(selected.type === 'JOB_SLOT' && field === 'width' ? { min: 220 } : {})}
+                  {...(selected.type === 'JOB_SLOT' && field === 'height' ? { min: 360 } : {})}
                   value={Math.round(selected.transform[field])}
-                  onChange={(event) =>
-                    onTransform({ ...selected.transform, [field]: Number(event.target.value) })
-                  }
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    if (selected.type !== 'JOB_SLOT' || (field !== 'width' && field !== 'height')) {
+                      onTransform({ ...selected.transform, [field]: value });
+                      return;
+                    }
+                    const ratio = BOARD_JOB_CARD_DEFAULT_HEIGHT / BOARD_JOB_CARD_DEFAULT_WIDTH;
+                    onTransform(
+                      field === 'width'
+                        ? {
+                            ...selected.transform,
+                            width: Math.max(220, value),
+                            height: Math.max(360, Math.round(value * ratio)),
+                          }
+                        : {
+                            ...selected.transform,
+                            width: Math.max(220, Math.round(value / ratio)),
+                            height: Math.max(360, value),
+                          },
+                    );
+                  }}
                 />
               </label>
             ))}
@@ -885,11 +907,11 @@ function CanvasNode({
       const target = shapeRef.current;
       if (!target) return;
       const width = Math.max(
-        node.type === 'JOB_SLOT' ? 260 : 40,
+        node.type === 'JOB_SLOT' ? 220 : 40,
         node.transform.width * target.scaleX(),
       );
       const height = Math.max(
-        node.type === 'JOB_SLOT' ? 140 : 40,
+        node.type === 'JOB_SLOT' ? 360 : 40,
         node.transform.height * target.scaleY(),
       );
       target.scaleX(1);
@@ -959,7 +981,7 @@ function CanvasNode({
           ref={transformerRef}
           rotateEnabled={node.type !== 'JOB_SLOT'}
           flipEnabled={false}
-          keepRatio={node.type === 'MACHINE_ASSET'}
+          keepRatio={node.type === 'MACHINE_ASSET' || node.type === 'JOB_SLOT'}
           enabledAnchors={
             node.type === 'ARROW'
               ? ['middle-left', 'middle-right']
@@ -980,6 +1002,11 @@ function JobCardNode({ job, ...props }: { job?: BoardJob } & ComponentProps<type
   const height = Number(props.height);
   const state = job?.state ?? 'VACANT';
   const accent = state === 'ASSIGNED' ? '#2f8f4e' : state === 'RESERVED' ? '#d97706' : '#d92d20';
+  const photoWidth = Math.max(150, width - 88);
+  const photoHeight = Math.max(176, height - 212);
+  const photoX = (width - photoWidth) / 2;
+  const photoY = 92;
+  const identityY = photoY + photoHeight + 14;
   return (
     <Group {...props}>
       <Rect
@@ -994,73 +1021,98 @@ function JobCardNode({ job, ...props }: { job?: BoardJob } & ComponentProps<type
         shadowBlur={18}
         shadowOffsetY={6}
       />
-      <Rect width={12} height={height} fill={accent} cornerRadius={[20, 0, 0, 20]} />
+      <Rect width={width} height={10} fill={accent} cornerRadius={[20, 20, 0, 0]} />
       <Text
-        x={28}
-        y={22}
-        width={width - 150}
+        x={20}
+        y={20}
+        width={width - 40}
+        height={28}
+        align="center"
         text={job?.jobName ?? 'Job unavailable'}
-        fontSize={25}
+        fontSize={22}
         fontStyle="bold"
         fill="#172033"
+        wrap="none"
+        ellipsis
       />
       <Rect
-        x={width - 118}
-        y={18}
-        width={94}
-        height={30}
+        x={(width - 116) / 2}
+        y={54}
+        width={116}
+        height={28}
         fill={`${accent}18`}
         stroke={accent}
         strokeWidth={1.5}
         cornerRadius={15}
       />
       <Text
-        x={width - 113}
-        y={25}
-        width={84}
+        x={(width - 108) / 2}
+        y={61}
+        width={108}
         align="center"
         text={`${state === 'ASSIGNED' ? '✓' : '!'} ${humanize(state)}`}
-        fontSize={13}
+        fontSize={12}
         fontStyle="bold"
         fill={accent}
       />
-      <Circle x={62} y={105} radius={34} fill="#e9eef7" />
+      <Rect
+        x={photoX}
+        y={photoY}
+        width={photoWidth}
+        height={photoHeight}
+        fill="#e9eef7"
+        stroke="#d5ddeb"
+        strokeWidth={2}
+        cornerRadius={16}
+      />
       {photo ? (
-        <KonvaImage image={photo} x={28} y={71} width={68} height={68} cornerRadius={34} />
+        <KonvaImage
+          image={photo}
+          x={photoX}
+          y={photoY}
+          width={photoWidth}
+          height={photoHeight}
+          crop={coverCrop(photo, photoWidth, photoHeight)}
+          cornerRadius={16}
+        />
       ) : (
         <Text
-          x={28}
-          y={91}
-          width={68}
+          x={photoX}
+          y={photoY + photoHeight / 2 - 18}
+          width={photoWidth}
           align="center"
           text={mpVisual.fallback}
-          fontSize={24}
+          fontSize={36}
           fontStyle="bold"
           fill="#526176"
         />
       )}
       <Text
-        x={112}
-        y={78}
-        width={width - 140}
+        x={20}
+        y={identityY}
+        width={width - 40}
+        align="center"
         text={job?.mp.name ?? 'Vacant'}
-        fontSize={20}
+        fontSize={19}
         fontStyle="bold"
         fill="#263246"
+        wrap="none"
+        ellipsis
       />
       <Text
-        x={112}
-        y={108}
-        width={width - 140}
+        x={20}
+        y={identityY + 28}
+        width={width - 40}
+        align="center"
         text={job?.mp.registrationNumber ?? humanize(state)}
-        fontSize={16}
+        fontSize={14}
         fill="#667085"
       />
       {(job?.indicators ?? []).map((indicator, index) => (
         <Circle
           key={indicator.henkatenId}
-          x={width - 34 - index * 24}
-          y={height - 24}
+          x={width / 2 + ((job?.indicators.length ?? 1) - 1) * 12 - index * 24}
+          y={height - 18}
           radius={8}
           fill={categoryColors[indicator.category]}
           stroke={indicator.status === 'OPEN' ? '#172033' : '#ffffff'}
@@ -1069,6 +1121,17 @@ function JobCardNode({ job, ...props }: { job?: BoardJob } & ComponentProps<type
       ))}
     </Group>
   );
+}
+
+function coverCrop(image: HTMLImageElement, targetWidth: number, targetHeight: number) {
+  const targetRatio = targetWidth / targetHeight;
+  const sourceRatio = image.naturalWidth / image.naturalHeight;
+  if (sourceRatio > targetRatio) {
+    const width = image.naturalHeight * targetRatio;
+    return { x: (image.naturalWidth - width) / 2, y: 0, width, height: image.naturalHeight };
+  }
+  const height = image.naturalWidth / targetRatio;
+  return { x: 0, y: (image.naturalHeight - height) / 2, width: image.naturalWidth, height };
 }
 
 function MachineNode({

@@ -42,7 +42,8 @@ The Stage host uses inline-size containment and a viewport-bounded initial width
 `ResizeObserver` measurement. This prevents the initial Konva backing canvas from becoming the
 grid's intrinsic width on tablet/mobile. Arrow nodes expose left/right endpoint handles in addition
 to rotation, while machine assets keep proportional corner handles and job cards remain
-non-rotatable.
+non-rotatable. Generated and reset layouts use a vertical `300 x 440` job card; proportional resize
+preserves that portrait direction, and a cover crop makes the live MP photo the dominant card area.
 
 Machine images are a closed v1 catalog with two generated transparent visual families for the same
 twelve industrial equipment types: polished soft-isometric cutouts and simple generic 2D icons.

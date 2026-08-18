@@ -30,6 +30,9 @@ export const boardMachineAssetKeySchema = z.enum([
 ]);
 export type BoardMachineAssetKey = z.infer<typeof boardMachineAssetKeySchema>;
 
+export const BOARD_JOB_CARD_DEFAULT_WIDTH = 300;
+export const BOARD_JOB_CARD_DEFAULT_HEIGHT = 440;
+
 const coordinateSchema = z.number().finite().min(0).max(12_000);
 const sizeSchema = z.number().finite().min(20).max(12_000);
 const rotationSchema = z.number().finite().min(-360).max(360);

@@ -934,9 +934,10 @@ Process difficulty, skill level, health, attendance, dan schedule tidak boleh mu
 - Setiap active job wajib memiliki tepat satu `JOB_SLOT`. Job baru direkonsiliasi ke overflow grid,
   job inactive dihapus dari runtime layout, sedangkan perpindahan MP, perubahan foto, vacancy,
   reservation, conflict, dan perubahan 4M tidak boleh mengubah koordinat card.
-- Card menampilkan nama job, foto thumbnail MP dengan initials fallback, nama MP, registration
-  number, state text/icon/border, dan dot 4M. Legend hanya berisi dot Man, Machine, Material, dan
-  Method; status assignment tidak memiliki legend terpisah.
+- Card memakai format vertikal dan menampilkan foto portrait MP sebagai elemen visual dominan,
+  dengan initials fallback, nama job, nama MP, registration number, state text/icon/border, dan dot
+  4M. Legend hanya berisi dot Man, Machine, Material, dan Method; status assignment tidak memiliki
+  legend terpisah.
 - Editor desktop dan tablet landscape menyediakan palette, Layers/Properties DOM, pan/zoom,
   fit/fullscreen, grid/snapping, 50-step undo/redo, numeric transforms, keyboard movement,
   lock/reorder, reset, dan explicit save. Mobile hanya baca dengan pan/zoom bila Canvas dibuka.

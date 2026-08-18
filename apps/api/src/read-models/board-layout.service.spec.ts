@@ -51,8 +51,8 @@ describe('BoardLayout reconciliation', () => {
     ).toMatchObject({
       canvas: { width: 2_400, height: 1_350 },
       nodes: [
-        { id: `job:${jobA}`, transform: { x: 100, y: 140 } },
-        { id: `job:${jobB}`, transform: { x: 670, y: 140 } },
+        { id: `job:${jobA}`, transform: { x: 100, y: 100, width: 300, height: 440 } },
+        { id: `job:${jobB}`, transform: { x: 670, y: 100, width: 300, height: 440 } },
       ],
     });
   });

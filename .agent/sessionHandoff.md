@@ -1,6 +1,6 @@
 # Session Handoff — Customizable Assignment Board Canvas
 
-Date: 2026-08-17
+Date: 2026-08-18
 
 Branch: `feat/canvas-board`
 
@@ -38,9 +38,10 @@ Phase 15.9 remains `in_progress`.
   layer, interactive layer, pan, 25–200% zoom, fit, fullscreen, snapping, 50-step undo/redo,
   explicit draft/save/discard/conflict flows, resize/rotate/lock/reorder/duplicate/delete rules,
   numeric Canvas/node properties, Layers DOM, keyboard movement, and reset auto-layout.
-- Required job cards cannot be deleted, duplicated, or rotated. They render live job name, MP photo
-  with credentialed image loading and initials fallback, MP name/registration, direct state
-  text/icon/border, and current 4M dots.
+- Required job cards cannot be deleted, duplicated, or rotated. Generated/reset cards are vertical
+  (`300 x 440`) and use the cover-cropped portrait MP photo as their dominant area, with
+  credentialed image loading and initials fallback. They also render live job name, MP
+  name/registration, direct state text/icon/border, and current 4M dots.
 - Added two generated transparent machine families: twelve polished soft-isometric cutouts and
   twelve simple generic 2D icons. The 24-entry typed manifest carries distinct stable keys,
   style-aware labels, ImageGen source, aspect ratio, default size, and accessible description. All
@@ -52,6 +53,9 @@ Phase 15.9 remains `in_progress`.
 - Final QA fixed tablet document overflow by containing the Stage's intrinsic inline size and using
   a viewport-bounded initial measurement. Arrow selection now exposes explicit left/right endpoint
   handles.
+- Portrait-card follow-up QA found a separate 768 px intrinsic-width issue in the board toolbar.
+  Tablet toolbar items now wrap, the metric grid uses zero-min tracks, and the Hosted Canvas journey
+  again passes every responsive viewport without document overflow.
 - Added ADR 0031 and updated PRD/roadmap. Security dependency pins now resolve the current nanoid and
   deepmerge-ts high-severity advisories.
 
@@ -77,6 +81,11 @@ Phase 15.9 remains `in_progress`.
   motion, zero document overflow, responsive navigation assertions, and zero axe violations. Edge
   smoke passed both tagged journeys; every E2E-owned database, process, network, volume, and photo
   root was cleaned by the harness.
+- The 2026-08-18 portrait-card follow-up reran formatting, lint, full TypeScript, all repository unit
+  tests, production build, migration-backed Hosted Chromium E2E, axe, reduced-motion, and the full
+  responsive screenshot matrix. Governance Chromium passed before the toolbar diagnostic; Hosted
+  Chromium passed after the final wrap/min-track fix. The Edge-only harness correctly had no Hosted
+  journey because that spec is not tagged for Edge; no browser-specific application branch changed.
 - Codex Security diff scan `294aa57f-73ec-453d-a727-c12311e1f2c4` reviewed the complete 27-file
   source inventory with complete coverage and no reportable findings. The final endpoint-handle and
   responsive-containment refinement was additionally reviewed as a UI-only diff and revalidated by

@@ -2182,7 +2182,12 @@ a.overview-activity-identifier:hover {
 }
 
 .board-metrics {
-  grid-template-columns: repeat(4, 1fr);
+  min-width: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.board-metrics > * {
+  min-width: 0;
 }
 
 .board-workspace {
@@ -5264,6 +5269,15 @@ a.overview-activity-identifier:hover {
 
 /* Keep narrow-screen adaptations after the existing compact-desktop rules above. */
 @media (max-width: 1279px) {
+  .board-toolbar {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .board-toolbar .hds-last-updated {
+    margin-left: 0;
+  }
+
   .henkaten-form,
   .henkaten-detail__layout,
   .henkaten-evidence-grid,

@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
 import {
+  BOARD_JOB_CARD_DEFAULT_HEIGHT,
+  BOARD_JOB_CARD_DEFAULT_WIDTH,
   boardLayoutDocumentSchema,
   type BoardLayoutDocument,
   type BoardLayoutNode,
@@ -205,7 +207,7 @@ const impossibleId = '00000000-0000-0000-0000-000000000000';
 export function generatedDocument(jobs: BoardJob[]): BoardLayoutDocument {
   const cards = autoPlaceJobs(jobs, 10);
   const rows = Math.max(1, Math.ceil(jobs.length / 4));
-  const height = Math.max(1_350, 300 + rows * 250);
+  const height = Math.max(1_350, 200 + rows * 500);
   return boardLayoutDocumentSchema.parse({
     schemaVersion: 1,
     canvas: { width: 2_400, height, background: 'LIGHT_GRID' },
@@ -259,9 +261,9 @@ function autoPlaceJobs(jobs: BoardJob[], zStart: number, offset = 0): BoardLayou
       jobId: job.jobId,
       transform: {
         x: 100 + column * 570,
-        y: 140 + row * 250,
-        width: 360,
-        height: 190,
+        y: 100 + row * 500,
+        width: BOARD_JOB_CARD_DEFAULT_WIDTH,
+        height: BOARD_JOB_CARD_DEFAULT_HEIGHT,
         rotation: 0,
         zIndex: zStart + index,
         locked: false,
