@@ -4544,11 +4544,22 @@ Execution:
   shift, konsentrasi line/part, job, narasi operasional, waktu kejadian, dan durasi keputusan tidak
   seragam tetapi tetap deterministic.
 - Credential acak disimpan atomik hanya pada `.local/seed-credentials.json` mode `0600`.
+- Enam line aktif memiliki saved Canvas v1 yang dibuat melalui production PUT API setelah live
+  Shift Run aktif. Layout memakai process-zone, station label, flow arrow, empat authoritative job
+  slot, family isometric untuk NPM, dan family simple 2D untuk GKI tanpa menyimpan live PII.
+- Empat portrait operator fiktif hasil ImageGen disimpan sebagai development-only assets dan
+  digunakan ulang deterministically dengan mapping `mpIndex % 4`; setiap line mendapat empat
+  portrait berbeda, tiga MP cadangan tetap menguji initials fallback, dan role avatars tetap
+  synthetic code-generated.
 
 Verification:
 
 - Seed planner/guard unit tests, API typecheck, clean-start Compose acceptance, serta reseed
   preservation/rotation acceptance lulus.
+- Visual seed tests memvalidasi empat JPEG 768×1024 di bawah 2 MiB, mapping reuse, strict Canvas
+  schema, bounds, unique job slots, dan machine family. Post-seed verification mengunci 19 current
+  photos serta tiga saved layout/audit per supplier, empat portrait checksum dengan tiga reuse per
+  supplier/enam global, active-job parity, dan healthy outbox.
 - Full parity lulus dengan Node.js 22.23.1: clean install, format, lint, typecheck, 97 unit tests,
   OpenAPI drift, build, PostgreSQL 18.4/pgvector 0.8.5, 32 integration tests, empat Chromium dan dua
   Edge journeys, Gitleaks, serta diff check.
@@ -4567,6 +4578,8 @@ Verification:
 Data/migration impact:
 
 - Tidak ada database schema migration.
+- Tidak ada endpoint, OpenAPI, atau production runtime image change; portrait source assets hanya
+  tersedia pada local developer build context.
 - Operasi destruktif dibatasi pada command lokal eksplisit dan target Compose yang tervalidasi.
 
 Exit criteria:

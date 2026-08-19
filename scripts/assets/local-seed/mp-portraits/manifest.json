@@ -1,0 +1,42 @@
+{
+  "status": "synthetic-local-development-only",
+  "generatedAt": "2026-08-19",
+  "generator": "OpenAI ImageGen built-in imagegen tool",
+  "useCase": "photorealistic-natural",
+  "sharedPrompt": {
+    "assetType": "Local demo profile portrait for an automotive manufacturing assignment board",
+    "scene": "Clean modern automotive factory interior with a softly blurred, visually quiet background",
+    "subject": "Fictional Indonesian automotive manufacturing operator in navy and charcoal-gray uniform with a clean light-gray safety helmet",
+    "composition": "Vertical 3:4 head-and-shoulders portrait, centered, safe crop around helmet and shoulders",
+    "lighting": "Even soft studio-natural lighting with a calm, capable, approachable expression",
+    "constraints": "No real person, logo, brand, text, readable badge, watermark, hands, or dramatic effects"
+  },
+  "assets": [
+    {
+      "file": "mp-operator-01.jpg",
+      "persona": "Fictional Indonesian male operator, early 30s"
+    },
+    {
+      "file": "mp-operator-02.jpg",
+      "persona": "Fictional Indonesian female operator, late 20s"
+    },
+    {
+      "file": "mp-operator-03.jpg",
+      "persona": "Fictional Indonesian male operator, early 40s"
+    },
+    {
+      "file": "mp-operator-04.jpg",
+      "persona": "Fictional Indonesian female operator, mid 30s"
+    }
+  ],
+  "postProcessing": {
+    "tool": "Sharp 0.35.3",
+    "format": "JPEG",
+    "width": 768,
+    "height": 1024,
+    "colorSpace": "sRGB",
+    "quality": 88,
+    "metadata": "stripped"
+  },
+  "reuse": "Assigned MP index modulo four; each line receives all four distinct portraits and each asset is reused six times across the two-supplier seed."
+}

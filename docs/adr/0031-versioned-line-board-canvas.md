@@ -50,6 +50,14 @@ twelve industrial equipment types: polished soft-isometric cutouts and simple ge
 Their 24-entry typed manifest provides distinct stable keys, style-aware labels, source, aspect
 ratio, default size, and accessible description. User uploads and media-storage APIs are excluded.
 
+The comprehensive development seed persists six representative layouts through the production
+Supplier Admin API after active Shift Runs exist. Each 2400×1350 composition uses two locked
+process zones, a locked title hierarchy, four labeled equipment stations, editable flow arrows and
+machine assets, and four editable portrait job cards. NPM uses soft-isometric equipment and GKI uses
+the corresponding simple 2D family so both catalog directions remain continuously inspectable.
+Four fictional ImageGen MP portraits are reused across lines but never duplicated within the same
+four-job baseline; the layout continues to store only job IDs and geometry, never portrait data.
+
 ## Rationale
 
 Line ownership gives operations a stable shared spatial language while reconciliation prevents
@@ -81,6 +89,8 @@ initial path remains unchanged.
   inside the responsive shell.
 - TMMIN can inspect the same Hosted layout but cannot mutate it.
 - Schema migration will be required before accepting a future document version.
+- Local Canvas seed failures stop clean start/reseed when layout schema, active-job parity,
+  portrait reuse, audit, or outbox invariants drift.
 
 ## Validation
 
@@ -90,6 +100,11 @@ role scope, optimistic conflicts, TMMIN read-only access, redacted audit summari
 payloads. Frontend checks cover the complete machine manifest and transform normalization, followed
 by repository lint, typecheck, unit, integration, build, E2E, migration, accessibility, and visual
 viewport verification.
+
+The seeded visual factory additionally validates deterministic node IDs, bounds, one required slot
+per active job, explicit machine-family mapping, and four normalized portrait assets. Clean start,
+reseed, and direct browser inspection confirm saved version-1 layouts with responsive containment
+and authoritative vacancy/photo rendering.
 
 ## Follow-up Work
 

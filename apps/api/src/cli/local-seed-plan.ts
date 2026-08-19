@@ -1,3 +1,5 @@
+import type { BoardMachineAssetKey } from '@tmmin-henkaten/contracts';
+
 export const LOCAL_SEED_CONFIRMATION = 'supplier-henkaten-local-seed';
 export const LOCAL_SEED_SUPPLIER_COUNT = 2;
 export const LOCAL_SEED_HISTORICAL_SHIFT_COUNT = 36;
@@ -36,6 +38,16 @@ export type SupplierSeedPlan = {
   accent: string;
   lineNames: string[];
   jobNames: string[][];
+  canvasLines: Array<{
+    subtitle: string;
+    zoneFill: string;
+    machines: [
+      BoardMachineAssetKey,
+      BoardMachineAssetKey,
+      BoardMachineAssetKey,
+      BoardMachineAssetKey,
+    ];
+  }>;
   parts: Array<{ number: string; name: string }>;
   historical: SeedHenkatenPlan[];
   live: SeedHenkatenPlan[];
@@ -234,6 +246,23 @@ export function createLocalSeedPlan(): SupplierSeedPlan[] {
         ['Jig Loading', 'Spot Welding', 'Stud Welding', 'Dimensional Check'],
         ['Visual Check', 'Torque Audit', 'Functional Check', 'Packing Release'],
       ],
+      canvasLines: [
+        {
+          subtitle: 'Material flow · forming · transfer · dimensional assurance',
+          zoneFill: '#eef4ff',
+          machines: ['MATERIAL_RACK', 'PRESS_STAMPING', 'STRAIGHT_CONVEYOR', 'INSPECTION_CMM'],
+        },
+        {
+          subtitle: 'Fixture loading · robotic joining · spot reinforcement · geometry check',
+          zoneFill: '#eef4ff',
+          machines: ['ASSEMBLY_FIXTURE', 'WELDING_ROBOT', 'SPOT_WELDING', 'INSPECTION_CMM'],
+        },
+        {
+          subtitle: 'Final inspection · torque assurance · transfer · release packing',
+          zoneFill: '#eef4ff',
+          machines: ['INSPECTION_CMM', 'TORQUE_STATION', 'STRAIGHT_CONVEYOR', 'PACKING_STATION'],
+        },
+      ],
       parts: [
         { number: 'NPM-61110-A', name: 'Panel Inner RH' },
         { number: 'NPM-61120-A', name: 'Panel Inner LH' },
@@ -256,6 +285,38 @@ export function createLocalSeedPlan(): SupplierSeedPlan[] {
         ['Material Drying', 'Molding', 'Gate Cutting', 'Appearance Check'],
         ['Component Feeding', 'Sub Assembly', 'Torque Process', 'Leak Test'],
         ['Sampling', 'Dimension Check', 'Function Test', 'Shipment Release'],
+      ],
+      canvasLines: [
+        {
+          subtitle: 'Material preparation · molding · transfer · appearance assurance',
+          zoneFill: '#fff7ed',
+          machines: [
+            'MATERIAL_RACK_2D',
+            'INJECTION_MOLDING_2D',
+            'STRAIGHT_CONVEYOR_2D',
+            'INSPECTION_CMM_2D',
+          ],
+        },
+        {
+          subtitle: 'Component feeding · fixture assembly · torque control · line transfer',
+          zoneFill: '#fff7ed',
+          machines: [
+            'MATERIAL_RACK_2D',
+            'ASSEMBLY_FIXTURE_2D',
+            'TORQUE_STATION_2D',
+            'ROLLER_CONVEYOR_2D',
+          ],
+        },
+        {
+          subtitle: 'Dimensional assurance · functional control · transfer · shipment release',
+          zoneFill: '#fff7ed',
+          machines: [
+            'INSPECTION_CMM_2D',
+            'TORQUE_STATION_2D',
+            'ROLLER_CONVEYOR_2D',
+            'PACKING_STATION_2D',
+          ],
+        },
       ],
       parts: [
         { number: 'GKI-17700-P', name: 'Air Cleaner Housing' },

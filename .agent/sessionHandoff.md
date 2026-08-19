@@ -1,4 +1,66 @@
-# Session Handoff — Staging CI DNS Preflight Recovery
+# Session Handoff — Polished Local Canvas Seed dan MP Portraits
+
+Date: 2026-08-19
+
+Branch: `staging`
+
+Status: implementation dan local verification complete. Enam production line kini memiliki saved
+Canvas version 1 yang siap demo, dan 24 assigned MP memakai empat portrait ImageGen fiktif secara
+deterministik. Perubahan tetap development-only; Phase 15.9 tetap `in_progress`.
+
+## 1. Objective and Locked Decisions
+
+- Seed tiga saved line layouts per Hosted supplier melalui production Supplier Admin PUT endpoint,
+  bukan direct Prisma insert, setelah live Shift Runs tersedia.
+- Keep job/member/photo/assignment/4M content authoritative in the read model; layout JSON stores
+  only stable job IDs and spatial/decorative configuration.
+- Use the soft-isometric machine family for NPM and the simple 2D family for GKI, with equipment
+  mappings locked per line.
+- Generate exactly four fictional Indonesian operator portraits as separate ImageGen assets and
+  reuse them by `mpIndex % 4`; each line gets four distinct faces, while three reserve MPs per
+  supplier retain initials fallback.
+- Preserve the seven synthetic PNG role avatars and keep all generated portrait assets out of the
+  frontend bundle, PWA cache, and production API runtime image.
+
+## 2. Implementation Completed
+
+- Added four tracked, normalized JPEG portraits plus a provenance/prompt manifest under
+  `scripts/assets/local-seed/mp-portraits/`. Each asset is sRGB JPEG, 768x1024, metadata-stripped,
+  quality 88, and below 2 MiB.
+- Added a pure deterministic Canvas factory that schema-validates a 2400x1350 document containing
+  locked production zones/header and editable machines, arrows, and four live job slots.
+- Added deterministic Canvas specifications for all six lines and their exact machine mappings.
+- Generalized the internal local-seed upload helper for buffer, filename, and MIME type so role
+  avatars remain PNG while MP portraits use JPEG.
+- Added endpoint-driven creation of three layouts per supplier, strict post-seed reconciliation,
+  photo-checksum reuse counts, audit-count, and outbox-health verification.
+- Extended the existing local-seed and Canvas ADRs and the implementation roadmap; no migration,
+  endpoint, OpenAPI, production fixture fallback, or Phase 15.9 status change was introduced.
+
+## 3. Verification
+
+- Portrait asset validation and Canvas factory unit coverage passed, including deterministic
+  mapping, unique IDs, bounds, strict schema, one job slot per live job, and equipment families.
+- Full format, lint, typecheck, unit, OpenAPI, production build, PostgreSQL 18 migration, integration
+  (38 tests), and Playwright Chromium/Edge suites passed.
+- Clean `local:start:clean` and `local:reseed` both completed with two Hosted suppliers and 240
+  Henkaten; the reseed preserved the test database.
+- Post-seed checks proved six version-1 layouts, four reconciled job slots per layout, six
+  `BOARD_LAYOUT_CREATED` audits, 19 current photos per supplier, each generated portrait referenced
+  six times globally, and a healthy outbox.
+- Browser QA passed at 390x844, 768x1024, 1280x720, and 1672x941: portraits crop naturally, nodes do
+  not overlap, mobile remains read-only, desktop/tablet editing remains available, and no document
+  overflow was present.
+
+## 4. Next Recommended Action
+
+1. Review the tracked ImageGen portraits and seeded Canvas composition in the local supplier portal.
+2. Commit the implementation when the visual direction is approved; keep the assets explicitly
+   documented as fictional, synthetic, and local-demo-only.
+
+---
+
+## Previous Handoff — Staging CI DNS Preflight Recovery
 
 Date: 2026-08-19
 
