@@ -1,4 +1,67 @@
-# Session Handoff — Customizable Assignment Board Canvas
+# Session Handoff — Staging CI DNS Preflight Recovery
+
+Date: 2026-08-19
+
+Branch: `staging`
+
+Status: the staging CI failure in run `32104023080` was traced to missing public DNS records for
+all three locked staging domains. The Cloudflare zone contained malformed records with the zone
+name duplicated; correct DNS-only A records now point to `34.177.111.165`. Phase 15.9 remains
+`in_progress` until the post-fix staging deployment is green.
+
+## 1. Objective and Root Cause
+
+- All application, database, E2E, security, container, routing, and Trivy gates passed for SHA
+  `cd9c23d5bf13c5c4d62cba391bde527d5a5e7575`.
+- `Deploy staging / Deploy under remote lock` exited with status 2 immediately after runtime-env
+  validation because `getent ahosts` returned no result inside a command substitution governed by
+  `set -euo pipefail`. This bypassed the intended actionable DNS error.
+- Direct inspection of `34.177.111.165` confirmed Ubuntu 22.04, healthy Docker/Compose, healthy
+  prior-release containers, reachable ports 22/80/443, and no public records for the locked domains.
+- Cloudflare held malformed names such as
+  `supplier-henkaten.qd-tmmin.site.qd-tmmin.site`; these do not answer the required hostname.
+
+## 2. Changes and Operational Recovery
+
+- Moved the DNS resolver helper into `deploy/scripts/lib.sh` and made failed lookups return an empty
+  result so `remote-preflight.sh` reaches its explicit VM/domain resolution errors.
+- Added a deployment-harness regression proving exit status 2 from `getent` cannot terminate the
+  resolver call prematurely.
+- Full-suite parity also exposed a sub-millisecond push-delivery race: PostgreSQL `now()` is fixed
+  at transaction start while newly inserted delivery timestamps are millisecond-rounded. Due and
+  lease comparisons now use `clock_timestamp()` so the worker evaluates the actual statement time.
+- Created DNS-only A records for `supplier-henkaten.qd-tmmin.site`, `henkaten.qd-tmmin.site`, and
+  `supplier-henkaten-api.qd-tmmin.site`, all targeting `34.177.111.165` with TTL 300.
+- Pruned only unused Docker build cache on the staging VM. This reclaimed 16.04 GB; active
+  containers and persistent data were not touched. Free disk increased from about 5 GiB to 20 GiB.
+- The refreshed Trivy database reported CVE-2026-14456 in the OpenSSL runtime package. Debian has
+  no fixed package and marks the Debian 13 equivalent fix deferred; an exact, expiring exception
+  is registered because exploitation requires a QUIC server while the API is TCP HTTP behind Caddy.
+
+## 3. Verification
+
+- `bash -n deploy/scripts/*.sh deploy/tests/*.sh` passed.
+- `pnpm run test:deployment` passed.
+- Clean-worktree format, lint, typecheck, unit, OpenAPI, production build, migration, integration
+  (38 tests), and Playwright Chromium/Edge suites passed.
+- ShellCheck v0.11.0 using the workflow-pinned image passed.
+- `git diff --check` passed.
+- Both authoritative Cloudflare nameservers and the staging VM resolver answer all three staging
+  domains with `34.177.111.165`. Re-running the failed release candidate's remote preflight then
+  passed every DNS and host-identity check.
+- The production-like five-service stack passed exact routing, headers, non-root, bootstrap
+  idempotence, restart, and persistence checks. Trivy 0.70.0 filesystem and all five image scans
+  passed with the exact exception registry.
+
+## 4. Next Recommended Action
+
+1. Commit and push the guarded-preflight, worker-clock, and security-registry changes to `staging`.
+2. Inspect the resulting GitHub Actions run through deployment and external smoke verification;
+   keep Phase 15.9 open unless every required job is green.
+
+---
+
+## Previous Handoff — Customizable Assignment Board Canvas
 
 Date: 2026-08-18
 

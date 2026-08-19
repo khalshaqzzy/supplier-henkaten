@@ -108,6 +108,18 @@ fi
 exit 0
 EOF
 chmod +x "${fake_bin}/docker"
+cat >"${fake_bin}/getent" <<'EOF'
+#!/usr/bin/env bash
+exit 2
+EOF
+chmod +x "${fake_bin}/getent"
+if ! PATH="${fake_bin}:${PATH}" bash -c '
+  set -euo pipefail
+  source "$1"
+  [[ -z "$(resolve_addresses does-not-resolve.example.invalid)" ]]
+' _ "${SCRIPTS}/lib.sh"; then
+  fail "failed DNS lookup escaped the guarded resolver"
+fi
 if ! command -v flock >/dev/null 2>&1; then
   cat >"${fake_bin}/flock" <<'EOF'
 #!/usr/bin/env bash

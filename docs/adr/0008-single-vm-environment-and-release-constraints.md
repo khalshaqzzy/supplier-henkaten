@@ -156,6 +156,20 @@ success/failure, lock behavior (mandatory on Ubuntu CI), and five-release retent
 Remote DNS/TLS, actual GitHub Environment deployment, race rehearsal, and controlled staging
 rollback still require the bootstrapped VM. Therefore 15.9 and 15.11 remain incomplete.
 
+On 2026-08-19, staging run `32104023080` passed every application and release-candidate gate but
+the remote deployment exited with status 2 after runtime validation. Direct VM reproduction showed
+that all three required staging hostnames lacked public DNS answers. The Cloudflare zone contained
+malformed records with `qd-tmmin.site` duplicated in the owner name. Correct DNS-only A records were
+created for the supplier, TMMIN, and API hostnames, each targeting `34.177.111.165`. The shared
+resolver now converts `getent` lookup failure into an empty result so preflight emits its explicit
+DNS/host mismatch diagnostic instead of being terminated by `set -euo pipefail`. A regression test
+covers the status-2 resolver path. Unused BuildKit cache was also pruned after the VM was found with
+only about 5 GiB free, reclaiming 16.04 GB without touching active containers or persistent data.
+The same verification refreshed Trivy's vulnerability database and surfaced CVE-2026-14456 in
+the distroless OpenSSL package. Debian publishes no fixed version and marks the equivalent Debian
+13 fix deferred. Because the issue requires an OpenSSL QUIC server and this API exposes only Node.js
+HTTP over TCP behind Caddy, the exact identifier has a registered exception expiring 2026-09-30.
+
 ## Follow-up
 
 After the operator bootstraps Ubuntu 22.04 and configures GitHub Environment `staging`, capture

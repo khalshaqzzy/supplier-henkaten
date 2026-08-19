@@ -2,7 +2,7 @@
 
 Document status: Active implementation roadmap
 Created: 2026-07-23
-Last updated: 2026-08-17
+Last updated: 2026-08-19
 Source of truth: `.agent/PRD.md`
 Implementation approach: Backend-first
 Workspace tooling: Node.js 22 + pnpm workspaces, tanpa Turborepo
@@ -4989,6 +4989,11 @@ Verification:
 
 - Push staging produces exact release or explicit failure.
 - Environment isolated from production.
+- Staging run `32104023080` proved every release gate green but exposed missing public DNS records
+  as a silent remote-preflight exit. Direct VM diagnosis found three malformed Cloudflare names
+  with a duplicated zone suffix. Correct DNS-only A records now target `34.177.111.165`; the
+  resolver is guarded so a failed lookup reaches an explicit diagnostic, and unused VM build cache
+  was pruned to restore about 20 GiB free space before the next deployment.
 
 Data/migration impact:
 

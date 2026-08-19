@@ -73,8 +73,11 @@ export class PushDeliveryWorker implements OnModuleInit, BeforeApplicationShutdo
         JOIN "PushSubscription" AS subscription ON subscription.id = delivery."subscriptionId"
         JOIN "Notification" AS notification ON notification.id = delivery."notificationId"
         WHERE delivery.status = 'PENDING'
-          AND delivery."nextAttemptAt" <= now()
-          AND (delivery."lockedAt" IS NULL OR delivery."lockedAt" < now() - interval '30 seconds')
+          AND delivery."nextAttemptAt" <= clock_timestamp()
+          AND (
+            delivery."lockedAt" IS NULL
+            OR delivery."lockedAt" < clock_timestamp() - interval '30 seconds'
+          )
         ORDER BY delivery."nextAttemptAt", delivery."createdAt"
         FOR UPDATE OF delivery SKIP LOCKED
         LIMIT ${this.config.pushDeliveryBatchSize}
