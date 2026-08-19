@@ -18,7 +18,9 @@ import {
   Copy,
   Expand,
   Focus,
+  Hand,
   Lock,
+  Minimize2,
   Minus,
   MousePointer2,
   Plus,
@@ -56,7 +58,13 @@ type Transform = BoardLayoutNode['transform'];
 
 const GRID = 10;
 const HISTORY_LIMIT = 50;
-const VIEWPORT_HEIGHT = 720;
+const CAMERA_PADDING = 24;
+const MIN_MANUAL_SCALE = 0.25;
+const MAX_SCALE = 2;
+const MIN_VISIBLE_CANVAS = 64;
+
+export type CanvasCamera = { scale: number; x: number; y: number };
+export type CanvasViewport = { width: number; height: number };
 const categoryColors: Record<HenkatenCategory, string> = {
   MAN: '#d92d20',
   MACHINE: '#2f6fed',
@@ -73,22 +81,34 @@ export default function BoardCanvas({
 }) {
   const { session } = useSession();
   const queryClient = useQueryClient();
+  const shellRef = useRef<HTMLElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
-  const [viewportWidth, setViewportWidth] = useState(() =>
-    Math.max(320, Math.min(900, window.innerWidth - 40)),
-  );
+  const draftRef = useRef<BoardLayoutDocument | null>(null);
+  const cameraRef = useRef<CanvasCamera>({ scale: 0.5, x: 16, y: 16 });
+  const viewportRef = useRef<CanvasViewport>({
+    width: Math.max(320, Math.min(900, window.innerWidth - 40)),
+    height: Math.max(420, Math.min(720, window.innerHeight - 220)),
+  });
+  const normalCameraRef = useRef<CanvasCamera | null>(null);
+  const fittedLineRef = useRef<string | null>(null);
+  const [viewport, setViewport] = useState(viewportRef.current);
   const [draft, setDraft] = useState<BoardLayoutDocument | null>(null);
   const [savedDocument, setSavedDocument] = useState<BoardLayoutDocument | null>(null);
   const [past, setPast] = useState<BoardLayoutDocument[]>([]);
   const [future, setFuture] = useState<BoardLayoutDocument[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const [scale, setScale] = useState(0.5);
-  const [stagePosition, setStagePosition] = useState({ x: 16, y: 16 });
+  const [camera, setCameraState] = useState<CanvasCamera>(cameraRef.current);
+  const [panMode, setPanMode] = useState(false);
+  const [spacePanning, setSpacePanning] = useState(false);
+  const [stageDragging, setStageDragging] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [saveConflict, setSaveConflict] = useState(false);
   const [editorViewport, setEditorViewport] = useState(
-    () => window.matchMedia('(min-width: 768px)').matches,
+    () =>
+      window.matchMedia('(min-width: 900px) and (orientation: landscape), (min-width: 1280px)')
+        .matches,
   );
   const scope = useMemo(
     () => ({
@@ -107,36 +127,131 @@ export default function BoardCanvas({
     queryFn: () => supplierApi.boardLayout(line.lineId),
   });
 
+  const setCamera = useCallback((next: CanvasCamera | ((value: CanvasCamera) => CanvasCamera)) => {
+    setCameraState((current) => {
+      const resolved = typeof next === 'function' ? next(current) : next;
+      cameraRef.current = resolved;
+      return resolved;
+    });
+  }, []);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const observer = new ResizeObserver(([entry]) => {
-      if (entry) setViewportWidth(Math.max(320, Math.floor(entry.contentRect.width)));
+      if (!entry) return;
+      const next = {
+        width: Math.max(1, Math.floor(entry.contentRect.width)),
+        height: Math.max(1, Math.floor(entry.contentRect.height)),
+      };
+      const previous = viewportRef.current;
+      viewportRef.current = next;
+      setViewport(next);
+      const layoutDocument = draftRef.current;
+      if (!layoutDocument) return;
+      if (document.fullscreenElement === shellRef.current) {
+        setCamera(fitCanvasCamera(layoutDocument, next));
+      } else if (normalCameraRef.current) {
+        setCamera(normalCameraRef.current);
+        normalCameraRef.current = null;
+      } else {
+        setCamera((current) => resizeCanvasCamera(current, previous, next, layoutDocument));
+      }
     });
     observer.observe(container);
     return () => observer.disconnect();
-  }, []);
+  }, [setCamera]);
 
   useEffect(() => {
-    const media = window.matchMedia('(min-width: 768px)');
+    draftRef.current = draft;
+  }, [draft]);
+
+  useEffect(() => {
+    const updateFullscreen = () => {
+      const nextFullscreen = document.fullscreenElement === shellRef.current;
+      setIsFullscreen(nextFullscreen);
+      requestAnimationFrame(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        const nextViewport = {
+          width: Math.max(1, Math.floor(container.clientWidth)),
+          height: Math.max(1, Math.floor(container.clientHeight)),
+        };
+        viewportRef.current = nextViewport;
+        setViewport(nextViewport);
+        if (nextFullscreen && draftRef.current) {
+          setCamera(fitCanvasCamera(draftRef.current, nextViewport));
+        } else if (normalCameraRef.current) {
+          setCamera(normalCameraRef.current);
+          normalCameraRef.current = null;
+        }
+      });
+    };
+    document.addEventListener('fullscreenchange', updateFullscreen);
+    return () => document.removeEventListener('fullscreenchange', updateFullscreen);
+  }, [setCamera]);
+
+  useEffect(() => {
+    const media = window.matchMedia(
+      '(min-width: 900px) and (orientation: landscape), (min-width: 1280px)',
+    );
     const update = () => setEditorViewport(media.matches);
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
   }, []);
 
+  useEffect(() => {
+    const isTypingTarget = (target: EventTarget | null) =>
+      target instanceof HTMLElement &&
+      (target.isContentEditable ||
+        ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName));
+    const keyDown = (event: KeyboardEvent) => {
+      if (event.code !== 'Space' || event.repeat || isTypingTarget(event.target)) return;
+      event.preventDefault();
+      setSpacePanning(true);
+    };
+    const keyUp = (event: KeyboardEvent) => {
+      if (event.code === 'Space') setSpacePanning(false);
+    };
+    const reset = () => setSpacePanning(false);
+    window.addEventListener('keydown', keyDown);
+    window.addEventListener('keyup', keyUp);
+    window.addEventListener('blur', reset);
+    return () => {
+      window.removeEventListener('keydown', keyDown);
+      window.removeEventListener('keyup', keyUp);
+      window.removeEventListener('blur', reset);
+    };
+  }, []);
+
   const fitView = useCallback(
     (document: BoardLayoutDocument | null = draft) => {
-      if (!document) return;
-      const nextScale = Math.min(
-        1,
-        (viewportWidth - 32) / document.canvas.width,
-        (VIEWPORT_HEIGHT - 32) / document.canvas.height,
-      );
-      setScale(Math.max(0.25, nextScale));
-      setStagePosition({ x: 16, y: 16 });
+      if (document) setCamera(fitCanvasCamera(document, viewportRef.current));
     },
-    [draft, viewportWidth],
+    [draft, setCamera],
   );
+
+  const zoomView = useCallback(
+    (nextScale: number, anchor = { x: viewport.width / 2, y: viewport.height / 2 }) => {
+      if (!draft) return;
+      setCamera((current) => zoomCanvasCamera(current, nextScale, anchor, viewport, draft));
+    },
+    [draft, setCamera, viewport],
+  );
+
+  const toggleFullscreen = useCallback(async () => {
+    if (document.fullscreenElement === shellRef.current) {
+      await document.exitFullscreen();
+      return;
+    }
+    normalCameraRef.current = cameraRef.current;
+    try {
+      await shellRef.current?.requestFullscreen();
+    } catch (error) {
+      normalCameraRef.current = null;
+      throw error;
+    }
+  }, []);
 
   useEffect(() => {
     if (!layout.data || editing) return;
@@ -145,8 +260,11 @@ export default function BoardCanvas({
     setPast([]);
     setFuture([]);
     setSaveConflict(false);
-    fitView(layout.data.document);
-  }, [editing, fitView, layout.data]);
+    if (fittedLineRef.current !== line.lineId) {
+      fittedLineRef.current = line.lineId;
+      setCamera(fitCanvasCamera(layout.data.document, viewportRef.current));
+    }
+  }, [editing, layout.data, line.lineId, setCamera]);
 
   const save = useMutation({
     mutationFn: (document: BoardLayoutDocument) =>
@@ -419,9 +537,11 @@ export default function BoardCanvas({
   }
   if (layout.isLoading || !draft || !layout.data) return <CanvasSkeleton />;
   const layoutData = layout.data;
+  const panning = panMode || spacePanning;
 
   return (
     <section
+      ref={shellRef}
       className={`board-canvas-shell${editing ? ' is-editing' : ''}`}
       aria-label={`Canvas ${line.lineCode} ${line.lineName}`}
     >
@@ -442,26 +562,35 @@ export default function BoardCanvas({
             variant="ghost"
             leadingIcon={<Minus />}
             aria-label="Perkecil"
-            onClick={() => setScale((value) => Math.max(0.25, value - 0.1))}
+            onClick={() => zoomView(camera.scale - 0.1)}
           />
-          <span>{Math.round(scale * 100)}%</span>
+          <span>{Math.round(camera.scale * 100)}%</span>
           <Button
             size="sm"
             variant="ghost"
             leadingIcon={<Plus />}
             aria-label="Perbesar"
-            onClick={() => setScale((value) => Math.min(2, value + 0.1))}
+            onClick={() => zoomView(camera.scale + 0.1)}
           />
+          <Button
+            size="sm"
+            variant={panMode ? 'secondary' : 'ghost'}
+            leadingIcon={panMode ? <MousePointer2 /> : <Hand />}
+            aria-pressed={panMode}
+            onClick={() => setPanMode((value) => !value)}
+          >
+            {panMode ? 'Select mode' : 'Pan mode'}
+          </Button>
           <Button size="sm" variant="ghost" leadingIcon={<Focus />} onClick={() => fitView()}>
             Auto-fit
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            leadingIcon={<Expand />}
-            onClick={() => void containerRef.current?.requestFullscreen()}
+            leadingIcon={isFullscreen ? <Minimize2 /> : <Expand />}
+            onClick={() => void toggleFullscreen()}
           >
-            Fullscreen
+            {isFullscreen ? 'Keluar fullscreen' : 'Fullscreen'}
           </Button>
           {layoutData.canEdit && editorViewport && !editing && (
             <Button size="sm" leadingIcon={<MousePointer2 />} onClick={() => setEditing(true)}>
@@ -535,25 +664,49 @@ export default function BoardCanvas({
       )}
       <div className="board-canvas-layout">
         {editing && <Palette onPrimitive={addPrimitive} onMachine={addMachine} />}
-        <div className="board-canvas-viewport" ref={containerRef}>
+        <div
+          className={`board-canvas-viewport${panning ? ' is-pan-mode' : ''}${stageDragging ? ' is-panning' : ''}`}
+          data-camera-scale={camera.scale}
+          data-camera-x={camera.x}
+          data-camera-y={camera.y}
+          data-pan-active={panning}
+          aria-label="Viewport canvas. Tahan Space untuk pan sementara."
+          role="group"
+          tabIndex={0}
+          ref={containerRef}
+        >
           <Stage
             ref={stageRef}
-            width={viewportWidth}
-            height={VIEWPORT_HEIGHT}
-            scaleX={scale}
-            scaleY={scale}
-            x={stagePosition.x}
-            y={stagePosition.y}
-            draggable={!editing}
-            onDragEnd={(event) => setStagePosition({ x: event.target.x(), y: event.target.y() })}
-            onWheel={(event) => {
-              event.evt.preventDefault();
-              setScale((value) =>
-                Math.max(0.25, Math.min(2, value * (event.evt.deltaY > 0 ? 0.9 : 1.1))),
+            width={viewport.width}
+            height={viewport.height}
+            scaleX={camera.scale}
+            scaleY={camera.scale}
+            x={camera.x}
+            y={camera.y}
+            draggable={panning}
+            onDragStart={(event) => {
+              if (event.target === event.target.getStage()) setStageDragging(true);
+            }}
+            onDragEnd={(event) => {
+              if (event.target !== event.target.getStage()) return;
+              setStageDragging(false);
+              setCamera(
+                constrainCanvasCamera(
+                  { ...cameraRef.current, x: event.target.x(), y: event.target.y() },
+                  viewportRef.current,
+                  draft,
+                ),
               );
             }}
+            onWheel={(event) => {
+              event.evt.preventDefault();
+              const pointer = event.target.getStage()?.getPointerPosition();
+              if (!pointer) return;
+              zoomView(cameraRef.current.scale * (event.evt.deltaY > 0 ? 0.9 : 1.1), pointer);
+            }}
             onMouseDown={(event) => {
-              if (event.target === event.target.getStage()) setSelectedId(null);
+              containerRef.current?.focus({ preventScroll: true });
+              if (!panning && event.target === event.target.getStage()) setSelectedId(null);
             }}
           >
             <Layer listening={false}>
@@ -569,9 +722,11 @@ export default function BoardCanvas({
                     {...(node.type === 'JOB_SLOT' && jobsById.get(node.jobId)
                       ? { job: jobsById.get(node.jobId)! }
                       : {})}
-                    editing={editing}
+                    editing={editing && !panning}
                     selected={selectedId === node.id}
-                    onSelect={() => setSelectedId(node.id)}
+                    onSelect={() => {
+                      if (!panning) setSelectedId(node.id);
+                    }}
                     onTransform={(transform) => updateTransform(node.id, transform)}
                   />
                 ))}
@@ -1202,6 +1357,101 @@ function defaultTransform(document: BoardLayoutDocument, width: number, height: 
     rotation: 0,
     zIndex: document.nodes.length + 20,
     locked: false,
+  };
+}
+
+export function fitCanvasCamera(
+  document: BoardLayoutDocument,
+  viewport: CanvasViewport,
+  padding = CAMERA_PADDING,
+): CanvasCamera {
+  const availableWidth = Math.max(1, viewport.width - padding * 2);
+  const availableHeight = Math.max(1, viewport.height - padding * 2);
+  const scale = Math.max(
+    Number.EPSILON,
+    Math.min(
+      MAX_SCALE,
+      availableWidth / document.canvas.width,
+      availableHeight / document.canvas.height,
+    ),
+  );
+  return {
+    scale,
+    x: (viewport.width - document.canvas.width * scale) / 2,
+    y: (viewport.height - document.canvas.height * scale) / 2,
+  };
+}
+
+export function resizeCanvasCamera(
+  camera: CanvasCamera,
+  previous: CanvasViewport,
+  next: CanvasViewport,
+  document: BoardLayoutDocument,
+): CanvasCamera {
+  if (previous.width <= 1 || previous.height <= 1) return fitCanvasCamera(document, next);
+  const fitted = fitCanvasCamera(document, next);
+  const wasFullyVisible =
+    camera.x >= -0.5 &&
+    camera.y >= -0.5 &&
+    camera.x + document.canvas.width * camera.scale <= previous.width + 0.5 &&
+    camera.y + document.canvas.height * camera.scale <= previous.height + 0.5;
+  if (wasFullyVisible && fitted.scale < camera.scale) return fitted;
+  const logicalCenter = {
+    x: (previous.width / 2 - camera.x) / camera.scale,
+    y: (previous.height / 2 - camera.y) / camera.scale,
+  };
+  return constrainCanvasCamera(
+    {
+      ...camera,
+      x: next.width / 2 - logicalCenter.x * camera.scale,
+      y: next.height / 2 - logicalCenter.y * camera.scale,
+    },
+    next,
+    document,
+  );
+}
+
+export function zoomCanvasCamera(
+  camera: CanvasCamera,
+  nextScale: number,
+  anchor: { x: number; y: number },
+  viewport: CanvasViewport,
+  document: BoardLayoutDocument,
+): CanvasCamera {
+  const scale = Math.max(Math.min(MIN_MANUAL_SCALE, camera.scale), Math.min(MAX_SCALE, nextScale));
+  const logicalAnchor = {
+    x: (anchor.x - camera.x) / camera.scale,
+    y: (anchor.y - camera.y) / camera.scale,
+  };
+  return constrainCanvasCamera(
+    {
+      scale,
+      x: anchor.x - logicalAnchor.x * scale,
+      y: anchor.y - logicalAnchor.y * scale,
+    },
+    viewport,
+    document,
+  );
+}
+
+export function constrainCanvasCamera(
+  camera: CanvasCamera,
+  viewport: CanvasViewport,
+  document: BoardLayoutDocument,
+): CanvasCamera {
+  const scaledWidth = document.canvas.width * camera.scale;
+  const scaledHeight = document.canvas.height * camera.scale;
+  const constrainAxis = (position: number, viewportSize: number, contentSize: number) => {
+    const minimum = MIN_VISIBLE_CANVAS - contentSize;
+    const maximum = viewportSize - MIN_VISIBLE_CANVAS;
+    return minimum > maximum
+      ? (viewportSize - contentSize) / 2
+      : Math.max(minimum, Math.min(maximum, position));
+  };
+  return {
+    ...camera,
+    x: constrainAxis(camera.x, viewport.width, scaledWidth),
+    y: constrainAxis(camera.y, viewport.height, scaledHeight),
   };
 }
 

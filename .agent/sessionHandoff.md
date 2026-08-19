@@ -1,4 +1,73 @@
-# Session Handoff — Polished Local Canvas Seed dan MP Portraits
+# Session Handoff — Stable Responsive Canvas Camera dan Fullscreen
+
+Date: 2026-08-19
+
+Branch: `fix/canvas-viewport-ux`
+
+Status: implementation dan local browser verification complete. Canvas camera tidak lagi berpindah
+ke koordinat node setelah drag, editor mempertahankan atau menyesuaikan view secara responsif, dan
+fullscreen memakai seluruh workspace. Phase 15.9 tetap `in_progress`.
+
+## 1. Objective and Locked Decisions
+
+- Keep camera state ephemeral per line/page session and separate from persisted layout/draft state.
+- Use full-canvas contain fit on the limiting measured viewport axis, including scales below 25%
+  when required to prevent clipping.
+- Keep explicit Hand mode available in read/edit views, with temporary Space pan when the focusable
+  Canvas viewport owns keyboard interaction.
+- Fullscreen the complete workspace so toolbar and editing panels remain available; restore the
+  prior normal camera on exit.
+- Preserve the existing layout document, API, authorization, database, and mobile read-only model.
+
+## 2. Implementation Completed
+
+- Fixed the primary camera jump: bubbled node `dragend` events are ignored by the Stage camera
+  handler instead of storing node coordinates as Stage coordinates.
+- Replaced the fixed 720 px Stage and separate position/scale state with a measured two-axis
+  viewport and unified camera helpers for fit, resize, zoom anchor, and recoverable pan bounds.
+- Initial fit now runs once per line; node changes, save, and edit re-entry no longer reset the
+  camera. A shrinking editor viewport scales down only when needed to retain a previously complete
+  view; manual work views preserve their logical center.
+- Added Hand/Select mode, temporary Space pan, pointer-centered wheel zoom, viewport-centered button
+  zoom, grab cursors, keyboard focus semantics, and a visible focus ring.
+- Fullscreen now targets the Canvas shell, measures after `fullscreenchange`, maximizes the complete
+  logical canvas in the remaining viewport, keeps toolbar/palette/inspector available, and restores
+  the normal camera after exit without a ResizeObserver race.
+- Limited editing availability to desktop and tablet-landscape media conditions while retaining
+  read-only pan/zoom on smaller Canvas views.
+- Extended unit/E2E coverage and synchronized PRD section 16.6, ADR 0031, and roadmap 8.3A.
+
+## 3. Verification
+
+- Repository formatting, lint, full TypeScript, all 183 unit tests across seven projects plus scripts,
+  production builds, and `git diff --check` passed.
+- Supplier Web unit suite passed: 47 tests across 10 files. New camera evidence covers sub-25% fit,
+  fullscreen-axis maximization, logical-center resize, pointer-anchored zoom, and pan recovery.
+- Production Supplier Web builds passed through the E2E harness with the required API origin; the
+  lazy BoardCanvas chunk remains separate at approximately 457 kB minified / 136 kB gzip and the
+  PWA precache remains 26 entries without machine PNG precaching.
+- Full Chromium E2E passed all four isolated journeys. Hosted coverage proves node drag does not
+  move the camera, Hand and Space pan work, fullscreen expands/restores, save succeeds, responsive
+  screenshots have no document overflow, and Axe reports zero violations.
+- Pre-commit parity additionally passed `pnpm install --frozen-lockfile`, `pnpm openapi:check`,
+  `docker compose config --quiet`, and the migration-backed API integration suite (38/38). The first
+  integration attempt exposed the known push retry timing race (`attemptCount` observed before the
+  worker claim); a clean database reset and complete repeat passed without source changes.
+- Edge passed both tagged governance/onboarding journeys. Gitleaks v8.24.3 directory mode scanned
+  the complete worktree and found no leaks; `git diff --check` remained clean.
+- Every E2E-owned PostgreSQL container, network, volume, app process, and temporary resource was
+  removed by the harness. The pre-existing local full-stack PostgreSQL service was restored after
+  the disposable integration reset so the user's running local services retain their prior state.
+
+## 4. Next Recommended Action
+
+1. Conduct manual pointer/touch UAT on the target shop-floor display and tablet landscape device.
+2. Commit and deliver `fix/canvas-viewport-ux` after visual approval; no migration or deployment
+   sequencing change is required.
+
+---
+
+# Previous Handoff — Polished Local Canvas Seed dan MP Portraits
 
 Date: 2026-08-19
 

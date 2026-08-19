@@ -32,18 +32,23 @@ concurrency. Each save emits a redacted node-count audit summary and `BOARD_LAYO
 event containing only supplier, line, layout, and version identifiers.
 
 The existing Assignment Board remains the default. The Canvas editor and exact Konva dependencies
-are dynamically imported only after one line is selected and Canvas is opened. The Stage remains
-viewport-sized while a bounded logical canvas supports pan, zoom, snapping, transforms, 50-step
-history, and explicit save. Required job cards cannot be deleted, duplicated, or rotated. A DOM
+are dynamically imported only after one line is selected and Canvas is opened. The Stage follows
+both dimensions of its measured viewport while a bounded logical canvas supports explicit Hand
+mode, temporary Space pan, pointer-centered zoom, snapping, transforms, 50-step history, and
+explicit save. Required job cards cannot be deleted, duplicated, or rotated. A DOM
 Layers/Properties panel, numeric fields, keyboard movement, accessible labels, risk rail, and the
 default board provide non-canvas access paths.
 
-The Stage host uses inline-size containment and a viewport-bounded initial width before
-`ResizeObserver` measurement. This prevents the initial Konva backing canvas from becoming the
-grid's intrinsic width on tablet/mobile. Arrow nodes expose left/right endpoint handles in addition
-to rotation, while machine assets keep proportional corner handles and job cards remain
-non-rotatable. Generated and reset layouts use a vertical `300 x 440` job card; proportional resize
-preserves that portrait direction, and a cover crop makes the live MP photo the dominant card area.
+The Stage host uses inline-size containment and viewport-bounded initial dimensions before
+`ResizeObserver` measurement. Camera state is separate from the layout draft: node drag events are
+not allowed to update the Stage camera, resize preserves the logical center, and a previously
+fully-visible canvas may scale down to remain fully visible. Auto-fit uses the limiting viewport
+axis without a 25% floor and centers the complete logical canvas. Fullscreen targets the complete
+workspace, fits after the browser transition, and restores the prior normal camera on exit. Arrow
+nodes expose left/right endpoint handles in addition to rotation, while machine assets keep
+proportional corner handles and job cards remain non-rotatable. Generated and reset layouts use a
+vertical `300 x 440` job card; proportional resize preserves that portrait direction, and a cover
+crop makes the live MP photo the dominant card area.
 
 Machine images are a closed v1 catalog with two generated transparent visual families for the same
 twelve industrial equipment types: polished soft-isometric cutouts and simple generic 2D icons.
@@ -87,6 +92,8 @@ initial path remains unchanged.
   autosaves.
 - Canvas intrinsic sizing cannot determine document width; the Stage is clipped and remeasured
   inside the responsive shell.
+- Canvas camera state is ephemeral per line/page session and never enters the persisted layout or
+  API contract.
 - TMMIN can inspect the same Hosted layout but cannot mutate it.
 - Schema migration will be required before accepting a future document version.
 - Local Canvas seed failures stop clean start/reseed when layout schema, active-job parity,
@@ -100,6 +107,11 @@ role scope, optimistic conflicts, TMMIN read-only access, redacted audit summari
 payloads. Frontend checks cover the complete machine manifest and transform normalization, followed
 by repository lint, typecheck, unit, integration, build, E2E, migration, accessibility, and visual
 viewport verification.
+
+Frontend camera tests cover sub-25% complete fit, fullscreen-axis maximization, logical-center
+preservation, pointer-anchored zoom, and recoverable pan bounds. Hosted browser coverage moves a
+node without moving the camera, exercises Hand and Space pan, enters/exits workspace fullscreen,
+verifies camera restoration, and repeats responsive overflow and Axe checks.
 
 The seeded visual factory additionally validates deterministic node IDs, bounds, one required slot
 per active job, explicit machine-family mapping, and four normalized portrait assets. Clean start,

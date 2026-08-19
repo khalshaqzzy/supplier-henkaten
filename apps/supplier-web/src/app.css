@@ -2314,12 +2314,40 @@ a.overview-activity-identifier:hover {
 }
 
 .board-canvas-shell {
+  --board-canvas-viewport-height: clamp(520px, calc(100dvh - 240px), 720px);
+
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--hds-border-default);
   border-radius: 12px;
   background: #fff;
   box-shadow: 0 12px 30px rgb(23 32 51 / 8%);
+}
+
+.board-canvas-shell:fullscreen {
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+}
+
+.board-canvas-shell:fullscreen .board-canvas-layout {
+  min-height: 0;
+  flex: 1;
+}
+
+.board-canvas-shell:fullscreen .board-canvas-viewport {
+  height: 100%;
+}
+
+.board-canvas-shell:fullscreen .board-canvas-palette,
+.board-canvas-shell:fullscreen .board-canvas-inspector {
+  max-height: none;
+  min-height: 0;
 }
 
 .board-canvas-toolbar {
@@ -2374,6 +2402,7 @@ a.overview-activity-identifier:hover {
 
 .board-canvas-viewport {
   width: 100%;
+  height: var(--board-canvas-viewport-height);
   max-width: 100%;
   min-width: 0;
   overflow: hidden;
@@ -2382,9 +2411,22 @@ a.overview-activity-identifier:hover {
   touch-action: none;
 }
 
+.board-canvas-viewport.is-pan-mode canvas {
+  cursor: grab;
+}
+
+.board-canvas-viewport.is-panning canvas {
+  cursor: grabbing;
+}
+
+.board-canvas-viewport:focus-visible {
+  outline: 3px solid #2367c9;
+  outline-offset: -3px;
+}
+
 .board-canvas-palette,
 .board-canvas-inspector {
-  max-height: 720px;
+  max-height: var(--board-canvas-viewport-height);
   overflow: auto;
   padding: 12px;
   background: #fff;

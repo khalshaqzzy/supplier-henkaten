@@ -940,7 +940,16 @@ Process difficulty, skill level, health, attendance, dan schedule tidak boleh mu
   legend terpisah.
 - Editor desktop dan tablet landscape menyediakan palette, Layers/Properties DOM, pan/zoom,
   fit/fullscreen, grid/snapping, 50-step undo/redo, numeric transforms, keyboard movement,
-  lock/reorder, reset, dan explicit save. Mobile hanya baca dengan pan/zoom bila Canvas dibuka.
+  lock/reorder, reset, dan explicit save. Pan wajib dapat dipilih melalui Hand mode dan diaktifkan
+  sementara dengan Space tanpa memindahkan node; zoom berpusat pada pointer/viewport. Mobile hanya
+  baca dengan pan/zoom bila Canvas dibuka.
+- Stage mengikuti ukuran viewport Canvas aktual pada kedua sumbu. Auto-fit wajib menampilkan dan
+  memusatkan seluruh logical canvas meskipun skala yang dibutuhkan di bawah batas zoom manual.
+  Perubahan node, save, dan masuk ulang ke edit tidak boleh mengubah kamera; penyempitan viewport
+  mempertahankan pusat kerja atau menurunkan fit bila seluruh canvas sebelumnya terlihat.
+- Fullscreen mencakup toolbar dan panel editor, memakai seluruh sisa ruang horizontal/vertikal,
+  melakukan fit setelah transisi browser selesai, dan memulihkan kamera non-fullscreen saat keluar.
+  Kamera bersifat state UI per line selama page session dan tidak disimpan di layout/server.
 - `JOB_SLOT` dapat dipindah dan di-resize tetapi tidak dapat dihapus, diduplikasi, atau dirotasi.
   Rectangle, outline, arrow, text, dan curated machine assets dapat dipindah, resize, rotate,
   duplicate, delete, lock, dan reorder.
