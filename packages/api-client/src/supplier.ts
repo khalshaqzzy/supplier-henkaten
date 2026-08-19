@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import {
   assignmentBoardSchema,
+  boardLayoutResponseSchema,
   assignmentIssuePageSchema,
   auditPageSchema,
   checklistDraftSchema,
@@ -22,6 +23,8 @@ import {
   notificationPageSchema,
   notificationSchema,
   notificationUnreadCountSchema,
+  pushConfigSchema,
+  pushSubscriptionSchema,
   partPageSchema,
   partSchema,
   preStartResolutionContextSchema,
@@ -35,6 +38,8 @@ import {
   workingAssignmentSchema,
   type AuditQuery,
   type BoardQuery,
+  type BoardLayoutSaveRequest,
+  type CreatePushSubscriptionRequest,
   type CreateHenkatenRequest,
   type DashboardQuery,
   type HenkatenFormOptionsQuery,
@@ -107,6 +112,20 @@ export class SupplierApi {
     });
   }
 
+  boardLayout(lineId: string) {
+    return this.client.request(`/api/v1/supplier/assignment-board/layouts/${lineId}`, {
+      responseSchema: boardLayoutResponseSchema,
+    });
+  }
+
+  saveBoardLayout(lineId: string, body: BoardLayoutSaveRequest) {
+    return this.client.request(`/api/v1/supplier/assignment-board/layouts/${lineId}`, {
+      method: 'PUT',
+      body,
+      responseSchema: boardLayoutResponseSchema,
+    });
+  }
+
   notifications(query: NotificationListQuery = { limit: 30 }) {
     return this.client.request('/api/v1/supplier/notifications', {
       query,
@@ -125,6 +144,28 @@ export class SupplierApi {
       method: 'PATCH',
       body,
       responseSchema: notificationSchema,
+    });
+  }
+
+  pushConfig() {
+    return this.client.request('/api/v1/supplier/push/config', {
+      responseSchema: pushConfigSchema,
+    });
+  }
+
+  createPushSubscription(body: CreatePushSubscriptionRequest) {
+    return this.client.request('/api/v1/supplier/push-subscriptions', {
+      method: 'POST',
+      body,
+      responseSchema: pushSubscriptionSchema,
+    });
+  }
+
+  deletePushSubscription(id: string, expectedVersion: number) {
+    return this.client.request(`/api/v1/supplier/push-subscriptions/${id}`, {
+      method: 'DELETE',
+      body: { expectedVersion },
+      responseSchema: pushSubscriptionSchema,
     });
   }
 
@@ -193,10 +234,11 @@ export class SupplierApi {
     });
   }
 
-  removeMemberPhoto(id: string) {
+  removeMemberPhoto(id: string, expectedVersion: number): Promise<void> {
     return this.client.request(`/api/v1/supplier/master-data/members/${id}/photo/remove`, {
       method: 'POST',
-      responseSchema: memberSchema,
+      body: { expectedVersion },
+      responseType: 'void',
     });
   }
 

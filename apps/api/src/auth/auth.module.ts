@@ -8,8 +8,10 @@ import { AuthService } from './auth.service.js';
 import { PasswordService } from './password.service.js';
 import { RateLimiterService } from './rate-limiter.service.js';
 import { SessionService } from './session.service.js';
+import { PushModule } from '../push/push.module.js';
 
 @Module({
+  imports: [PushModule],
   controllers: [SupplierAuthController, TmminAuthController],
   providers: [
     AuthControllerFacade,

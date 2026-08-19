@@ -104,4 +104,25 @@ describe('SupplierApi', () => {
       expect.objectContaining({ jobName: 'Inspection' }),
     ]);
   });
+
+  it('removes a member photo with optimistic versioning and accepts 204', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }));
+    const api = new SupplierApi(
+      new ApiClient({
+        baseUrl: 'https://api.example.test',
+        realm: 'SUPPLIER',
+        fetch: fetchMock,
+      }),
+    );
+
+    await expect(api.removeMemberPhoto(id(8), 4)).resolves.toBeUndefined();
+
+    const [url, request] = fetchMock.mock.calls[0]!;
+    const requestUrl = url instanceof URL ? url.href : typeof url === 'string' ? url : url.url;
+    expect(requestUrl).toBe(
+      `https://api.example.test/api/v1/supplier/master-data/members/${id(8)}/photo/remove`,
+    );
+    expect(request?.method).toBe('POST');
+    expect(request?.body).toBe(JSON.stringify({ expectedVersion: 4 }));
+  });
 });

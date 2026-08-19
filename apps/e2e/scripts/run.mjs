@@ -246,6 +246,9 @@ for (const [index, { spec, browserProject }] of journeys.entries()) {
       env: environment,
     });
     run('pnpm', ['admin:bootstrap'], { env: environment });
+    run('pnpm', ['--filter', '@tmmin-henkaten/supplier-web', 'run', 'build'], {
+      env: environment,
+    });
 
     const api = start(
       'pnpm',
@@ -260,6 +263,7 @@ for (const [index, { spec, browserProject }] of journeys.entries()) {
         '@tmmin-henkaten/supplier-web',
         'exec',
         'vite',
+        'preview',
         '--host',
         '127.0.0.1',
         '--port',

@@ -28,6 +28,7 @@ export function presentMember(
 ) {
   const user = member.users?.[0];
   const photo = member.photos?.find(({ state }) => state === 'CURRENT');
+  const photoVersion = photo ? `?v=${photo.version}` : '';
   return {
     id: member.id,
     fullName: member.fullName,
@@ -38,8 +39,8 @@ export function presentMember(
     photo: photo
       ? {
           id: photo.id,
-          fullUrl: `${photoBase}/${member.id}/photo/full`,
-          thumbnailUrl: `${photoBase}/${member.id}/photo/thumbnail`,
+          fullUrl: `${photoBase}/${member.id}/photo/full${photoVersion}`,
+          thumbnailUrl: `${photoBase}/${member.id}/photo/thumbnail${photoVersion}`,
           version: photo.version,
         }
       : null,

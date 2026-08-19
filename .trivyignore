@@ -1,3 +1,4 @@
 # Exact exceptions are validated against .agent/securityExceptions.json for rationale and expiry.
 GHSA-qwww-vcr4-c8h2
 DS-0002
+CVE-2026-14456

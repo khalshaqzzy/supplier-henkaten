@@ -98,7 +98,10 @@ describe('RealtimeService', () => {
     await expect(nextInvalidation).resolves.toMatchObject({
       id: 'right-line',
       type: 'invalidate',
-      data: { lineId: 'line-a', refresh: ['assignment-board', 'notifications', 'dashboard'] },
+      data: {
+        lineId: 'line-a',
+        refresh: ['assignment-board', 'assignment-board-layout', 'notifications', 'dashboard'],
+      },
     });
   });
 });

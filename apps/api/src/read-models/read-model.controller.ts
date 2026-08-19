@@ -1,7 +1,8 @@
-import { Controller, Get, Param, Patch, Req, Sse } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Put, Req, Sse } from '@nestjs/common';
 
 import {
   auditQuerySchema,
+  boardLayoutSaveRequestSchema,
   boardQuerySchema,
   dashboardQuerySchema,
   notificationListQuerySchema,
@@ -10,6 +11,7 @@ import {
   realtimeQuerySchema,
   tmminDashboardQuerySchema,
   type AuditQuery,
+  type BoardLayoutSaveRequest,
   type BoardQuery,
   type DashboardQuery,
   type NotificationListQuery,
@@ -23,6 +25,8 @@ import type { ContextRequest } from '../common/request-context.js';
 import { parseWithSchema, ValidatedBody, ValidatedQuery } from '../common/zod.js';
 import { OperationalAccessService } from '../shifts/operational-access.service.js';
 import { HostedReadinessService } from '../administration/hosted-readiness.service.js';
+import { mutationContext } from '../administration/mutation-context.js';
+import { BoardLayoutService } from './board-layout.service.js';
 import { NotificationService } from './notification.service.js';
 import { ReadModelService } from './read-model.service.js';
 import { RealtimeService } from './realtime.service.js';
@@ -35,6 +39,7 @@ export class SupplierReadModelController {
     private readonly reads: ReadModelService,
     private readonly realtime: RealtimeService,
     private readonly hostedReadiness: HostedReadinessService,
+    private readonly layouts: BoardLayoutService,
   ) {}
 
   @RequireCapabilities('SUPPLIER_NOTIFICATION_READ')
@@ -74,6 +79,33 @@ export class SupplierReadModelController {
       this.access.supplierScope(request),
       this.access.principal(request),
       query.lineId,
+    );
+  }
+
+  @RequireCapabilities('SUPPLIER_BOARD_READ')
+  @Get('/assignment-board/layouts/:lineId')
+  boardLayout(@Param('lineId') lineId: string, @Req() request: ContextRequest) {
+    return this.layouts.get(
+      this.access.supplierScope(request),
+      this.access.principal(request),
+      parseWithSchema(opaqueIdSchema, lineId),
+    );
+  }
+
+  @RequireCapabilities('SUPPLIER_BOARD_LAYOUT_MANAGE')
+  @Put('/assignment-board/layouts/:lineId')
+  async saveBoardLayout(
+    @Param('lineId') lineId: string,
+    @ValidatedBody(boardLayoutSaveRequestSchema) body: BoardLayoutSaveRequest,
+    @Req() request: ContextRequest,
+  ) {
+    const principal = this.access.principal(request);
+    return this.layouts.save(
+      await this.access.assertHostedOperational(principal),
+      principal,
+      parseWithSchema(opaqueIdSchema, lineId),
+      body,
+      mutationContext(request),
     );
   }
 
@@ -128,6 +160,7 @@ export class TmminReadModelController {
     private readonly access: OperationalAccessService,
     private readonly notifications: NotificationService,
     private readonly reads: ReadModelService,
+    private readonly layouts: BoardLayoutService,
   ) {}
 
   @RequireCapabilities('TMMIN_DASHBOARD_READ')
@@ -179,6 +212,21 @@ export class TmminReadModelController {
       principal,
     );
     return this.reads.board(scope, principal, query.lineId);
+  }
+
+  @RequireCapabilities('TMMIN_SHIFT_READ')
+  @Get('/suppliers/:supplierId/assignment-board/layouts/:lineId')
+  async assignmentBoardLayout(
+    @Param('supplierId') supplierId: string,
+    @Param('lineId') lineId: string,
+    @Req() request: ContextRequest,
+  ) {
+    const principal = this.access.principal(request);
+    const scope = await this.access.assertTmminHostedCurrent(
+      parseWithSchema(opaqueIdSchema, supplierId),
+      principal,
+    );
+    return this.layouts.get(scope, principal, parseWithSchema(opaqueIdSchema, lineId));
   }
 
   @RequireCapabilities('TMMIN_AUDIT_READ')

@@ -60,10 +60,6 @@ jq -e '
   and (.services.caddy.ports | length) >= 2
 ' <<<"${config_json}" >/dev/null || die "Compose exposure policy failed: only Caddy may publish host ports."
 
-resolve_addresses() {
-  getent ahosts "$1" | awk '{print $1}' | sort -u
-}
-
 expected_addresses="$(resolve_addresses "${EXPECTED_HOST}")"
 if [[ -z "${expected_addresses}" && "${EXPECTED_HOST}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
   expected_addresses="${EXPECTED_HOST}"

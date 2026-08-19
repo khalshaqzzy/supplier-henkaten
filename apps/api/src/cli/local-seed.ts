@@ -7,6 +7,8 @@ import { dirname, resolve } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import sharp from 'sharp';
 
+import { boardLayoutDocumentSchema, type BoardLayoutDocument } from '@tmmin-henkaten/contracts';
+
 import { PrismaClient } from '../generated/prisma/client.js';
 import {
   LOCAL_SEED_HENKATEN_PER_SUPPLIER,
@@ -19,6 +21,12 @@ import {
   type SeedOutcome,
   type SupplierSeedPlan,
 } from './local-seed-plan.js';
+import {
+  createLocalSeedCanvasDocument,
+  loadLocalSeedPortraits,
+  localSeedPortraitIndex,
+  type LocalSeedPortrait,
+} from './local-seed-visuals.js';
 
 type Credential = { username: string; temporaryPassword: string };
 type AccountRecord = {
@@ -87,7 +95,7 @@ class ApiSession {
   private readonly cookies = new Map<string, string>();
 
   async request<T>(
-    method: 'GET' | 'POST' | 'PATCH',
+    method: 'GET' | 'POST' | 'PATCH' | 'PUT',
     path: string,
     body?: unknown,
     csrf?: string,
@@ -120,9 +128,13 @@ class ApiSession {
     return (await response.json()) as T;
   }
 
-  async uploadPhoto(path: string, photo: Buffer, csrf: string): Promise<void> {
+  async uploadPhoto(
+    path: string,
+    photo: { buffer: Buffer; filename: string; mimeType: 'image/jpeg' | 'image/png' },
+    csrf: string,
+  ): Promise<void> {
     const form = new FormData();
-    form.set('photo', new Blob([photo], { type: 'image/png' }), 'synthetic-avatar.png');
+    form.set('photo', new Blob([photo.buffer], { type: photo.mimeType }), photo.filename);
     const response = await fetch(`${apiOrigin}${path}`, {
       method: 'POST',
       headers: {
@@ -170,11 +182,13 @@ async function main() {
       suppliers: [],
     };
     const tmmin = await prepareTmmin(manifest);
+    const portraits = await loadLocalSeedPortraits();
     const runtimes: SupplierRuntime[] = [];
     for (const plan of createLocalSeedPlan()) {
-      const runtime = await provisionSupplier(plan, tmmin, manifest);
+      const runtime = await provisionSupplier(plan, tmmin, manifest, portraits);
       await seedHistorical(runtime);
       await seedLive(runtime);
+      await seedCanvasLayouts(runtime);
       runtimes.push(runtime);
     }
     await waitForOutbox(prisma);
@@ -277,6 +291,7 @@ async function provisionSupplier(
   plan: SupplierSeedPlan,
   tmmin: SessionClient,
   manifest: Manifest,
+  portraits: LocalSeedPortrait[],
 ): Promise<SupplierRuntime> {
   const created = await tmmin.api.request<{
     supplier: Resource & { code: string };
@@ -442,17 +457,25 @@ async function provisionSupplier(
       await assignDefaultMp(admin, jobs[lineIndex]![jobIndex]!, mps[lineIndex * 4 + jobIndex]!);
     }
   }
-  const photoMemberIds = [
+  const rolePhotoMemberIds = [
     ...supervisors.map(({ memberId }) => memberId),
     ...leaders.map(({ memberId }) => memberId),
     ...qcs.map(({ memberId }) => memberId),
-    ...mps.map(({ id }) => id),
   ];
-  for (let index = 0; index < 8; index += 1) {
+  for (const memberId of rolePhotoMemberIds) {
     const photo = await syntheticAvatar(plan.accent);
     await admin.api.uploadPhoto(
-      `/api/v1/supplier/master-data/members/${photoMemberIds[index]!}/photo`,
-      photo,
+      `/api/v1/supplier/master-data/members/${memberId}/photo`,
+      { buffer: photo, filename: 'synthetic-avatar.png', mimeType: 'image/png' },
+      admin.csrf,
+    );
+  }
+  for (let mpIndex = 0; mpIndex < 12; mpIndex += 1) {
+    const portrait = portraits[localSeedPortraitIndex(mpIndex)];
+    if (!portrait) throw new Error('Local seed portrait catalog is incomplete.');
+    await admin.api.uploadPhoto(
+      `/api/v1/supplier/master-data/members/${mps[mpIndex]!.id}/photo`,
+      portrait,
       admin.csrf,
     );
   }
@@ -785,6 +808,23 @@ async function seedLive(runtime: SupplierRuntime) {
     await applyOutcome(runtime, lineIndex, created, record.outcome, leader);
   }
   void moved;
+}
+
+async function seedCanvasLayouts(runtime: SupplierRuntime) {
+  for (let lineIndex = 0; lineIndex < runtime.lines.length; lineIndex += 1) {
+    const document = createLocalSeedCanvasDocument(
+      runtime.plan,
+      lineIndex,
+      runtime.jobs[lineIndex]!,
+    );
+    await runtime.admin.api.request<{ document: BoardLayoutDocument; version: number }>(
+      'PUT',
+      `/api/v1/supplier/assignment-board/layouts/${runtime.lines[lineIndex]!.id}`,
+      { expectedVersion: null, document },
+      runtime.admin.csrf,
+      200,
+    );
+  }
 }
 
 async function createCrossLineMan(
@@ -1333,6 +1373,13 @@ async function verifySeed(prisma: PrismaClient) {
       unresolvedIssues,
       resolvedIssues,
       photos,
+      boardLayouts,
+      layoutAudits,
+      mpPortraitReuse,
+      sensitiveMembers,
+      sensitiveJobs,
+      sensitivePhotoPaths,
+      sensitiveHenkatens,
       shiftLoadStats,
       usageStats,
       timingStats,
@@ -1368,6 +1415,64 @@ async function verifySeed(prisma: PrismaClient) {
         where: { supplierId: supplier.id, status: 'RESOLVED' },
       }),
       prisma.memberPhoto.count({ where: { supplierId: supplier.id, state: 'CURRENT' } }),
+      prisma.lineBoardLayout.findMany({
+        where: { supplierId: supplier.id },
+        orderBy: { lineId: 'asc' },
+        include: {
+          line: {
+            select: {
+              shiftRuns: {
+                where: { status: 'ACTIVE' },
+                select: {
+                  workingAssignments: {
+                    where: { active: true, includedInPlan: true },
+                    select: { jobId: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      prisma.auditEvent.count({
+        where: {
+          supplierId: supplier.id,
+          action: 'BOARD_LAYOUT_CREATED',
+          resourceType: 'LineBoardLayout',
+        },
+      }),
+      prisma.$queryRaw<Array<{ checksum: string; count: number }>>`
+        SELECT p."fullChecksum" AS checksum, count(*)::int AS count
+        FROM "MemberPhoto" p
+        JOIN "Member" m ON m.id = p."memberId" AND m."supplierId" = p."supplierId"
+        WHERE p."supplierId" = ${supplier.id} AND p.state = 'CURRENT' AND m.role = 'MP'
+        GROUP BY p."fullChecksum"
+        ORDER BY p."fullChecksum"
+      `,
+      prisma.member.findMany({
+        where: { supplierId: supplier.id },
+        select: { fullName: true, registrationNumber: true },
+      }),
+      prisma.job.findMany({
+        where: { supplierId: supplier.id },
+        select: { name: true },
+      }),
+      prisma.memberPhoto.findMany({
+        where: { supplierId: supplier.id, state: 'CURRENT' },
+        select: { fullPath: true, thumbnailPath: true },
+      }),
+      prisma.henkaten.findMany({
+        where: { supplierId: supplier.id },
+        select: {
+          identifier: true,
+          creatorNameSnapshot: true,
+          cause: true,
+          detail: true,
+          affectedObject: true,
+          replacementObject: true,
+          withdrawalReason: true,
+        },
+      }),
       prisma.$queryRaw<Array<{ minimum: number; maximum: number; variants: number }>>`
         SELECT min(load)::int AS minimum, max(load)::int AS maximum,
                count(DISTINCT load)::int AS variants
@@ -1416,6 +1521,36 @@ async function verifySeed(prisma: PrismaClient) {
     const categories = Object.fromEntries(
       henkatenCategories.map(({ category, _count }) => [category, _count._all]),
     );
+    const forbiddenLayoutContent = [
+      ...sensitiveMembers.flatMap(({ fullName, registrationNumber }) => [
+        fullName,
+        registrationNumber,
+      ]),
+      ...sensitivePhotoPaths.flatMap(({ fullPath, thumbnailPath }) => [fullPath, thumbnailPath]),
+      ...sensitiveHenkatens.flatMap((henkaten) => Object.values(henkaten)),
+    ].filter((value): value is string => typeof value === 'string' && value.length > 0);
+    const validLayouts = boardLayouts.every((layout) => {
+      const parsed = boardLayoutDocumentSchema.safeParse(layout.document);
+      if (!parsed.success || layout.version !== 1 || layout.schemaVersion !== 1) return false;
+      const serialized = JSON.stringify(parsed.data);
+      if (forbiddenLayoutContent.some((value) => serialized.includes(value))) return false;
+      const layoutText = parsed.data.nodes
+        .filter((node) => node.type === 'TEXT')
+        .map(({ text }) => text);
+      if (sensitiveJobs.some(({ name }) => layoutText.includes(name))) return false;
+      const jobIds = parsed.data.nodes
+        .filter((node) => node.type === 'JOB_SLOT')
+        .map(({ jobId }) => jobId)
+        .sort();
+      const activeJobIds = layout.line.shiftRuns
+        .flatMap(({ workingAssignments }) => workingAssignments.map(({ jobId }) => jobId))
+        .sort();
+      return (
+        jobIds.length === 4 &&
+        new Set(jobIds).size === 4 &&
+        JSON.stringify(jobIds) === JSON.stringify(activeJobIds)
+      );
+    });
     if (
       lines !== 3 ||
       jobs !== 12 ||
@@ -1448,7 +1583,12 @@ async function verifySeed(prisma: PrismaClient) {
       activeReservations < 1 ||
       unresolvedIssues < 1 ||
       resolvedIssues < 1 ||
-      photos < 1
+      photos !== 19 ||
+      boardLayouts.length !== 3 ||
+      !validLayouts ||
+      layoutAudits !== 3 ||
+      mpPortraitReuse.length !== 4 ||
+      mpPortraitReuse.some(({ count }) => count !== 3)
     ) {
       throw new Error(
         `Post-seed invariant failed for ${supplier.code}: ${JSON.stringify({
@@ -1470,26 +1610,62 @@ async function verifySeed(prisma: PrismaClient) {
           unresolvedIssues,
           resolvedIssues,
           photos,
+          boardLayouts: boardLayouts.length,
+          validLayouts,
+          layoutAudits,
+          mpPortraitReuse,
         })}`,
       );
     }
   }
-  const [externalClients, ingestionEvents, externalProjections, pendingOutbox, failedOutbox] =
-    await Promise.all([
-      prisma.externalApiClient.count(),
-      prisma.externalIngestionEvent.count(),
-      prisma.externalHenkatenProjection.count(),
-      prisma.outboxEvent.count({ where: { processedAt: null, failedAt: null } }),
-      prisma.outboxEvent.count({ where: { failedAt: { not: null } } }),
-    ]);
+  const [
+    externalClients,
+    ingestionEvents,
+    externalProjections,
+    pushSubscriptions,
+    pushDeliveries,
+    boardLayoutTotal,
+    boardLayoutAuditTotal,
+    portraitReuseTotal,
+    pendingOutbox,
+    failedOutbox,
+  ] = await Promise.all([
+    prisma.externalApiClient.count(),
+    prisma.externalIngestionEvent.count(),
+    prisma.externalHenkatenProjection.count(),
+    prisma.pushSubscription.count(),
+    prisma.pushDelivery.count(),
+    prisma.lineBoardLayout.count(),
+    prisma.auditEvent.count({
+      where: { action: 'BOARD_LAYOUT_CREATED', resourceType: 'LineBoardLayout' },
+    }),
+    prisma.$queryRaw<Array<{ checksum: string; count: number }>>`
+      SELECT p."fullChecksum" AS checksum, count(*)::int AS count
+      FROM "MemberPhoto" p
+      JOIN "Member" m ON m.id = p."memberId" AND m."supplierId" = p."supplierId"
+      WHERE p.state = 'CURRENT' AND m.role = 'MP'
+      GROUP BY p."fullChecksum"
+      ORDER BY p."fullChecksum"
+    `,
+    prisma.outboxEvent.count({ where: { processedAt: null, failedAt: null } }),
+    prisma.outboxEvent.count({ where: { failedAt: { not: null } } }),
+  ]);
   if (
     externalClients !== 0 ||
     ingestionEvents !== 0 ||
     externalProjections !== 0 ||
+    pushSubscriptions !== 0 ||
+    pushDeliveries !== 0 ||
+    boardLayoutTotal !== 6 ||
+    boardLayoutAuditTotal !== 6 ||
+    portraitReuseTotal.length !== 4 ||
+    portraitReuseTotal.some(({ count }) => count !== 6) ||
     pendingOutbox !== 0 ||
     failedOutbox !== 0
   ) {
-    throw new Error('Post-seed invariant failed: External or unhealthy outbox state exists.');
+    throw new Error(
+      'Post-seed invariant failed: External, synthetic push, or unhealthy outbox state exists.',
+    );
   }
 }
 

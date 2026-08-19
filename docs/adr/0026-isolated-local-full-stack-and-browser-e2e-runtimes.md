@@ -85,6 +85,15 @@ MP can coexist with an assignment whose current state remains `ASSIGNED` until f
 Local runtime output reports the canonical `localhost` browser origins accepted by CORS/cookies;
 the numeric loopback origin remains appropriate only for readiness probes.
 
+The durable seed also provisions one saved Canvas v1 for every active line through the Hosted
+layout PUT endpoint used by Supplier Admin. NPM demonstrates the curated isometric family and GKI
+the simple 2D family, while process zones, arrows, labels, and required job slots remain
+deterministic. Four tracked, fictional ImageGen operator portraits are normalized to 768×1024 JPEG
+and reused by assigned-MP index modulo four. This gives every four-job line distinct faces while
+keeping the asset catalog deliberately small; reserve MPs still exercise initials fallback. The
+source portraits are copied only into the local developer image context and are not shipped in the
+production API or frontend images.
+
 ## Rationale
 
 Durable local data makes daily development practical. Per-journey database isolation makes browser
@@ -116,6 +125,12 @@ instead of a test-only substitute.
   seed baseline could be presented by code that is no longer in the working tree.
 - **Add a permanent External supplier to the seed for admin QA:** rejected because it would change
   the promised two-Hosted-supplier baseline and bypass real administration/governance workflows.
+- **Generate a unique portrait for every seeded MP:** rejected because four deliberately reused
+  fictional identities provide sufficient visual coverage without creating an unnecessary asset
+  inventory. Reuse is kept out of any one line so duplicate faces do not reduce board clarity.
+- **Insert saved layouts directly with Prisma:** rejected because the local seed must exercise
+  Hosted authorization, strict contracts, optimistic creation, audit, and outbox behavior through
+  the production API.
 
 ## Consequences
 
@@ -141,6 +156,11 @@ concerns.
   represented, weighted line/part usage, and dozens of event/resolution timing variants. Reseed
   preserves a test-database sentinel while rotating supplier IDs, credentials, and member-photo
   files.
+- The 2026-08-19 Canvas refinement passed both clean start and reseed with six version-1 layouts,
+  nineteen current photos per supplier, four MP portrait checksums reused three times per supplier
+  and six times globally, exact active-job parity, six layout audits, and a drained outbox. Browser
+  review covered 390×844, 768×1024, 1280×720, and 1672×941 with no document overflow; mobile stayed
+  read-only and both NPM isometric and GKI 2D compositions rendered as saved layouts.
 - The 2026-07-27 seeded application audit exercised Supplier Admin followed by a clean TMMIN Admin
   baseline at 1280×720 and wide desktop viewports. Database/API/UI triangulation found no seed
   defects and seven application/runtime defects; all were fixed with regression coverage. The

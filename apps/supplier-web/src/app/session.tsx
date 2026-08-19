@@ -13,6 +13,7 @@ import { ApiProblemError } from '@tmmin-henkaten/api-client';
 
 import { queryClient } from './query';
 import { setCsrfToken, setSessionExpiredHandler, supplierApi } from './api';
+import { unsubscribeBrowserPush } from './push-browser';
 
 type SessionStatus = 'loading' | 'anonymous' | 'authenticated';
 
@@ -84,12 +85,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         try {
           await supplierApi.logout();
         } finally {
+          await unsubscribeBrowserPush().catch(() => undefined);
           await clear();
         }
       },
       async changePassword(input) {
-        await supplierApi.changePassword(input);
-        await clear();
+        try {
+          await supplierApi.changePassword(input);
+        } finally {
+          await unsubscribeBrowserPush().catch(() => undefined);
+          await clear();
+        }
       },
       hasCapability: (capability) => session?.capabilities.includes(capability) ?? false,
       refresh,

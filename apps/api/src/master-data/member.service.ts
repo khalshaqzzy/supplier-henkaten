@@ -272,6 +272,10 @@ export class MemberService {
             version: { increment: 1 },
           },
         });
+        await transaction.pushSubscription.updateMany({
+          where: { userId: { in: ids }, status: 'ACTIVE' },
+          data: { status: 'REVOKED', revokedAt: new Date(), version: { increment: 1 } },
+        });
       }
       await this.audit.write(
         masterAudit(
@@ -437,6 +441,10 @@ async function revokeSessions(
   await transaction.userSession.updateMany({
     where: { userId, revokedAt: null },
     data: { revokedAt: new Date(), revocationReason: reason, version: { increment: 1 } },
+  });
+  await transaction.pushSubscription.updateMany({
+    where: { userId, status: 'ACTIVE' },
+    data: { status: 'REVOKED', revokedAt: new Date(), version: { increment: 1 } },
   });
 }
 

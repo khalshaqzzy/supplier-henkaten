@@ -13,19 +13,22 @@
   },
   "dependencies": {
     "@hookform/resolvers": "5.2.2",
+    "@tailwindcss/vite": "4.3.3",
     "@tanstack/react-query": "5.90.21",
     "@tmmin-henkaten/api-client": "workspace:*",
     "@tmmin-henkaten/contracts": "workspace:*",
     "@tmmin-henkaten/ui": "workspace:*",
-    "@tailwindcss/vite": "4.3.3",
     "@vitejs/plugin-react": "6.0.4",
     "lucide-react": "1.26.0",
+    "konva": "10.3.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-hook-form": "7.71.2",
+    "react-konva": "19.2.5",
     "react-router-dom": "7.18.1",
     "tailwindcss": "4.3.3",
     "vite": "8.1.5",
+    "workbox-window": "7.4.0",
     "zod": "4.4.3"
   },
   "devDependencies": {
@@ -38,6 +41,7 @@
     "jsdom": "29.1.1",
     "msw": "2.12.8",
     "typescript": "6.0.3",
+    "vite-plugin-pwa": "1.3.0",
     "vitest": "4.1.10"
   }
 }

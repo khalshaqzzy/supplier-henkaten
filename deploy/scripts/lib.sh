@@ -26,6 +26,11 @@ version_ge() {
   [[ "$(printf '%s\n%s\n' "${minimum}" "${current}" | sort -V | head -n 1)" == "${minimum}" ]]
 }
 
+resolve_addresses() {
+  local hostname="$1"
+  getent ahosts "${hostname}" 2>/dev/null | awk '{print $1}' | sort -u || true
+}
+
 compose_for() {
   local release_dir="$1"
   local runtime_env="$2"

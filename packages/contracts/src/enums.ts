@@ -47,6 +47,7 @@ export const capabilitySchema = z.enum([
   'TMMIN_HENKATEN_READ',
   'SUPPLIER_NOTIFICATION_READ',
   'SUPPLIER_BOARD_READ',
+  'SUPPLIER_BOARD_LAYOUT_MANAGE',
   'SUPPLIER_DASHBOARD_READ',
   'SUPPLIER_AUDIT_READ',
   'TMMIN_DASHBOARD_READ',
@@ -149,6 +150,7 @@ export const domainEventTypeSchema = z.enum([
   'EXTERNAL_INGESTION_ACCEPTED',
   'EXTERNAL_INGESTION_REJECTED',
   'EXTERNAL_PROJECTION_UPDATED',
+  'BOARD_LAYOUT_UPDATED',
 ]);
 export type DomainEventType = z.infer<typeof domainEventTypeSchema>;
 
@@ -174,5 +176,6 @@ export const publicErrorCodeSchema = z.enum([
   'IMMUTABLE_FIELD',
   'INVALID_IMAGE',
   'CHECKLIST_NOT_PUBLISHED',
+  'PUSH_SUBSCRIPTION_REQUIRED',
 ]);
 export type PublicErrorCode = z.infer<typeof publicErrorCodeSchema>;

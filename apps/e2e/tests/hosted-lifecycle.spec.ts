@@ -1,5 +1,5 @@
 import { AxeBuilder } from '@axe-core/playwright';
-import { expect, type Page, type TestInfo } from '@playwright/test';
+import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 
 import {
   createHostedFixture,
@@ -174,6 +174,103 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
   await expect(boardPage.getByText('Live')).toBeVisible();
   await expect(boardPage.getByText('Open Henkaten').locator('..').getByText('0')).toBeVisible();
   await captureSupplierVisuals(boardPage, 'assignment-board', testInfo);
+
+  await boardPage.getByLabel('Line dalam scope').selectOption(fixture.line.id);
+  await boardPage.getByRole('button', { name: 'Canvas' }).click();
+  const canvasRegion = boardPage.getByRole('region', { name: /^Canvas / });
+  await expect(canvasRegion).toBeVisible();
+  await expect(canvasRegion.locator('canvas')).toHaveCount(2);
+  await expect(canvasRegion.getByLabel('Legenda 4M')).toContainText('ManMachineMaterialMethod');
+  await expect(canvasRegion.getByText('Auto-layout belum disimpan')).toBeVisible();
+  await canvasRegion.getByRole('button', { name: 'Edit layout' }).click();
+  const canvasViewport = canvasRegion.locator('.board-canvas-viewport');
+  await expect(canvasRegion.getByRole('complementary', { name: 'Asset palette' })).toBeVisible();
+  await expect(
+    canvasRegion.getByRole('complementary', { name: 'Layers dan properties' }),
+  ).toBeVisible();
+  await expect.poll(() => canvasCamera(canvasViewport)).toMatchObject({ panActive: false });
+  const cameraBeforeObjectMove = await canvasCamera(canvasViewport);
+  const stageBox = await canvasRegion.locator('canvas').last().boundingBox();
+  expect(stageBox).not.toBeNull();
+  await boardPage.mouse.move(
+    stageBox!.x + cameraBeforeObjectMove.x + 250 * cameraBeforeObjectMove.scale,
+    stageBox!.y + cameraBeforeObjectMove.y + 320 * cameraBeforeObjectMove.scale,
+  );
+  await boardPage.mouse.down();
+  await boardPage.mouse.move(
+    stageBox!.x + cameraBeforeObjectMove.x + 290 * cameraBeforeObjectMove.scale,
+    stageBox!.y + cameraBeforeObjectMove.y + 350 * cameraBeforeObjectMove.scale,
+    { steps: 4 },
+  );
+  await boardPage.mouse.up();
+  await expect
+    .poll(() => canvasCamera(canvasViewport))
+    .toMatchObject({
+      x: cameraBeforeObjectMove.x,
+      y: cameraBeforeObjectMove.y,
+      scale: cameraBeforeObjectMove.scale,
+    });
+
+  await canvasRegion.getByRole('button', { name: 'Pan mode' }).click();
+  await expect(canvasRegion.getByRole('button', { name: 'Select mode' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  const cameraBeforePan = await canvasCamera(canvasViewport);
+  await boardPage.mouse.move(stageBox!.x + 6, stageBox!.y + 6);
+  await boardPage.mouse.down();
+  await boardPage.mouse.move(stageBox!.x + 46, stageBox!.y + 26, { steps: 4 });
+  await boardPage.mouse.up();
+  await expect.poll(async () => (await canvasCamera(canvasViewport)).x).not.toBe(cameraBeforePan.x);
+  await canvasRegion.getByRole('button', { name: 'Select mode' }).click();
+  await canvasViewport.focus();
+  await boardPage.keyboard.down('Space');
+  await expect(canvasViewport).toHaveAttribute('data-pan-active', 'true');
+  await boardPage.keyboard.up('Space');
+  await expect(canvasViewport).toHaveAttribute('data-pan-active', 'false');
+
+  await canvasRegion.getByRole('button', { name: 'Press / stamping · Isometric' }).first().click();
+  await expect(
+    canvasRegion.getByRole('button', { name: 'Press / stamping · Isometric' }),
+  ).toHaveCount(2);
+  await canvasRegion.getByRole('button', { name: 'Simpan' }).click();
+  await expect(canvasRegion.getByText('Layout v1')).toBeVisible();
+  const cameraBeforeFullscreen = await canvasCamera(canvasViewport);
+  await canvasRegion.getByRole('button', { name: 'Fullscreen', exact: true }).click();
+  await expect(canvasRegion.getByRole('button', { name: 'Keluar fullscreen' })).toBeVisible();
+  await expect
+    .poll(async () => (await canvasCamera(canvasViewport)).scale)
+    .toBeGreaterThan(cameraBeforeFullscreen.scale);
+  const fullscreenBox = await canvasRegion.boundingBox();
+  expect(fullscreenBox?.width ?? 0).toBeGreaterThanOrEqual(1_275);
+  expect(fullscreenBox?.height ?? 0).toBeGreaterThanOrEqual(715);
+  await canvasRegion.getByRole('button', { name: 'Keluar fullscreen' }).click();
+  await expect(canvasRegion.getByRole('button', { name: 'Fullscreen', exact: true })).toBeVisible();
+  await expect
+    .poll(async () => (await canvasCamera(canvasViewport)).scale)
+    .toBeCloseTo(cameraBeforeFullscreen.scale, 4);
+  const savedCanvas = await get<{
+    source: string;
+    version: number;
+    canEdit: boolean;
+    document: {
+      nodes: Array<{
+        type: string;
+        jobId?: string;
+        transform: { x: number; y: number };
+      }>;
+    };
+  }>(supervisor.context.request, `/api/v1/supplier/assignment-board/layouts/${fixture.line.id}`);
+  expect(savedCanvas).toMatchObject({ source: 'SAVED', version: 1, canEdit: false });
+  expect(
+    savedCanvas.document.nodes.find(
+      (node) => node.type === 'JOB_SLOT' && node.jobId === fixture.job.id,
+    )?.transform,
+  ).not.toMatchObject({ x: 100, y: 100 });
+  await captureSupplierVisuals(boardPage, 'assignment-board-canvas', testInfo);
+
+  await boardPage.getByRole('button', { name: 'Default' }).click();
+  await expect(boardPage.locator('.board-job')).toHaveCount(1);
 
   const invalid = await leader.context.request.post(
     `${runtime.apiOrigin}/api/v1/supplier/henkatens`,
@@ -464,6 +561,15 @@ function createHenkaten(
   );
 }
 
+async function canvasCamera(viewport: Locator) {
+  return viewport.evaluate((element) => ({
+    x: Number(element.getAttribute('data-camera-x')),
+    y: Number(element.getAttribute('data-camera-y')),
+    scale: Number(element.getAttribute('data-camera-scale')),
+    panActive: element.getAttribute('data-pan-active') === 'true',
+  }));
+}
+
 async function captureSupplierPage(
   context: Awaited<ReturnType<typeof loginRole>>['context'],
   url: string,
@@ -490,17 +596,55 @@ async function captureSupplierPage(
 }
 
 async function captureSupplierVisuals(page: Page, slug: string, testInfo: TestInfo) {
-  if (process.env.E2E_VISUAL_CAPTURE !== '1') return;
+  if (
+    process.env.E2E_VISUAL_CAPTURE !== '1' &&
+    slug !== 'supplier-overview' &&
+    slug !== 'assignment-board-canvas'
+  )
+    return;
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 1024, height: 768 },
+    { width: 1440, height: 900 },
     { width: 1672, height: 941 },
     { width: 1280, height: 720 },
   ]) {
     await page.setViewportSize(viewport);
     await page.evaluate(() => window.scrollTo(0, 0));
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    const overflow = await page.evaluate((viewportWidth) => {
+      const scrollWidth = document.documentElement.scrollWidth;
+      const offenders = [...document.querySelectorAll<HTMLElement>('body *')]
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            element: `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}${[
+              ...element.classList,
+            ]
+              .map((name) => `.${name}`)
+              .join('')}`,
+            left: Math.round(rect.left * 10) / 10,
+            right: Math.round(rect.right * 10) / 10,
+          };
+        })
+        .filter(({ left, right }) => left < -0.5 || right > viewportWidth + 0.5)
+        .slice(0, 10);
+      return { scrollWidth, offenders };
+    }, viewport.width);
+    expect(overflow.scrollWidth, JSON.stringify(overflow.offenders)).toBeLessThanOrEqual(
       viewport.width,
     );
+    const menu = page.getByRole('button', { name: 'Buka navigasi' });
+    if (viewport.width < 1280) {
+      await expect(menu).toBeVisible();
+      const menuBox = await menu.boundingBox();
+      expect(menuBox?.width ?? 0).toBeGreaterThanOrEqual(44);
+      expect(menuBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+    } else {
+      await expect(menu).toBeHidden();
+      await expect(page.getByRole('navigation', { name: 'Navigasi utama' })).toBeVisible();
+    }
     await page.screenshot({
       path: testInfo.outputPath(`${slug}-${viewport.width}x${viewport.height}.png`),
       animations: 'disabled',
@@ -520,7 +664,7 @@ async function captureSupplierVisuals(page: Page, slug: string, testInfo: TestIn
         animations: 'disabled',
       });
     }
-    if (viewport.width === 1280) {
+    if (slug === 'supplier-overview' || slug === 'assignment-board-canvas') {
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     }
   }

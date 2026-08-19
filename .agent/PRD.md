@@ -3,7 +3,7 @@
 | Atribut | Nilai |
 |---|---|
 | Status dokumen | **Approved product contract for v1 planning** |
-| Status implementasi | **Phase 0-10 implemented; Phase 11+ planned** |
+| Status implementasi | **Phase 0-14 implemented; Phase 15 in progress** |
 | Versi dokumen | 1.0 |
 | Tanggal | 23 Juli 2026 |
 | Product owner | TMMIN |
@@ -922,6 +922,47 @@ Approved Henkaten pada Shift Run aktif tetap terlihat sebagai active change samp
 
 Process difficulty, skill level, health, attendance, dan schedule tidak boleh muncul.
 
+### 16.6 Customizable Line Canvas
+
+- Assignment Board default tetap menjadi canonical fallback, termasuk untuk mobile dan kebutuhan
+  accessibility. Canvas dipilih eksplisit melalui toggle `Default | Canvas` setelah satu line
+  dipilih.
+- Layout Canvas shared per supplier/line dan tidak mengikuti user, pergantian Line Leader, atau
+  Shift Run. Layout hanya menyimpan job ID, geometri, style allowlist, lock/z-index, dan curated
+  machine asset key; nama, foto, nomor registrasi, assignment state, serta data Henkaten selalu
+  diambil dari Working Assignment saat ini.
+- Setiap active job wajib memiliki tepat satu `JOB_SLOT`. Job baru direkonsiliasi ke overflow grid,
+  job inactive dihapus dari runtime layout, sedangkan perpindahan MP, perubahan foto, vacancy,
+  reservation, conflict, dan perubahan 4M tidak boleh mengubah koordinat card.
+- Card memakai format vertikal dan menampilkan foto portrait MP sebagai elemen visual dominan,
+  dengan initials fallback, nama job, nama MP, registration number, state text/icon/border, dan dot
+  4M. Legend hanya berisi dot Man, Machine, Material, dan Method; status assignment tidak memiliki
+  legend terpisah.
+- Editor desktop dan tablet landscape menyediakan palette, Layers/Properties DOM, pan/zoom,
+  fit/fullscreen, grid/snapping, 50-step undo/redo, numeric transforms, keyboard movement,
+  lock/reorder, reset, dan explicit save. Pan wajib dapat dipilih melalui Hand mode dan diaktifkan
+  sementara dengan Space tanpa memindahkan node; zoom berpusat pada pointer/viewport. Mobile hanya
+  baca dengan pan/zoom bila Canvas dibuka.
+- Stage mengikuti ukuran viewport Canvas aktual pada kedua sumbu. Auto-fit wajib menampilkan dan
+  memusatkan seluruh logical canvas meskipun skala yang dibutuhkan di bawah batas zoom manual.
+  Perubahan node, save, dan masuk ulang ke edit tidak boleh mengubah kamera; penyempitan viewport
+  mempertahankan pusat kerja atau menurunkan fit bila seluruh canvas sebelumnya terlihat.
+- Fullscreen mencakup toolbar dan panel editor, memakai seluruh sisa ruang horizontal/vertikal,
+  melakukan fit setelah transisi browser selesai, dan memulihkan kamera non-fullscreen saat keluar.
+  Kamera bersifat state UI per line selama page session dan tidak disimpan di layout/server.
+- `JOB_SLOT` dapat dipindah dan di-resize tetapi tidak dapat dihapus, diduplikasi, atau dirotasi.
+  Rectangle, outline, arrow, text, dan curated machine assets dapat dipindah, resize, rotate,
+  duplicate, delete, lock, dan reorder.
+- Curated machine catalog menyediakan dua visual family untuk dua belas tipe equipment yang sama:
+  polished soft-isometric cutout dan ikon 2D simple/generic. Keduanya memakai transparent alpha,
+  stable asset key terpisah, serta label style yang eksplisit di palette dan Layers panel.
+- Supplier Admin dapat mengubah seluruh layout line; active Line Leader hanya line aktifnya.
+  Supervisor, QC, role lain, serta TMMIN support hanya membaca. Mutation tetap Hosted-only dan
+  tidak mengubah assignment atau lifecycle Henkaten.
+- Save memakai optimistic layout version dan menghasilkan audit redacted plus outbox invalidation
+  tanpa PII. Konflik mempertahankan local draft sampai pengguna memilih mempertahankan draft atau
+  memuat versi authoritative terbaru.
+
 ---
 
 ## 17. Dashboard dan Reporting
@@ -1013,11 +1054,13 @@ Dashboard v1 tidak menyediakan bulk export.
 
 ---
 
-## 18. In-App Notification
+## 18. Notification Center dan Supplier Web Push
 
 ### 18.1 Channel
 
-V1 hanya menyediakan notification center/in-app. Tidak ada email, SMS, mobile push, atau outbound webhook.
+Notification center tetap source of truth dan tersedia untuk seluruh role yang berhak. Supplier web
+menambahkan standards-based Web Push sebagai best-effort accelerator; TMMIN web, email, SMS, native
+mobile push, dan outbound webhook tidak termasuk v1.
 
 ### 18.2 Event Minimum
 
@@ -1045,9 +1088,43 @@ V1 hanya menyediakan notification center/in-app. Tidak ada email, SMS, mobile pu
 - Unauthorized deep-link tetap ditolak backend.
 - Duplicate domain event tidak boleh membuat duplicate notification.
 
-### 18.4 Accepted Limitation
+### 18.4 Supplier Web Push
 
-Pengguna yang offline tidak menerima critical warning sampai membuka aplikasi. Ini adalah accepted operational risk v1.
+- Push hanya dibuat setelah durable in-app Notification berhasil dibuat.
+- Push-eligible: approval pending, vacancy/Assignment Issue, reservation/conflict yang membutuhkan
+  tindakan, Start Shift blocked, emergency override, dan account/security event relevan.
+- Approved, Rejected, Cancelled, dan outcome rutin tetap in-app saja.
+- Setiap browser installation memiliki random stable `installationId`; raw endpoint dan encryption
+  keys tidak boleh muncul pada response status, log, atau audit.
+- Payload lock-screen hanya boleh memuat notification ID/kind, Henkaten identifier,
+  category/status, line, job, safe title/body, tag, dan validated same-origin deep link. Nama/nomor
+  registrasi MP, komentar, evidence checklist, credential, token, endpoint, dan secret dilarang.
+- Accepted oleh vendor push service bukan bukti notifikasi ditampilkan perangkat.
+- Duplicate Notification + subscription tidak boleh membuat duplicate delivery.
+- `404/410` menonaktifkan subscription; network error, `429`, dan `5xx` memakai bounded retry dan
+  `Retry-After`; validation/auth/config error menjadi permanent failure.
+- Endpoint wajib HTTPS port standar, tanpa credential, dan hostname harus cocok exact/suffix
+  allowlist vendor untuk mencegah SSRF.
+- Notification click membuka same-origin deep link melalui login dan capability checks normal,
+  tidak otomatis menandai Notification read.
+
+### 18.5 Device Requirement
+
+- Line Leader NORMAL wajib memiliki active subscription pada installation yang sedang digunakan.
+- Sebelum compliant, frontend dan backend hanya mengizinkan activation/config subscription,
+  session, change-password, Account/help, dan Logout; endpoint operasional mengembalikan
+  `PUSH_SUBSCRIPTION_REQUIRED`.
+- Browser unsupported atau permission `denied` tidak melemahkan gate; user diarahkan mengganti
+  browser/perangkat atau memperbaiki site settings.
+- Supplier Admin, Supervisor, dan QC opt-in per installation tanpa workflow blocking.
+- Logout, password change/reset, user/supplier deactivation, role change, source-mode cutover,
+  preparation cancellation, dan account recovery menonaktifkan subscription terkait.
+
+### 18.6 Accepted Limitation
+
+Web Push bersifat best-effort dan dapat terlambat/tidak ditampilkan oleh OS atau browser.
+Notification center tetap authoritative; push tidak menjadi approval/delivery guarantee dan
+kegagalan push tidak mengubah lifecycle Henkaten.
 
 ---
 
@@ -1078,6 +1155,8 @@ Pengguna yang offline tidak menerima critical warning sampai membuka aplikasi. I
 | ApprovalDecision | Decision route Supervisor atau QC. |
 | MPReservation | Lock replacement MP saat Man Henkaten Open. |
 | Notification | Per-user in-app notification. |
+| PushSubscription | Per-user/per-installation Web Push endpoint dan key material dengan lifecycle/version. |
+| PushDelivery | Idempotent delivery attempt per Notification + subscription dengan bounded retry state. |
 | ExternalApiClient | Hashed credential metadata, scopes, rotation state, IP allowlist. |
 | ExternalIngestionEvent | Raw immutable external request/event dan processing result. |
 | ExternalHenkatenProjection | Current monitoring projection data eksternal. |
@@ -1410,6 +1489,7 @@ Endpoints operasional minimum secara capability:
 - Assignment Board;
 - dashboard queries;
 - notification read/unread;
+- supplier push config/subscription lifecycle;
 - audit timeline;
 - external credential management;
 - external ingestion.
@@ -1445,15 +1525,42 @@ Supplier Admin melihat seluruh item. Role lain hanya melihat item yang relevan.
 - Users/Administration
 - System Status
 
-### 22.3 Desktop Scope
+### 22.3 Responsive Supplier Scope dan Browser Support
 
-- Acceptance target minimum viewport 1280×720.
-- Workflow penuh tidak wajib usable pada tablet atau mobile.
-- Mobile/tablet dapat menampilkan unsupported viewport message.
-- Supported browser: current dan previous major release Chrome dan Edge.
+- Seluruh workflow Supplier, termasuk Hosted Preparation, wajib usable pada mobile `360–767px`,
+  tablet `768–1279px`, dan desktop `>=1280px`, portrait maupun landscape.
+- Desktop mempertahankan persistent/collapsible sidebar, topbar, dense table, dashboard, dan board
+  composition yang ada. Responsive adaptation dibatasi di bawah `1280px`.
+- Mobile memakai compact sticky header dan accessible navigation drawer; tablet memakai collapsed
+  rail/drawer. Bell, account, logout, unread badge, skip-link, focus restoration tetap tersedia.
+- Filter/action stack atau collapse; form dua kolom menjadi satu; mobile list memiliki card-row
+  representation dan tablet table tetap scroll-contained. Tidak boleh ada document-level
+  horizontal overflow atau clipped primary action.
+- Assignment Board mobile memakai line selector + single-column job cards; tablet memakai adaptive
+  grid. Dense assignment editor memakai job card dan full-width context sheet.
+- Dialog/sheet full-screen pada mobile; chart, facts, stats, timeline, dan approval route memakai
+  adaptive grid tanpa kehilangan informasi.
+- Minimum touch target `44×44px`; desktop keyboard support tetap wajib.
+- Supported: current dan previous major Chrome/Edge pada desktop dan Android, serta Home Screen PWA
+  pada iOS/iPadOS 16.4+. Safari browser tab di iOS tidak dianggap push-capable sebelum install.
 - Internet Explorer tidak didukung.
 
-### 22.4 Accessibility
+### 22.4 Supplier PWA dan Offline Policy
+
+- Supplier web installable sebagai `standalone` PWA dengan stable app ID/root scope/start URL,
+  brand icons 192/512/maskable dan Apple touch icon.
+- Custom TypeScript service worker menggunakan `injectManifest` agar precache, update, push, dan
+  click handler berada dalam satu worker.
+- Hanya hashed JS/CSS/font, icons, dan offline status page yang diprecache. `/api/**`, auth/session,
+  member photo, dan seluruh user/domain data selalu network-only.
+- Navigation network-first dengan offline fallback. Tidak ada IndexedDB draft, background sync,
+  queued mutation, ataupun offline domain data.
+- Offline status dan retry harus jelas. Worker baru ditawarkan setelah ready dan tidak boleh
+  memotong form/mutation aktif; activation terjadi melalui gesture user.
+- Service worker, manifest, dan HTML memakai non-stale cache policy; hashed assets immutable. CSP
+  mengizinkan `worker-src 'self'` dan `manifest-src 'self'`.
+
+### 22.5 Accessibility
 
 - Semua fungsi dapat dijalankan dengan keyboard pada desktop.
 - Visible focus wajib.
@@ -1463,7 +1570,7 @@ Supplier Admin melihat seluruh item. Role lain hanya melihat item yang relevan.
 - Kontras mengikuti WCAG 2.1 AA untuk text dan control utama.
 - Board item memiliki accessible name yang merangkum line/job/MP/change state.
 
-### 22.5 Empty, Loading, Error, dan Stale States
+### 22.6 Empty, Loading, Error, dan Stale States
 
 Setiap screen wajib memiliki:
 
@@ -2062,6 +2169,23 @@ Scenario minimum:
 - [ ] Three-domain smoke/readiness checks lulus.
 - [ ] Accepted critical risks ditampilkan di release readiness.
 
+### 32.10 Responsive Supplier PWA dan Push
+
+- [ ] Seluruh role, navigation group, dan major supplier workflow lulus pada 390×844, 768×1024,
+  1024×768, 1280×720, dan existing wide desktop tanpa document-level overflow/clipped action.
+- [ ] Desktop `>=1280px` mempertahankan shell, density, dan workflow composition existing.
+- [ ] Touch target, focus/keyboard, status non-color-only, Axe, dan deterministic screenshots lulus.
+- [ ] Manifest/installability, worker registration/update, offline fallback, dan cache exclusions
+  API/photo/session lulus.
+- [ ] Push permission hanya diminta setelah explicit gesture; iOS/iPadOS memberi Home Screen guidance.
+- [ ] Line Leader diblokir frontend dan backend sebelum installation compliant dan usable penuh
+  sesudahnya; role lain tetap opt-in.
+- [ ] Subscription tenant/user isolation, shared-browser reassignment, multi-device idempotency,
+  revocation paths, concurrent claims, retry classification, SSRF allowlist, payload redaction, dan
+  notification-click auth/capability checks lulus.
+- [ ] Android Chrome/Edge dan iPhone/iPad Home Screen staging rehearsal membuktikan foreground,
+  background, app-closed, granted/denied/reset, logout, expiry, dan delayed-delivery behavior.
+
 ---
 
 ## 33. Success Metrics
@@ -2097,11 +2221,10 @@ Metrik adoption, cycle time approval, reject rate, dan aging dipantau melalui da
 - material inventory/procurement;
 - quality inspection execution di luar Henkaten checklist;
 - TMMIN QC × production integration;
-- email, SMS, push, Slack, Teams, atau webhook notification;
+- email, SMS, native push, Slack, Teams, atau webhook notification;
 - bulk CSV/Excel import/export;
 - document/photo attachment pada Henkaten selain member photo;
 - native mobile app;
-- full tablet/mobile responsive workflow;
 - AI/ML/vector search;
 - supplier external assignment board di TMMIN;
 - hosted approval bagi supplier External;
@@ -2122,11 +2245,13 @@ Metrik adoption, cycle time approval, reject rate, dan aging dipantau melalui da
 | Single VM adalah single point of failure | Critical | Accepted | Health/readiness, restart policy, observability; bukan HA. |
 | Auto production deploy tanpa approval | High | Accepted | Mandatory CI/security/smoke checks dan code rollback. |
 | DB migration gagal tanpa backup | Critical | Accepted | Expand/contract, forward-only, CI migration tests; recovery tidak tersedia. |
-| In-app-only alert tidak menjangkau user offline | High | Accepted | Persistent notification, dashboard aging; external channels deferred. |
+| Vendor/OS Web Push terlambat atau tidak tampil | High | Mitigated | Persistent notification center authoritative, bounded retry, delivery metrics; push bukan guarantee. |
 | Permanent PII retention | High | Open governance dependency | Least privilege, no hard delete, legal/privacy approval sebelum go-live. |
 | Satu Supplier Admin menjadi operational bottleneck | Medium | Accepted | TMMIN reset/replacement capability; multi-admin deferred. |
 | CRUD-only onboarding lambat untuk 300 member/500 job | Medium | Accepted | Clear forms, validation, progressive setup; bulk import deferred. |
-| Desktop-only membatasi shop-floor device | Medium | Accepted | Minimum desktop viewport; tablet/mobile deferred. |
+| Responsive dense workflow menyembunyikan konteks/action | High | Mitigated | Locked breakpoint patterns, no-overflow/action checks, role matrix, real-device rehearsal; desktop regression retained. |
+| Line Leader tidak dapat bekerja karena permission/browser push | High | Mitigated | Explicit activation guidance, supported-browser matrix, per-installation status/troubleshooting, backend exempt activation routes. |
+| Service worker lama menahan release atau mutation | High | Mitigated | Non-stale HTML/manifest/worker headers, prompted activation, network-only mutation/data, recovery runbook. |
 | Cross-line Man cascade menciptakan vacancy baru | High | Mitigated | Reservation, Assignment Issue, hard gate, notification, transaction. |
 | External supplier mengirim data tidak lengkap/tidak benar | High | Mitigated | Schema, versioning, validation, attestation/source badge, ingestion health. |
 | Freeform field mengandung PII/secret | Medium | Partially mitigated | Documentation, length/schema validation, access control, no secret logging. |
@@ -2143,6 +2268,8 @@ Production launch membutuhkan:
 - GitHub Actions secrets;
 - Caddy email;
 - database/runtime secrets;
+- stable environment-specific VAPID key pair/contact subject dan approved push endpoint allowlist;
+- Android Chrome/Edge dan iPhone/iPad iOS/iPadOS 16.4+ staging devices;
 - TMMIN account bootstrap;
 - security/privacy approval untuk permanent hosted PII retention;
 - acceptance bahwa tidak ada backup/recovery;
@@ -2170,6 +2297,8 @@ V1 siap dirilis bila:
 10. operational owner untuk incident/deployment tersedia;
 11. tidak ada unresolved Critical/High security finding;
 12. production deployment dan rollback procedure telah direhearsal pada staging.
+13. responsive matrix, real-device push, service-worker recovery, dan Supplier Line Leader
+    acceptance telah lulus.
 
 ---
 
@@ -2189,14 +2318,14 @@ Ringkasan keputusan yang tidak boleh ditafsirkan ulang saat implementasi:
 - checklist per kategori 4M dan berversi;
 - external PII diminimalkan;
 - satu source mode aktif per supplier;
-- notification in-app saja;
+- notification center authoritative dengan best-effort Supplier Web Push;
 - tidak ada MFA;
 - permanent logical retention;
 - tidak ada backup/recovery/RPO/RTO/HA;
 - staging dan production memakai VM terpisah;
 - baseline kapasitas Compact;
 - master data CRUD individual tanpa bulk import/export;
-- desktop-only;
+- Supplier responsive mobile/tablet/desktop; TMMIN tetap desktop-only;
 - production deploy otomatis dari `main`;
 - supplier login memakai Supplier Code + Username;
 - correction memakai Withdraw + Clone;

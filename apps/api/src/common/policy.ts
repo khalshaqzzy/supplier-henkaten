@@ -6,6 +6,7 @@ import type { Capability } from '@tmmin-henkaten/contracts';
 
 import type { ContextRequest, RequestPrincipal } from './request-context.js';
 import { ProblemException } from './problem.js';
+import { PushSubscriptionService } from '../push/push.service.js';
 
 const POLICY_KEY = 'route-policy';
 type RoutePolicy =
@@ -50,6 +51,7 @@ export const CAPABILITIES: Readonly<Record<RequestPrincipal['role'], ReadonlySet
     'SUPPLIER_APPROVAL_REROUTE',
     'SUPPLIER_NOTIFICATION_READ',
     'SUPPLIER_BOARD_READ',
+    'SUPPLIER_BOARD_LAYOUT_MANAGE',
     'SUPPLIER_DASHBOARD_READ',
     'SUPPLIER_AUDIT_READ',
   ]),
@@ -72,6 +74,7 @@ export const CAPABILITIES: Readonly<Record<RequestPrincipal['role'], ReadonlySet
     'SUPPLIER_HENKATEN_WITHDRAW',
     'SUPPLIER_NOTIFICATION_READ',
     'SUPPLIER_BOARD_READ',
+    'SUPPLIER_BOARD_LAYOUT_MANAGE',
     'SUPPLIER_DASHBOARD_READ',
     'SUPPLIER_AUDIT_READ',
   ]),
@@ -89,9 +92,12 @@ export const CAPABILITIES: Readonly<Record<RequestPrincipal['role'], ReadonlySet
 
 @Injectable()
 export class RoutePolicyGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly push: PushSubscriptionService,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const policy = this.reflector.getAllAndOverride<RoutePolicy>(POLICY_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -119,6 +125,23 @@ export class RoutePolicyGuard implements CanActivate {
         code: 'FORBIDDEN',
         title: 'Password change required',
         detail: 'The temporary password must be changed before using this capability.',
+      });
+    }
+    const pushActivationAllowed =
+      request.path.startsWith('/api/v1/supplier/push/') ||
+      request.path.startsWith('/api/v1/supplier/push-subscriptions') ||
+      request.path.endsWith('/logout') ||
+      request.path.endsWith('/session') ||
+      request.path.endsWith('/change-password');
+    if (
+      !pushActivationAllowed &&
+      !(await this.push.isCompliant(principal, this.push.installationId(request)))
+    ) {
+      throw new ProblemException({
+        status: 428,
+        code: 'PUSH_SUBSCRIPTION_REQUIRED',
+        title: 'Push notification required',
+        detail: 'Line Leader must enable push notification on this device before continuing.',
       });
     }
     if (policy.kind === 'authenticated') return true;

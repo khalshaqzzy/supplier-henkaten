@@ -140,6 +140,11 @@ lockfile audit additionally detected patched advisories affecting `undici 7.28.0
 and `brace-expansion 5.0.9`. Clean-worktree Trivy filesystem, `pnpm audit`, production-like
 acceptance, and all five rebuilt runtime image scans passed without adding an exception.
 
+On 2026-08-18, PR CI run `32101378423` detected Go stdlib vulnerabilities (CVE-2026-33818, CVE-2026-39821,
+CVE-2026-56853, CVE-2026-56858, CVE-2026-56859, CVE-2026-56860, CVE-2026-56862) in the Go 1.25.12
+stdlib of the custom Caddy binary. The builder base image was updated to `golang:1.25.13-alpine@sha256:1e0126852075c9c60731c8ba49088448b91f63e2aed97ca9d1a9791622a05946`
+with `go mod tidy` dependency resolution, restoring clean Trivy scans across all runtime images without exceptions.
+
 The production-like stack passed exact-SHA API readiness and both `/release.json` checks,
 three-domain Host routing, supplier SPA deep-link fallback, same-origin session and SSE routing,
 surface-specific CSP/HSTS/anti-framing/nosniff policy, removal of `Server`/`Via`, non-root runtime
@@ -150,6 +155,20 @@ success/failure, lock behavior (mandatory on Ubuntu CI), and five-release retent
 
 Remote DNS/TLS, actual GitHub Environment deployment, race rehearsal, and controlled staging
 rollback still require the bootstrapped VM. Therefore 15.9 and 15.11 remain incomplete.
+
+On 2026-08-19, staging run `32104023080` passed every application and release-candidate gate but
+the remote deployment exited with status 2 after runtime validation. Direct VM reproduction showed
+that all three required staging hostnames lacked public DNS answers. The Cloudflare zone contained
+malformed records with `qd-tmmin.site` duplicated in the owner name. Correct DNS-only A records were
+created for the supplier, TMMIN, and API hostnames, each targeting `34.177.111.165`. The shared
+resolver now converts `getent` lookup failure into an empty result so preflight emits its explicit
+DNS/host mismatch diagnostic instead of being terminated by `set -euo pipefail`. A regression test
+covers the status-2 resolver path. Unused BuildKit cache was also pruned after the VM was found with
+only about 5 GiB free, reclaiming 16.04 GB without touching active containers or persistent data.
+The same verification refreshed Trivy's vulnerability database and surfaced CVE-2026-14456 in
+the distroless OpenSSL package. Debian publishes no fixed version and marks the equivalent Debian
+13 fix deferred. Because the issue requires an OpenSSL QUIC server and this API exposes only Node.js
+HTTP over TCP behind Caddy, the exact identifier has a registered exception expiring 2026-09-30.
 
 ## Follow-up
 

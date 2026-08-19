@@ -18,7 +18,25 @@ describe('application configuration', () => {
     expect(config.dbPoolMax).toBe(10);
     expect(config.outboxBatchSize).toBe(50);
     expect(config.realtimePollMs).toBe(1_000);
+    expect(config.pushEnabled).toBe(false);
+    expect(config.pushDeliveryMaxAttempts).toBe(5);
     expect(config.argon2MemoryKib).toBe(19_456);
+  });
+
+  it('requires complete VAPID configuration when push is enabled', () => {
+    expect(() => loadAppConfig({ ...baseline, PUSH_ENABLED: 'true' })).toThrow();
+    expect(
+      loadAppConfig({
+        ...baseline,
+        PUSH_ENABLED: 'true',
+        PUSH_VAPID_PUBLIC_KEY: 'A'.repeat(64),
+        PUSH_VAPID_PRIVATE_KEY: 'B'.repeat(32),
+        PUSH_VAPID_SUBJECT: 'mailto:push@example.com',
+      }).pushEnabled,
+    ).toBe(true);
+    expect(() =>
+      loadAppConfig({ ...baseline, PUSH_ENDPOINT_HOSTS: '127.0.0.1,https://push.example.com' }),
+    ).toThrow();
   });
 
   it('bounds realtime polling below the observable propagation target', () => {

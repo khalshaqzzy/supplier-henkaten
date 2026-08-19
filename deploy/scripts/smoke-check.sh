@@ -24,6 +24,11 @@ fetch() {
 supplier_release="$(fetch "${SUPPLIER_ORIGIN}/release.json")"
 tmmin_release="$(fetch "${TMMIN_ORIGIN}/release.json")"
 fetch "${SUPPLIER_ORIGIN}/" | grep -F '<div id="root">' >/dev/null
+supplier_manifest="$(fetch "${SUPPLIER_ORIGIN}/manifest.webmanifest")"
+fetch "${SUPPLIER_ORIGIN}/sw.js" | grep -F 'offline.html' >/dev/null
+fetch "${SUPPLIER_ORIGIN}/icons/icon-192.png" >/dev/null
+fetch "${SUPPLIER_ORIGIN}/icons/icon-512.png" >/dev/null
+jq -e '.id == "/" and .start_url == "/" and .scope == "/" and .display == "standalone"' <<<"${supplier_manifest}" >/dev/null
 fetch "${TMMIN_ORIGIN}/" | grep -F '<div id="root">' >/dev/null
 fetch "${API_ORIGIN}/health" | jq -e --arg sha "${RELEASE_SHA}" '.status == "ok" and .releaseSha == $sha' >/dev/null
 
@@ -39,6 +44,14 @@ for url in "${SUPPLIER_ORIGIN}/" "${TMMIN_ORIGIN}/" "${API_ORIGIN}/health"; do
   }
   grep -Eiq '^x-content-type-options:[[:space:]]*nosniff' <<<"${headers}" || {
     echo "nosniff header is missing from ${url}." >&2
+    exit 1
+  }
+done
+
+for path in / /manifest.webmanifest /sw.js; do
+  headers="$(curl --fail --silent --show-error --head "${SUPPLIER_ORIGIN}${path}")"
+  grep -Eiq '^cache-control:.*(no-store|no-cache)' <<<"${headers}" || {
+    echo "Non-stale cache policy is missing from ${SUPPLIER_ORIGIN}${path}." >&2
     exit 1
   }
 done

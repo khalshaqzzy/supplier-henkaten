@@ -1,6 +1,16 @@
-import { AlertTriangle, CheckCircle2, Radio, RefreshCw, UserRound, Users } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  FileText,
+  Radio,
+  RefreshCw,
+  UserRound,
+  Users,
+  Wrench,
+} from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import type { HenkatenCategory, HenkatenStatus } from '@tmmin-henkaten/contracts';
@@ -31,24 +41,28 @@ import {
   SummaryStrip,
 } from '../components/OperationalUI';
 
+const BoardCanvas = lazy(() => import('../components/board-canvas/BoardCanvas'));
+
 export function BoardPage() {
   const { session } = useSession();
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
   const [connection, setConnection] = useState<RealtimeConnectionState>('connecting');
+  const [canvasDirty, setCanvasDirty] = useState(false);
   const lineId = params.get('lineId') ?? undefined;
+  const view = params.get('view') === 'canvas' ? 'canvas' : 'default';
   const scope = {
     userId: session!.principal.userId,
     supplierId: session!.supplier!.id,
     purpose: session!.principal.purpose,
   };
   const boardKey = useMemo(
-    () => scopedKey(scope, 'assignment-board', { lineId }),
-    [lineId, scope.purpose, scope.supplierId, scope.userId],
+    () => scopedKey(scope, 'assignment-board'),
+    [scope.purpose, scope.supplierId, scope.userId],
   );
   const board = useQuery({
     queryKey: boardKey,
-    queryFn: () => supplierApi.board({ ...(lineId ? { lineId } : {}) }),
+    queryFn: () => supplierApi.board({}),
   });
   const realtime = useMemo(
     () =>
@@ -59,6 +73,10 @@ export function BoardPage() {
         onInvalidate: (event) => {
           if (event.refresh.includes('assignment-board'))
             void queryClient.invalidateQueries({ queryKey: boardKey });
+          if (event.refresh.includes('assignment-board-layout'))
+            void queryClient.invalidateQueries({
+              queryKey: scopedKey(scope, 'assignment-board-layout'),
+            });
           if (event.refresh.includes('notifications'))
             void queryClient.invalidateQueries({
               queryKey: scopedKey(scope, 'notification-count'),
@@ -76,7 +94,8 @@ export function BoardPage() {
     return () => realtime.close();
   }, [realtime]);
 
-  const lines = board.data?.lines ?? [];
+  const allLines = board.data?.lines ?? [];
+  const lines = lineId ? allLines.filter((line) => line.lineId === lineId) : allLines;
   const jobs = lines.flatMap((line) => line.jobs);
   const openIndicators = jobs
     .flatMap((job) => job.indicators)
@@ -127,18 +146,65 @@ export function BoardPage() {
           <span>Line dalam scope</span>
           <NativeSelect
             value={lineId ?? ''}
-            onChange={(event) =>
-              setParams(event.target.value ? { lineId: event.target.value } : {}, { replace: true })
-            }
+            onChange={(event) => {
+              if (
+                canvasDirty &&
+                !window.confirm('Ganti line dan buang perubahan Canvas yang belum disimpan?')
+              )
+                return;
+              const nextLineId = event.target.value;
+              const next = new URLSearchParams(params);
+              if (nextLineId) next.set('lineId', nextLineId);
+              else {
+                next.delete('lineId');
+                next.delete('view');
+              }
+              setParams(next, { replace: true });
+            }}
           >
             <option value="">Semua line</option>
-            {board.data?.lines.map((line) => (
+            {allLines.map((line) => (
               <option key={line.lineId} value={line.lineId}>
                 {line.lineCode} · {line.lineName}
               </option>
             ))}
           </NativeSelect>
         </label>
+        <div className="board-view-toggle" role="group" aria-label="Tampilan assignment board">
+          <Button
+            size="sm"
+            variant={view === 'default' ? 'primary' : 'ghost'}
+            aria-pressed={view === 'default'}
+            onClick={() => {
+              if (
+                canvasDirty &&
+                !window.confirm(
+                  'Kembali ke Default dan buang perubahan Canvas yang belum disimpan?',
+                )
+              )
+                return;
+              const next = new URLSearchParams(params);
+              next.delete('view');
+              setParams(next, { replace: true });
+            }}
+          >
+            Default
+          </Button>
+          <Button
+            size="sm"
+            variant={view === 'canvas' ? 'primary' : 'ghost'}
+            aria-pressed={view === 'canvas'}
+            disabled={!lineId}
+            title={lineId ? 'Buka Canvas' : 'Pilih satu line untuk membuka Canvas'}
+            onClick={() => {
+              const next = new URLSearchParams(params);
+              next.set('view', 'canvas');
+              setParams(next, { replace: true });
+            }}
+          >
+            Canvas
+          </Button>
+        </div>
         <span className={`realtime-state is-${connection}`}>
           <Radio aria-hidden="true" />
           {connection === 'connected'
@@ -184,7 +250,7 @@ export function BoardPage() {
         />
       )}
       {board.data && lines.length > 0 && (
-        <div className="board-workspace">
+        <div className={`board-workspace${view === 'canvas' ? ' is-canvas' : ''}`}>
           <div className="board-workspace__main">
             <SummaryStrip label="Ringkasan Assignment Board" className="board-metrics">
               <SummaryMetric label="Line aktif" value={lines.length} icon={<Users />} />
@@ -202,78 +268,89 @@ export function BoardPage() {
                 tone={issues ? 'danger' : 'neutral'}
               />
             </SummaryStrip>
-            <div className="board-lines">
-              {lines.map((line) => (
-                <section key={line.shiftRunId} className="board-line">
-                  <header>
-                    <div>
-                      <span>{line.lineCode}</span>
-                      <h2>{line.lineName}</h2>
-                      <p>
-                        {line.shiftName} · {line.businessDate}
-                      </p>
-                    </div>
-                    <dl>
-                      <div>
-                        <dt>Supervisor</dt>
-                        <dd>{line.supervisor.name ?? 'Kosong'}</dd>
-                      </div>
-                      <div>
-                        <dt>Line Leader</dt>
-                        <dd>{line.lineLeader.name ?? 'Kosong'}</dd>
-                      </div>
-                    </dl>
-                    <Link to={`/shifts/${line.shiftRunId}`}>Detail Shift</Link>
-                  </header>
-                  {line.activeOverride && (
-                    <Alert tone="danger" title="Emergency Start aktif">
-                      {line.activeOverride.reason} · {line.activeOverride.unresolvedIssueCount}{' '}
-                      issue belum selesai.
-                    </Alert>
-                  )}
-                  <div className="board-job-grid">
-                    {line.jobs.map((job) => (
-                      <article
-                        key={job.assignmentId}
-                        className={`board-job is-${job.state.toLowerCase()}`}
-                      >
-                        <header>
-                          <span>{String(job.displayOrder).padStart(2, '0')}</span>
-                          <strong>{job.jobName}</strong>
-                          {job.state === 'ASSIGNED' ? <CheckCircle2 /> : <AlertTriangle />}
-                        </header>
-                        <div className="board-job__person">
-                          <i>
-                            {job.mp.photoThumbnailUrl ? (
-                              <img src={supplierAssetUrl(job.mp.photoThumbnailUrl)} alt="" />
-                            ) : job.mp.initials ? (
-                              job.mp.initials
-                            ) : (
-                              <UserRound />
-                            )}
-                          </i>
-                          <span>
-                            <strong>{job.mp.name ?? 'Vacant'}</strong>
-                            <small>{job.mp.registrationNumber ?? humanize(job.state)}</small>
-                          </span>
-                        </div>
-                        <div className="board-job__status">
-                          <span>{humanize(job.state)}</span>
-                          <div role="group" aria-label={`${job.indicators.length} Henkaten aktif`}>
-                            {job.indicators.map((indicator) => (
-                              <BoardHenkatenIndicator
-                                key={indicator.henkatenId}
-                                indicator={indicator}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      </article>
-                    ))}
+            {view === 'canvas' && contextLine ? (
+              <Suspense
+                fallback={
+                  <div className="board-canvas-skeleton">
+                    <Skeleton />
+                    <Skeleton />
+                    <Skeleton />
                   </div>
-                </section>
-              ))}
-            </div>
+                }
+              >
+                <BoardCanvas line={contextLine} onDirtyChange={setCanvasDirty} />
+              </Suspense>
+            ) : (
+              <div className="board-lines">
+                {lines.map((line) => (
+                  <section key={line.shiftRunId} className="board-line">
+                    <header>
+                      <div>
+                        <span>{line.lineCode}</span>
+                        <h2>{line.lineName}</h2>
+                        <p>
+                          {line.shiftName} · {line.businessDate}
+                        </p>
+                      </div>
+                      <dl>
+                        <div>
+                          <dt>Supervisor</dt>
+                          <dd>{line.supervisor.name ?? 'Kosong'}</dd>
+                        </div>
+                        <div>
+                          <dt>Line Leader</dt>
+                          <dd>{line.lineLeader.name ?? 'Kosong'}</dd>
+                        </div>
+                      </dl>
+                      <Link to={`/shifts/${line.shiftRunId}`}>Detail Shift</Link>
+                    </header>
+                    {line.activeOverride && (
+                      <Alert tone="danger" title="Emergency Start aktif">
+                        {line.activeOverride.reason} · {line.activeOverride.unresolvedIssueCount}{' '}
+                        issue belum selesai.
+                      </Alert>
+                    )}
+                    <div className="board-job-grid">
+                      {line.jobs.map((job) => (
+                        <article
+                          key={job.assignmentId}
+                          className={`board-job is-${job.state.toLowerCase()}`}
+                        >
+                          <header>
+                            <span>{String(job.displayOrder).padStart(2, '0')}</span>
+                            <strong>{job.jobName}</strong>
+                            {job.state === 'ASSIGNED' ? <CheckCircle2 /> : <AlertTriangle />}
+                          </header>
+                          <div className="board-job__person">
+                            <i>
+                              <BoardMpAvatar mp={job.mp} />
+                            </i>
+                            <span>
+                              <strong>{job.mp.name ?? 'Vacant'}</strong>
+                              <small>{job.mp.registrationNumber ?? humanize(job.state)}</small>
+                            </span>
+                          </div>
+                          <div className="board-job__status">
+                            <span>{humanize(job.state)}</span>
+                            <div
+                              role="group"
+                              aria-label={`${job.indicators.length} Henkaten aktif`}
+                            >
+                              {job.indicators.map((indicator) => (
+                                <BoardHenkatenIndicator
+                                  key={indicator.henkatenId}
+                                  indicator={indicator}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
           </div>
           <ContextRail
             eyebrow="Konteks authoritative"
@@ -299,11 +376,7 @@ export function BoardPage() {
                       <strong>{risk.jobName}</strong>
                       <small>{risk.label}</small>
                     </span>
-                    {risk.henkatenId ? (
-                      <Link to={`/henkatens/${risk.henkatenId}`}>Buka Henkaten</Link>
-                    ) : risk.resolutionShiftRunId ? (
-                      <Link to={`/shifts/${risk.resolutionShiftRunId}/resolve`}>Buka resolusi</Link>
-                    ) : null}
+                    <BoardRiskAction risk={risk} />
                   </div>
                 ))}
               </section>
@@ -327,20 +400,13 @@ export function BoardPage() {
                 />
               </FactStrip>
             )}
-            <section className="board-legend">
-              <h3>Legenda status</h3>
-              <span>
-                <i className="is-assigned" /> Assigned
-              </span>
-              <span>
-                <i className="is-vacant" /> Vacant
-              </span>
-              <span>
-                <i className="is-reserved" /> Reserved
-              </span>
-              <span>
-                <i className="is-conflicted" /> Conflicted
-              </span>
+            <section className="board-legend" aria-label="Legenda 4M">
+              <h3>Legenda 4M</h3>
+              {(['MAN', 'MACHINE', 'MATERIAL', 'METHOD'] as const).map((category) => (
+                <span key={category}>
+                  <FourMDot category={category} /> {humanize(category)}
+                </span>
+              ))}
             </section>
           </ContextRail>
         </div>
@@ -351,18 +417,30 @@ export function BoardPage() {
 
 type BoardLines = NonNullable<Awaited<ReturnType<typeof supplierApi.board>>>['lines'];
 
+function BoardMpAvatar({ mp }: { mp: BoardLines[number]['jobs'][number]['mp'] }) {
+  const photoUrl = mp.photoThumbnailUrl ? supplierAssetUrl(mp.photoThumbnailUrl) : null;
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  return photoUrl && failedUrl !== photoUrl ? (
+    <img src={photoUrl} alt="" onError={() => setFailedUrl(photoUrl)} />
+  ) : mp.initials ? (
+    mp.initials
+  ) : (
+    <UserRound aria-hidden="true" />
+  );
+}
+
 export function boardOperationalRisks(lines: BoardLines) {
   return lines.flatMap((line) =>
     line.jobs.flatMap((job) => [
-      ...(job.state === 'VACANT' || job.state === 'CONFLICTED' || job.state === 'RESERVED'
+      ...(job.state === 'VACANT' || job.state === 'CONFLICTED'
         ? [
             {
               key: `assignment:${job.assignmentId}`,
+              kind: 'ISSUE' as const,
               jobName: job.jobName,
-              label: humanize(job.state),
+              label: `Assignment issue · ${humanize(job.state)}`,
               henkatenId: null,
-              resolutionShiftRunId:
-                job.state === 'VACANT' || job.state === 'CONFLICTED' ? line.shiftRunId : null,
+              resolutionShiftRunId: line.shiftRunId,
             },
           ]
         : []),
@@ -370,12 +448,39 @@ export function boardOperationalRisks(lines: BoardLines) {
         .filter((indicator) => indicator.category === 'MAN' && indicator.status === 'OPEN')
         .map((indicator) => ({
           key: `reservation:${indicator.henkatenId}`,
+          kind: 'RESERVATION' as const,
           jobName: job.jobName,
           label: `Reservation aktif · ${indicator.identifier}`,
           henkatenId: indicator.henkatenId,
           resolutionShiftRunId: null,
         })),
     ]),
+  );
+}
+
+export function BoardRiskAction({
+  risk,
+}: {
+  risk: ReturnType<typeof boardOperationalRisks>[number];
+}) {
+  return risk.kind === 'RESERVATION' ? (
+    <Link
+      className="hds-button hds-button--secondary hds-button--sm board-risk-action"
+      to={`/henkatens/${risk.henkatenId}`}
+    >
+      <FileText aria-hidden="true" />
+      Buka Henkaten
+      <ArrowRight aria-hidden="true" />
+    </Link>
+  ) : (
+    <Link
+      className="hds-button hds-button--primary hds-button--sm board-risk-action"
+      to={`/shifts/${risk.resolutionShiftRunId}/resolve`}
+    >
+      <Wrench aria-hidden="true" />
+      Buka resolusi
+      <ArrowRight aria-hidden="true" />
+    </Link>
   );
 }
 

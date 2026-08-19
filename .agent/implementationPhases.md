@@ -2,7 +2,7 @@
 
 Document status: Active implementation roadmap
 Created: 2026-07-23
-Last updated: 2026-08-04
+Last updated: 2026-08-19
 Source of truth: `.agent/PRD.md`
 Implementation approach: Backend-first
 Workspace tooling: Node.js 22 + pnpm workspaces, tanpa Turborepo
@@ -28,7 +28,7 @@ Roadmap tidak memberikan estimasi waktu. Urutan didasarkan pada dependency dan r
 
 Kondisi repository setelah Phase 0-10:
 
-- branch aktif: `feat/typography-elements`;
+- branch aktif: `staging`;
 - `.agent/PRD.md` tersedia dan menjadi product contract;
 - dua puluh ADR dan delapan architecture/security baseline tersedia;
 - Node.js 22.23.1 + pnpm 11.16.0 ESM workspace tersedia;
@@ -71,6 +71,12 @@ Kondisi repository setelah Phase 0-10:
 - local full-stack Compose, centralized realtime outbox fan-out, isolated Playwright Chromium/Edge
   E2E, production containers, dan deployment workflows tersedia; aktivasi staging eksternal masih
   berjalan;
+- refinement foto member menyediakan cache-generation URL, event invalidation realtime, editor
+  Set/Ganti/Hapus yang optimistic, dan thumbnail list/board; risk rail Assignment Board menyediakan
+  CTA resolusi/Henkaten yang accessible, tidak duplikat, dan bebas overflow pada mobile;
+- Assignment Board memiliki refinement Canvas per-line yang lazy-loaded, versioned, reconciled
+  terhadap live Working Assignment, editable oleh Supplier Admin/active Line Leader, read-only
+  untuk role lain/TMMIN, serta memakai curated transparent machine asset catalog;
 - materi slide tersedia sebagai reference-only input.
 
 Completed phases: **Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 7, Phase 8, Phase 9, Phase 10, Phase 11, Phase 12, Phase 13, dan Phase 14**
@@ -2377,6 +2383,46 @@ Exit criteria:
 
 - One stable board payload supports supplier frontend without client-side joins.
 
+### 8.3A Versioned Assignment Board Canvas
+
+Status: **done**
+
+Dependency: 8.3, Hosted authorization, member photo read model, dan transactional outbox.
+
+Execution:
+
+- Persist shared versioned `LineBoardLayout` JSON per supplier/line tanpa menyimpan live MP/PII.
+- Add strict schemas, generated/reconciled GET, optimistic PUT, redacted audit, safe outbox event,
+  Supplier/TMMIN read access, dan Admin/active-Line-Leader mutation scope.
+- Add lazy Konva editor, viewport Stage, curated machine catalog dengan family soft-isometric dan
+  simple generic 2D, required MP/photo job cards, spatial tools, DOM Layers/Properties fallback,
+  explicit draft/save flow, dan 4M-only legend.
+- Stabilize camera as UI-only state: ignore bubbled node drags at Stage level, measure both viewport
+  axes, preserve logical center across editor resize, keep full-canvas fit below 25%, add Hand/Space
+  pan and pointer-centered zoom, and use full-workspace fullscreen with camera restoration.
+- Preserve the existing default board as mobile/accessibility fallback and keep assignment/Henkaten
+  lifecycle read-only from Canvas.
+
+Verification:
+
+- Contract and service unit tests cover strict validation, catalog closure, bounds, deterministic
+  generation, and reconciliation.
+- Hosted integration covers generated/read-only/editable responses, optimistic conflict,
+  authorization, TMMIN read, audit summary, and outbox payload.
+- Frontend unit/build checks cover transform normalization, unique style-aware labels, and the
+  complete 24-entry curated asset manifest.
+- Camera unit and Hosted Chromium checks cover full fit, resize/zoom math, recoverable pan, node drag
+  isolation, Hand/Space interaction, fullscreen expansion/restoration, responsive overflow, dan Axe.
+
+Data/migration impact:
+
+- Add `LineBoardLayout` with tenant/line uniqueness, schema/version, audit actors, and timestamps.
+
+Exit criteria:
+
+- Every active job is rendered exactly once with live MP content while saved coordinates remain
+  stable across assignment/photo/4M changes.
+
 ### 8.4 SSE Realtime Stream dan Stale Fallback
 
 Status: **done**
@@ -4503,11 +4549,22 @@ Execution:
   shift, konsentrasi line/part, job, narasi operasional, waktu kejadian, dan durasi keputusan tidak
   seragam tetapi tetap deterministic.
 - Credential acak disimpan atomik hanya pada `.local/seed-credentials.json` mode `0600`.
+- Enam line aktif memiliki saved Canvas v1 yang dibuat melalui production PUT API setelah live
+  Shift Run aktif. Layout memakai process-zone, station label, flow arrow, empat authoritative job
+  slot, family isometric untuk NPM, dan family simple 2D untuk GKI tanpa menyimpan live PII.
+- Empat portrait operator fiktif hasil ImageGen disimpan sebagai development-only assets dan
+  digunakan ulang deterministically dengan mapping `mpIndex % 4`; setiap line mendapat empat
+  portrait berbeda, tiga MP cadangan tetap menguji initials fallback, dan role avatars tetap
+  synthetic code-generated.
 
 Verification:
 
 - Seed planner/guard unit tests, API typecheck, clean-start Compose acceptance, serta reseed
   preservation/rotation acceptance lulus.
+- Visual seed tests memvalidasi empat JPEG 768×1024 di bawah 2 MiB, mapping reuse, strict Canvas
+  schema, bounds, unique job slots, dan machine family. Post-seed verification mengunci 19 current
+  photos serta tiga saved layout/audit per supplier, empat portrait checksum dengan tiga reuse per
+  supplier/enam global, active-job parity, dan healthy outbox.
 - Full parity lulus dengan Node.js 22.23.1: clean install, format, lint, typecheck, 97 unit tests,
   OpenAPI drift, build, PostgreSQL 18.4/pgvector 0.8.5, 32 integration tests, empat Chromium dan dua
   Edge journeys, Gitleaks, serta diff check.
@@ -4526,6 +4583,8 @@ Verification:
 Data/migration impact:
 
 - Tidak ada database schema migration.
+- Tidak ada endpoint, OpenAPI, atau production runtime image change; portrait source assets hanya
+  tersedia pada local developer build context.
 - Operasi destruktif dibatasi pada command lokal eksplisit dan target Compose yang tervalidasi.
 
 Exit criteria:
@@ -4948,6 +5007,11 @@ Verification:
 
 - Push staging produces exact release or explicit failure.
 - Environment isolated from production.
+- Staging run `32104023080` proved every release gate green but exposed missing public DNS records
+  as a silent remote-preflight exit. Direct VM diagnosis found three malformed Cloudflare names
+  with a duplicated zone suffix. Correct DNS-only A records now target `34.177.111.165`; the
+  resolver is guarded so a failed lookup reaches an explicit diagnostic, and unused VM build cache
+  was pruned to restore about 20 GiB free space before the next deployment.
 
 Data/migration impact:
 
@@ -5012,11 +5076,132 @@ Exit criteria:
 
 - Staging is stable enough for UAT.
 
+### 15.12 Responsive Supplier Experience
+
+Status: **implementation-complete, acceptance pending**
+
+Dependency: 15.9 deployment baseline; final exit also depends on 15.11 staging rehearsal.
+
+Execution:
+
+- Remove the unsupported-viewport gate and support mobile 360–767px, tablet 768–1279px, and
+  desktop at least 1280px in portrait/landscape.
+- Preserve the accepted desktop sidebar/topbar, density, board, dashboard, and tables.
+- Add mobile sticky header/drawer, tablet drawer/rail, stacked filters/actions/forms, contained
+  tables, mobile card rows, adaptive grids, full-screen mobile dialogs/sheets, and 44px targets.
+- Apply patterns to every supplier role and workflow including Hosted Preparation, master/default
+  assignment, board, shift, Henkaten, approval, notification, audit, setup, and account.
+
+Verification:
+
+- Chromium 390×844, 768×1024, 1024×768, 1280×720, and wide desktop; Edge desktop/tablet.
+- No document overflow/clipped action; keyboard/focus, non-color status, 44px, Axe, and screenshot
+  checks across all roles/navigation groups/major workflows.
+
+Data/migration impact:
+
+- No domain or authorization change.
+
+Exit criteria:
+
+- Responsive matrix and retained desktop regression are green on staging.
+
+### 15.13 Supplier PWA Foundation
+
+Status: **implementation-complete, acceptance pending**
+
+Dependency: 15.12 and deployed HTTPS staging.
+
+Execution:
+
+- Add stable root manifest, brand 192/512/maskable/Apple icons, and `injectManifest` TypeScript
+  service worker containing precache, offline navigation fallback, push, and safe click handling.
+- Precache only static shell assets/icons/offline document; keep API/session/photo/domain data and
+  every mutation network-only with no offline draft, IndexedDB, sync, or queued mutation.
+- Add offline/retry and prompted update UI. Add worker/manifest CSP and non-stale HTML/worker/
+  manifest headers plus immutable hashed-asset caching.
+- Extend deployment smoke for manifest, worker, icons, release identity, and cache headers.
+
+Verification:
+
+- Manifest/installability, worker registration/update, offline fallback, network-only exclusions,
+  expired-session click, tag/deep-link validation, and rollback/worker recovery.
+
+Data/migration impact:
+
+- Static frontend/runtime configuration only.
+
+Exit criteria:
+
+- PWA install/update/offline behavior is proven on staging without cached domain data.
+
+### 15.14 Supplier Web Push Backend and Line Leader Enforcement
+
+Status: **implementation and local integration complete; staging rehearsal pending**
+
+Dependency: 15.13 and environment-specific VAPID secrets.
+
+Execution:
+
+- Add shared contracts/OpenAPI/client for config, create, and owner-only expected-version revoke;
+  stable `X-Device-Installation-ID`; redacted device status; opt-in UI and iOS install guidance.
+- Add additive PushSubscription/PushDelivery schema, eligible event materialization, payload
+  allowlist/redaction, exact/suffix vendor endpoint validation, concurrency-safe worker, bounded
+  retry/Retry-After, 404/410 expiry, and safe audit/logging.
+- Hard-block NORMAL Line Leader operational endpoints and routes per installation until active;
+  keep activation/session/change-password/account/help/logout paths available. Other roles opt in.
+- Revoke subscriptions for logout, password/account/role/supplier/source/preparation lifecycle paths.
+- Validate push env/VAPID/allowlist/retry bounds and document forced re-subscription rotation.
+
+Verification:
+
+- Unit/contract and PostgreSQL integration for tenant/user isolation, idempotency/reassignment,
+  multi-device, concurrent claims, revocation paths, transient/permanent gateway results,
+  enforcement exemptions, payload redaction, and SSRF prevention.
+
+Data/migration impact:
+
+- Additive PushSubscription and PushDelivery tables/enums/indexes; code rollback requires no down
+  migration.
+
+Exit criteria:
+
+- Backend/UI enforcement and delivery semantics pass CI and staging vendor-service checks.
+
+### 15.15 Responsive PWA and Real-device Push Rehearsal
+
+Status: **planned**
+
+Dependency: 15.9, 15.11-15.14.
+
+Execution:
+
+- Rehearse Android Chrome/Edge plus iPhone/iPad Home Screen PWA on iOS/iPadOS 16.4+.
+- Cover foreground/background/app-closed push; granted/denied/reset; logout; multi-device;
+  shared-browser reassignment; expiry/delay; worker update/recovery; and offline fallback.
+- Prove Line Leader blocked before activation and fully usable afterward; obtain Supplier Line
+  Leader acceptance and record device/release-safe evidence.
+
+Verification:
+
+- Actual vendor push services and deployed staging release only; no public production test endpoint.
+- Staging redeploy and code-only rollback preserve Notification/domain state and additive schema.
+
+Data/migration impact:
+
+- Staging test data/subscriptions/deliveries only.
+
+Exit criteria:
+
+- Responsive matrix, real-device push, staging redeploy/rollback, and Supplier Line Leader
+  acceptance all pass before Phase 16 UAT.
+
 Phase 15 exit criteria:
 
 - Automatic staging deploy works.
 - Full CI/security checks work.
 - Production workflow waits only on external production readiness.
+- Responsive Supplier, PWA, Web Push/enforcement, and real-device staging rehearsal pass.
 
 Current implementation evidence (2026-07-27):
 
@@ -5035,6 +5220,10 @@ Current implementation evidence (2026-07-27):
   deployment tooling, production-like routing/persistence, Gitleaks, audit, filesystem scan, dan
   seluruh runtime image scan. Phase 15.9 tetap `in_progress` sampai hosted push/deploy evidence
   tersedia.
+- Pada 2026-08-11, refinement foto member dan Assignment Board risk actions lulus unit/component,
+  targeted PostgreSQL integration, TypeScript, OpenAPI, dan inspeksi browser desktop/mobile. Tidak
+  ada migration atau endpoint baru; Phase 15.9 tetap `in_progress` karena evidence ini bukan hosted
+  staging deployment.
 
 ---
 
@@ -5046,7 +5235,7 @@ Goal: memenuhi performance/security/acceptance targets, memperoleh sign-off, dan
 
 Depends on:
 
-- Phase 15.
+- Phase 15 including 15.12-15.15.
 
 Unlocks:
 
@@ -5462,6 +5651,7 @@ PRD/ADRs
   -> Supplier + TMMIN Frontends
   -> Full E2E
   -> Containers/CI/CD/Staging
+  -> Responsive Supplier/PWA/Web Push/Device Rehearsal
   -> Hardening/UAT/Production
 ```
 
@@ -5521,6 +5711,9 @@ ADR minimum sebelum atau selama owning phase:
 | Two-frontend shared UI and API-client boundary | Phase 11 |
 | Single-VM Compose/Caddy release topology | Phase 15 |
 | Forward-only migration and code-only rollback | Phase 15 |
+| Responsive supplier shell and adaptive workflow patterns | Phase 15.12 |
+| Supplier service-worker cache/update policy | Phase 15.13 |
+| Web Push delivery, security, and Line Leader enforcement | Phase 15.14 |
 
 ADR harus dibuat ketika keputusan mulai diimplementasikan, bukan setelah implementation selesai.
 
@@ -5538,6 +5731,7 @@ ADR harus dibuat ketika keputusan mulai diimplementasikan, bukan setelah impleme
 | Supplier dashboard | 8 | 12, 14, 16 |
 | TMMIN dashboard/warnings | 8 | 13, 14, 16 |
 | Notification | 8 | 12, 14, 16 |
+| Supplier responsive/PWA/Web Push | 15.12-15.15 | 16 |
 | Audit | 2, 8 | 12, 13, 14, 16 |
 | External API | 9 | 13, 14, 16 |
 | Security/privacy | all backend phases | 10, 15, 16 |
@@ -5579,11 +5773,10 @@ Roadmap tidak mencakup:
 - material inventory/procurement;
 - quality execution di luar Henkaten checklist;
 - QC production integration;
-- email/SMS/push/Slack/Teams/webhook notifications;
+- email/SMS/native push/Slack/Teams/webhook notifications;
 - bulk CSV/Excel import/export;
 - Henkaten attachments selain member photo;
 - native mobile;
-- full tablet/mobile responsive;
 - AI/ML/vector search;
 - External supplier assignment board di TMMIN;
 - Hosted approval untuk External supplier;
@@ -5621,7 +5814,7 @@ Critical accepted constraints:
 - tidak ada RPO/RTO/HA;
 - automatic production deployment;
 - permanent Hosted PII retention;
-- in-app-only critical notifications.
+- best-effort Web Push remains non-authoritative; notification center is authoritative.
 
 Dokumen tidak boleh mengubah constraints tersebut tanpa PRD decision change.
 

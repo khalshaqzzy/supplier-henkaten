@@ -105,6 +105,10 @@ async function run(): Promise<void> {
           version: { increment: 1 },
         },
       });
+      await transaction.pushSubscription.updateMany({
+        where: { userId: existing.id, status: 'ACTIVE' },
+        data: { status: 'REVOKED', revokedAt: new Date(), version: { increment: 1 } },
+      });
       await audit.write(
         {
           actorKind: 'SYSTEM',

@@ -131,6 +131,16 @@ export default tseslint.config(
     },
   },
   {
+    files: ['apps/supplier-web/src/sw.ts'],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: './apps/supplier-web/tsconfig.sw.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+  {
     files: ['apps/api/src/**/*.ts'],
     ignores: ['apps/api/src/**/*.test.ts'],
     rules: {

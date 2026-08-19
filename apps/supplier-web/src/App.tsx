@@ -5,6 +5,8 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import type { Capability } from '@tmmin-henkaten/contracts';
 
 import { queryClient } from './app/query';
+import { PwaLifecycle } from './app/pwa';
+import { PushProvider } from './app/push';
 import { rememberIntendedPath, SessionProvider, useSession } from './app/session';
 import { ProductLayout } from './components/layout';
 import { AccountPage, ChangePasswordPage, LoginPage } from './pages/AuthPages';
@@ -41,7 +43,10 @@ export function App() {
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <SessionProvider>
-          <ProductRoutes />
+          <PushProvider>
+            <ProductRoutes />
+            <PwaLifecycle />
+          </PushProvider>
         </SessionProvider>
       </QueryClientProvider>
     </AppErrorBoundary>
@@ -316,14 +321,6 @@ function ProductRoutes() {
           }
         />
         <Route path="forbidden" element={<ForbiddenPage />} />
-        <Route
-          path="unsupported-viewport"
-          element={
-            <div className="route-state">
-              <p>Viewport minimal 1280 × 720.</p>
-            </div>
-          }
-        />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

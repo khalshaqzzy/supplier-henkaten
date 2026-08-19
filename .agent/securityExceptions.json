@@ -46,5 +46,11 @@
     "id": "DS-0002",
     "rationale": "Dockerfile.local is an explicitly development-only bind-mount image; every production runtime Dockerfile declares and is tested with a non-root user.",
     "expiresOn": "2026-08-31"
+  },
+  {
+    "scanner": "trivy",
+    "id": "CVE-2026-14456",
+    "rationale": "Debian has deferred an OpenSSL fix and publishes no fixed package for the pinned distroless runtime; the reported denial of service requires an OpenSSL QUIC server, while this API serves HTTP over Node.js TCP behind Caddy and does not enable OpenSSL QUIC.",
+    "expiresOn": "2026-09-30"
   }
 ]

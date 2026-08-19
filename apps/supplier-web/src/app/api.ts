@@ -1,4 +1,5 @@
 import { ApiClient, SupplierApi } from '@tmmin-henkaten/api-client';
+import { getInstallationId } from './installation';
 
 const apiOrigin = environmentString('VITE_API_ORIGIN') ?? 'http://localhost:3000';
 let csrfToken: string | null = null;
@@ -8,6 +9,7 @@ export const supplierClient = new ApiClient({
   baseUrl: apiOrigin,
   realm: 'SUPPLIER',
   getCsrfToken: () => csrfToken,
+  getInstallationId,
   onSessionExpired: () => sessionExpiredHandler?.(),
 });
 

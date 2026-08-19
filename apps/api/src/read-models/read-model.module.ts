@@ -7,11 +7,19 @@ import { SupplierReadModelController, TmminReadModelController } from './read-mo
 import { ReadModelService } from './read-model.service.js';
 import { RealtimeService } from './realtime.service.js';
 import { RealtimeEventPump } from './realtime-event-pump.js';
+import { PushModule } from '../push/push.module.js';
+import { BoardLayoutService } from './board-layout.service.js';
 
 @Module({
-  imports: [OperationsModule, AdministrationModule],
+  imports: [OperationsModule, AdministrationModule, PushModule],
   controllers: [SupplierReadModelController, TmminReadModelController],
-  providers: [NotificationService, ReadModelService, RealtimeEventPump, RealtimeService],
+  providers: [
+    NotificationService,
+    ReadModelService,
+    BoardLayoutService,
+    RealtimeEventPump,
+    RealtimeService,
+  ],
   exports: [ReadModelService, NotificationService],
 })
 export class ReadModelModule {}

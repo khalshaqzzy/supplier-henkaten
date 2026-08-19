@@ -871,6 +871,22 @@ describe('Hosted shift and Henkaten core', () => {
     expect(read.status).toBe(200);
     expect(read.body.readAt).toBeTypeOf('string');
 
+    await prisma.memberPhoto.create({
+      data: {
+        supplierId,
+        memberId: mp1Id,
+        fullPath: `/tmp/${mp1Id}/full.webp`,
+        thumbnailPath: `/tmp/${mp1Id}/thumbnail.webp`,
+        fullChecksum: 'a'.repeat(64),
+        thumbnailChecksum: 'b'.repeat(64),
+        fullWidth: 64,
+        fullHeight: 64,
+        thumbnailWidth: 64,
+        thumbnailHeight: 64,
+        version: 7,
+      },
+    });
+
     const board = await request(app.getHttpServer())
       .get('/api/v1/supplier/assignment-board')
       .set('Cookie', adminCookie);
@@ -879,7 +895,14 @@ describe('Hosted shift and Henkaten core', () => {
       lines: Array<{
         lineId: string;
         activeOverride: unknown;
-        jobs: Array<{ indicators: unknown[] }>;
+        jobs: Array<{
+          indicators: unknown[];
+          mp: {
+            memberId: string | null;
+            photoThumbnailUrl: string | null;
+            initials: string | null;
+          };
+        }>;
       }>;
     }>(board);
     expect(boardBody.lines.some((line) => line.lineId === lineId)).toBe(true);
@@ -887,6 +910,115 @@ describe('Hosted shift and Henkaten core', () => {
     expect(mainLine).toHaveProperty('activeOverride');
     expect(mainLine.jobs).toHaveLength(2);
     expect(mainLine.jobs.some((job) => job.indicators.length > 0)).toBe(true);
+    expect(mainLine.jobs.find((job) => job.mp.memberId === mp1Id)?.mp.photoThumbnailUrl).toBe(
+      `/api/v1/supplier/master-data/members/${mp1Id}/photo/thumbnail?v=7`,
+    );
+    expect(
+      mainLine.jobs.some((job) => job.mp.memberId !== mp1Id && job.mp.photoThumbnailUrl === null),
+    ).toBe(true);
+
+    const generatedLayout = await request(app.getHttpServer())
+      .get(`/api/v1/supplier/assignment-board/layouts/${lineId}`)
+      .set('Cookie', adminCookie);
+    expect(generatedLayout.status).toBe(200);
+    expect(generatedLayout.body).toMatchObject({
+      lineId,
+      source: 'GENERATED',
+      version: null,
+      canEdit: true,
+      reconciliation: { addedJobIds: [], removedJobIds: [] },
+    });
+    expect(
+      (generatedLayout.body.document.nodes as Array<{ type: string }>).filter(
+        (node) => node.type === 'JOB_SLOT',
+      ),
+    ).toHaveLength(2);
+
+    const leaderLayout = await request(app.getHttpServer())
+      .get(`/api/v1/supplier/assignment-board/layouts/${lineId}`)
+      .set('Cookie', leaderCookie);
+    expect(leaderLayout.status).toBe(200);
+    expect(leaderLayout.body.canEdit).toBe(true);
+    const supervisorLayout = await request(app.getHttpServer())
+      .get(`/api/v1/supplier/assignment-board/layouts/${lineId}`)
+      .set('Cookie', supervisorCookie);
+    expect(supervisorLayout.status).toBe(200);
+    expect(supervisorLayout.body.canEdit).toBe(false);
+
+    const document = generatedLayout.body.document as {
+      nodes: unknown[];
+      [key: string]: unknown;
+    };
+    const createLayout = await request(app.getHttpServer())
+      .put(`/api/v1/supplier/assignment-board/layouts/${lineId}`)
+      .set('Origin', supplierOrigin)
+      .set('Cookie', adminCookie)
+      .set('X-CSRF-Token', adminCsrf)
+      .send({
+        expectedVersion: null,
+        document: {
+          ...document,
+          nodes: [
+            ...document.nodes,
+            {
+              id: 'machine:integration-press',
+              type: 'MACHINE_ASSET',
+              assetKey: 'PRESS_STAMPING',
+              opacity: 1,
+              transform: {
+                x: 1_600,
+                y: 600,
+                width: 410,
+                height: 380,
+                rotation: 0,
+                zIndex: 50,
+                locked: false,
+              },
+            },
+          ],
+        },
+      });
+    expect(createLayout.status).toBe(200);
+    expect(createLayout.body).toMatchObject({ source: 'SAVED', version: 1, canEdit: true });
+
+    const conflict = await request(app.getHttpServer())
+      .put(`/api/v1/supplier/assignment-board/layouts/${lineId}`)
+      .set('Origin', supplierOrigin)
+      .set('Cookie', adminCookie)
+      .set('X-CSRF-Token', adminCsrf)
+      .send({ expectedVersion: null, document: createLayout.body.document });
+    expect(conflict.status).toBe(409);
+    expect(conflict.body.code).toBe('VERSION_CONFLICT');
+
+    const forbiddenLayoutWrite = await request(app.getHttpServer())
+      .put(`/api/v1/supplier/assignment-board/layouts/${lineId}`)
+      .set('Origin', supplierOrigin)
+      .set('Cookie', supervisorCookie)
+      .set('X-CSRF-Token', supervisorCsrf)
+      .send({ expectedVersion: 1, document: createLayout.body.document });
+    expect(forbiddenLayoutWrite.status).toBe(403);
+
+    const tmminLayout = await request(app.getHttpServer())
+      .get(`/api/v1/tmmin/suppliers/${supplierId}/assignment-board/layouts/${lineId}`)
+      .set('Cookie', tmminCookie);
+    expect(tmminLayout.status).toBe(200);
+    expect(tmminLayout.body).toMatchObject({ source: 'SAVED', version: 1, canEdit: false });
+    await expect(
+      prisma.auditEvent.findFirstOrThrow({
+        where: { resourceType: 'LineBoardLayout', resourceId: createLayout.body.id as string },
+      }),
+    ).resolves.toMatchObject({
+      action: 'BOARD_LAYOUT_CREATED',
+      changeSummary: expect.objectContaining({ nodeCount: 3, JOB_SLOT: 2, MACHINE_ASSET: 1 }),
+    });
+    await expect(
+      prisma.outboxEvent.findFirstOrThrow({
+        where: { aggregateType: 'LineBoardLayout', aggregateId: createLayout.body.id as string },
+      }),
+    ).resolves.toMatchObject({
+      eventType: 'BOARD_LAYOUT_UPDATED',
+      payload: { lineId, layoutId: createLayout.body.id, version: 1 },
+    });
 
     const activityBaseTime = Date.now() + 60_000;
     await prisma.auditEvent.createMany({

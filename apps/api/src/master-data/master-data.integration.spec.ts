@@ -336,12 +336,81 @@ describe('supplier master data', () => {
       .set('X-CSRF-Token', supplierCsrf)
       .attach('photo', png, { filename: 'avatar.png', contentType: 'image/png' });
     expect(upload.status).toBe(201);
+    expect(upload.body.photo).toMatchObject({
+      version: 1,
+      fullUrl: expect.stringContaining('/photo/full?v=1'),
+      thumbnailUrl: expect.stringContaining('/photo/thumbnail?v=1'),
+    });
+
+    const replacementPng = await sharp({
+      create: { width: 48, height: 48, channels: 3, background: '#cc5500' },
+    })
+      .png()
+      .toBuffer();
+    const replacement = await request(app.getHttpServer())
+      .post(`/api/v1/supplier/master-data/members/${mpId}/photo`)
+      .set('Origin', supplierOrigin)
+      .set('Cookie', supplierCookie)
+      .set('X-CSRF-Token', supplierCsrf)
+      .attach('photo', replacementPng, { filename: 'replacement.png', contentType: 'image/png' });
+    expect(replacement.status).toBe(201);
+    expect(replacement.body.photo).toMatchObject({
+      version: 2,
+      thumbnailUrl: expect.stringContaining('/photo/thumbnail?v=2'),
+    });
+    const unchanged = await request(app.getHttpServer())
+      .post(`/api/v1/supplier/master-data/members/${mpId}/photo`)
+      .set('Origin', supplierOrigin)
+      .set('Cookie', supplierCookie)
+      .set('X-CSRF-Token', supplierCsrf)
+      .attach('photo', replacementPng, {
+        filename: 'replacement-again.png',
+        contentType: 'image/png',
+      });
+    expect(unchanged.status).toBe(409);
+    expect(unchanged.body.code).toBe('STATE_CONFLICT');
+    await expect(
+      prisma.memberPhoto.count({ where: { memberId: mpId, state: 'CURRENT' } }),
+    ).resolves.toBe(1);
 
     const photo = await request(app.getHttpServer())
       .get(`/api/v1/supplier/master-data/members/${mpId}/photo/thumbnail`)
       .set('Cookie', supplierCookie);
     expect(photo.status).toBe(200);
     expect(photo.headers['content-type']).toContain('image/webp');
+
+    const staleRemoval = await supplierPost(
+      `/api/v1/supplier/master-data/members/${mpId}/photo/remove`,
+      { expectedVersion: 1 },
+    );
+    expect(staleRemoval.status).toBe(409);
+    expect(staleRemoval.body.code).toBe('VERSION_CONFLICT');
+
+    const removal = await supplierPost(
+      `/api/v1/supplier/master-data/members/${mpId}/photo/remove`,
+      { expectedVersion: 2 },
+    );
+    expect(removal.status).toBe(204);
+    await expect(
+      prisma.memberPhoto.count({ where: { memberId: mpId, state: 'CURRENT' } }),
+    ).resolves.toBe(0);
+
+    const restored = await request(app.getHttpServer())
+      .post(`/api/v1/supplier/master-data/members/${mpId}/photo`)
+      .set('Origin', supplierOrigin)
+      .set('Cookie', supplierCookie)
+      .set('X-CSRF-Token', supplierCsrf)
+      .attach('photo', png, { filename: 'restored.png', contentType: 'image/png' });
+    expect(restored.status).toBe(201);
+    expect(restored.body.photo).toMatchObject({
+      version: 4,
+      thumbnailUrl: expect.stringContaining('/photo/thumbnail?v=4'),
+    });
+    await expect(
+      prisma.outboxEvent.count({
+        where: { supplierId, eventType: 'MEMBER_PHOTO_CHANGED', aggregateId: mpId },
+      }),
+    ).resolves.toBe(4);
 
     const otherSupplierCode = `OTHER-${randomUUID()}`;
     const otherSupplier = await prisma.supplier.create({
