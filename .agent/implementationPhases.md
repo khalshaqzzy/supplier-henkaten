@@ -2397,6 +2397,9 @@ Execution:
 - Add lazy Konva editor, viewport Stage, curated machine catalog dengan family soft-isometric dan
   simple generic 2D, required MP/photo job cards, spatial tools, DOM Layers/Properties fallback,
   explicit draft/save flow, dan 4M-only legend.
+- Stabilize camera as UI-only state: ignore bubbled node drags at Stage level, measure both viewport
+  axes, preserve logical center across editor resize, keep full-canvas fit below 25%, add Hand/Space
+  pan and pointer-centered zoom, and use full-workspace fullscreen with camera restoration.
 - Preserve the existing default board as mobile/accessibility fallback and keep assignment/Henkaten
   lifecycle read-only from Canvas.
 
@@ -2408,6 +2411,8 @@ Verification:
   authorization, TMMIN read, audit summary, and outbox payload.
 - Frontend unit/build checks cover transform normalization, unique style-aware labels, and the
   complete 24-entry curated asset manifest.
+- Camera unit and Hosted Chromium checks cover full fit, resize/zoom math, recoverable pan, node drag
+  isolation, Hand/Space interaction, fullscreen expansion/restoration, responsive overflow, dan Axe.
 
 Data/migration impact:
 

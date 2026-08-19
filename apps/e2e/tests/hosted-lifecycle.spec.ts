@@ -1,5 +1,5 @@
 import { AxeBuilder } from '@axe-core/playwright';
-import { expect, type Page, type TestInfo } from '@playwright/test';
+import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 
 import {
   createHostedFixture,
@@ -183,21 +183,90 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
   await expect(canvasRegion.getByLabel('Legenda 4M')).toContainText('ManMachineMaterialMethod');
   await expect(canvasRegion.getByText('Auto-layout belum disimpan')).toBeVisible();
   await canvasRegion.getByRole('button', { name: 'Edit layout' }).click();
+  const canvasViewport = canvasRegion.locator('.board-canvas-viewport');
   await expect(canvasRegion.getByRole('complementary', { name: 'Asset palette' })).toBeVisible();
   await expect(
     canvasRegion.getByRole('complementary', { name: 'Layers dan properties' }),
   ).toBeVisible();
+  await expect.poll(() => canvasCamera(canvasViewport)).toMatchObject({ panActive: false });
+  const cameraBeforeObjectMove = await canvasCamera(canvasViewport);
+  const stageBox = await canvasRegion.locator('canvas').last().boundingBox();
+  expect(stageBox).not.toBeNull();
+  await boardPage.mouse.move(
+    stageBox!.x + cameraBeforeObjectMove.x + 250 * cameraBeforeObjectMove.scale,
+    stageBox!.y + cameraBeforeObjectMove.y + 320 * cameraBeforeObjectMove.scale,
+  );
+  await boardPage.mouse.down();
+  await boardPage.mouse.move(
+    stageBox!.x + cameraBeforeObjectMove.x + 290 * cameraBeforeObjectMove.scale,
+    stageBox!.y + cameraBeforeObjectMove.y + 350 * cameraBeforeObjectMove.scale,
+    { steps: 4 },
+  );
+  await boardPage.mouse.up();
+  await expect
+    .poll(() => canvasCamera(canvasViewport))
+    .toMatchObject({
+      x: cameraBeforeObjectMove.x,
+      y: cameraBeforeObjectMove.y,
+      scale: cameraBeforeObjectMove.scale,
+    });
+
+  await canvasRegion.getByRole('button', { name: 'Pan mode' }).click();
+  await expect(canvasRegion.getByRole('button', { name: 'Select mode' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  const cameraBeforePan = await canvasCamera(canvasViewport);
+  await boardPage.mouse.move(stageBox!.x + 6, stageBox!.y + 6);
+  await boardPage.mouse.down();
+  await boardPage.mouse.move(stageBox!.x + 46, stageBox!.y + 26, { steps: 4 });
+  await boardPage.mouse.up();
+  await expect.poll(async () => (await canvasCamera(canvasViewport)).x).not.toBe(cameraBeforePan.x);
+  await canvasRegion.getByRole('button', { name: 'Select mode' }).click();
+  await canvasViewport.focus();
+  await boardPage.keyboard.down('Space');
+  await expect(canvasViewport).toHaveAttribute('data-pan-active', 'true');
+  await boardPage.keyboard.up('Space');
+  await expect(canvasViewport).toHaveAttribute('data-pan-active', 'false');
+
   await canvasRegion.getByRole('button', { name: 'Press / stamping · Isometric' }).first().click();
   await expect(
     canvasRegion.getByRole('button', { name: 'Press / stamping · Isometric' }),
   ).toHaveCount(2);
   await canvasRegion.getByRole('button', { name: 'Simpan' }).click();
   await expect(canvasRegion.getByText('Layout v1')).toBeVisible();
-  const savedCanvas = await get<{ source: string; version: number; canEdit: boolean }>(
-    supervisor.context.request,
-    `/api/v1/supplier/assignment-board/layouts/${fixture.line.id}`,
-  );
+  const cameraBeforeFullscreen = await canvasCamera(canvasViewport);
+  await canvasRegion.getByRole('button', { name: 'Fullscreen', exact: true }).click();
+  await expect(canvasRegion.getByRole('button', { name: 'Keluar fullscreen' })).toBeVisible();
+  await expect
+    .poll(async () => (await canvasCamera(canvasViewport)).scale)
+    .toBeGreaterThan(cameraBeforeFullscreen.scale);
+  const fullscreenBox = await canvasRegion.boundingBox();
+  expect(fullscreenBox?.width ?? 0).toBeGreaterThanOrEqual(1_275);
+  expect(fullscreenBox?.height ?? 0).toBeGreaterThanOrEqual(715);
+  await canvasRegion.getByRole('button', { name: 'Keluar fullscreen' }).click();
+  await expect(canvasRegion.getByRole('button', { name: 'Fullscreen', exact: true })).toBeVisible();
+  await expect
+    .poll(async () => (await canvasCamera(canvasViewport)).scale)
+    .toBeCloseTo(cameraBeforeFullscreen.scale, 4);
+  const savedCanvas = await get<{
+    source: string;
+    version: number;
+    canEdit: boolean;
+    document: {
+      nodes: Array<{
+        type: string;
+        jobId?: string;
+        transform: { x: number; y: number };
+      }>;
+    };
+  }>(supervisor.context.request, `/api/v1/supplier/assignment-board/layouts/${fixture.line.id}`);
   expect(savedCanvas).toMatchObject({ source: 'SAVED', version: 1, canEdit: false });
+  expect(
+    savedCanvas.document.nodes.find(
+      (node) => node.type === 'JOB_SLOT' && node.jobId === fixture.job.id,
+    )?.transform,
+  ).not.toMatchObject({ x: 100, y: 100 });
   await captureSupplierVisuals(boardPage, 'assignment-board-canvas', testInfo);
 
   await boardPage.getByRole('button', { name: 'Default' }).click();
@@ -490,6 +559,15 @@ function createHenkaten(
     201,
     `e2e-${key}`,
   );
+}
+
+async function canvasCamera(viewport: Locator) {
+  return viewport.evaluate((element) => ({
+    x: Number(element.getAttribute('data-camera-x')),
+    y: Number(element.getAttribute('data-camera-y')),
+    scale: Number(element.getAttribute('data-camera-scale')),
+    panActive: element.getAttribute('data-pan-active') === 'true',
+  }));
 }
 
 async function captureSupplierPage(
