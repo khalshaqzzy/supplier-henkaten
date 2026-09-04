@@ -1,4 +1,57 @@
-# Session Handoff — Stable Responsive Canvas Camera dan Fullscreen
+# Session Handoff — Browser Henkaten Mutation CORS Recovery
+
+Date: 2026-09-04
+
+Branch: `fix/submit-approve`
+
+Status: implementation and local browser verification complete. Browser submission and approval
+decisions can cross the Supplier-web/API origin boundary again. Phase 15.9 remains `in_progress`.
+
+## 1. Objective and Root Cause
+
+- Reproduce the inability to submit, approve, or reject Hosted Henkaten after `pnpm local:reseed`.
+- The seeded database, current Shift Run, checklist, responsibility routes, and backend lifecycle
+  were valid: direct API submission, Supervisor approval, and QC rejection all returned success.
+- The browser stopped every idempotent mutation during CORS preflight. Supplier web sends the
+  required `Idempotency-Key`, but the API omitted that header from `Access-Control-Allow-Headers`.
+- The defect was cross-cutting rather than seed-specific and could affect every cross-origin
+  idempotent browser mutation, including End Shift, emergency start, Withdraw, and reroute.
+
+## 2. Implementation Completed
+
+- Added `Idempotency-Key` to the API CORS allow-header contract.
+- Upgraded the Hosted lifecycle browser journey so Henkaten submission, Supervisor approval, and
+  Supervisor rejection are performed through the rendered Supplier UI. Existing direct API checks
+  continue to cover QC final approval, QC reject-fast, concurrency, idempotency, and lifecycle
+  side effects.
+- Preserved the public API, database schema, workflow policy, seed shape, and authorization model.
+
+## 3. Verification
+
+- `pnpm local:reseed` completed with two Hosted suppliers and 240 seeded Henkaten.
+- Before the fix, browser submit reproduced the generic uncertain-mutation error and no POST reached
+  the API; preflight response omitted `Idempotency-Key`.
+- After rebuilding the local stack, preflight returned HTTP 204 with `Idempotency-Key` allowed.
+- Manual browser verification passed end to end: Line Leader submitted
+  `HEN-NPM-20260904-0014`, Supervisor approved its route, and QC rejected the remaining route; the
+  final record was `REJECTED` with immutable decision evidence.
+- Format, ESLint, full TypeScript, all 181 Vitest tests plus two Node tests, and the production build
+  with explicit `VITE_API_ORIGIN` passed. The first build invocation correctly stopped at the
+  repository's required-origin guard; the CI-equivalent invocation passed.
+- All four isolated Chromium journeys passed. The Hosted lifecycle journey exercised UI submit,
+  Supervisor approve, and Supervisor reject with real cross-origin preflight; every disposable E2E
+  PostgreSQL container, network, and volume was removed by the harness.
+- A final `pnpm local:reseed` restored the clean two-supplier/240-Henkaten baseline and rotated away
+  the temporary diagnostic passwords and records.
+
+## 4. Next Recommended Action
+
+1. Commit and deliver `fix/submit-approve` after final regression checks.
+2. Keep Phase 15.9 open until the next hosted staging deployment is green.
+
+---
+
+# Previous Handoff — Stable Responsive Canvas Camera dan Fullscreen
 
 Date: 2026-08-19
 

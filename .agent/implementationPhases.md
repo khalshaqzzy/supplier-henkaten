@@ -5007,6 +5007,10 @@ Verification:
 
 - Push staging produces exact release or explicit failure.
 - Environment isolated from production.
+- Cross-origin Hosted browser mutations now have explicit regression coverage: the lifecycle E2E
+  submits a Henkaten and records Supervisor approve/reject decisions through Supplier web, so the
+  required `Idempotency-Key` CORS preflight contract is exercised by a real browser rather than
+  only by Playwright's API request context.
 - Staging run `32104023080` proved every release gate green but exposed missing public DNS records
   as a silent remote-preflight exit. Direct VM diagnosis found three malformed Cloudflare names
   with a duplicated zone suffix. Correct DNS-only A records now target `34.177.111.165`; the

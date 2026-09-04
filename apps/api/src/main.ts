@@ -36,6 +36,7 @@ async function bootstrap(): Promise<void> {
     allowedHeaders: [
       'Content-Type',
       'Authorization',
+      'Idempotency-Key',
       'X-Correlation-ID',
       'X-CSRF-Token',
       'X-Device-Installation-ID',
