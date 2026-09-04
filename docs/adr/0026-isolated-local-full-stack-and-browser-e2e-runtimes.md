@@ -85,6 +85,12 @@ MP can coexist with an assignment whose current state remains `ASSIGNED` until f
 Local runtime output reports the canonical `localhost` browser origins accepted by CORS/cookies;
 the numeric loopback origin remains appropriate only for readiness probes.
 
+Cross-origin mutation coverage must execute representative idempotent commands through a browser
+page. The API CORS allow-header contract includes `Idempotency-Key` alongside CSRF, correlation,
+content-type, authorization, and device-installation headers. Direct API-request contexts remain
+useful for domain and concurrency assertions, but they are not accepted as evidence that browser
+preflight permits the same request.
+
 The durable seed also provisions one saved Canvas v1 for every active line through the Hosted
 layout PUT endpoint used by Supplier Admin. NPM demonstrates the curated isometric family and GKI
 the simple 2D family, while process zones, arrows, labels, and required job slots remain
@@ -185,6 +191,9 @@ concerns.
   evidence is recorded in `docs/audits/seededAppAllRolesQaAudit.md`.
 - Browser journeys start from fresh PostgreSQL/pgvector, exercise real authentication and domain
   operations, and leave no project container, network, process, or volume behind.
+- The 2026-09-04 Hosted lifecycle regression submits a Henkaten and records both approve and reject
+  decisions through Supplier-web pages. It reproduces browser preflight semantics and guards the
+  `Idempotency-Key` CORS allowance that direct API clients do not enforce.
 - An intentional browser failure produces a nonzero result and retained diagnostic artifacts while
   teardown still completes.
 

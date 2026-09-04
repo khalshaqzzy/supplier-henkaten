@@ -286,7 +286,7 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
   expect(invalid.status()).toBe(409);
   expect((await invalid.json()).code).toBe('CHECKLIST_NOT_PUBLISHED');
 
-  const machine = await createHenkaten(fixture, active, leader, 'MACHINE', 'machine-open');
+  const machine = await createHenkatenThroughUi(fixture, active, leader);
   await expect
     .poll(
       async () =>
@@ -317,13 +317,10 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
     expect.objectContaining({ supplierId: fixture.supplier.id, openWarningCount: 1 }),
   );
 
-  const supervisorApproved = await post<Henkaten>(
-    supervisor.context.request,
-    `/api/v1/supplier/henkatens/${machine.id}/decisions`,
-    { expectedVersion: machine.version, decision: 'APPROVED', comment: 'Supervisor approved' },
-    supervisor.csrf,
-    201,
-    'e2e-machine-supervisor',
+  const supervisorApproved = await decideHenkatenThroughUi(
+    supervisor.context,
+    machine.id,
+    'APPROVED',
   );
   expect(supervisorApproved.status).toBe('OPEN');
   await captureSupplierPage(
@@ -362,14 +359,7 @@ test('proves shift, four-4M, approval, rejection, clone, warning and realtime be
   expect(materialApproved.status).toBe('APPROVED');
 
   const method = await createHenkaten(fixture, active, leader, 'METHOD', 'method-open');
-  const rejected = await post<Henkaten>(
-    supervisor.context.request,
-    `/api/v1/supplier/henkatens/${method.id}/decisions`,
-    { expectedVersion: method.version, decision: 'REJECTED', comment: 'Reject fast evidence' },
-    supervisor.csrf,
-    201,
-    'e2e-method-reject',
-  );
+  const rejected = await decideHenkatenThroughUi(supervisor.context, method.id, 'REJECTED');
   expect(rejected.status).toBe('REJECTED');
   expect(rejected.routes.qc.status).toBe('NOT_REQUIRED');
 
@@ -559,6 +549,54 @@ function createHenkaten(
     201,
     `e2e-${key}`,
   );
+}
+
+async function createHenkatenThroughUi(
+  fixture: Awaited<ReturnType<typeof createHostedFixture>>,
+  shift: Shift,
+  leader: Awaited<ReturnType<typeof loginRole>>,
+) {
+  const page = await leader.context.newPage();
+  await page.goto(
+    `${runtime.supplierOrigin}/henkatens/new?shiftRunId=${shift.id}&jobId=${fixture.job.id}`,
+  );
+  await page.getByRole('radio', { name: 'Machine' }).click();
+  await page.getByLabel('Part terdampak').selectOption(fixture.part.id);
+  await page.getByLabel('Objek terdampak').fill('Machine A');
+  await page.getByLabel('Kondisi pengganti / baru').fill('Machine B');
+  await page.getByLabel('Penyebab').fill('Machine controlled change');
+  await page.getByLabel('Detail kejadian').fill('Machine detailed evidence');
+  const yesButtons = page.getByRole('button', { name: 'Yes', exact: true });
+  await expect(yesButtons).toHaveCount(1);
+  await yesButtons.click();
+  await page.getByRole('button', { name: 'Submit Henkaten' }).click();
+  await expect(page).toHaveURL(/\/henkatens\/[0-9a-f-]+$/);
+  const id = new URL(page.url()).pathname.split('/').at(-1)!;
+  const created = await get<Henkaten>(leader.context.request, `/api/v1/supplier/henkatens/${id}`);
+  await page.close();
+  return created;
+}
+
+async function decideHenkatenThroughUi(
+  context: Awaited<ReturnType<typeof loginRole>>['context'],
+  id: string,
+  decision: 'APPROVED' | 'REJECTED',
+) {
+  const page = await context.newPage();
+  await page.goto(`${runtime.supplierOrigin}/henkatens/${id}`);
+  const label = decision === 'APPROVED' ? 'Approve' : 'Reject';
+  await page.getByRole('button', { name: label, exact: true }).click();
+  await page.getByRole('button', { name: `Konfirmasi ${label}` }).click();
+  await expect(page.getByText('Action tidak dapat diproses')).toHaveCount(0);
+  await expect
+    .poll(async () => get<Henkaten>(context.request, `/api/v1/supplier/henkatens/${id}`))
+    .toMatchObject({
+      ...(decision === 'REJECTED' ? { status: 'REJECTED' } : {}),
+      routes: { supervisor: { status: decision } },
+    });
+  const updated = await get<Henkaten>(context.request, `/api/v1/supplier/henkatens/${id}`);
+  await page.close();
+  return updated;
 }
 
 async function canvasCamera(viewport: Locator) {
