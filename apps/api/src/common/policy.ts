@@ -42,6 +42,8 @@ export const CAPABILITIES: Readonly<Record<RequestPrincipal['role'], ReadonlySet
     'TMMIN_AUDIT_READ',
   ]),
   SUPPLIER_ADMIN: new Set([
+    'SUPPLIER_TANOKO_READ',
+    'SUPPLIER_TANOKO_MANAGE',
     'SUPPLIER_SELF_SERVICE',
     'SUPPLIER_MASTER_DATA_READ',
     'SUPPLIER_MASTER_DATA_MANAGE',
@@ -56,6 +58,8 @@ export const CAPABILITIES: Readonly<Record<RequestPrincipal['role'], ReadonlySet
     'SUPPLIER_AUDIT_READ',
   ]),
   SUPERVISOR: new Set([
+    'SUPPLIER_TANOKO_READ',
+    'SUPPLIER_TANOKO_MANAGE',
     'SUPPLIER_SELF_SERVICE',
     'SUPPLIER_SHIFT_READ',
     'SUPPLIER_HENKATEN_READ',
@@ -66,6 +70,7 @@ export const CAPABILITIES: Readonly<Record<RequestPrincipal['role'], ReadonlySet
     'SUPPLIER_AUDIT_READ',
   ]),
   LINE_LEADER: new Set([
+    'SUPPLIER_TANOKO_READ',
     'SUPPLIER_SELF_SERVICE',
     'SUPPLIER_SHIFT_READ',
     'SUPPLIER_SHIFT_OPERATE',
@@ -79,6 +84,7 @@ export const CAPABILITIES: Readonly<Record<RequestPrincipal['role'], ReadonlySet
     'SUPPLIER_AUDIT_READ',
   ]),
   QC: new Set([
+    'SUPPLIER_TANOKO_READ',
     'SUPPLIER_SELF_SERVICE',
     'SUPPLIER_SHIFT_READ',
     'SUPPLIER_HENKATEN_READ',

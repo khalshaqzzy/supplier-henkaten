@@ -1,3 +1,86 @@
+# Session Handoff — Compact Tanoko Matrix and Proficiency Enforcement
+
+Date: 2026-09-16
+Branch: `feat/tanoko`
+Status: implemented and locally verified; uncommitted. Phase 15.9 remains `in_progress`.
+
+## Objective and decisions
+
+- Implement the approved PDF-derived design A with the existing supplier navbar, left-aligned
+  Matriks/Riwayat tabs, name-only clipped MP headers and right-side cell editor from design C.
+- Keep the UI compact: 16px desktop content inset, 36px matrix rows, viewport-owned matrix scroll,
+  sticky MP names and Line/Job/Kategori columns, sticky summary, no dashboard metric cards.
+- Supplier Admin and every GL (SUPERVISOR) can edit any active MP/job within their supplier.
+  LL and QC have read access only. Authorization is enforced by API capabilities and service checks.
+- High/Medium/Low categorizes jobs visually; mastery levels 1–4 are independent. Missing mastery
+  is unassessed. No MP employment categories, license, annual restrictions or extra criteria.
+- Require level >=3 at Man submission and final atomic movement. A downgrade while approval is
+  pending blocks movement; existing reservation and assignment checks remain in force.
+
+## Seed follow-up verification
+
+- `pnpm --filter @tmmin-henkaten/api exec vitest run src/cli/local-seed-plan.spec.ts`: 6 passed.
+- API typecheck, targeted ESLint, Prettier check and `git diff --check`: passed.
+- Full bootstrap + `local:seed` ran successfully against isolated Docker Compose project
+  `tanoko-seed-check` (separate database/photo volumes and credentials output): 2 Hosted
+  suppliers and 240 Henkaten; all existing and new post-seed invariants passed.
+- SQL verified 12 default assignments per supplier, minimum level 3 for both suppliers.
+  Mapping totals: level 1=50, level 2=42, level 3=159, level 4=56, explicit unassessed=2;
+  51 additional pairs have no assessment. History includes 179 GL and 164 Admin entries.
+- Temporary Compose stack and volumes were removed after verification. Existing local demo
+  database and credentials were not reset. Updated seed applies on the next local reseed.
+
+## Changed files and implementation
+
+- New `packages/contracts/src/tanoko.ts`, API Tanoko controller/service/eligibility helper,
+  Prisma mapping/history models and forward migration `20260916001200_tanoko`.
+- Supplier API client methods, generated OpenAPI/client contract, role capabilities and native
+  navigation/route integration. Job Setup creates/updates the independent skill category.
+- New `TanokoPage.tsx`/`tanoko.css`: searchable matrix, line/category filters, 24-column pages,
+  qualified totals, keyboard cell navigation, fullscreen, responsive inspector, explicit save,
+  conflict recovery, read-only states, optional notes and immutable searchable history.
+- Serializable versioned writes atomically update mapping/history/general audit. Polling is 30s
+  and focus-based; Tanoko SSE is not implemented and drafts are not overwritten by polling.
+- Local seed covers unassessed cells and levels 1–4 through the same versioned API, with
+  Admin and both GL actors plus upgrade, downgrade and clearing history. Every seeded default
+  MP is qualified at level >=3 on its default job; Man replacements are independently assessed
+  on the exact target job. Post-seed invariants check default qualifications and visual/history
+  coverage. Production migration never invents proficiency; real MPs require assessment.
+- Three ImageGen concepts and prompts are saved under `.agent/design/tanoko/`.
+- PRD, roadmap and ADR 0032 synchronize the new scope and release consequences.
+
+## Verification
+
+- `pnpm generate`, `pnpm shared:build`, `pnpm typecheck`, API build and production Supplier build passed.
+- `pnpm openapi:generate` and `pnpm api-client:generate` refreshed the shared contract;
+  contract-freeze unit coverage confirms all 155 operations across 138 paths are documented.
+- `pnpm test:unit` passed before the final three UI interaction tests; the final Supplier suite
+  passes 50 tests. New coverage includes draft discard, read-only controls and conflict reload.
+- `pnpm db:up`, `pnpm db:wait`, `pnpm db:test:reset`, `pnpm db:test:migrate` passed on Docker
+  PostgreSQL 18/pgvector. All 12 migrations applied from empty state.
+- `NODE_ENV=test DATABASE_URL=<disposable-test-url> RELEASE_SHA=tanoko-local
+  SESSION_CSRF_SECRET=<test-value> AUTH_THROTTLE_SECRET=<test-value> OUTBOX_ENABLED=false
+  pnpm --filter @tmmin-henkaten/api test:integration` passed all 39 tests, including Tanoko
+  permission/version/history checks, insufficient submission mastery and downgrade at final approval.
+- All five Chromium journeys passed: governance, hosted lifecycle, Man concurrency, onboarding,
+  and Tanoko. All three Edge journeys passed: governance, onboarding, and Tanoko.
+- Tanoko browser evidence verifies frozen axes, save/history/reload, API conflict/read-only rejection,
+  no horizontal document overflow at 1440/1280/768/390 widths and zero Axe violations.
+- `pnpm exec eslint .`, `pnpm format:check` and `git diff --check` passed after test typing cleanup.
+- An early mobile screenshot captured the existing sidebar transition mid-frame; the final
+  responsive test waits for the sidebar to leave the viewport. Final Edge screenshot is correct.
+- The E2E harness can leave pnpm-spawned Vite descendants and log database-shutdown errors after
+  successful tests. Session-owned processes were cleaned separately after all journeys passed. Docker test containers were stopped; no session-owned runtime is retained.
+
+## Delivery and next action
+
+No commit, push, staging deployment or production migration has been performed. Review the local
+changes, then use the full repository pre-commit/CI parity and normal release workflow. Production
+rollout requires real GL/Admin qualification entry before Man substitutions. Large tenant payload
+performance and shop-floor UAT remain follow-up work.
+
+---
+
 # Session Handoff — Browser Henkaten Mutation CORS Recovery
 
 Date: 2026-09-04

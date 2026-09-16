@@ -415,7 +415,12 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
   const operationalComplete = Boolean(effectiveShiftId && jobId && partId);
   const categoryDetailComplete =
     category === 'MAN'
-      ? Boolean(target && replacement && !replacement.reserved)
+      ? Boolean(
+          target &&
+          replacement &&
+          !replacement.reserved &&
+          (replacement.skillLevels?.find((skill) => skill.jobId === target.jobId)?.level ?? 0) >= 3,
+        )
       : Boolean(affectedObject.trim() && replacementObject.trim());
   const narrativeComplete = Boolean(cause.trim() && detail.trim());
   const valid =
@@ -672,8 +677,17 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
                       {formOptions.data?.replacementMembers
                         .filter((member) => member.id !== target?.effectiveMpMemberId)
                         .map((member) => (
-                          <option key={member.id} value={member.id} disabled={member.reserved}>
+                          <option
+                            key={member.id}
+                            value={member.id}
+                            disabled={
+                              member.reserved ||
+                              (member.skillLevels?.find((skill) => skill.jobId === target?.jobId)
+                                ?.level ?? 0) < 3
+                            }
+                          >
                             {member.fullName} · {member.registrationNumber}
+                            {` · Tanoko ${member.skillLevels?.find((skill) => skill.jobId === target?.jobId)?.level ?? 'belum dinilai'}`}
                             {member.reserved
                               ? ' · Reserved'
                               : member.currentAssignment

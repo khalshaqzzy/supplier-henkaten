@@ -1,3 +1,4 @@
+import { assertTanokoEligible } from '../master-data/tanoko-eligibility.js';
 import { createHash } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
@@ -523,6 +524,10 @@ export class HenkatenService {
           fullName: true,
           registrationNumber: true,
           reservations: { where: { releasedAt: null }, select: { id: true }, take: 1 },
+          tanokoMappings: {
+            where: { supplierId: scope.supplierId },
+            select: { jobId: true, level: true },
+          },
           effectiveWorkingAssignments: {
             where: { active: true },
             orderBy: { updatedAt: 'desc' },
@@ -569,6 +574,7 @@ export class HenkatenService {
           fullName: member.fullName,
           registrationNumber: member.registrationNumber,
           reserved: member.reservations.length > 0,
+          skillLevels: member.tanokoMappings,
           currentAssignment: assignment
             ? {
                 id: assignment.id,
@@ -942,6 +948,7 @@ export class HenkatenService {
       },
     });
     if (!replacement) throw missing('Active replacement MP');
+    await assertTanokoEligible(tx, supplierId, replacement.id, target.jobId);
     if (replacement.id === replaced?.id) throw assignmentConflict();
     const source = await tx.workingAssignment.findFirst({
       where: {

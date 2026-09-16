@@ -389,7 +389,8 @@ export class SupplierCatalogController {
   @Post('/lines/:lineId/jobs')
   async createJob(
     @Param('lineId') lineId: string,
-    @ValidatedBody(createJobRequestSchema) body: { name: string },
+    @ValidatedBody(createJobRequestSchema)
+    body: { name: string; skillCategory?: 'HIGH' | 'MEDIUM' | 'LOW' },
     @Req() request: ContextRequest,
   ) {
     return this.catalog.createJob(
@@ -415,7 +416,8 @@ export class SupplierCatalogController {
   async updateJob(
     @Param('lineId') lineId: string,
     @Param('id') id: string,
-    @ValidatedBody(updateJobRequestSchema) body: { expectedVersion: number; name: string },
+    @ValidatedBody(updateJobRequestSchema)
+    body: { expectedVersion: number; name: string; skillCategory?: 'HIGH' | 'MEDIUM' | 'LOW' },
     @Req() request: ContextRequest,
   ) {
     return this.catalog.updateJob(

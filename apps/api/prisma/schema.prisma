@@ -559,6 +559,7 @@ model ExternalHenkatenProjection {
 }
 
 model Member {
+  tanokoMappings               TanokoMapping[]
   id                           String                  @id @default(uuid()) @db.Uuid
   supplierId                   String                  @db.Uuid
   fullName                     String                  @db.VarChar(150)
@@ -675,6 +676,8 @@ model LineBoardLayout {
 }
 
 model Job {
+  skillCategory      String?              @db.VarChar(6)
+  tanokoMappings     TanokoMapping[]
   id                 String               @id @default(uuid()) @db.Uuid
   supplierId         String               @db.Uuid
   lineId             String               @db.Uuid
@@ -1335,4 +1338,37 @@ model HenkatenTransition {
 
   @@unique([id, supplierId])
   @@index([supplierId, henkatenId, occurredAt])
+}
+
+model TanokoMapping {
+  id String @id @default(uuid()) @db.Uuid
+  supplierId String @db.Uuid
+  memberId String @db.Uuid
+  jobId String @db.Uuid
+  level Int?
+  version Int @default(1)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  member Member @relation(fields: [memberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  job Job @relation(fields: [jobId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  @@unique([supplierId, memberId, jobId])
+}
+
+model TanokoChange {
+  id String @id @default(uuid()) @db.Uuid
+  supplierId String @db.Uuid
+  memberId String @db.Uuid
+  jobId String @db.Uuid
+  lineId String @db.Uuid
+  memberName String @db.VarChar(150)
+  jobName String @db.VarChar(150)
+  lineName String @db.VarChar(150)
+  previousLevel Int?
+  level Int?
+  actorUserId String @db.Uuid
+  actorName String @db.VarChar(150)
+  actorRole String @db.VarChar(30)
+  note String @db.VarChar(500)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([supplierId, createdAt, id])
+  @@index([supplierId, lineId, createdAt, id])
 }

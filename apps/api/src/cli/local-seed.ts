@@ -7,7 +7,12 @@ import { dirname, resolve } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import sharp from 'sharp';
 
-import { boardLayoutDocumentSchema, type BoardLayoutDocument } from '@tmmin-henkaten/contracts';
+import {
+  boardLayoutDocumentSchema,
+  type BoardLayoutDocument,
+  type TanokoMatrix,
+  type TanokoMapping,
+} from '@tmmin-henkaten/contracts';
 
 import { PrismaClient } from '../generated/prisma/client.js';
 import {
@@ -16,6 +21,7 @@ import {
   assertLocalSeedEnvironment,
   createLocalSeedPlan,
   localSeedSummary,
+  localSeedTanokoLevel,
   type SeedCategory,
   type SeedHenkatenPlan,
   type SeedOutcome,
@@ -338,7 +344,10 @@ async function provisionSupplier(
         await admin.api.request<Resource>(
           'POST',
           `/api/v1/supplier/master-data/lines/${line.id}/jobs`,
-          { name: plan.jobNames[lineIndex]![jobIndex]! },
+          {
+            name: plan.jobNames[lineIndex]![jobIndex]!,
+            skillCategory: ['HIGH', 'MEDIUM', 'LOW'][jobIndex % 3],
+          },
           admin.csrf,
         ),
       );
@@ -390,6 +399,43 @@ async function provisionSupplier(
       admin.csrf,
     );
     mps.push(response.member);
+  }
+  // Synthetic local-demo qualifications; production data is never backfilled.
+  for (const [index, mp] of mps.entries()) {
+    for (const [jobIndex, job] of jobs.flat().entries()) {
+      const level = localSeedTanokoLevel(index, jobIndex);
+      if (level === null) continue;
+      const editor = jobIndex % 2 === 0 ? admin : supervisors[index % supervisors.length]!;
+      await editor.api.request(
+        'PUT',
+        `/api/v1/supplier/tanoko/members/${mp.id}/jobs/${job.id}`,
+        {
+          expectedVersion: null,
+          level,
+          note: 'Penilaian awal sintetis untuk demo lokal.',
+        },
+        editor.csrf,
+      );
+    }
+  }
+  // Show reassessment, correction and clearing in history before operational scenarios start.
+  const historyMember = mps[13]!;
+  const historyJob = jobs[2]![3]!;
+  let historyVersion: number | null = null; // This deterministic pair starts unassessed.
+  for (const [level, note] of [
+    [2, 'Simulasi asesmen: perlu pendampingan pada job ini.'],
+    [3, 'Simulasi evaluasi GL: mampu bekerja mandiri setelah pelatihan.'],
+    [2, 'Simulasi koreksi asesmen: pendampingan masih diperlukan.'],
+    [null, 'Simulasi pembatalan asesmen: menunggu evaluasi ulang.'],
+  ] as const) {
+    const editor: SessionClient = supervisors[historyVersion === null ? 0 : historyVersion % 2]!;
+    const mapping: TanokoMapping = await editor.api.request<TanokoMapping>(
+      'PUT',
+      `/api/v1/supplier/tanoko/members/${historyMember.id}/jobs/${historyJob.id}`,
+      { expectedVersion: historyVersion, level, note },
+      editor.csrf,
+    );
+    historyVersion = mapping.version;
   }
   const checklists = {} as SupplierRuntime['checklists'];
   const checklistLabels = {
@@ -945,6 +991,13 @@ async function createManHenkaten(
   clonedFromHenkatenId?: string,
   record?: SeedHenkatenPlan,
 ) {
+  const assessor = runtime.supervisors[lineIndex % runtime.supervisors.length]!;
+  await ensureSeedQualification(
+    assessor,
+    replacementMpMemberId,
+    target.jobId,
+    'Simulasi evaluasi GL: kompetensi job tujuan diverifikasi sebelum Henkaten Man.',
+  );
   const checklist = runtime.checklists.MAN;
   const narrative = henkatenNarrative('MAN', record?.narrativeVariant ?? key.length);
   return runtime.leaders[lineIndex]!.api.request<HenkatenResource>(
@@ -1199,7 +1252,37 @@ function decide(
   );
 }
 
+async function ensureSeedQualification(
+  assessor: SessionClient,
+  memberId: string,
+  jobId: string,
+  note: string,
+) {
+  const matrix = await assessor.api.request<TanokoMatrix>('GET', '/api/v1/supplier/tanoko');
+  const qualification = matrix.mappings.find(
+    (mapping) => mapping.memberId === memberId && mapping.jobId === jobId,
+  );
+  if ((qualification?.level ?? 0) < 3) {
+    await assessor.api.request(
+      'PUT',
+      `/api/v1/supplier/tanoko/members/${memberId}/jobs/${jobId}`,
+      {
+        expectedVersion: qualification?.version ?? null,
+        level: 3,
+        note,
+      },
+      assessor.csrf,
+    );
+  }
+}
+
 async function assignDefaultMp(admin: SessionClient, job: Resource, mp: MemberResource) {
+  await ensureSeedQualification(
+    admin,
+    mp.id,
+    job.id,
+    'Asesmen sintetis: MP memenuhi kompetensi minimal level 3 pada job default.',
+  );
   await admin.api.request(
     'POST',
     `/api/v1/supplier/master-data/jobs/${job.id}/default-mp`,
@@ -1358,6 +1441,36 @@ async function verifySeed(prisma: PrismaClient) {
     throw new Error('Post-seed invariant failed: expected exactly two active Hosted suppliers.');
   }
   for (const supplier of suppliers) {
+    const [tanokoMappings, tanokoChanges, categorizedJobs, defaultMps] = await Promise.all([
+      prisma.tanokoMapping.findMany({ where: { supplierId: supplier.id } }),
+      prisma.tanokoChange.findMany({ where: { supplierId: supplier.id } }),
+      prisma.job.findMany({ where: { supplierId: supplier.id }, select: { skillCategory: true } }),
+      prisma.defaultJobMp.findMany({ where: { supplierId: supplier.id } }),
+    ]);
+    if (
+      defaultMps.some(
+        (assignment) =>
+          !tanokoMappings.some(
+            (mapping) =>
+              mapping.memberId === assignment.mpMemberId &&
+              mapping.jobId === assignment.jobId &&
+              (mapping.level ?? 0) >= 3,
+          ),
+      ) ||
+      ![1, 2, 3, 4].every((level) => tanokoMappings.some((mapping) => mapping.level === level)) ||
+      tanokoMappings.filter((mapping) => mapping.level !== null).length >= 15 * 12 ||
+      !['HIGH', 'MEDIUM', 'LOW'].every((category) =>
+        categorizedJobs.some((job) => job.skillCategory === category),
+      ) ||
+      !['SUPPLIER_ADMIN', 'SUPERVISOR'].every((role) =>
+        tanokoChanges.some((change) => change.actorRole === role),
+      ) ||
+      !tanokoChanges.some((change) => change.previousLevel === 2 && change.level === 3) ||
+      !tanokoChanges.some((change) => change.previousLevel === 3 && change.level === 2) ||
+      !tanokoChanges.some((change) => change.previousLevel === 2 && change.level === null)
+    ) {
+      throw new Error(`Post-seed Tanoko coverage failed for ${supplier.code}.`);
+    }
     const [
       lines,
       jobs,

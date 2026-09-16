@@ -1,3 +1,5 @@
+import { TanokoController } from './tanoko.controller.js';
+import { TanokoService } from './tanoko.service.js';
 import { Module } from '@nestjs/common';
 
 import { AuthModule } from '../auth/auth.module.js';
@@ -17,12 +19,14 @@ import { TmminMasterDataController } from './tmmin-master-data.controller.js';
 @Module({
   imports: [AuthModule],
   controllers: [
+    TanokoController,
     SupplierMemberController,
     SupplierCatalogController,
     SupplierConfigurationController,
     TmminMasterDataController,
   ],
   providers: [
+    TanokoService,
     MasterDataAccessService,
     MemberService,
     CatalogService,

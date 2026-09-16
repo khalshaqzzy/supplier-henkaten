@@ -208,6 +208,11 @@ describe('Hosted shift and Henkaten core', () => {
     ]);
     job1Id = job1.id;
     job2Id = job2.id;
+    await prisma.tanokoMapping.createMany({
+      data: [mp1Id, mp2Id, replacementMpId].flatMap((memberId) =>
+        [job1Id, job2Id].map((jobId) => ({ supplierId, memberId, jobId, level: 3 })),
+      ),
+    });
     partId = part.id;
     shiftTemplateId = template.id;
 
@@ -473,6 +478,79 @@ describe('Hosted shift and Henkaten core', () => {
     const secondBody = responseBody<HenkatenPageBody>(second);
     expect(secondBody.items).toHaveLength(1);
     expect(secondBody.items[0]!.id).not.toBe(firstBody.items[0]!.id);
+  });
+
+  it('enforces Tanoko edits, tenant isolation, concurrency, history and replacement eligibility', async () => {
+    const path = `/api/v1/supplier/tanoko/members/${replacementMpId}/jobs/${job1Id}`;
+    const put = (cookie: string[], csrf: string, body: object, route = path) =>
+      request(app.getHttpServer())
+        .put(route)
+        .set('Origin', supplierOrigin)
+        .set('Cookie', cookie)
+        .set('X-CSRF-Token', csrf)
+        .send(body);
+    expect((await put(leaderCookie, leaderCsrf, { expectedVersion: 1, level: 2 })).status).toBe(
+      403,
+    );
+    expect((await put(qcCookie, qcCsrf, { expectedVersion: 1, level: 2 })).status).toBe(403);
+    expect((await put(adminCookie, adminCsrf, { expectedVersion: 1, level: 5 })).status).toBe(400);
+    expect(
+      (
+        await put(
+          adminCookie,
+          adminCsrf,
+          { expectedVersion: null, level: 3 },
+          `/api/v1/supplier/tanoko/members/${randomUUID()}/jobs/${job1Id}`,
+        )
+      ).status,
+    ).toBe(404);
+    const updated = await put(supervisorCookie, supervisorCsrf, {
+      expectedVersion: 1,
+      level: 2,
+      note: 'Perlu pendampingan',
+    });
+    expect(updated.status).toBe(200);
+    expect((await put(adminCookie, adminCsrf, { expectedVersion: 1, level: 4 })).status).toBe(409);
+    const checklist = checklists.get('MAN')!;
+    const response = await leaderPost(
+      '/api/v1/supplier/henkatens',
+      {
+        category: 'MAN',
+        shiftRunId,
+        jobId: job1Id,
+        partId,
+        checklistVersionId: checklist.versionId,
+        checklistAnswers: [{ itemId: checklist.itemId, answer: 'YES' }],
+        cause: 'Check qualification',
+        detail: 'Level two must be refused.',
+        targetWorkingAssignmentId,
+        targetAssignmentVersion: targetWorkingAssignmentVersion,
+        replaced: { kind: 'MP', memberId: mp1Id },
+        replacementMpMemberId: replacementMpId,
+      },
+      'tanoko-ineligible',
+    );
+    expect(response.status).toBe(422);
+    expect(response.body.fieldErrors[0].code).toBe('TANOKO_LEVEL_REQUIRED');
+    expect(
+      (
+        await put(adminCookie, adminCsrf, {
+          expectedVersion: 2,
+          level: 3,
+          note: 'Evaluasi mandiri',
+        })
+      ).status,
+    ).toBe(200);
+    const history = await request(app.getHttpServer())
+      .get('/api/v1/supplier/tanoko/history?limit=1')
+      .set('Cookie', supervisorCookie);
+    expect(history.status).toBe(200);
+    expect(history.body.items[0].note).toBe('Evaluasi mandiri');
+    expect(history.body.nextCursor).toBeTruthy();
+    const next = await request(app.getHttpServer())
+      .get(`/api/v1/supplier/tanoko/history?cursor=${history.body.nextCursor}`)
+      .set('Cookie', supervisorCookie);
+    expect(next.body.items[0].note).toBe('Perlu pendampingan');
   });
 
   it('reserves Man replacement/target atomically and releases only its reservation on withdraw', async () => {
@@ -1238,6 +1316,31 @@ describe('Hosted shift and Henkaten core', () => {
         )
       ).status,
     ).toBe(201);
+    // A downgrade while approvals are pending must prevent the atomic movement.
+    await prisma.tanokoMapping.update({
+      where: {
+        supplierId_memberId_jobId: { supplierId, memberId: replacementMpId, jobId: job1Id },
+      },
+      data: { level: 2 },
+    });
+    const blockedApproval = await supplierRolePost(
+      qcCookie,
+      qcCsrf,
+      `/api/v1/supplier/henkatens/${henkatenId}/decisions`,
+      { expectedVersion: 2, decision: 'APPROVED' },
+      'tanoko-downgraded-approval',
+    );
+    expect(blockedApproval.status).toBe(422);
+    expect(await prisma.assignmentMovement.count({ where: { henkatenId } })).toBe(0);
+    expect((await prisma.henkaten.findUniqueOrThrow({ where: { id: henkatenId } })).version).toBe(
+      2,
+    );
+    await prisma.tanokoMapping.update({
+      where: {
+        supplierId_memberId_jobId: { supplierId, memberId: replacementMpId, jobId: job1Id },
+      },
+      data: { level: 3 },
+    });
     const approved = await supplierRolePost(
       qcCookie,
       qcCsrf,
@@ -1334,6 +1437,9 @@ describe('Hosted shift and Henkaten core', () => {
       id: string;
       version: number;
     };
+    await prisma.tanokoMapping.create({
+      data: { supplierId, memberId: plannedReplacement, jobId: plannedJob.id, level: 3 },
+    });
     const submitted = await supplierRolePost(
       plannedLogin.cookie,
       plannedLogin.csrf,
@@ -1567,6 +1673,9 @@ describe('Hosted shift and Henkaten core', () => {
     const plannedSourceAssignment = await prisma.workingAssignment.findUniqueOrThrow({
       where: { id: plannedAssignment.id },
     });
+    await prisma.tanokoMapping.create({
+      data: { supplierId, memberId: plannedReplacement, jobId: receivingJob.id, level: 3 },
+    });
     const donorMove = await supplierRolePost(
       receivingLogin.cookie,
       receivingLogin.csrf,
@@ -1627,6 +1736,9 @@ describe('Hosted shift and Henkaten core', () => {
     });
     expect(donorAssignment.effectiveMpMemberId).toBeNull();
 
+    await prisma.tanokoMapping.create({
+      data: { supplierId, memberId: issueResolutionMp, jobId: plannedJob.id, level: 3 },
+    });
     const resolution = await supplierRolePost(
       plannedLogin.cookie,
       plannedLogin.csrf,

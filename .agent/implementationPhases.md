@@ -2,7 +2,7 @@
 
 Document status: Active implementation roadmap
 Created: 2026-07-23
-Last updated: 2026-08-19
+Last updated: 2026-09-16
 Source of truth: `.agent/PRD.md`
 Implementation approach: Backend-first
 Workspace tooling: Node.js 22 + pnpm workspaces, tanpa Turborepo
@@ -5858,3 +5858,20 @@ Sebelum v1 dinyatakan complete:
 - UAT dan accepted-risk references tersedia;
 - tidak ada unresolved Critical/High security issue;
 - tidak ada agent-started local process/container yang dibiarkan berjalan.
+
+## Tanoko extension — 2026-09-16
+
+Status: implemented; local verification recorded in sessionHandoff. Phase 15.9 remains the sole
+in_progress delivery phase. No deployment or production UAT is claimed.
+
+- Accepted design A (PDF baseline), existing navigation, left-aligned tabs, clipped MP names,
+  two-axis freeze, compact matrix and right inspector, polished searchable history.
+- Added tenant-bound mapping/history storage, GL/Admin authorization, optimistic concurrency,
+  category setup, and minimum level 3 checks at Man submission and final movement.
+- No production proficiency backfill. Populate Tanoko before making new Man replacements.
+- Follow-up: deploy forward migration with normal release process, assess actual large-supplier
+  matrix load, and conduct user acceptance on the target shop-floor device.
+
+- Seed extension: varied levels 1–4/unassessed mappings, Admin/GL audit examples, and automatic
+  synthetic assessment to at least level 3 before assigning a default MP or submitting a Man
+  replacement. Post-seed checks verify all default MP/job pairs remain qualified.

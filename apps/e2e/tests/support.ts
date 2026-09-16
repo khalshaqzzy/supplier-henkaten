@@ -250,6 +250,18 @@ export async function createHostedFixture(
     mp: await member(context.request, csrf, suffix, 'MP', 5),
     replacement: await member(context.request, csrf, suffix, 'MP', 6),
   };
+  for (const mp of [members.mp, members.replacement]) {
+    for (const target of [job, donorJob]) {
+      const response = await context.request.put(
+        `${runtime.apiOrigin}/api/v1/supplier/tanoko/members/${mp.id}/jobs/${target.id}`,
+        {
+          headers: { Origin: runtime.supplierOrigin, 'X-CSRF-Token': csrf },
+          data: { expectedVersion: null, level: 3, note: 'Qualified E2E fixture' },
+        },
+      );
+      expect(response.status()).toBe(200);
+    }
+  }
   const checklists: HostedFixture['checklists'] = {};
   for (const category of ['MAN', 'MACHINE', 'MATERIAL', 'METHOD']) {
     const draft = await patch<{ version: number }>(

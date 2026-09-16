@@ -1,3 +1,10 @@
+import {
+  tanokoMatrixSchema,
+  tanokoMappingSchema,
+  tanokoSaveSchema,
+  tanokoHistoryQuerySchema,
+  tanokoHistorySchema,
+} from '@tmmin-henkaten/contracts';
 import { z } from 'zod';
 import { createDocument } from 'zod-openapi';
 
@@ -470,6 +477,24 @@ function readModelPaths() {
         requestParams: idPath,
         requestBody: body(notificationReadRequestSchema),
         responses: { '200': json('Updated notification', notificationSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/tanoko': {
+      get: { responses: { '200': json('Supplier Tanoko matrix', tanokoMatrixSchema) } },
+    },
+    '/api/v1/supplier/tanoko/history': {
+      get: {
+        requestParams: { query: tanokoHistoryQuerySchema },
+        responses: { '200': json('Tanoko changes', tanokoHistorySchema) },
+      },
+    },
+    '/api/v1/supplier/tanoko/members/{memberId}/jobs/{jobId}': {
+      put: {
+        requestParams: {
+          path: z.object({ memberId: z.string().uuid(), jobId: z.string().uuid() }),
+        },
+        requestBody: body(tanokoSaveSchema),
+        responses: { '200': json('Saved mapping', tanokoMappingSchema), '409': problem },
       },
     },
     '/api/v1/supplier/assignment-board': {

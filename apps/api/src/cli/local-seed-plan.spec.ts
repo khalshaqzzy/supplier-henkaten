@@ -6,6 +6,7 @@ import {
   createLocalSeedPlan,
   assertLocalSeedEnvironment,
   localSeedSummary,
+  localSeedTanokoLevel,
 } from './local-seed-plan.js';
 
 describe('local seed plan', () => {
@@ -125,6 +126,17 @@ describe('local seed plan', () => {
         'OPEN_QC_APPROVED',
       ]),
     );
+  });
+
+  it('provides every Tanoko level, unassessed cells and qualified coverage for each job', () => {
+    for (let jobIndex = 0; jobIndex < 12; jobIndex += 1) {
+      const levels = Array.from({ length: 15 }, (_, memberIndex) =>
+        localSeedTanokoLevel(memberIndex, jobIndex),
+      );
+      expect(new Set(levels)).toEqual(new Set([null, 1, 2, 3, 4]));
+      expect(levels.filter((level) => (level ?? 0) >= 3).length).toBeGreaterThanOrEqual(6);
+    }
+    expect(localSeedTanokoLevel(13, 11)).toBeNull();
   });
 
   it('rejects non-local, production, test-database, missing-confirmation, CI, and push-enabled execution', () => {

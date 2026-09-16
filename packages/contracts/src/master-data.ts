@@ -1,3 +1,4 @@
+import { skillCategorySchema } from './tanoko.js';
 import { z } from 'zod';
 
 import { henkatenCategorySchema, memberRoleSchema, userStatusSchema } from './enums.js';
@@ -137,12 +138,19 @@ export const linePageSchema = z
   .object({ items: z.array(lineSchema), pageInfo: pageInfoSchema })
   .strict();
 
-export const createJobRequestSchema = z.object({ name: nameSchema }).strict();
+export const createJobRequestSchema = z
+  .object({ name: nameSchema, skillCategory: skillCategorySchema.optional() })
+  .strict();
 export const updateJobRequestSchema = z
-  .object({ expectedVersion: optimisticVersionSchema, name: nameSchema })
+  .object({
+    expectedVersion: optimisticVersionSchema,
+    name: nameSchema,
+    skillCategory: skillCategorySchema.optional(),
+  })
   .strict();
 export const jobSchema = z
   .object({
+    skillCategory: skillCategorySchema.nullable().optional(),
     id: opaqueIdSchema,
     lineId: opaqueIdSchema,
     name: nameSchema,

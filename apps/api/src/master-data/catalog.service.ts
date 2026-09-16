@@ -199,7 +199,7 @@ export class CatalogService {
   async createJob(
     scope: TenantScope,
     lineId: string,
-    input: { name: string },
+    input: { name: string; skillCategory?: string },
     context: MutationContext,
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
@@ -219,6 +219,7 @@ export class CatalogService {
           supplierId: scope.supplierId,
           lineId,
           name: input.name.trim(),
+          ...(input.skillCategory ? { skillCategory: input.skillCategory } : {}),
           normalizedName: normalizeLookup(input.name),
           displayOrder: displayOrder + 1,
           createdById: context.actorUserId,
@@ -246,7 +247,7 @@ export class CatalogService {
     scope: TenantScope,
     lineId: string,
     id: string,
-    input: { expectedVersion: number; name: string },
+    input: { expectedVersion: number; name: string; skillCategory?: string },
     context: MutationContext,
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
@@ -259,6 +260,7 @@ export class CatalogService {
         where: { id },
         data: {
           name: input.name.trim(),
+          ...(input.skillCategory ? { skillCategory: input.skillCategory } : {}),
           normalizedName: normalizeLookup(input.name),
           version: { increment: 1 },
           updatedById: context.actorUserId,

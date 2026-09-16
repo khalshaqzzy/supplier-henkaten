@@ -26,6 +26,8 @@ export const hostedPreparationStatusSchema = z.enum(['ACTIVE', 'COMPLETED', 'CAN
 export type HostedPreparationStatus = z.infer<typeof hostedPreparationStatusSchema>;
 
 export const capabilitySchema = z.enum([
+  'SUPPLIER_TANOKO_READ',
+  'SUPPLIER_TANOKO_MANAGE',
   'TMMIN_SUPPLIER_READ',
   'TMMIN_SUPPLIER_MANAGE',
   'TMMIN_QUALITY_MANAGE',

@@ -26,7 +26,7 @@ TMMIN menyediakan dua pilihan kepada setiap supplier:
 
 Satu supplier hanya boleh memiliki satu source mode aktif. Data antar-supplier wajib terisolasi. TMMIN dapat memonitor seluruh supplier, tetapi tidak menjalankan approval supplier.
 
-Scope produk dibatasi pada **Henkaten management**. Fitur health monitoring, attendance, skill matrix, skill recommendation, schedule, moral, task planning, process difficulty, machine telemetry, dan modul operasional non-Henkaten lainnya tidak termasuk v1.
+Scope produk dibatasi pada **Henkaten management**. Fitur health monitoring, attendance, skill recommendation, schedule, moral, task planning, process difficulty, machine telemetry, dan modul operasional non-Henkaten lainnya tidak termasuk v1.
 
 ---
 
@@ -90,7 +90,7 @@ Menyediakan satu sistem Henkaten yang aman, traceable, dan konsisten bagi seluru
 Produk ini bukan:
 
 - HRIS, attendance system, atau employee scheduling system;
-- skill management atau automatic replacement recommendation engine;
+- automatic replacement recommendation engine atau skill management di luar Tanoko job mapping;
 - production planning atau machine monitoring system;
 - quality inspection execution system di luar checklist Henkaten;
 - platform komunikasi email/chat;
@@ -503,7 +503,7 @@ Shift yang melewati tengah malam wajib didukung. Business date mengikuti tanggal
 - Minimum satu active checklist item per kategori diperlukan sebelum kategori dapat dipakai.
 - Henkaten menyimpan snapshot label, urutan, version, dan jawaban.
 - Semua jawaban wajib `YES` saat submit; `NO` atau unanswered menolak submission.
-- Admin-defined checklist boleh berisi pertanyaan terkait tindakan operasional, tetapi tidak mengaktifkan skill-management feature.
+- Admin-defined checklist boleh berisi pertanyaan terkait tindakan operasional, dan terpisah dari penilaian Tanoko pada section 16.7.
 
 ### 10.7 CRUD dan Deactivation
 
@@ -723,6 +723,7 @@ Validasi:
 
 - replaced dan replacement tidak boleh orang yang sama;
 - replacement aktif dan role MP;
+- replacement memiliki Tanoko level 3 atau 4 pada exact job tujuan; validasi dilakukan saat submit dan atomic movement, termasuk bila level berubah selama approval;
 - replacement berada pada supplier yang sama;
 - replacement tidak memiliki active reservation lain;
 - target job belum menjadi target Man Henkaten Open lain;
@@ -962,6 +963,42 @@ Process difficulty, skill level, health, attendance, dan schedule tidak boleh mu
 - Save memakai optimistic layout version dan menghasilkan audit redacted plus outbox invalidation
   tanpa PII. Konflik mempertahankan local draft sampai pengguna memilih mempertahankan draft atau
   memuat versi authoritative terbaru.
+
+---
+
+### 16.7 Tanoko (implemented, September 2026)
+
+Tanoko merupakan perluasan scope Hosted, terpisah dari Assignment Board. Skill adalah job pada
+line tertentu; nama job yang sama pada line lain tidak berarti kualifikasi yang sama.
+
+- Menu Tanoko menggunakan navbar supplier yang ada. Tab Matriks/Riwayat ditempatkan di kiri.
+- Seluruh MP terdaftar menjadi kolom; seluruh job dari seluruh line supplier menjadi baris.
+  MP/job nonaktif tetap terlihat tetapi tidak dapat diedit; tidak ada akses lintas supplier.
+- Supplier Admin dan seluruh Supervisor/GL dapat memperbarui mapping lintas-line kapan saja,
+  tanpa bergantung pada shift atau penugasan GL. LL dan QC hanya membaca.
+- Kategori job High/Medium/Low diatur pada Setup Line & Job dan bersifat visual. Job lama tidak
+  diberi kategori asumsi; ditampilkan sebagai Belum diatur sampai Admin mengaturnya.
+- Nilai mapping: belum dinilai (null), 1 Training, 2 Dengan pengawasan, 3 Mandiri,
+  4 Dapat melatih. Tidak ada kategori MP, license, expiry, periode tahunan, atau kriteria tambahan.
+- Pengganti Man wajib memiliki level >=3 pada job tujuan. Kelayakan skill tidak menghapus
+  validasi MP aktif, reservasi, versi assignment, dan tenant. Penurunan level tetap dapat
+  disimpan kapan saja; final approval tidak memindahkan MP yang sudah tidak memenuhi syarat.
+- Matriks compact dengan header nama MP sticky, kolom Line/Job/Kategori sticky, sudut sticky,
+  dan footer jumlah job dikuasai. Nama horizontal memakai ellipsis dan tooltip hover/fokus;
+  nomor registrasi tidak ditampilkan. Scroll dimiliki matriks, bukan lebar dokumen.
+- Render kolom dibatasi 24 MP per halaman kolom untuk menjaga DOM; seluruh MP tetap dapat
+  dicari dan diakses. Rekap per job menghitung seluruh MP aktif, bukan hanya halaman kolom.
+  Rekap per MP menghitung job aktif pada hasil filter saat ini.
+- Klik sel membuka inspector kanan. Penyimpanan eksplisit, catatan opsional maksimal 500
+  karakter, optimistic version conflict, serta perlindungan draft saat pindah sel/tab/link.
+- Riwayat immutable menyimpan nilai sebelum/sesudah, MP, job, line, nama/role actor, waktu,
+  dan catatan. Filter pencarian/line serta keyset pagination tersedia. Waktu mengikuti timezone
+  supplier. Update menyimpan mapping, history, dan audit dalam satu transaksi serializable.
+- Matriks membaca ulang setiap 30 detik dan saat window kembali fokus; draft editor tidak
+  ditimpa polling. Tidak ada klaim SSE Tanoko.
+- Production migration tidak mengarang nilai penguasaan. Data lama belum dinilai sampai GL/Admin
+  mengisi; Man replacement akan ditolak bila belum memenuhi syarat. Local demo seed saja
+  membuat penilaian sintetis melalui API.
 
 ---
 
@@ -2212,7 +2249,7 @@ Metrik adoption, cycle time approval, reject rate, dan aging dipantau melalui da
 - health monitoring;
 - attendance/leave management;
 - shift employee scheduling di luar Shift Run Henkaten;
-- skill matrix, skill level, license, dan replacement recommendation;
+- job license, kriteria fundamental/TJI/TPS, kategori permanent/temporary/fresh, dan automatic replacement recommendation;
 - moral monitoring;
 - task planning/result record;
 - process difficulty/hard-medium-easy;
