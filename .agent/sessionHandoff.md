@@ -91,6 +91,15 @@ Verification for this fix:
   locally for this change; CI passed every one of those steps at this SHA and the change touches
   only the Caddy image's Go dependencies, with the Caddyfile unchanged.
 
+Delivery result:
+
+- Commit `6e32b7d` was pushed to `feat/tanoko`. CI run `35076423277` completed successfully with all
+  ten required jobs green, including `Production containers and routing` with its `Scan Caddy image`
+  step, and `Release candidate gate`. `Deploy staging` remains skipped for pull requests by design.
+  PR #16 is `MERGEABLE` with merge state `CLEAN`.
+- The commit-mode Gitleaks scan over the new commit reported no leaks. No container, network, or
+  volume from this work remains; the local development stack was not started or stopped.
+
 ## Changed files and implementation
 
 - New `packages/contracts/src/tanoko.ts`, API Tanoko controller/service/eligibility helper,
