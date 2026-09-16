@@ -31,6 +31,7 @@ RUN pnpm --filter @tmmin-henkaten/contracts run build \
 
 FROM ${STATIC_IMAGE} AS runtime
 ARG RELEASE_SHA=unknown
+USER root
 RUN apk upgrade --no-cache
 LABEL org.opencontainers.image.title="supplier-henkaten-tmmin-web" \
   org.opencontainers.image.revision="${RELEASE_SHA}" \
