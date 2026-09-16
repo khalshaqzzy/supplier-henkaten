@@ -2,7 +2,7 @@
 
 Document status: Active implementation roadmap
 Created: 2026-07-23
-Last updated: 2026-08-19
+Last updated: 2026-09-16
 Source of truth: `.agent/PRD.md`
 Implementation approach: Backend-first
 Workspace tooling: Node.js 22 + pnpm workspaces, tanpa Turborepo
@@ -4891,6 +4891,15 @@ Verification:
   `undici 7.29.0`, dan `brace-expansion 5.0.9` melalui vulnerable-range pnpm overrides. Audit,
   clean-worktree Trivy filesystem, dan kelima rebuilt production image lulus tanpa ignore atau
   exception baru.
+- PR #16 release-gate remediation memindahkan floor `golang.org/x/text` ke 0.41.0 dan menetapkan
+  floor `google.golang.org/grpc` 1.83.2 serta `golang.org/x/crypto` 0.55.0. Urutan pin sebelumnya
+  membuat permintaan `x/text` 0.39.0 menurunkan `x/crypto` kembali ke 0.53.0, sehingga image Caddy
+  tetap memuat CVE-2026-56854 dan CVE-2026-84445 meski Dockerfile terbaca sudah dipatch. Builder
+  kini menerapkan floor sebelum `go mod tidy` terakhir dan menegaskan versi hasil resolusi setelahnya,
+  sehingga downgrade senyap menggagalkan build; urutan lama diuji ulang dan memang menggagalkan build.
+  Trivy 0.70.0 melaporkan zero High/Critical untuk Caddy image dan untuk cold-cache rebuild API,
+  kedua web, serta PostgreSQL image; Hadolint, actionlint, ShellCheck, bootstrap check, deployment
+  validate/harness, security-exception, format, lint, typecheck, unit, dan OpenAPI check lulus.
 
 Data/migration impact:
 
@@ -5858,3 +5867,20 @@ Sebelum v1 dinyatakan complete:
 - UAT dan accepted-risk references tersedia;
 - tidak ada unresolved Critical/High security issue;
 - tidak ada agent-started local process/container yang dibiarkan berjalan.
+
+## Tanoko extension — 2026-09-16
+
+Status: implemented; local verification recorded in sessionHandoff. Phase 15.9 remains the sole
+in_progress delivery phase. No deployment or production UAT is claimed.
+
+- Accepted design A (PDF baseline), existing navigation, left-aligned tabs, clipped MP names,
+  two-axis freeze, compact matrix and right inspector, polished searchable history.
+- Added tenant-bound mapping/history storage, GL/Admin authorization, optimistic concurrency,
+  category setup, and minimum level 3 checks at Man submission and final movement.
+- No production proficiency backfill. Populate Tanoko before making new Man replacements.
+- Follow-up: deploy forward migration with normal release process, assess actual large-supplier
+  matrix load, and conduct user acceptance on the target shop-floor device.
+
+- Seed extension: varied levels 1–4/unassessed mappings, Admin/GL audit examples, and automatic
+  synthetic assessment to at least level 3 before assigning a default MP or submitting a Man
+  replacement. Post-seed checks verify all default MP/job pairs remain qualified.

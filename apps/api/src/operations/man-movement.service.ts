@@ -1,3 +1,4 @@
+import { assertTanokoEligible } from '../master-data/tanoko-eligibility.js';
 import { Injectable } from '@nestjs/common';
 
 import type { Prisma, UserRole } from '../generated/prisma/client.js';
@@ -91,6 +92,8 @@ export class ManMovementService {
         throw assignmentConflict();
       }
     }
+
+    await assertTanokoEligible(tx, supplierId, detail.replacementMpMemberId, target.jobId);
 
     const now = new Date();
     const updatedSource = source

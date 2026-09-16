@@ -1,5 +1,6 @@
 import {
   Bell,
+  Grid2X2,
   ClipboardCheck,
   Factory,
   Gauge,
@@ -79,6 +80,13 @@ const navigation: NavigationItem[] = [
     label: 'Antrean Approval',
     capability: 'SUPPLIER_HENKATEN_DECIDE',
     icon: ShieldCheck,
+    group: 'OPERASIONAL',
+  },
+  {
+    to: '/tanoko',
+    label: 'Tanoko',
+    capability: 'SUPPLIER_TANOKO_READ',
+    icon: Grid2X2,
     group: 'OPERASIONAL',
   },
   {
@@ -349,7 +357,11 @@ export function ProductLayout() {
             </IconButton>
           </div>
         </header>
-        <main id="main-content" className="product-content" tabIndex={-1}>
+        <main
+          id="main-content"
+          className={`product-content${location.pathname === '/tanoko' ? ' product-content--tanoko' : ''}`}
+          tabIndex={-1}
+        >
           {push.loading && pushRequired ? (
             <Spinner label="Memeriksa status push perangkat" />
           ) : showPushGate ? (

@@ -6,6 +6,11 @@ export const LOCAL_SEED_HISTORICAL_SHIFT_COUNT = 36;
 export const LOCAL_SEED_HISTORICAL_HENKATEN_COUNT = 108;
 export const LOCAL_SEED_HENKATEN_PER_SUPPLIER = LOCAL_SEED_HISTORICAL_HENKATEN_COUNT + 12;
 
+/** Deterministic synthetic assessments, including unassessed pairs, for local demos only. */
+export function localSeedTanokoLevel(memberIndex: number, jobIndex: number): number | null {
+  return [3, 4, 3, 2, 1, null][(memberIndex + jobIndex * 2) % 6]!;
+}
+
 export type SeedCategory = 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
 export type SeedOutcome =
   | 'APPROVED_SUPERVISOR_FIRST'

@@ -269,6 +269,13 @@ export const henkatenFormOptionsSchema = z
           fullName: z.string().min(1).max(150),
           registrationNumber: z.string().min(1).max(100),
           reserved: z.boolean(),
+          skillLevels: z
+            .array(
+              z
+                .object({ jobId: opaqueIdSchema, level: z.number().int().min(1).max(4).nullable() })
+                .strict(),
+            )
+            .optional(),
           currentAssignment: z
             .object({
               id: opaqueIdSchema,

@@ -847,17 +847,34 @@ function PhotoWithFallback({
 function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof scopeOf> }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
+  const [skillCategory, setSkillCategory] = useState('MEDIUM');
   const [problem, setProblem] = useState<string | null>(null);
   const jobs = useQuery({
     queryKey: scopedKey(scope, 'line-jobs', lineId),
     queryFn: () => supplierApi.jobs(lineId, { limit: 100, active: 'ALL' }),
   });
   const create = useMutation({
-    mutationFn: () => supplierApi.createJob(lineId, { name }),
+    mutationFn: () => supplierApi.createJob(lineId, { name, skillCategory }),
     onSuccess: async () => {
       setName('');
       await queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'line-jobs', lineId) });
     },
+    onError: (error) => setProblem(masterMutationProblem(error)),
+  });
+  const categoryChange = useMutation({
+    mutationFn: ({
+      id,
+      name,
+      version,
+      skillCategory,
+    }: {
+      id: string;
+      name: string;
+      version: number;
+      skillCategory: string;
+    }) => supplierApi.updateJob(lineId, id, { name, expectedVersion: version, skillCategory }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'line-jobs', lineId) }),
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
   const change = useMutation({
@@ -914,6 +931,15 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
           placeholder="Nama job baru"
           onChange={(event) => setName(event.target.value)}
         />
+        <NativeSelect
+          aria-label="Kategori skill job baru"
+          value={skillCategory}
+          onChange={(e) => setSkillCategory(e.target.value)}
+        >
+          <option value="HIGH">High</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="LOW">Low</option>
+        </NativeSelect>
         <Button type="submit" loading={create.isPending}>
           Tambah job
         </Button>
@@ -923,6 +949,26 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
           <li key={job.id}>
             <span>{job.displayOrder}</span>
             <strong>{job.name}</strong>
+            <NativeSelect
+              aria-label={`Kategori skill ${job.name}`}
+              value={job.skillCategory ?? ''}
+              disabled={categoryChange.isPending}
+              onChange={(e) =>
+                categoryChange.mutate({
+                  id: job.id,
+                  name: job.name,
+                  version: job.version,
+                  skillCategory: e.target.value,
+                })
+              }
+            >
+              <option value="" disabled>
+                Belum diatur
+              </option>
+              <option value="HIGH">High</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="LOW">Low</option>
+            </NativeSelect>
             <small>{job.active ? 'Aktif' : 'Nonaktif'}</small>
             <div>
               <Button

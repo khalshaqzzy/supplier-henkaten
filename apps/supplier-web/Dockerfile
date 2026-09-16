@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 
 ARG NODE_IMAGE=node:22.23.1-bookworm-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3
-ARG STATIC_IMAGE=nginxinc/nginx-unprivileged:1.31.3-alpine@sha256:18d67281256ded39ff65e010ae4f831be18f19356f83c60bc546492c7eb6dd23
+ARG STATIC_IMAGE=nginxinc/nginx-unprivileged:1.31.4-alpine@sha256:68850a4d3aa53846d547975e44ac4a0cfc984bde83b40bc15761dcf80c5fe0b1
 
 FROM ${NODE_IMAGE} AS build
 ARG RELEASE_SHA=unknown
@@ -31,6 +31,8 @@ RUN pnpm --filter @tmmin-henkaten/contracts run build \
 
 FROM ${STATIC_IMAGE} AS runtime
 ARG RELEASE_SHA=unknown
+USER root
+RUN apk upgrade --no-cache
 LABEL org.opencontainers.image.title="supplier-henkaten-supplier-web" \
   org.opencontainers.image.revision="${RELEASE_SHA}" \
   org.opencontainers.image.source="https://github.com/khalshaqzzy/supplier-henkaten"

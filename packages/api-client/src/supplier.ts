@@ -1,3 +1,10 @@
+import {
+  tanokoMatrixSchema,
+  tanokoMappingSchema,
+  tanokoHistorySchema,
+  type TanokoSave,
+  type TanokoHistoryQuery,
+} from '@tmmin-henkaten/contracts';
 import { z } from 'zod';
 
 import {
@@ -61,6 +68,23 @@ const assignmentsSchema = z
 
 export class SupplierApi {
   constructor(private readonly client: ApiClient) {}
+
+  tanoko() {
+    return this.client.request('/api/v1/supplier/tanoko', { responseSchema: tanokoMatrixSchema });
+  }
+  tanokoHistory(query: Partial<TanokoHistoryQuery> = {}) {
+    return this.client.request('/api/v1/supplier/tanoko/history', {
+      responseSchema: tanokoHistorySchema,
+      query,
+    });
+  }
+  saveTanoko(memberId: string, jobId: string, body: TanokoSave) {
+    return this.client.request(`/api/v1/supplier/tanoko/members/${memberId}/jobs/${jobId}`, {
+      method: 'PUT',
+      responseSchema: tanokoMappingSchema,
+      body,
+    });
+  }
 
   login(body: SupplierLoginRequest) {
     return this.client.request('/api/v1/auth/supplier/login', {

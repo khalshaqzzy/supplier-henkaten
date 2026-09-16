@@ -31,6 +31,8 @@ import {
 } from './pages/ShiftPages';
 import { AppLoading, ForbiddenPage, NotFoundPage, RouteErrorPage } from './pages/StatePages';
 
+const TanokoPage = lazy(() => import('./pages/TanokoPage'));
+
 const DesignSystemShowcase = lazy(() =>
   import('@tmmin-henkaten/ui/showcase').then((module) => ({
     default: module.DesignSystemShowcase,
@@ -80,6 +82,16 @@ function ProductRoutes() {
         }
       >
         <Route index element={<HomeRoute />} />
+        <Route
+          path="tanoko"
+          element={
+            <CapabilityRoute capability="SUPPLIER_TANOKO_READ">
+              <Suspense fallback={<AppLoading />}>
+                <TanokoPage />
+              </Suspense>
+            </CapabilityRoute>
+          }
+        />
         <Route
           path="setup"
           element={

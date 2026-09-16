@@ -201,6 +201,8 @@ export interface paths {
                 mustChangePassword: boolean;
               };
               capabilities: (
+                | 'SUPPLIER_TANOKO_READ'
+                | 'SUPPLIER_TANOKO_MANAGE'
                 | 'TMMIN_SUPPLIER_READ'
                 | 'TMMIN_SUPPLIER_MANAGE'
                 | 'TMMIN_QUALITY_MANAGE'
@@ -353,6 +355,8 @@ export interface paths {
                 mustChangePassword: boolean;
               };
               capabilities: (
+                | 'SUPPLIER_TANOKO_READ'
+                | 'SUPPLIER_TANOKO_MANAGE'
                 | 'TMMIN_SUPPLIER_READ'
                 | 'TMMIN_SUPPLIER_MANAGE'
                 | 'TMMIN_QUALITY_MANAGE'
@@ -496,6 +500,8 @@ export interface paths {
                 mustChangePassword: boolean;
               };
               capabilities: (
+                | 'SUPPLIER_TANOKO_READ'
+                | 'SUPPLIER_TANOKO_MANAGE'
                 | 'TMMIN_SUPPLIER_READ'
                 | 'TMMIN_SUPPLIER_MANAGE'
                 | 'TMMIN_QUALITY_MANAGE'
@@ -641,6 +647,8 @@ export interface paths {
                 mustChangePassword: boolean;
               };
               capabilities: (
+                | 'SUPPLIER_TANOKO_READ'
+                | 'SUPPLIER_TANOKO_MANAGE'
                 | 'TMMIN_SUPPLIER_READ'
                 | 'TMMIN_SUPPLIER_MANAGE'
                 | 'TMMIN_QUALITY_MANAGE'
@@ -5698,6 +5706,7 @@ export interface paths {
           content: {
             'application/json': {
               items: {
+                skillCategory?: ('HIGH' | 'MEDIUM' | 'LOW') | null;
                 /** Format: uuid */
                 id: string;
                 /** Format: uuid */
@@ -5734,6 +5743,8 @@ export interface paths {
         content: {
           'application/json': {
             name: string;
+            /** @enum {string} */
+            skillCategory?: 'HIGH' | 'MEDIUM' | 'LOW';
           };
         };
       };
@@ -5745,6 +5756,7 @@ export interface paths {
           };
           content: {
             'application/json': {
+              skillCategory?: ('HIGH' | 'MEDIUM' | 'LOW') | null;
               /** Format: uuid */
               id: string;
               /** Format: uuid */
@@ -5794,6 +5806,7 @@ export interface paths {
           };
           content: {
             'application/json': {
+              skillCategory?: ('HIGH' | 'MEDIUM' | 'LOW') | null;
               /** Format: uuid */
               id: string;
               /** Format: uuid */
@@ -5876,6 +5889,8 @@ export interface paths {
           'application/json': {
             expectedVersion: number;
             name: string;
+            /** @enum {string} */
+            skillCategory?: 'HIGH' | 'MEDIUM' | 'LOW';
           };
         };
       };
@@ -5887,6 +5902,7 @@ export interface paths {
           };
           content: {
             'application/json': {
+              skillCategory?: ('HIGH' | 'MEDIUM' | 'LOW') | null;
               /** Format: uuid */
               id: string;
               /** Format: uuid */
@@ -5985,6 +6001,7 @@ export interface paths {
           };
           content: {
             'application/json': {
+              skillCategory?: ('HIGH' | 'MEDIUM' | 'LOW') | null;
               /** Format: uuid */
               id: string;
               /** Format: uuid */
@@ -6087,6 +6104,7 @@ export interface paths {
           };
           content: {
             'application/json': {
+              skillCategory?: ('HIGH' | 'MEDIUM' | 'LOW') | null;
               /** Format: uuid */
               id: string;
               /** Format: uuid */
@@ -9123,6 +9141,7 @@ export interface paths {
           content: {
             'application/json': {
               items: {
+                skillCategory?: ('HIGH' | 'MEDIUM' | 'LOW') | null;
                 /** Format: uuid */
                 id: string;
                 /** Format: uuid */
@@ -12256,6 +12275,11 @@ export interface paths {
                 fullName: string;
                 registrationNumber: string;
                 reserved: boolean;
+                skillLevels?: {
+                  /** Format: uuid */
+                  jobId: string;
+                  level: number | null;
+                }[];
                 currentAssignment: {
                   /** Format: uuid */
                   id: string;
@@ -14375,6 +14399,227 @@ export interface paths {
         };
       };
     };
+    trace?: never;
+  };
+  '/api/v1/supplier/tanoko': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Supplier Tanoko matrix */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              canEdit: boolean;
+              members: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                active: boolean;
+              }[];
+              jobs: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /** Format: uuid */
+                lineId: string;
+                lineName: string;
+                lineCode: string;
+                category: ('HIGH' | 'MEDIUM' | 'LOW') | null;
+                active: boolean;
+              }[];
+              mappings: {
+                /** Format: uuid */
+                memberId: string;
+                /** Format: uuid */
+                jobId: string;
+                level: number | null;
+                version: number;
+                /** Format: date-time */
+                updatedAt: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/tanoko/history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          cursor?: string;
+          search?: string;
+          lineId?: string;
+          limit?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Tanoko changes */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              items: {
+                /** Format: uuid */
+                id: string;
+                memberName: string;
+                jobName: string;
+                lineName: string;
+                previousLevel: number | null;
+                level: number | null;
+                actorName: string;
+                actorRole: string;
+                note: string;
+                /** Format: date-time */
+                createdAt: string;
+              }[];
+              nextCursor: string | null;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/tanoko/members/{memberId}/jobs/{jobId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          memberId: string;
+          jobId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number | null;
+            level: number | null;
+            /** @default  */
+            note?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Saved mapping */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: uuid */
+              memberId: string;
+              /** Format: uuid */
+              jobId: string;
+              level: number | null;
+              version: number;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   '/api/v1/supplier/assignment-board': {

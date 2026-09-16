@@ -1,3 +1,156 @@
+# Session Handoff — Compact Tanoko Matrix and Proficiency Enforcement
+
+Date: 2026-09-16
+Branch: `feat/tanoko`
+Status: implemented and delivered on `feat/tanoko` as PR #16 against `staging`. The last remaining
+release-gate failure, the Caddy runtime image scan, is fixed and locally verified pending the next
+CI run. Phase 15.9 remains `in_progress`.
+
+## Objective and decisions
+
+- Implement the approved PDF-derived design A with the existing supplier navbar, left-aligned
+  Matriks/Riwayat tabs, name-only clipped MP headers and right-side cell editor from design C.
+- Keep the UI compact: 16px desktop content inset, 36px matrix rows, viewport-owned matrix scroll,
+  sticky MP names and Line/Job/Kategori columns, sticky summary, no dashboard metric cards.
+- Supplier Admin and every GL (SUPERVISOR) can edit any active MP/job within their supplier.
+  LL and QC have read access only. Authorization is enforced by API capabilities and service checks.
+- High/Medium/Low categorizes jobs visually; mastery levels 1–4 are independent. Missing mastery
+  is unassessed. No MP employment categories, license, annual restrictions or extra criteria.
+- Require level >=3 at Man submission and final atomic movement. A downgrade while approval is
+  pending blocks movement; existing reservation and assignment checks remain in force.
+
+## Seed follow-up verification
+
+- `pnpm --filter @tmmin-henkaten/api exec vitest run src/cli/local-seed-plan.spec.ts`: 6 passed.
+- API typecheck, targeted ESLint, Prettier check and `git diff --check`: passed.
+- Full bootstrap + `local:seed` ran successfully against isolated Docker Compose project
+  `tanoko-seed-check` (separate database/photo volumes and credentials output): 2 Hosted
+  suppliers and 240 Henkaten; all existing and new post-seed invariants passed.
+- SQL verified 12 default assignments per supplier, minimum level 3 for both suppliers.
+  Mapping totals: level 1=50, level 2=42, level 3=159, level 4=56, explicit unassessed=2;
+  51 additional pairs have no assessment. History includes 179 GL and 164 Admin entries.
+- Temporary Compose stack and volumes were removed after verification. Existing local demo
+  database and credentials were not reset. Updated seed applies on the next local reseed.
+
+## CI follow-up — 2026-09-16
+
+- PR #16 initially failed only in deployment-quality security-exception validation and the
+  filesystem Trivy scan. The exception registry had three expired entries, while the lockfile
+  contained patched advisories for `fast-uri`, `multer`, `mysql2`, and `sharp` that required
+  current dependency resolutions.
+- Updated `multer` to 2.4.0 and `sharp` to 0.35.4, and pinned safe override resolutions for
+  `fast-uri` 3.1.6 and `mysql2` 3.22.0. The registry expiry dates now remain within the active
+  review window. Local Trivy filesystem scan reports zero HIGH/CRITICAL findings and the exact
+  exception validator passes.
+- Production build, format, lint, typecheck, unit tests, OpenAPI drift check, deployment
+  validation and deployment harness pass locally. The next push is expected to rerun CI with
+  the dependency and registry corrections.
+- The follow-up container scan identified newly published HIGH Alpine advisories in the pinned
+  Nginx runtime image (`libexpat` and `util-linux`). Both static runtime Dockerfiles now run
+  `apk upgrade --no-cache` after the pinned base image so the image contains the fixed Alpine
+  packages at build time; Hadolint passes for both files.
+- The next container scan reached the Caddy image and found fixed advisories in Go modules
+  (`x/crypto` 0.53.0 and gRPC 1.82.1). The Caddy build now pins `x/crypto` 0.55.0 and gRPC
+  1.83.1 before producing the static binary.
+
+### Caddy image scan resolution — 2026-09-16
+
+- Run `35070388492` reduced the release gate to a single failing step: `Scan Caddy image` reported
+  CVE-2026-56854 (`golang.org/x/crypto` 0.53.0) and CVE-2026-84445 (`google.golang.org/grpc`
+  1.83.1). The previous pin commit therefore did not take effect.
+- Root cause: the pre-existing `go get golang.org/x/text@v0.39.0` step ran after the `x/crypto`
+  0.55.0 request and resolved the shared module graph back down, because `x/crypto` 0.55.0 requires
+  `x/text` 0.41.0. The build log showed `v0.53.0` while the Dockerfile still read as patched.
+- `deploy/caddy/Dockerfile` now applies the three floors (`grpc` 1.83.2, `x/text` 0.41.0,
+  `x/crypto` 0.55.0) before a final `go mod tidy`, then asserts each resolved version with
+  `go list -m` so a silent downgrade fails the build. An intermediate ordering with `go mod tidy`
+  before the floors was rejected because it left `go.sum` incomplete and made the build succeed
+  from a cold module cache while failing from a warm one.
+- The assertion was proven by rebuilding with the old, buggy dependency order: the guard failed the
+  build where the image scan previously caught it only after publishing the image.
+
+Verification for this fix:
+
+- `docker compose --env-file deploy/env/runtime.staging.env.example -f deploy/compose/docker-compose.remote.yml build --pull postgres api supplier-web tmmin-web caddy` built all five images.
+- Trivy 0.70.0 `image --scanners vuln --severity HIGH,CRITICAL` reported zero findings for the Caddy
+  image and for cold-cache rebuilds (`--no-cache`) of the API, both web, and PostgreSQL images.
+  Earlier local findings in the PostgreSQL and web images came from cached `apk upgrade` layers, not
+  from the images; cold-cache builds are clean and match the passing CI scans.
+- The rebuilt Caddy binary reports `v2.11.4` and validates the production Caddyfile (`Valid
+  configuration`).
+- Hadolint 2.14.0 passed for all five production Dockerfiles (a `DL4006` warning introduced by the
+  first assertion draft was removed by dropping the pipeline), actionlint 1.7.7, ShellCheck 0.11.0,
+  `bootstrap-vm.sh --check`, `pnpm deployment:validate`, `pnpm test:deployment`,
+  `pnpm security:exceptions:check`, `docker compose config --quiet`, `pnpm format:check`,
+  `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, and `pnpm openapi:check` all passed.
+- The mandatory Gitleaks v8.24.3 directory scan reported no leaks across the worktree once three
+  git-ignored local artifacts were set aside without being read (`.local/.ssh/supplier-henkaten-staging-ci`,
+  `playwright-report/`, `test-results/`) and then restored; all three are untracked and cannot enter
+  a commit. The filesystem Trivy scan flags only the same git-ignored SSH key, which CI never checks out.
+- The full production Compose build/start/routing/non-root/persistence sequence was not re-run
+  locally for this change; CI passed every one of those steps at this SHA and the change touches
+  only the Caddy image's Go dependencies, with the Caddyfile unchanged.
+
+Delivery result:
+
+- Commit `6e32b7d` was pushed to `feat/tanoko`. CI run `35076423277` completed successfully with all
+  ten required jobs green, including `Production containers and routing` with its `Scan Caddy image`
+  step, and `Release candidate gate`. `Deploy staging` remains skipped for pull requests by design.
+  PR #16 is `MERGEABLE` with merge state `CLEAN`.
+- The commit-mode Gitleaks scan over the new commit reported no leaks. No container, network, or
+  volume from this work remains; the local development stack was not started or stopped.
+
+## Changed files and implementation
+
+- New `packages/contracts/src/tanoko.ts`, API Tanoko controller/service/eligibility helper,
+  Prisma mapping/history models and forward migration `20260916001200_tanoko`.
+- Supplier API client methods, generated OpenAPI/client contract, role capabilities and native
+  navigation/route integration. Job Setup creates/updates the independent skill category.
+- New `TanokoPage.tsx`/`tanoko.css`: searchable matrix, line/category filters, 24-column pages,
+  qualified totals, keyboard cell navigation, fullscreen, responsive inspector, explicit save,
+  conflict recovery, read-only states, optional notes and immutable searchable history.
+- Serializable versioned writes atomically update mapping/history/general audit. Polling is 30s
+  and focus-based; Tanoko SSE is not implemented and drafts are not overwritten by polling.
+- Local seed covers unassessed cells and levels 1–4 through the same versioned API, with
+  Admin and both GL actors plus upgrade, downgrade and clearing history. Every seeded default
+  MP is qualified at level >=3 on its default job; Man replacements are independently assessed
+  on the exact target job. Post-seed invariants check default qualifications and visual/history
+  coverage. Production migration never invents proficiency; real MPs require assessment.
+- Three ImageGen concepts and prompts are saved under `.agent/design/tanoko/`.
+- PRD, roadmap and ADR 0032 synchronize the new scope and release consequences.
+
+## Verification
+
+- `pnpm generate`, `pnpm shared:build`, `pnpm typecheck`, API build and production Supplier build passed.
+- `pnpm openapi:generate` and `pnpm api-client:generate` refreshed the shared contract;
+  contract-freeze unit coverage confirms all 155 operations across 138 paths are documented.
+- `pnpm test:unit` passed before the final three UI interaction tests; the final Supplier suite
+  passes 50 tests. New coverage includes draft discard, read-only controls and conflict reload.
+- `pnpm db:up`, `pnpm db:wait`, `pnpm db:test:reset`, `pnpm db:test:migrate` passed on Docker
+  PostgreSQL 18/pgvector. All 12 migrations applied from empty state.
+- `NODE_ENV=test DATABASE_URL=<disposable-test-url> RELEASE_SHA=tanoko-local
+  SESSION_CSRF_SECRET=<test-value> AUTH_THROTTLE_SECRET=<test-value> OUTBOX_ENABLED=false
+  pnpm --filter @tmmin-henkaten/api test:integration` passed all 39 tests, including Tanoko
+  permission/version/history checks, insufficient submission mastery and downgrade at final approval.
+- All five Chromium journeys passed: governance, hosted lifecycle, Man concurrency, onboarding,
+  and Tanoko. All three Edge journeys passed: governance, onboarding, and Tanoko.
+- Tanoko browser evidence verifies frozen axes, save/history/reload, API conflict/read-only rejection,
+  no horizontal document overflow at 1440/1280/768/390 widths and zero Axe violations.
+- `pnpm exec eslint .`, `pnpm format:check` and `git diff --check` passed after test typing cleanup.
+- An early mobile screenshot captured the existing sidebar transition mid-frame; the final
+  responsive test waits for the sidebar to leave the viewport. Final Edge screenshot is correct.
+- The E2E harness can leave pnpm-spawned Vite descendants and log database-shutdown errors after
+  successful tests. Session-owned processes were cleaned separately after all journeys passed. Docker test containers were stopped; no session-owned runtime is retained.
+
+## Delivery and next action
+
+No commit, push, staging deployment or production migration has been performed. Review the local
+changes, then use the full repository pre-commit/CI parity and normal release workflow. Production
+rollout requires real GL/Admin qualification entry before Man substitutions. Large tenant payload
+performance and shop-floor UAT remain follow-up work.
+
+---
+
 # Session Handoff — Browser Henkaten Mutation CORS Recovery
 
 Date: 2026-09-04

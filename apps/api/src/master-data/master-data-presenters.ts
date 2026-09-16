@@ -73,6 +73,7 @@ export const presentLine = (line: Line) => ({
 });
 
 export const presentJob = (job: Job) => ({
+  skillCategory: job.skillCategory,
   id: job.id,
   lineId: job.lineId,
   name: job.name,
