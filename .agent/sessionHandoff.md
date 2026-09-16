@@ -2,7 +2,9 @@
 
 Date: 2026-09-16
 Branch: `feat/tanoko`
-Status: implemented and locally verified; uncommitted. Phase 15.9 remains `in_progress`.
+Status: implemented and delivered on `feat/tanoko` as PR #16 against `staging`. The last remaining
+release-gate failure, the Caddy runtime image scan, is fixed and locally verified pending the next
+CI run. Phase 15.9 remains `in_progress`.
 
 ## Objective and decisions
 
@@ -50,6 +52,44 @@ Status: implemented and locally verified; uncommitted. Phase 15.9 remains `in_pr
 - The next container scan reached the Caddy image and found fixed advisories in Go modules
   (`x/crypto` 0.53.0 and gRPC 1.82.1). The Caddy build now pins `x/crypto` 0.55.0 and gRPC
   1.83.1 before producing the static binary.
+
+### Caddy image scan resolution — 2026-09-16
+
+- Run `35070388492` reduced the release gate to a single failing step: `Scan Caddy image` reported
+  CVE-2026-56854 (`golang.org/x/crypto` 0.53.0) and CVE-2026-84445 (`google.golang.org/grpc`
+  1.83.1). The previous pin commit therefore did not take effect.
+- Root cause: the pre-existing `go get golang.org/x/text@v0.39.0` step ran after the `x/crypto`
+  0.55.0 request and resolved the shared module graph back down, because `x/crypto` 0.55.0 requires
+  `x/text` 0.41.0. The build log showed `v0.53.0` while the Dockerfile still read as patched.
+- `deploy/caddy/Dockerfile` now applies the three floors (`grpc` 1.83.2, `x/text` 0.41.0,
+  `x/crypto` 0.55.0) before a final `go mod tidy`, then asserts each resolved version with
+  `go list -m` so a silent downgrade fails the build. An intermediate ordering with `go mod tidy`
+  before the floors was rejected because it left `go.sum` incomplete and made the build succeed
+  from a cold module cache while failing from a warm one.
+- The assertion was proven by rebuilding with the old, buggy dependency order: the guard failed the
+  build where the image scan previously caught it only after publishing the image.
+
+Verification for this fix:
+
+- `docker compose --env-file deploy/env/runtime.staging.env.example -f deploy/compose/docker-compose.remote.yml build --pull postgres api supplier-web tmmin-web caddy` built all five images.
+- Trivy 0.70.0 `image --scanners vuln --severity HIGH,CRITICAL` reported zero findings for the Caddy
+  image and for cold-cache rebuilds (`--no-cache`) of the API, both web, and PostgreSQL images.
+  Earlier local findings in the PostgreSQL and web images came from cached `apk upgrade` layers, not
+  from the images; cold-cache builds are clean and match the passing CI scans.
+- The rebuilt Caddy binary reports `v2.11.4` and validates the production Caddyfile (`Valid
+  configuration`).
+- Hadolint 2.14.0 passed for all five production Dockerfiles (a `DL4006` warning introduced by the
+  first assertion draft was removed by dropping the pipeline), actionlint 1.7.7, ShellCheck 0.11.0,
+  `bootstrap-vm.sh --check`, `pnpm deployment:validate`, `pnpm test:deployment`,
+  `pnpm security:exceptions:check`, `docker compose config --quiet`, `pnpm format:check`,
+  `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, and `pnpm openapi:check` all passed.
+- The mandatory Gitleaks v8.24.3 directory scan reported no leaks across the worktree once three
+  git-ignored local artifacts were set aside without being read (`.local/.ssh/supplier-henkaten-staging-ci`,
+  `playwright-report/`, `test-results/`) and then restored; all three are untracked and cannot enter
+  a commit. The filesystem Trivy scan flags only the same git-ignored SSH key, which CI never checks out.
+- The full production Compose build/start/routing/non-root/persistence sequence was not re-run
+  locally for this change; CI passed every one of those steps at this SHA and the change touches
+  only the Caddy image's Go dependencies, with the Caddyfile unchanged.
 
 ## Changed files and implementation
 

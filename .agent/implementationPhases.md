@@ -4891,6 +4891,15 @@ Verification:
   `undici 7.29.0`, dan `brace-expansion 5.0.9` melalui vulnerable-range pnpm overrides. Audit,
   clean-worktree Trivy filesystem, dan kelima rebuilt production image lulus tanpa ignore atau
   exception baru.
+- PR #16 release-gate remediation memindahkan floor `golang.org/x/text` ke 0.41.0 dan menetapkan
+  floor `google.golang.org/grpc` 1.83.2 serta `golang.org/x/crypto` 0.55.0. Urutan pin sebelumnya
+  membuat permintaan `x/text` 0.39.0 menurunkan `x/crypto` kembali ke 0.53.0, sehingga image Caddy
+  tetap memuat CVE-2026-56854 dan CVE-2026-84445 meski Dockerfile terbaca sudah dipatch. Builder
+  kini menerapkan floor sebelum `go mod tidy` terakhir dan menegaskan versi hasil resolusi setelahnya,
+  sehingga downgrade senyap menggagalkan build; urutan lama diuji ulang dan memang menggagalkan build.
+  Trivy 0.70.0 melaporkan zero High/Critical untuk Caddy image dan untuk cold-cache rebuild API,
+  kedua web, serta PostgreSQL image; Hadolint, actionlint, ShellCheck, bootstrap check, deployment
+  validate/harness, security-exception, format, lint, typecheck, unit, dan OpenAPI check lulus.
 
 Data/migration impact:
 
