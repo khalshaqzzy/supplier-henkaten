@@ -33,19 +33,19 @@
     "scanner": "pnpm-audit",
     "id": "GHSA-qwww-vcr4-c8h2",
     "rationale": "React Router DOM has no compatible patched 7.x release; both frontends use declarative SPA mode and do not enable the advisory's React Server Components action mode.",
-    "expiresOn": "2026-08-31"
+    "expiresOn": "2026-10-31"
   },
   {
     "scanner": "trivy",
     "id": "GHSA-qwww-vcr4-c8h2",
     "rationale": "React Router DOM has no compatible patched 7.x release; both frontends use declarative SPA mode and do not enable the advisory's React Server Components action mode.",
-    "expiresOn": "2026-08-31"
+    "expiresOn": "2026-10-31"
   },
   {
     "scanner": "trivy",
     "id": "DS-0002",
     "rationale": "Dockerfile.local is an explicitly development-only bind-mount image; every production runtime Dockerfile declares and is tested with a non-root user.",
-    "expiresOn": "2026-08-31"
+    "expiresOn": "2026-10-31"
   },
   {
     "scanner": "trivy",

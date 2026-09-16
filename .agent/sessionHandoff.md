@@ -30,6 +30,20 @@ Status: implemented and locally verified; uncommitted. Phase 15.9 remains `in_pr
 - Temporary Compose stack and volumes were removed after verification. Existing local demo
   database and credentials were not reset. Updated seed applies on the next local reseed.
 
+## CI follow-up — 2026-09-16
+
+- PR #16 initially failed only in deployment-quality security-exception validation and the
+  filesystem Trivy scan. The exception registry had three expired entries, while the lockfile
+  contained patched advisories for `fast-uri`, `multer`, `mysql2`, and `sharp` that required
+  current dependency resolutions.
+- Updated `multer` to 2.4.0 and `sharp` to 0.35.4, and pinned safe override resolutions for
+  `fast-uri` 3.1.6 and `mysql2` 3.22.0. The registry expiry dates now remain within the active
+  review window. Local Trivy filesystem scan reports zero HIGH/CRITICAL findings and the exact
+  exception validator passes.
+- Production build, format, lint, typecheck, unit tests, OpenAPI drift check, deployment
+  validation and deployment harness pass locally. The next push is expected to rerun CI with
+  the dependency and registry corrections.
+
 ## Changed files and implementation
 
 - New `packages/contracts/src/tanoko.ts`, API Tanoko controller/service/eligibility helper,
