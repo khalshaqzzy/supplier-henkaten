@@ -43,6 +43,10 @@ Status: implemented and locally verified; uncommitted. Phase 15.9 remains `in_pr
 - Production build, format, lint, typecheck, unit tests, OpenAPI drift check, deployment
   validation and deployment harness pass locally. The next push is expected to rerun CI with
   the dependency and registry corrections.
+- The follow-up container scan identified newly published HIGH Alpine advisories in the pinned
+  Nginx runtime image (`libexpat` and `util-linux`). Both static runtime Dockerfiles now run
+  `apk upgrade --no-cache` after the pinned base image so the image contains the fixed Alpine
+  packages at build time; Hadolint passes for both files.
 
 ## Changed files and implementation
 
