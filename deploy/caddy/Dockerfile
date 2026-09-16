@@ -19,7 +19,8 @@ RUN --mount=type=cache,id=supplier-henkaten-go-mod,target=/go/pkg/mod \
     '}' > main.go \
   && go mod init supplier-henkaten/caddy \
   && go get github.com/caddyserver/caddy/v2@v2.11.4 \
-  && go get google.golang.org/grpc@v1.82.1 \
+  && go get google.golang.org/grpc@v1.83.1 \
+  && go get golang.org/x/crypto@v0.55.0 \
   && go get golang.org/x/text@v0.39.0 \
   && go mod tidy \
   && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/caddy .

@@ -47,6 +47,9 @@ Status: implemented and locally verified; uncommitted. Phase 15.9 remains `in_pr
   Nginx runtime image (`libexpat` and `util-linux`). Both static runtime Dockerfiles now run
   `apk upgrade --no-cache` after the pinned base image so the image contains the fixed Alpine
   packages at build time; Hadolint passes for both files.
+- The next container scan reached the Caddy image and found fixed advisories in Go modules
+  (`x/crypto` 0.53.0 and gRPC 1.82.1). The Caddy build now pins `x/crypto` 0.55.0 and gRPC
+  1.83.1 before producing the static binary.
 
 ## Changed files and implementation
 
