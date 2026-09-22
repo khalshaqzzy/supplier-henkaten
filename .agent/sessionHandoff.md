@@ -567,9 +567,14 @@ immediately-following `migration-policy: allow-drop-index` declaration, with dep
 coverage for accepted exact matches and rejected missing/mismatched declarations. Other `DROP`
 statements remain forbidden.
 
-Fresh-database local-seed smoke also passed through the built API with the production-like outbox
-worker enabled. Evidence after completion: 2 suppliers, 6 lines, 24 jobs, 6 shift templates, 18
-LineShifts, 72 LineShiftJobAssignments, 6 saved Canvas layouts, 0 ShiftRuns, and 0 pending outbox
-events. Board layout scope now derives from active Line/LineShift configuration rather than an
-active ShiftRun. The smoke database and temporary API were removed afterward; the main local
-database was not changed by this verification.
+Fresh-database local-seed smoke passes through the built API with the production-like outbox worker
+enabled. A regression introduced during the Line–Shift cutover had removed both Henkaten seed calls,
+leaving the dashboard empty even though the retained plan still specified 120 records per supplier.
+The seed now creates all 240 Henkaten through the Line–Shift API, relocates 216 terminal records into
+72 synthetic historical occurrence snapshots, keeps 24 current records, and verifies the Supplier
+dashboard response before writing credentials. Evidence after completion: 2 suppliers; 240 Henkaten;
+16 Open warnings; 18 LineShifts; 72 LineShiftJobAssignments; all three shift templates represented;
+6 Canvas layouts; and 0 pending outbox events. Every configured default MP/job pair is Tanoko level
+3 or 4. No preflight, Start Shift, End Shift, reservation, or MP exclusivity path is used. The smoke
+database, temporary API, photos, and credentials were removed afterward; the main local database was
+not changed by this verification.

@@ -7,14 +7,23 @@ import { dirname, resolve } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import sharp from 'sharp';
 
-import { type BoardLayoutDocument, type TanokoMapping } from '@tmmin-henkaten/contracts';
+import {
+  type BoardLayoutDocument,
+  type TanokoMapping,
+  type TanokoMatrix,
+} from '@tmmin-henkaten/contracts';
 
 import { PrismaClient } from '../generated/prisma/client.js';
 import {
+  LOCAL_SEED_HENKATEN_PER_SUPPLIER,
+  LOCAL_SEED_HISTORICAL_SHIFT_COUNT,
   assertLocalSeedEnvironment,
   createLocalSeedPlan,
+  localSeedSummary,
   localSeedTanokoLevel,
   type SeedCategory,
+  type SeedHenkatenPlan,
+  type SeedOutcome,
   type SupplierSeedPlan,
 } from './local-seed-plan.js';
 import {
@@ -38,6 +47,28 @@ type Session = {
 type SessionClient = { api: ApiSession; csrf: string; account: AccountRecord };
 type Resource = { id: string; version: number };
 type MemberResource = Resource & { fullName?: string };
+type LineShiftDefinition = Resource & {
+  lineId: string;
+  shiftTemplateId: string;
+  shiftName: string;
+  startTime: string;
+  endTime: string;
+  timezone: string;
+  assignments: Array<{
+    id: string;
+    jobId: string;
+    mpMemberId: string | null;
+  }>;
+};
+type LineShiftOccurrence = LineShiftDefinition & {
+  current: boolean;
+  effectiveStartAt: string;
+  effectiveEndAt: string;
+};
+type HenkatenResource = Resource & {
+  shiftRunId: string;
+  status: string;
+};
 type SupplierRuntime = {
   plan: SupplierSeedPlan;
   supplier: Resource & { code: string };
@@ -50,6 +81,7 @@ type SupplierRuntime = {
   jobs: Resource[][];
   parts: Resource[];
   shifts: Resource[];
+  lineShifts: LineShiftDefinition[][];
   checklists: Record<SeedCategory, Resource & { itemIds: string[] }>;
 };
 type Manifest = {
@@ -168,13 +200,22 @@ async function main() {
     const runtimes: SupplierRuntime[] = [];
     for (const plan of createLocalSeedPlan()) {
       const runtime = await provisionSupplier(plan, tmmin, manifest, portraits);
+      await seedHenkatens(prisma, runtime);
       await seedCanvasLayouts(runtime);
       runtimes.push(runtime);
     }
     await waitForOutbox(prisma);
+    await markOneNotificationRead(runtimes[0]!);
+    await waitForOutbox(prisma);
+    await verifySeed(prisma);
+    for (const runtime of runtimes) await verifySeedDashboard(runtime);
     await writeManifest(manifest);
+    const seededHenkaten = localSeedSummary(createLocalSeedPlan()).reduce(
+      (total, item) => total + item.henkaten,
+      0,
+    );
     process.stdout.write(
-      `Local seed complete: 2 Hosted suppliers with Line Shift configuration. Credentials: ${credentialPath}\n`,
+      `Local seed complete: 2 Hosted suppliers, ${seededHenkaten} Henkaten, and Line Shift configuration. Credentials: ${credentialPath}\n`,
     );
   } finally {
     await prisma.$disconnect();
@@ -452,7 +493,18 @@ async function provisionSupplier(
       itemIds: published.items.map(({ id }) => id),
     };
   }
+  const lineShifts: LineShiftDefinition[][] = [];
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+    for (let jobIndex = 0; jobIndex < jobs[lineIndex]!.length; jobIndex += 1) {
+      const mp = mps[lineIndex * 4 + jobIndex]!;
+      await ensureSeedQualification(
+        admin,
+        mp.id,
+        jobs[lineIndex]![jobIndex]!.id,
+        'Asesmen sintetis: MP memenuhi kompetensi minimal level 3 pada assignment Line Shift.',
+      );
+    }
+    const configuredLineShifts: LineShiftDefinition[] = [];
     for (const shift of shifts) {
       const lineShift = await admin.api.request<{
         id: string;
@@ -464,21 +516,24 @@ async function provisionSupplier(
         { shiftTemplateId: shift.id },
         admin.csrf,
       );
-      await admin.api.request(
-        'PATCH',
-        `/api/v1/supplier/master-data/line-shifts/${lineShift.id}/assignments`,
-        {
-          expectedVersion: lineShift.version,
-          supervisorMemberId: supervisors[lineIndex % supervisors.length]!.memberId,
-          lineLeaderMemberId: leaders[lineIndex]!.memberId,
-          jobs: lineShift.assignments.map(({ jobId }, jobIndex) => ({
-            jobId,
-            mpMemberId: mps[(lineIndex * 4 + jobIndex) % mps.length]!.id,
-          })),
-        },
-        admin.csrf,
+      configuredLineShifts.push(
+        await admin.api.request<LineShiftDefinition>(
+          'PATCH',
+          `/api/v1/supplier/master-data/line-shifts/${lineShift.id}/assignments`,
+          {
+            expectedVersion: lineShift.version,
+            supervisorMemberId: supervisors[lineIndex % supervisors.length]!.memberId,
+            lineLeaderMemberId: leaders[lineIndex]!.memberId,
+            jobs: lineShift.assignments.map(({ jobId }, jobIndex) => ({
+              jobId,
+              mpMemberId: mps[(lineIndex * 4 + jobIndex) % mps.length]!.id,
+            })),
+          },
+          admin.csrf,
+        ),
       );
     }
+    lineShifts.push(configuredLineShifts);
   }
   const rolePhotoMemberIds = [
     ...supervisors.map(({ memberId }) => memberId),
@@ -515,6 +570,7 @@ async function provisionSupplier(
     jobs,
     parts,
     shifts,
+    lineShifts,
     checklists,
   };
 }
@@ -602,6 +658,448 @@ async function activateCredential(
   };
 }
 
+async function seedHenkatens(prisma: PrismaClient, runtime: SupplierRuntime) {
+  for (let group = 0; group < LOCAL_SEED_HISTORICAL_SHIFT_COUNT; group += 1) {
+    const records = runtime.plan.historical.filter(
+      ({ historicalShiftIndex }) => historicalShiftIndex === group,
+    );
+    if (records.length === 0) {
+      throw new Error(`Historical Line Shift occurrence ${group} has no planned Henkaten.`);
+    }
+    const lineIndex = records[0]!.lineIndex!;
+    const occurrence = await currentOccurrence(runtime.leaders[lineIndex]!);
+    let shiftRunId: string | undefined;
+    for (const [index, record] of records.entries()) {
+      const created = await createSeedHenkaten(
+        runtime,
+        occurrence,
+        lineIndex,
+        record,
+        `historical-${group}-${index}-m${record.eventMinuteOffset}-d${record.resolutionMinuteDelay}`,
+        group * 10 + index,
+      );
+      shiftRunId ??= created.shiftRunId;
+      if (shiftRunId !== created.shiftRunId) {
+        throw new Error('Historical seed group unexpectedly crossed automatic occurrences.');
+      }
+      await applySeedOutcome(runtime, lineIndex, created, record.outcome);
+    }
+    await relocateHistoricalOccurrence(
+      prisma,
+      runtime,
+      shiftRunId!,
+      runtime.lineShifts[lineIndex]![records[0]!.shiftTemplateIndex!]!,
+      records[0]!.historicalDayOffset!,
+    );
+  }
+
+  for (const [index, record] of runtime.plan.live.entries()) {
+    const lineIndex = index % runtime.lines.length;
+    const occurrence = await currentOccurrence(runtime.leaders[lineIndex]!);
+    const created = await createSeedHenkaten(
+      runtime,
+      occurrence,
+      lineIndex,
+      record,
+      `live-${index}`,
+      index + runtime.plan.historical.length,
+    );
+    await applySeedOutcome(runtime, lineIndex, created, record.outcome);
+  }
+}
+
+async function currentOccurrence(leader: SessionClient): Promise<LineShiftOccurrence> {
+  const context = await leader.api.request<{
+    currentLineShiftIds: string[];
+    items: LineShiftOccurrence[];
+  }>(
+    'GET',
+    '/api/v1/supplier/master-data/line-shifts/operational-context',
+    undefined,
+    undefined,
+    200,
+  );
+  const occurrence = context.items.find(
+    ({ id, current }) => current && context.currentLineShiftIds.includes(id),
+  );
+  if (!occurrence) throw new Error('Expected one current Line Shift occurrence for seed leader.');
+  return occurrence;
+}
+
+async function createSeedHenkaten(
+  runtime: SupplierRuntime,
+  occurrence: LineShiftOccurrence,
+  lineIndex: number,
+  record: SeedHenkatenPlan,
+  key: string,
+  ordinal: number,
+) {
+  const job = runtime.jobs[lineIndex]![record.jobIndex ?? ordinal % 4]!;
+  const assignment = occurrence.assignments.find(({ jobId }) => jobId === job.id);
+  if (!assignment) throw new Error('Seed job is missing from the current Line Shift assignment.');
+  const checklist = runtime.checklists[record.category];
+  const narrative = henkatenNarrative(record.category, record.narrativeVariant ?? ordinal);
+  const base = {
+    lineShiftId: occurrence.id,
+    jobId: job.id,
+    partId: runtime.parts[record.partIndex ?? ordinal % runtime.parts.length]!.id,
+    checklistVersionId: checklist.id,
+    checklistAnswers: checklist.itemIds.map((itemId) => ({ itemId, answer: 'YES' })),
+    cause: narrative.cause,
+    detail: narrative.detail,
+  };
+  const body =
+    record.category === 'MAN'
+      ? await seedManBody(runtime, lineIndex, assignment, ordinal, base)
+      : {
+          ...base,
+          category: record.category,
+          affectedObject: narrative.affectedObject ?? 'Kondisi proses sebelum perubahan',
+          replacementObject: narrative.replacementObject ?? 'Kondisi proses setelah perubahan',
+        };
+  return runtime.leaders[lineIndex]!.api.request<HenkatenResource>(
+    'POST',
+    '/api/v1/supplier/henkatens',
+    body,
+    runtime.leaders[lineIndex]!.csrf,
+    201,
+    `local-${runtime.plan.code}-${key}`,
+  );
+}
+
+async function seedManBody(
+  runtime: SupplierRuntime,
+  lineIndex: number,
+  assignment: LineShiftOccurrence['assignments'][number],
+  ordinal: number,
+  base: Record<string, unknown>,
+) {
+  const replacement = runtime.mps[(ordinal + lineIndex * 3 + 5) % runtime.mps.length]!;
+  await ensureSeedQualification(
+    runtime.supervisors[lineIndex % runtime.supervisors.length]!,
+    replacement.id,
+    assignment.jobId,
+    'Simulasi evaluasi GL: kompetensi job tujuan diverifikasi sebelum Henkaten Man.',
+  );
+  return {
+    ...base,
+    category: 'MAN',
+    lineShiftJobAssignmentId: assignment.id,
+    replacementMpMemberId: replacement.id,
+  };
+}
+
+async function applySeedOutcome(
+  runtime: SupplierRuntime,
+  lineIndex: number,
+  henkaten: HenkatenResource,
+  outcome: SeedOutcome,
+) {
+  const supervisor = runtime.supervisors[lineIndex % runtime.supervisors.length]!;
+  const qc = runtime.qcs[lineIndex % runtime.qcs.length]!;
+  if (outcome === 'APPROVED_SUPERVISOR_FIRST') {
+    const first = await decideSeed(
+      supervisor,
+      henkaten,
+      'APPROVED',
+      `${runtime.plan.code}-${henkaten.id}-supervisor`,
+    );
+    await decideSeed(qc, first, 'APPROVED', `${runtime.plan.code}-${henkaten.id}-qc`);
+  } else if (outcome === 'APPROVED_QC_FIRST') {
+    const first = await decideSeed(
+      qc,
+      henkaten,
+      'APPROVED',
+      `${runtime.plan.code}-${henkaten.id}-qc`,
+    );
+    await decideSeed(
+      supervisor,
+      first,
+      'APPROVED',
+      `${runtime.plan.code}-${henkaten.id}-supervisor`,
+    );
+  } else if (outcome === 'REJECTED_SUPERVISOR') {
+    await decideSeed(
+      supervisor,
+      henkaten,
+      'REJECTED',
+      `${runtime.plan.code}-${henkaten.id}-supervisor-reject`,
+    );
+  } else if (outcome === 'REJECTED_QC') {
+    await decideSeed(qc, henkaten, 'REJECTED', `${runtime.plan.code}-${henkaten.id}-qc-reject`);
+  } else if (outcome === 'CANCELLED_WITHDRAWN') {
+    await runtime.leaders[lineIndex]!.api.request(
+      'POST',
+      `/api/v1/supplier/henkatens/${henkaten.id}/withdraw`,
+      {
+        expectedVersion: henkaten.version,
+        reason: 'Data objek perubahan perlu dikoreksi sebelum diajukan kembali.',
+      },
+      runtime.leaders[lineIndex]!.csrf,
+      201,
+      `${runtime.plan.code}-${henkaten.id}-withdraw`,
+    );
+  } else if (outcome === 'OPEN_SUPERVISOR_APPROVED') {
+    await decideSeed(
+      supervisor,
+      henkaten,
+      'APPROVED',
+      `${runtime.plan.code}-${henkaten.id}-supervisor-open`,
+    );
+  } else if (outcome === 'OPEN_QC_APPROVED') {
+    await decideSeed(qc, henkaten, 'APPROVED', `${runtime.plan.code}-${henkaten.id}-qc-open`);
+  }
+}
+
+function decideSeed(
+  role: SessionClient,
+  henkaten: HenkatenResource,
+  decision: 'APPROVED' | 'REJECTED',
+  key: string,
+) {
+  return role.api.request<HenkatenResource>(
+    'POST',
+    `/api/v1/supplier/henkatens/${henkaten.id}/decisions`,
+    {
+      expectedVersion: henkaten.version,
+      decision,
+      comment:
+        decision === 'APPROVED'
+          ? 'Poin kontrol telah diverifikasi dan perubahan dapat dijalankan.'
+          : 'Checklist belum memenuhi acceptance criteria; lakukan koreksi sebelum pengajuan ulang.',
+    },
+    role.csrf,
+    201,
+    key,
+  );
+}
+
+async function ensureSeedQualification(
+  assessor: SessionClient,
+  memberId: string,
+  jobId: string,
+  note: string,
+) {
+  const matrix = await assessor.api.request<TanokoMatrix>(
+    'GET',
+    '/api/v1/supplier/tanoko',
+    undefined,
+    undefined,
+    200,
+  );
+  const qualification = matrix.mappings.find(
+    (mapping) => mapping.memberId === memberId && mapping.jobId === jobId,
+  );
+  if ((qualification?.level ?? 0) >= 3) return;
+  await assessor.api.request(
+    'PUT',
+    `/api/v1/supplier/tanoko/members/${memberId}/jobs/${jobId}`,
+    {
+      expectedVersion: qualification?.version ?? null,
+      level: 3,
+      note,
+    },
+    assessor.csrf,
+  );
+}
+
+async function relocateHistoricalOccurrence(
+  prisma: PrismaClient,
+  runtime: SupplierRuntime,
+  shiftRunId: string,
+  targetLineShift: LineShiftDefinition,
+  daysAgo: number,
+) {
+  const businessDate = jakartaDate(daysAgo);
+  const scheduledStartAt = jakartaInstant(businessDate, targetLineShift.startTime);
+  const scheduledEndAt = jakartaInstant(businessDate, targetLineShift.endTime);
+  if (scheduledEndAt <= scheduledStartAt) {
+    scheduledEndAt.setUTCDate(scheduledEndAt.getUTCDate() + 1);
+  }
+  await prisma.$transaction([
+    prisma.$executeRaw`SET LOCAL session_replication_role = replica`,
+    prisma.shiftRun.update({
+      where: { id: shiftRunId },
+      data: {
+        businessDate: new Date(`${businessDate}T00:00:00.000Z`),
+        shiftTemplateId: targetLineShift.shiftTemplateId,
+        shiftNameSnapshot: targetLineShift.shiftName,
+        shiftStartMinuteSnapshot: minuteOfDay(targetLineShift.startTime),
+        shiftEndMinuteSnapshot: minuteOfDay(targetLineShift.endTime),
+        scheduledStartAt,
+        scheduledEndAt,
+        latestPreflightAt: scheduledStartAt,
+        createdAt: new Date(scheduledStartAt.getTime() - 5 * 60_000),
+        updatedAt: scheduledEndAt,
+      },
+    }),
+    prisma.$executeRaw`
+      UPDATE "Henkaten" h
+      SET "businessDate" = ${businessDate}::date,
+          "lineShiftId" = ${targetLineShift.id}::uuid,
+          "shiftNameSnapshot" = ${targetLineShift.shiftName},
+          "identifier" = 'HEN-' || ${runtime.plan.code} || '-' || replace(${businessDate}, '-', '')
+            || '-' || lpad(h."dailySequence"::text, 4, '0'),
+          "occurredAt" = ${scheduledStartAt}::timestamptz
+            + substring(h."submissionKey" from '-m([0-9]+)-d')::int * interval '1 minute',
+          "effectiveStartAt" = ${scheduledStartAt}::timestamptz,
+          "effectiveEndAt" = ${scheduledEndAt}::timestamptz,
+          "createdAt" = ${scheduledStartAt}::timestamptz
+            + substring(h."submissionKey" from '-m([0-9]+)-d')::int * interval '1 minute',
+          "updatedAt" = ${scheduledStartAt}::timestamptz
+            + (
+                substring(h."submissionKey" from '-m([0-9]+)-d')::int
+                + substring(h."submissionKey" from '-d([0-9]+)$')::int
+              ) * interval '1 minute',
+          "finalizedAt" = ${scheduledStartAt}::timestamptz
+            + (
+                substring(h."submissionKey" from '-m([0-9]+)-d')::int
+                + substring(h."submissionKey" from '-d([0-9]+)$')::int
+              ) * interval '1 minute'
+      WHERE h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+    prisma.$executeRaw`
+      UPDATE "ManHenkatenDetail" md
+      SET "lineShiftJobAssignmentId" = target_assignment.id
+      FROM "Henkaten" h
+      JOIN "LineShiftJobAssignment" target_assignment
+        ON target_assignment."lineShiftId" = ${targetLineShift.id}::uuid
+       AND target_assignment."jobId" = h."jobId"
+       AND target_assignment."supplierId" = h."supplierId"
+      WHERE md."henkatenId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+    prisma.$executeRaw`
+      UPDATE "HenkatenApprovalRoute" r
+      SET "createdAt" = h."occurredAt", "updatedAt" = COALESCE(h."finalizedAt", h."occurredAt")
+      FROM "Henkaten" h WHERE r."henkatenId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+    prisma.$executeRaw`
+      UPDATE "ApprovalDecision" d
+      SET "decidedAt" = h."occurredAt" + (8 + d."resultHenkatenVersion" * 5) * interval '1 minute'
+      FROM "Henkaten" h WHERE d."henkatenId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+    prisma.$executeRaw`
+      UPDATE "HenkatenTransition" t
+      SET "occurredAt" = CASE WHEN t."fromStatus" IS NULL THEN h."occurredAt"
+        ELSE COALESCE(h."finalizedAt", h."occurredAt" + interval '10 minutes') END
+      FROM "Henkaten" h WHERE t."henkatenId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+    prisma.$executeRaw`
+      UPDATE "WarningInstance" w
+      SET "openedAt" = h."occurredAt",
+          "closedAt" = CASE WHEN w.status = 'CLOSED' THEN h."finalizedAt" ELSE NULL END
+      FROM "Henkaten" h WHERE w."henkatenId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+    prisma.$executeRaw`
+      UPDATE "AssignmentMovement" m SET "movedAt" = h."occurredAt"
+      FROM "Henkaten" h WHERE m."henkatenId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+    prisma.$executeRaw`
+      UPDATE "OutboxEvent" o
+      SET "occurredAt" = h."occurredAt", "availableAt" = h."occurredAt", "createdAt" = h."occurredAt",
+          "processedAt" = CASE WHEN o."processedAt" IS NULL THEN NULL
+            ELSE h."occurredAt" + interval '1 minute' END
+      FROM "Henkaten" h
+      WHERE o."aggregateId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+    prisma.$executeRaw`
+      UPDATE "AuditEvent" a SET "occurredAt" = h."occurredAt"
+      FROM "Henkaten" h
+      WHERE a."resourceId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+  ]);
+}
+
+function henkatenNarrative(
+  category: SeedCategory,
+  variant: number,
+): { cause: string; detail: string; affectedObject?: string; replacementObject?: string } {
+  const narratives = {
+    MAN: [
+      [
+        'Rotasi operator untuk pemerataan kompetensi proses',
+        'Handover titik kualitas kritis telah dilakukan.',
+      ],
+      [
+        'Penggantian operator pada jam istirahat bergilir',
+        'Relief operator ditempatkan dengan monitoring awal.',
+      ],
+      [
+        'Penyesuaian manpower pada proses bottleneck',
+        'Kompetensi job tujuan telah diverifikasi oleh GL.',
+      ],
+    ],
+    MACHINE: [
+      [
+        'Pergantian dies setelah preventive maintenance',
+        'Parameter dan hasil first-piece telah diperiksa.',
+        'Dies sebelum perawatan',
+        'Dies setelah setting',
+      ],
+      [
+        'Penggantian torque tool karena jadwal kalibrasi',
+        'Tool pengganti diverifikasi terhadap master torque.',
+        'Torque tool lama',
+        'Torque tool terkalibrasi',
+      ],
+      [
+        'Restart mesin setelah minor breakdown',
+        'Recovery disertai verifikasi first-piece.',
+        'Mesin berhenti',
+        'Mesin kembali normal',
+      ],
+    ],
+    MATERIAL: [
+      [
+        'Pergantian lot material sesuai FIFO',
+        'Traceability dan spesifikasi lot baru telah diverifikasi.',
+        'Lot sebelumnya',
+        'Lot berikutnya',
+      ],
+      [
+        'Penggunaan batch sub-component berikutnya',
+        'Label dan incoming inspection telah diperiksa.',
+        'Batch sebelumnya',
+        'Batch baru',
+      ],
+      [
+        'Material alternatif sesuai temporary deviation',
+        'Dokumen deviasi dan batas penggunaan dikonfirmasi.',
+        'Material standar',
+        'Material alternatif',
+      ],
+    ],
+    METHOD: [
+      [
+        'Revisi urutan kerja untuk mengurangi handling',
+        'Urutan baru disosialisasikan dan divalidasi.',
+        'Urutan sebelumnya',
+        'Urutan revisi',
+      ],
+      [
+        'Penyesuaian urutan pengencangan bolt',
+        'Sequence dikonfirmasi terhadap instruksi terbaru.',
+        'Sequence sebelumnya',
+        'Sequence terbaru',
+      ],
+      [
+        'Peningkatan frekuensi inspeksi sementara',
+        'Sampling ditingkatkan berdasarkan tren defect.',
+        'Frekuensi normal',
+        'Tightened inspection',
+      ],
+    ],
+  } as const;
+  const [cause, detail, affectedObject, replacementObject] =
+    narratives[category][variant % narratives[category].length]!;
+  return {
+    cause,
+    detail,
+    ...(affectedObject ? { affectedObject } : {}),
+    ...(replacementObject ? { replacementObject } : {}),
+  };
+}
+
 async function seedCanvasLayouts(runtime: SupplierRuntime) {
   for (let lineIndex = 0; lineIndex < runtime.lines.length; lineIndex += 1) {
     const document = createLocalSeedCanvasDocument(
@@ -615,6 +1113,191 @@ async function seedCanvasLayouts(runtime: SupplierRuntime) {
       { expectedVersion: null, document },
       runtime.admin.csrf,
       200,
+    );
+  }
+}
+
+async function markOneNotificationRead(runtime: SupplierRuntime) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const response = await runtime.qcs[0]!.api.request<{
+      items: Array<Resource & { read: boolean }>;
+    }>('GET', '/api/v1/supplier/notifications?limit=25', undefined, undefined, 200);
+    const unread = response.items.find(({ read }) => !read);
+    if (unread) {
+      await runtime.qcs[0]!.api.request(
+        'PATCH',
+        `/api/v1/supplier/notifications/${unread.id}/read-state`,
+        { read: true, expectedVersion: unread.version },
+        runtime.qcs[0]!.csrf,
+      );
+      return;
+    }
+    await delay(250);
+  }
+  throw new Error(`No notification became available for ${runtime.plan.code}.`);
+}
+
+async function verifySeed(prisma: PrismaClient) {
+  const suppliers = await prisma.supplier.findMany({ orderBy: { code: 'asc' } });
+  const expectedByCode = new Map(
+    localSeedSummary(createLocalSeedPlan()).map((summary) => [summary.code, summary]),
+  );
+  if (
+    suppliers.length !== 2 ||
+    suppliers.some(({ sourceMode, active }) => sourceMode !== 'HOSTED' || !active)
+  ) {
+    throw new Error('Post-seed invariant failed: expected exactly two active Hosted suppliers.');
+  }
+  for (const supplier of suppliers) {
+    const [
+      lines,
+      jobs,
+      members,
+      parts,
+      shiftTemplates,
+      lineShifts,
+      lineShiftAssignments,
+      historicalOccurrences,
+      currentOccurrences,
+      henkatens,
+      henkatenCategories,
+      historicalHenkatens,
+      openWarnings,
+      layouts,
+      photos,
+      tanokoMappings,
+      configuredAssignments,
+    ] = await Promise.all([
+      prisma.line.count({ where: { supplierId: supplier.id } }),
+      prisma.job.count({ where: { supplierId: supplier.id } }),
+      prisma.member.count({ where: { supplierId: supplier.id } }),
+      prisma.part.count({ where: { supplierId: supplier.id } }),
+      prisma.shiftTemplate.count({ where: { supplierId: supplier.id } }),
+      prisma.lineShift.count({ where: { supplierId: supplier.id } }),
+      prisma.lineShiftJobAssignment.count({ where: { supplierId: supplier.id } }),
+      prisma.shiftRun.count({
+        where: { supplierId: supplier.id, scheduledEndAt: { lt: new Date() } },
+      }),
+      prisma.shiftRun.count({
+        where: {
+          supplierId: supplier.id,
+          scheduledStartAt: { lte: new Date() },
+          scheduledEndAt: { gt: new Date() },
+        },
+      }),
+      prisma.henkaten.groupBy({
+        by: ['status'],
+        where: { supplierId: supplier.id },
+        _count: { _all: true },
+      }),
+      prisma.henkaten.groupBy({
+        by: ['category'],
+        where: { supplierId: supplier.id },
+        _count: { _all: true },
+      }),
+      prisma.henkaten.count({
+        where: { supplierId: supplier.id, submissionKey: { contains: '-historical-' } },
+      }),
+      prisma.warningInstance.count({
+        where: { supplierId: supplier.id, status: 'OPEN', sourceMode: 'HOSTED' },
+      }),
+      prisma.lineBoardLayout.count({ where: { supplierId: supplier.id } }),
+      prisma.memberPhoto.count({ where: { supplierId: supplier.id, state: 'CURRENT' } }),
+      prisma.tanokoMapping.findMany({ where: { supplierId: supplier.id } }),
+      prisma.lineShiftJobAssignment.findMany({
+        where: { supplierId: supplier.id, mpMemberId: { not: null } },
+        select: { jobId: true, mpMemberId: true },
+      }),
+    ]);
+    const expected = expectedByCode.get(supplier.code);
+    if (!expected) throw new Error(`No local seed plan exists for ${supplier.code}.`);
+    const statuses = Object.fromEntries(
+      henkatens.map(({ status, _count }) => [status, _count._all]),
+    );
+    const categories = Object.fromEntries(
+      henkatenCategories.map(({ category, _count }) => [category, _count._all]),
+    );
+    const assignmentsQualified = configuredAssignments.every((assignment) =>
+      tanokoMappings.some(
+        (mapping) =>
+          mapping.memberId === assignment.mpMemberId &&
+          mapping.jobId === assignment.jobId &&
+          (mapping.level ?? 0) >= 3,
+      ),
+    );
+    if (
+      lines !== 3 ||
+      jobs !== 12 ||
+      members !== 22 ||
+      parts !== 8 ||
+      shiftTemplates !== 3 ||
+      lineShifts !== 9 ||
+      lineShiftAssignments !== 36 ||
+      historicalOccurrences !== LOCAL_SEED_HISTORICAL_SHIFT_COUNT ||
+      currentOccurrences !== 3 ||
+      historicalHenkatens !== 108 ||
+      Object.values(statuses).reduce((sum, value) => sum + value, 0) !==
+        LOCAL_SEED_HENKATEN_PER_SUPPLIER ||
+      statuses.APPROVED !== expected.statuses.APPROVED ||
+      statuses.REJECTED !== expected.statuses.REJECTED ||
+      statuses.CANCELLED !== expected.statuses.CANCELLED ||
+      statuses.OPEN !== expected.statuses.OPEN ||
+      categories.MAN !== expected.categories.MAN ||
+      categories.MACHINE !== expected.categories.MACHINE ||
+      categories.MATERIAL !== expected.categories.MATERIAL ||
+      categories.METHOD !== expected.categories.METHOD ||
+      openWarnings !== expected.statuses.OPEN ||
+      layouts !== 3 ||
+      photos !== 19 ||
+      !assignmentsQualified
+    ) {
+      throw new Error(
+        `Post-seed invariant failed for ${supplier.code}: ${JSON.stringify({
+          lines,
+          jobs,
+          members,
+          parts,
+          shiftTemplates,
+          lineShifts,
+          lineShiftAssignments,
+          historicalOccurrences,
+          currentOccurrences,
+          historicalHenkatens,
+          statuses,
+          categories,
+          openWarnings,
+          layouts,
+          photos,
+          assignmentsQualified,
+        })}`,
+      );
+    }
+  }
+  const [pendingOutbox, failedOutbox] = await Promise.all([
+    prisma.outboxEvent.count({ where: { processedAt: null, failedAt: null } }),
+    prisma.outboxEvent.count({ where: { failedAt: { not: null } } }),
+  ]);
+  if (pendingOutbox !== 0 || failedOutbox !== 0) {
+    throw new Error('Post-seed invariant failed: transactional outbox is unhealthy.');
+  }
+}
+
+async function verifySeedDashboard(runtime: SupplierRuntime) {
+  const dashboard = await runtime.admin.api.request<{
+    totals: { all: number; open: number; approved: number; rejected: number; cancelled: number };
+    trend: unknown[];
+  }>('GET', '/api/v1/supplier/dashboard?granularity=DAY', undefined, undefined, 200);
+  const expected = localSeedSummary([runtime.plan])[0]!;
+  if (
+    dashboard.totals.all !== expected.henkaten ||
+    dashboard.totals.open !== expected.statuses.OPEN ||
+    dashboard.totals.approved !== expected.statuses.APPROVED ||
+    dashboard.totals.rejected !== expected.statuses.REJECTED ||
+    dashboard.totals.cancelled !== expected.statuses.CANCELLED ||
+    dashboard.trend.length === 0
+  ) {
+    throw new Error(
+      `Post-seed dashboard invariant failed for ${runtime.plan.code}: ${JSON.stringify(dashboard.totals)}`,
     );
   }
 }
@@ -664,6 +1347,26 @@ async function syntheticAvatar(accent: string) {
 
 function securePassword() {
   return `L0cal!${randomBytes(24).toString('base64url')}`;
+}
+
+function jakartaDate(daysAgo: number) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(Date.now() - daysAgo * 86_400_000));
+  const value = Object.fromEntries(parts.map(({ type, value: part }) => [type, part]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
+function jakartaInstant(businessDate: string, time: string) {
+  return new Date(`${businessDate}T${time}:00+07:00`);
+}
+
+function minuteOfDay(time: string) {
+  const [hour, minute] = time.split(':').map(Number);
+  return hour! * 60 + minute!;
 }
 
 function realmOrigin(path: string) {

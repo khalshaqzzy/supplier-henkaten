@@ -5902,9 +5902,11 @@ lint, TypeScript, generated API client/OpenAPI parity, 188 repository/script uni
 integration tests, production build, and diff whitespace check pass. All six isolated Playwright
 journeys pass on Chromium and Edge; onboarding now covers Admin Line Setup and shift assignment.
 The production-like five-image Compose acceptance, deployment quality checks, Gitleaks, Trivy
-filesystem/image scans, and package audit also pass. A separate fresh-database runtime seed
-completed through the built API with 2 suppliers, 18 LineShifts, 72 shift assignments, 6 Canvas
-layouts, no ShiftRuns, and no pending outbox events.
+filesystem/image scans, and package audit also pass. A separate fresh-database runtime seed now
+creates the planned 240 Henkaten through the built Line–Shift API: 216 terminal historical records
+across 72 compatibility occurrence snapshots plus 24 current records, with 16 Open warnings, 18
+LineShifts, 72 shift assignments, 6 Canvas layouts, dashboard totals/trend verified, and no pending
+outbox events.
 Decisions/ADR: ADR 0033.
 Blockers: none for local implementation.
 Next recommended subphase: run staging UAT of Line Setup and during/outside-shift Henkaten flows;

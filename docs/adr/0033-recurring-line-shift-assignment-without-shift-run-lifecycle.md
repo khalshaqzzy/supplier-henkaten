@@ -66,4 +66,7 @@ client/OpenAPI parity, production builds, repository unit tests, and API integra
 occurrence selection, Tanoko-only replacement, duplicate MP assignment, reject/withdraw restoration,
 removed supplier Shift endpoints, and Line Setup. The Admin Line Setup onboarding journey passes on
 Chromium and Edge. Production-like Compose acceptance and HIGH/CRITICAL filesystem plus image scans
-also pass. Dedicated during-shift/outside-shift browser coverage and staging UAT remain pending.
+also pass. The local seed creates 240 Henkaten via Line–Shift commands, retains time-distributed
+dashboard evidence using internal compatibility occurrence snapshots, and asserts the dashboard
+totals and trend before reporting success. Dedicated during-shift/outside-shift browser coverage and
+staging UAT remain pending.
