@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { OperationsModule } from '../operations/operations.module.js';
+import { MasterDataModule } from '../master-data/master-data.module.js';
 import {
   SupplierHenkatenController,
   TmminHenkatenController,
@@ -11,7 +12,7 @@ import { HenkatenService } from './henkaten.service.js';
 import { ApprovalService } from './approval.service.js';
 
 @Module({
-  imports: [OperationsModule],
+  imports: [OperationsModule, MasterDataModule],
   controllers: [
     SupplierHenkatenController,
     TmminHenkatenController,

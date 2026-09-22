@@ -17,8 +17,8 @@ const areaMeta = {
   PARTS: { label: 'Part', to: '/master-data/parts' },
   CHECKLISTS: { label: 'Checklist 4M', to: '/master-data/checklists' },
   DEFAULT_ASSIGNMENTS: {
-    label: 'Default Assignment',
-    to: '/master-data/default-assignments',
+    label: 'Line Setup',
+    to: '/master-data/line-setup',
   },
 } as const;
 
@@ -38,10 +38,10 @@ export function SetupPage() {
     <div className="product-page">
       <PageHeader
         eyebrow={
-          identity.purpose === 'HOSTED_PREPARATION' ? 'Hosted Preparation' : 'Konfigurasi tenant'
+          identity.purpose === 'HOSTED_PREPARATION' ? 'Persiapan Supplier' : 'Konfigurasi supplier'
         }
         title="Setup Supplier"
-        description="Selesaikan setiap prerequisite secara berurutan sampai operasi Hosted siap."
+        description=""
         actions={
           <Button
             variant="secondary"
@@ -67,7 +67,7 @@ export function SetupPage() {
       {readiness.isError && (
         <ErrorState
           title="Readiness tidak dapat dimuat"
-          description="Status tidak ditebak dari data browser. Coba ambil evaluasi server kembali."
+          description=""
           action={<Button onClick={() => void readiness.refetch()}>Coba lagi</Button>}
         />
       )}
@@ -91,7 +91,7 @@ export function SetupPage() {
             <SummaryMetric
               label="Langkah berikutnya"
               value={
-                readiness.data.nextArea ? areaMeta[readiness.data.nextArea].label : 'Operasi Hosted'
+                readiness.data.nextArea ? areaMeta[readiness.data.nextArea].label : 'Operasional'
               }
               detail={
                 <LastUpdated
@@ -133,7 +133,7 @@ export function SetupPage() {
               })}
             </section>
             <ContextRail
-              eyebrow="Readiness authoritative"
+              eyebrow="Kesiapan"
               title={
                 readiness.data.nextArea
                   ? areaMeta[readiness.data.nextArea].label
@@ -149,7 +149,7 @@ export function SetupPage() {
             >
               {readiness.data.ready ? (
                 <Alert tone="success" title="Siap beroperasi">
-                  Semua prerequisite Hosted telah dipenuhi.
+                  Persiapan telah selesai.
                 </Alert>
               ) : (
                 <>

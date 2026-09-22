@@ -1976,7 +1976,16 @@ a.overview-activity-identifier:hover {
 }
 
 .defaults-summary {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.defaults-summary > label {
+  display: grid;
+  gap: var(--hds-space-2);
+  padding: var(--hds-space-4);
+  border: 1px solid var(--hds-border-default);
+  border-radius: var(--hds-radius-lg);
+  background: var(--hds-surface-default);
 }
 
 .defaults-summary > div {
@@ -2014,7 +2023,7 @@ a.overview-activity-identifier:hover {
 .defaults-table__head,
 .defaults-table__row {
   display: grid;
-  grid-template-columns: 64px minmax(160px, 1fr) minmax(220px, 1.4fr) 140px 80px;
+  grid-template-columns: 64px minmax(160px, 1fr) minmax(240px, 1.5fr);
   align-items: center;
   gap: var(--hds-space-3);
   min-height: 52px;

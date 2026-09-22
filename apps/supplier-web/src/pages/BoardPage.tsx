@@ -2,7 +2,6 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
-  FileText,
   Radio,
   RefreshCw,
   UserRound,
@@ -101,15 +100,14 @@ export function BoardPage() {
     .flatMap((job) => job.indicators)
     .filter((item) => item.status === 'OPEN').length;
   const issues = jobs.filter((job) => job.state === 'VACANT' || job.state === 'CONFLICTED').length;
-  const operationalRisks = boardOperationalRisks(lines);
   const contextLine = lines[0];
 
   return (
     <div className="product-page board-page">
       <PageHeader
-        eyebrow="Realtime monitoring"
+        eyebrow="Operasional"
         title="Assignment Board Supplier"
-        description="Working Assignment dan active change state untuk Shift Run dalam scope Anda."
+        description=""
         actions={
           session!.principal.role === 'LINE_LEADER' ? (
             <Link className="hds-button hds-button--primary hds-button--md" to="/henkatens/new">
@@ -123,17 +121,13 @@ export function BoardPage() {
           tone="warning"
           title={
             connection === 'connecting'
-              ? 'Menyambungkan realtime'
+              ? 'Menghubungkan'
               : connection === 'resyncing'
-                ? 'Menyinkronkan ulang data'
-                : 'Data mungkin stale'
+                ? 'Memperbarui data'
+                : 'Koneksi terputus'
           }
         >
-          {connection === 'connecting'
-            ? 'Board sedang membuka koneksi event.'
-            : connection === 'resyncing'
-              ? 'Cursor event tidak tersedia. Board sedang mengambil ulang data authoritative.'
-              : 'Koneksi event terputus. Data authoritative terakhir tetap ditampilkan.'}
+          Coba sambungkan ulang atau perbarui data.
           {connection === 'disconnected' && (
             <Button size="sm" variant="ghost" onClick={() => realtime.reconnect()}>
               Sambungkan ulang
@@ -239,15 +233,12 @@ export function BoardPage() {
       {board.isError && (
         <ErrorState
           title="Assignment Board tidak dapat dimuat"
-          description="Coba refetch. Scope line tidak diperluas oleh filter browser."
+          description=""
           action={<Button onClick={() => void board.refetch()}>Coba lagi</Button>}
         />
       )}
       {board.data && lines.length === 0 && (
-        <EmptyState
-          title="Tidak ada shift aktif"
-          description="Board akan terisi setelah Shift Run pada line dalam scope menjadi Active."
-        />
+        <EmptyState title="Belum ada assignment" description="" />
       )}
       {board.data && lines.length > 0 && (
         <div className={`board-workspace${view === 'canvas' ? ' is-canvas' : ''}`}>
@@ -302,14 +293,7 @@ export function BoardPage() {
                           <dd>{line.lineLeader.name ?? 'Kosong'}</dd>
                         </div>
                       </dl>
-                      <Link to={`/shifts/${line.shiftRunId}`}>Detail Shift</Link>
                     </header>
-                    {line.activeOverride && (
-                      <Alert tone="danger" title="Emergency Start aktif">
-                        {line.activeOverride.reason} · {line.activeOverride.unresolvedIssueCount}{' '}
-                        issue belum selesai.
-                      </Alert>
-                    )}
                     <div className="board-job-grid">
                       {line.jobs.map((job) => (
                         <article
@@ -352,41 +336,9 @@ export function BoardPage() {
               </div>
             )}
           </div>
-          <ContextRail
-            eyebrow="Konteks authoritative"
-            title="Status operasional"
-            footer={
-              contextLine && (
-                <Link
-                  className="hds-button hds-button--secondary hds-button--sm"
-                  to={`/shifts/${contextLine.shiftRunId}`}
-                >
-                  Buka detail Shift
-                </Link>
-              )
-            }
-          >
-            {operationalRisks.length ? (
-              <section className="board-critical">
-                <h3>Issue dan reservation</h3>
-                {operationalRisks.slice(0, 6).map((risk) => (
-                  <div key={risk.key}>
-                    <AlertTriangle aria-hidden="true" />
-                    <span>
-                      <strong>{risk.jobName}</strong>
-                      <small>{risk.label}</small>
-                    </span>
-                    <BoardRiskAction risk={risk} />
-                  </div>
-                ))}
-              </section>
-            ) : (
-              <Alert tone="success" title="Assignment stabil">
-                Tidak ada vacancy, conflict, atau reservation pada scope ini.
-              </Alert>
-            )}
+          <ContextRail eyebrow="" title="Shift">
             {contextLine && (
-              <FactStrip label="Ringkasan Shift aktif">
+              <FactStrip label="Shift berjalan">
                 <FactItem label="Line" value={contextLine.lineCode} detail={contextLine.lineName} />
                 <FactItem label="Shift" value={contextLine.shiftName} />
                 <FactItem label="Business date" value={contextLine.businessDate} />
@@ -431,8 +383,8 @@ function BoardMpAvatar({ mp }: { mp: BoardLines[number]['jobs'][number]['mp'] })
 
 export function boardOperationalRisks(lines: BoardLines) {
   return lines.flatMap((line) =>
-    line.jobs.flatMap((job) => [
-      ...(job.state === 'VACANT' || job.state === 'CONFLICTED'
+    line.jobs.flatMap((job) =>
+      job.state === 'VACANT' || job.state === 'CONFLICTED'
         ? [
             {
               key: `assignment:${job.assignmentId}`,
@@ -440,21 +392,11 @@ export function boardOperationalRisks(lines: BoardLines) {
               jobName: job.jobName,
               label: `Assignment issue · ${humanize(job.state)}`,
               henkatenId: null,
-              resolutionShiftRunId: line.shiftRunId,
+              lineId: line.lineId,
             },
           ]
-        : []),
-      ...job.indicators
-        .filter((indicator) => indicator.category === 'MAN' && indicator.status === 'OPEN')
-        .map((indicator) => ({
-          key: `reservation:${indicator.henkatenId}`,
-          kind: 'RESERVATION' as const,
-          jobName: job.jobName,
-          label: `Reservation aktif · ${indicator.identifier}`,
-          henkatenId: indicator.henkatenId,
-          resolutionShiftRunId: null,
-        })),
-    ]),
+        : [],
+    ),
   );
 }
 
@@ -463,22 +405,13 @@ export function BoardRiskAction({
 }: {
   risk: ReturnType<typeof boardOperationalRisks>[number];
 }) {
-  return risk.kind === 'RESERVATION' ? (
-    <Link
-      className="hds-button hds-button--secondary hds-button--sm board-risk-action"
-      to={`/henkatens/${risk.henkatenId}`}
-    >
-      <FileText aria-hidden="true" />
-      Buka Henkaten
-      <ArrowRight aria-hidden="true" />
-    </Link>
-  ) : (
+  return (
     <Link
       className="hds-button hds-button--primary hds-button--sm board-risk-action"
-      to={`/shifts/${risk.resolutionShiftRunId}/resolve`}
+      to={`/master-data/line-setup?lineId=${risk.lineId}`}
     >
       <Wrench aria-hidden="true" />
-      Buka resolusi
+      Line Setup
       <ArrowRight aria-hidden="true" />
     </Link>
   );

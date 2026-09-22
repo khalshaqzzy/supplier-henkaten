@@ -13,6 +13,22 @@
 
 Dokumen ini adalah kontrak produk dan implementasi v1. Kata **MUST/wajib**, **MUST NOT/dilarang**, **SHOULD/sebaiknya**, dan **MAY/dapat** bersifat normatif. Bila source code, prototype, slide, atau asumsi implementasi berbeda dengan dokumen ini, tim wajib mengeskalasi perbedaan tersebut dan tidak boleh memilih perilaku secara diam-diam.
 
+### Amendment operasional Line–Shift — 22 September 2026
+
+Amendment ini menggantikan seluruh aturan lama tentang Shift Run operasional, shift preflight,
+Start/End/Emergency Start, MP reservation, exclusivity MP, donor vacancy, dan Assignment Issue yang
+berasal dari perpindahan MP. Shift adalah konfigurasi berulang per line. Supplier Admin mengatur
+Supervisor, Line Leader, dan MP default secara terpisah untuk setiap pasangan Line–Shift.
+
+Henkaten memakai occurrence berdasarkan waktu: saat berada dalam jadwal, Line–Shift dipilih otomatis;
+di luar jadwal LL memilih shift dan efek dimulai pada start berikutnya. Man replacement langsung
+mengubah assignment occurrence tersebut, hanya diblokir bila MP tidak aktif atau Tanoko job kurang
+dari level 3. MP yang sama boleh berada di banyak assignment pada waktu yang sama. Reject/Withdraw
+mengembalikan assignment efektif sebelumnya/default, dan occurrence shift berikutnya selalu kembali
+ke default. API Supplier hanya menerima konteks `lineShiftId`; `shiftRunId` tidak dapat dipakai untuk
+membuat Henkaten baru. Detail keputusan ada pada ADR 0033; klausul lama yang bertentangan tidak
+berlaku.
+
 ---
 
 ## 1. Ringkasan Eksekutif
@@ -77,7 +93,7 @@ Menyediakan satu sistem Henkaten yang aman, traceable, dan konsisten bagi seluru
 
 - Mendigitalkan input dan approval Henkaten 4M.
 - Memvisualisasikan current assignment dan change point pada Assignment Board.
-- Menjamin satu MP tidak memiliki assignment/reservation yang bertentangan.
+- Mendukung assignment MP fleksibel; kelayakan replacement Man ditentukan oleh Tanoko job.
 - Memberikan warning kepada TMMIN Quality selama Henkaten masih Open.
 - Menyimpan decision history dan audit trail permanen.
 - Memberikan isolasi data yang kuat untuk 20-42 supplier.
@@ -115,14 +131,12 @@ Produk ini bukan:
 | TMMIN Quality | User monitoring lintas supplier; read-only terhadap domain Henkaten. |
 | Line | Unit line produksi milik supplier. |
 | Job | Posisi/proses kerja di dalam satu line. |
-| Default Assignment | Penempatan rutin Supervisor, LL, dan MP yang menjadi baseline shift. |
-| Working Assignment | Penempatan aktual untuk satu Shift Run. |
-| Assignment Issue | Masalah assignment, misalnya vacancy akibat MP ditarik line lain. |
+| Line–Shift Assignment | Supervisor, LL, dan MP default untuk satu pasangan line dan shift. |
+| Effective Assignment | Penempatan aktual pada occurrence shift setelah override Man diterapkan. |
 | Shift Template | Definisi nama, urutan, waktu mulai/selesai, dan timezone shift. |
-| Shift Run | Eksekusi satu Shift Template untuk line dan business date tertentu. |
+| Shift Occurrence | Interval waktu berulang yang dihitung dari Line–Shift dan timezone. |
 | Open | Henkaten menunggu keputusan final dan memunculkan warning TMMIN. |
 | Closed | Kondisi turunan untuk outcome Approved, Rejected, atau Cancelled. |
-| Reservation | Lock sementara atas MP pengganti selama Man Henkaten Open. |
 | Hosted | Source mode dengan seluruh workflow supplier dijalankan di platform TMMIN. |
 | External | Source mode dengan aplikasi supplier sebagai source of truth dan TMMIN hanya menerima data monitoring. |
 | Hosted Preparation | Akses konfigurasi terkontrol saat tenant masih `EXTERNAL`; bukan source mode ketiga dan tidak mengizinkan workflow operasional Hosted. |
@@ -164,7 +178,7 @@ Aturan:
 
 Cutover mode wajib:
 
-1. memblokir perubahan mode bila ada active shift atau Henkaten Open;
+1. memblokir perubahan mode bila ada Henkaten Open;
 2. mencatat alasan, actor, waktu, source mode lama, dan source mode baru;
 3. mencabut session/credential source lama;
 4. menaikkan `sourceEpoch`;

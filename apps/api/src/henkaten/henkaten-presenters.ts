@@ -26,6 +26,7 @@ export function presentHenkatenSummary(row: SummaryRow) {
     id: row.id,
     identifier: row.identifier,
     shiftRunId: row.shiftRunId,
+    lineShiftId: row.lineShiftId,
     lineId: row.lineId,
     jobId: row.jobId,
     partId: row.partId,
@@ -35,6 +36,8 @@ export function presentHenkatenSummary(row: SummaryRow) {
     category: row.category,
     businessDate: databaseDate(row.businessDate),
     occurredAt: row.occurredAt.toISOString(),
+    effectiveStartAt: row.effectiveStartAt?.toISOString() ?? null,
+    effectiveEndAt: row.effectiveEndAt?.toISOString() ?? null,
     line: { code: row.lineCodeSnapshot, name: row.lineNameSnapshot },
     jobName: row.jobNameSnapshot,
     part: { number: row.partNumberSnapshot, name: row.partNameSnapshot },
@@ -80,6 +83,7 @@ export function presentHenkatenDetail(row: DetailRow) {
     man: row.manDetail
       ? {
           targetWorkingAssignmentId: row.manDetail.targetWorkingAssignmentId,
+          lineShiftJobAssignmentId: row.manDetail.lineShiftJobAssignmentId,
           sourceWorkingAssignmentId: row.manDetail.sourceWorkingAssignmentId,
           replacedMpMemberId: row.manDetail.replacedMpMemberId,
           replacedWasVacant: row.manDetail.replacedWasVacant,

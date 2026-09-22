@@ -1,4 +1,5 @@
 import { assertTanokoEligible } from '../master-data/tanoko-eligibility.js';
+import { LineShiftService } from '../master-data/line-shift.service.js';
 import { createHash } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
@@ -38,6 +39,7 @@ export class HenkatenService {
     private readonly audit: AuditWriter,
     private readonly outbox: OutboxService,
     private readonly finalization: OperationalFinalizationService,
+    private readonly lineShifts: LineShiftService,
   ) {}
 
   async create(
@@ -48,300 +50,357 @@ export class HenkatenService {
     context: MutationContext,
   ) {
     if (principal.role !== 'LINE_LEADER' || !principal.memberId) throw forbidden();
+    const operational = await this.lineShifts.operationalContext(scope, principal);
+    if (
+      operational.currentLineShiftIds.length > 0 &&
+      !operational.currentLineShiftIds.includes(input.lineShiftId)
+    ) {
+      throw shiftSelectionConflict();
+    }
+    return this.createForLineShift(scope, input, idempotencyKey, principal, context);
+  }
+
+  private async createForLineShift(
+    scope: TenantScope,
+    input: CreateHenkatenRequest & { lineShiftId: string },
+    idempotencyKey: string,
+    principal: RequestPrincipal,
+    context: MutationContext,
+  ) {
+    if (!principal.memberId) throw missing('Line Shift');
     const memberId = principal.memberId;
     const payloadHash = createHash('sha256').update(canonicalJson(input)).digest('hex');
-    try {
-      const id = await runSerializable(this.prisma, async (tx) => {
-        await lockSupplier(tx, scope.supplierId);
-        const existing = await tx.henkaten.findFirst({
+    const id = await runSerializable(this.prisma, async (tx) => {
+      await lockSupplier(tx, scope.supplierId);
+      const retry = await tx.henkaten.findFirst({
+        where: {
+          supplierId: scope.supplierId,
+          createdById: principal.userId,
+          submissionKey: idempotencyKey,
+        },
+      });
+      if (retry) {
+        if (retry.submissionPayloadHash !== payloadHash) throw idempotencyConflict();
+        return retry.id;
+      }
+      const occurrence = await this.lineShifts.resolveOccurrence(
+        tx,
+        scope,
+        input.lineShiftId,
+        principal,
+      );
+      const lineShift = occurrence.row;
+      const [supplier, job, part, checklist] = await Promise.all([
+        tx.supplier.findUnique({ where: { id: scope.supplierId } }),
+        tx.job.findFirst({
           where: {
+            id: input.jobId,
             supplierId: scope.supplierId,
-            createdById: principal.userId,
-            submissionKey: idempotencyKey,
+            lineId: lineShift.lineId,
+            active: true,
           },
-        });
-        if (existing) {
-          if (existing.submissionPayloadHash !== payloadHash) throw idempotencyConflict();
-          return existing.id;
-        }
-        const submittedSource =
-          input.category === 'MAN' && input.sourceWorkingAssignmentId
-            ? await tx.workingAssignment.findFirst({
-                where: {
-                  id: input.sourceWorkingAssignmentId,
-                  supplierId: scope.supplierId,
-                },
-                select: { shiftRunId: true },
-              })
-            : null;
-        await lockShiftRuns(tx, [
-          input.shiftRunId,
-          ...(submittedSource ? [submittedSource.shiftRunId] : []),
-        ]);
-        const shift = await tx.shiftRun.findFirst({
+        }),
+        tx.part.findFirst({
+          where: { id: input.partId, supplierId: scope.supplierId, active: true },
+        }),
+        tx.checklistVersion.findFirst({
           where: {
-            id: input.shiftRunId,
+            id: input.checklistVersionId,
             supplierId: scope.supplierId,
-            status: { in: ['NOT_STARTED', 'ACTIVE'] },
-            lineLeaderMemberId: memberId,
+            category: input.category,
+            template: { active: true },
           },
-        });
-        if (!shift) throw missing('Owned active or planned Shift Run');
-        if (shift.status === 'NOT_STARTED' && input.category !== 'MAN') throw invalidTransition();
-        const [supplier, job, part, checklist] = await Promise.all([
-          tx.supplier.findUnique({ where: { id: scope.supplierId } }),
-          tx.job.findFirst({
-            where: {
-              id: input.jobId,
-              supplierId: scope.supplierId,
-              lineId: shift.lineId,
-              active: true,
-            },
-          }),
-          tx.part.findFirst({
-            where: { id: input.partId, supplierId: scope.supplierId, active: true },
-          }),
-          tx.checklistVersion.findFirst({
-            where: {
-              id: input.checklistVersionId,
-              supplierId: scope.supplierId,
-              category: input.category,
-              template: { active: true },
-            },
-            include: {
-              items: { orderBy: { displayOrder: 'asc' } },
-              template: { include: { versions: { orderBy: { versionNumber: 'desc' }, take: 1 } } },
-            },
-          }),
-        ]);
-        if (
-          !supplier ||
-          supplier.sourceMode !== 'HOSTED' ||
-          supplier.sourceEpoch !== principal.sourceEpoch
-        ) {
-          throw sourceMismatch();
-        }
-        if (!job) throw missing('Active job');
-        if (!part) throw missing('Active part');
-        if (
-          !checklist ||
-          checklist.template.versions[0]?.id !== checklist.id ||
-          checklist.items.length !== input.checklistAnswers.length
-        ) {
-          throw checklistInvalid();
-        }
-        const answers = new Map(
-          input.checklistAnswers.map((answer) => [answer.itemId, answer.answer]),
-        );
-        if (
-          answers.size !== checklist.items.length ||
-          checklist.items.some(({ id }) => answers.get(id) !== 'YES')
-        ) {
-          throw checklistInvalid();
-        }
+          include: {
+            items: { orderBy: { displayOrder: 'asc' } },
+            template: { include: { versions: { orderBy: { versionNumber: 'desc' }, take: 1 } } },
+          },
+        }),
+      ]);
+      if (
+        !supplier ||
+        supplier.sourceMode !== 'HOSTED' ||
+        supplier.sourceEpoch !== principal.sourceEpoch
+      )
+        throw sourceMismatch();
+      if (!job) throw missing('Active job');
+      if (!part) throw missing('Active part');
+      const answers = new Map(
+        input.checklistAnswers.map((answer) => [answer.itemId, answer.answer]),
+      );
+      if (
+        !checklist ||
+        checklist.template.versions[0]?.id !== checklist.id ||
+        checklist.items.length !== input.checklistAnswers.length ||
+        answers.size !== checklist.items.length ||
+        checklist.items.some(({ id: itemId }) => answers.get(itemId) !== 'YES')
+      )
+        throw checklistInvalid();
 
-        const man =
-          input.category === 'MAN'
-            ? await this.validateMan(tx, scope.supplierId, shift.id, input)
-            : undefined;
-        if (input.clonedFromHenkatenId) {
-          const source = await tx.henkaten.findFirst({
-            where: { id: input.clonedFromHenkatenId, supplierId: scope.supplierId },
-          });
-          if (!source) throw missing('Cloned Henkaten');
-        }
-        const sequence = await nextSequence(tx, scope.supplierId, shift.businessDate);
-        const dateToken = shift.businessDate.toISOString().slice(0, 10).replaceAll('-', '');
-        const identifier = `HEN-${supplier.code}-${dateToken}-${sequence
-          .toString()
-          .padStart(4, '0')}`;
-        const now = new Date();
-        const created = await tx.henkaten.create({
+      const legacyShift = await ensureAutomaticOccurrence(
+        tx,
+        scope.supplierId,
+        supplier.sourceEpoch,
+        lineShift,
+        occurrence.businessDate,
+        occurrence.start,
+        occurrence.end,
+        principal.userId,
+      );
+      const targetWorking = legacyShift.workingAssignments.find(
+        (assignment) => assignment.jobId === job.id,
+      );
+      if (!targetWorking) throw missing('Line Shift job assignment');
+
+      let man:
+        | {
+            assignment: (typeof lineShift.jobAssignments)[number];
+            replacement: { id: string; fullName: string; registrationNumber: string };
+            replaced: { id: string; fullName: string } | null;
+          }
+        | undefined;
+      if (input.category === 'MAN') {
+        const assignment = lineShift.jobAssignments.find(
+          (item) =>
+            item.jobId === job.id &&
+            (!input.lineShiftJobAssignmentId || item.id === input.lineShiftJobAssignmentId),
+        );
+        if (!assignment) throw missing('Line Shift job assignment');
+        const replacement = await tx.member.findFirst({
+          where: {
+            id: input.replacementMpMemberId,
+            supplierId: scope.supplierId,
+            role: 'MP',
+            active: true,
+          },
+          select: { id: true, fullName: true, registrationNumber: true },
+        });
+        if (!replacement) throw missing('Active replacement MP');
+        await assertTanokoEligible(tx, scope.supplierId, replacement.id, job.id);
+        const previousOverride = await tx.henkaten.findFirst({
+          where: {
+            supplierId: scope.supplierId,
+            lineShiftId: lineShift.id,
+            jobId: job.id,
+            category: 'MAN',
+            status: { in: ['OPEN', 'APPROVED'] },
+            effectiveStartAt: occurrence.start,
+            effectiveEndAt: occurrence.end,
+            manDetail: { lineShiftJobAssignmentId: assignment.id },
+          },
+          include: { manDetail: { include: { replacementMp: true } } },
+          orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+        });
+        const replacedMember = previousOverride?.manDetail?.replacementMp ?? assignment.mp;
+        man = {
+          assignment,
+          replacement,
+          replaced: replacedMember
+            ? { id: replacedMember.id, fullName: replacedMember.fullName }
+            : null,
+        };
+      }
+
+      if (input.clonedFromHenkatenId) {
+        const source = await tx.henkaten.findFirst({
+          where: { id: input.clonedFromHenkatenId, supplierId: scope.supplierId },
+        });
+        if (!source) throw missing('Cloned Henkaten');
+      }
+      const businessDate = new Date(`${occurrence.businessDate}T00:00:00.000Z`);
+      const sequence = await nextSequence(tx, scope.supplierId, businessDate);
+      const identifier = `HEN-${supplier.code}-${occurrence.businessDate.replaceAll('-', '')}-${sequence
+        .toString()
+        .padStart(4, '0')}`;
+      const now = new Date();
+      const created = await tx.henkaten.create({
+        data: {
+          supplierId: scope.supplierId,
+          shiftRunId: legacyShift.id,
+          lineShiftId: lineShift.id,
+          lineId: lineShift.lineId,
+          jobId: job.id,
+          partId: part.id,
+          identifier,
+          dailySequence: sequence,
+          sourceMode: supplier.sourceMode,
+          sourceEpoch: supplier.sourceEpoch,
+          category: input.category,
+          businessDate,
+          timezoneSnapshot: lineShift.shiftTemplate.timezone,
+          shiftNameSnapshot: lineShift.shiftTemplate.name,
+          lineCodeSnapshot: lineShift.line.code,
+          lineNameSnapshot: lineShift.line.name,
+          jobNameSnapshot: job.name,
+          partNumberSnapshot: part.partNumber,
+          normalizedPartNumberSnapshot: normalizeLookup(part.partNumber),
+          partNameSnapshot: part.partName,
+          creatorMemberId: memberId,
+          creatorNameSnapshot: principal.displayName,
+          cause: input.cause,
+          detail: input.detail,
+          ...(input.category !== 'MAN'
+            ? {
+                affectedObject: input.affectedObject,
+                replacementObject: input.replacementObject,
+              }
+            : {}),
+          occurredAt: now,
+          effectiveStartAt: occurrence.start,
+          effectiveEndAt: occurrence.end,
+          ...(input.clonedFromHenkatenId
+            ? { clonedFromHenkatenId: input.clonedFromHenkatenId }
+            : {}),
+          submissionKey: idempotencyKey,
+          submissionPayloadHash: payloadHash,
+          createdById: principal.userId,
+          checklistSnapshot: {
+            create: {
+              checklistVersionId: checklist.id,
+              category: checklist.category,
+              versionNumber: checklist.versionNumber,
+              answers: {
+                create: checklist.items.map((item) => ({
+                  sourceItemId: item.id,
+                  labelSnapshot: item.label,
+                  displayOrderSnapshot: item.displayOrder,
+                  answer: 'YES',
+                })),
+              },
+            },
+          },
+          transitions: {
+            create: {
+              toStatus: 'OPEN',
+              actorUserId: principal.userId,
+              actorRole: principal.role,
+              actorName: principal.displayName,
+              correlationId: context.correlationId,
+            },
+          },
+          warning: {
+            create: {
+              partNumberSnapshot: part.partNumber,
+              normalizedPartNumberSnapshot: normalizeLookup(part.partNumber),
+              partNameSnapshot: part.partName,
+            },
+          },
+          approvalRoutes: {
+            create: [
+              {
+                route: 'SUPERVISOR',
+                initialResponsibleMemberId: lineShift.supervisorMemberId,
+                initialResponsibleNameSnapshot: lineShift.supervisor?.fullName ?? null,
+                currentResponsibleMemberId: lineShift.supervisorMemberId,
+                currentResponsibleNameSnapshot: lineShift.supervisor?.fullName ?? null,
+              },
+              { route: 'QC' },
+            ],
+          },
+          ...(man
+            ? {
+                manDetail: {
+                  create: {
+                    targetWorkingAssignmentId: targetWorking.id,
+                    lineShiftJobAssignmentId: man.assignment.id,
+                    ...(man.replaced
+                      ? {
+                          replacedMpMemberId: man.replaced.id,
+                          replacedMpNameSnapshot: man.replaced.fullName,
+                        }
+                      : {}),
+                    replacedWasVacant: !man.replaced,
+                    replacementMpMemberId: man.replacement.id,
+                    replacementMpNameSnapshot: man.replacement.fullName,
+                    targetAssignmentVersion: targetWorking.version,
+                  },
+                },
+              }
+            : {}),
+        },
+      });
+
+      if (man) {
+        const updatedTarget = await tx.workingAssignment.update({
+          where: { id: targetWorking.id },
+          data: {
+            effectiveMpMemberId: man.replacement.id,
+            candidateMpMemberId: man.replacement.id,
+            mpNameSnapshot: man.replacement.fullName,
+            mpRegistrationSnapshot: man.replacement.registrationNumber,
+            state: 'ASSIGNED',
+            version: { increment: 1 },
+            updatedById: principal.userId,
+          },
+        });
+        await tx.assignmentMovement.create({
           data: {
             supplierId: scope.supplierId,
-            shiftRunId: shift.id,
-            lineId: shift.lineId,
-            jobId: job.id,
-            partId: part.id,
-            identifier,
-            dailySequence: sequence,
-            sourceMode: supplier.sourceMode,
-            sourceEpoch: supplier.sourceEpoch,
-            category: input.category,
-            businessDate: shift.businessDate,
-            timezoneSnapshot: shift.timezoneSnapshot,
-            shiftNameSnapshot: shift.shiftNameSnapshot,
-            lineCodeSnapshot: shift.lineCodeSnapshot,
-            lineNameSnapshot: shift.lineNameSnapshot,
-            jobNameSnapshot: job.name,
-            partNumberSnapshot: part.partNumber,
-            normalizedPartNumberSnapshot: normalizeLookup(part.partNumber),
-            partNameSnapshot: part.partName,
-            creatorMemberId: memberId,
-            creatorNameSnapshot: principal.displayName,
-            cause: input.cause,
-            detail: input.detail,
-            ...(input.category !== 'MAN'
+            henkatenId: created.id,
+            targetShiftRunId: legacyShift.id,
+            targetWorkingAssignmentId: targetWorking.id,
+            targetLineId: lineShift.lineId,
+            targetJobId: job.id,
+            movedMpMemberId: man.replacement.id,
+            movedMpNameSnapshot: man.replacement.fullName,
+            ...(man.replaced
               ? {
-                  affectedObject: input.affectedObject,
-                  replacementObject: input.replacementObject,
+                  replacedMpMemberId: man.replaced.id,
+                  replacedMpNameSnapshot: man.replaced.fullName,
                 }
               : {}),
-            occurredAt: now,
-            ...(input.clonedFromHenkatenId
-              ? { clonedFromHenkatenId: input.clonedFromHenkatenId }
-              : {}),
-            submissionKey: idempotencyKey,
-            submissionPayloadHash: payloadHash,
-            createdById: principal.userId,
-            checklistSnapshot: {
-              create: {
-                checklistVersionId: checklist.id,
-                category: checklist.category,
-                versionNumber: checklist.versionNumber,
-                answers: {
-                  create: checklist.items.map((item) => ({
-                    sourceItemId: item.id,
-                    labelSnapshot: item.label,
-                    displayOrderSnapshot: item.displayOrder,
-                    answer: 'YES',
-                  })),
-                },
-              },
-            },
-            transitions: {
-              create: {
-                toStatus: 'OPEN',
-                actorUserId: principal.userId,
-                actorRole: principal.role,
-                actorName: principal.displayName,
-                correlationId: context.correlationId,
-              },
-            },
-            warning: {
-              create: {
-                partNumberSnapshot: part.partNumber,
-                normalizedPartNumberSnapshot: normalizeLookup(part.partNumber),
-                partNameSnapshot: part.partName,
-              },
-            },
-            approvalRoutes: {
-              create: [
-                {
-                  route: 'SUPERVISOR',
-                  initialResponsibleMemberId: shift.supervisorMemberId,
-                  initialResponsibleNameSnapshot: shift.supervisorNameSnapshot,
-                  currentResponsibleMemberId: shift.supervisorMemberId,
-                  currentResponsibleNameSnapshot: shift.supervisorNameSnapshot,
-                },
-                { route: 'QC' },
-              ],
-            },
-            ...(man
-              ? {
-                  manDetail: {
-                    create: {
-                      targetWorkingAssignmentId: man.target.id,
-                      ...(man.source ? { sourceWorkingAssignmentId: man.source.id } : {}),
-                      ...(man.replaced
-                        ? {
-                            replacedMpMemberId: man.replaced.id,
-                            replacedMpNameSnapshot: man.replaced.fullName,
-                          }
-                        : {}),
-                      replacedWasVacant: !man.replaced,
-                      replacementMpMemberId: man.replacement.id,
-                      replacementMpNameSnapshot: man.replacement.fullName,
-                      targetAssignmentVersion: man.target.version,
-                      ...(man.source ? { sourceAssignmentVersion: man.source.version } : {}),
-                      ...(man.issue ? { resolutionIssueId: man.issue.id } : {}),
-                    },
-                  },
-                }
-              : {}),
+            targetAssignmentVersionBefore: targetWorking.version,
+            targetAssignmentVersionAfter: updatedTarget.version,
+            movedById: principal.userId,
+            correlationId: context.correlationId,
           },
         });
-        if (man) {
-          await tx.mPReservation.create({
-            data: {
-              supplierId: scope.supplierId,
-              henkatenId: created.id,
-              shiftRunId: shift.id,
-              replacementMpMemberId: man.replacement.id,
-              targetWorkingAssignmentId: man.target.id,
-              ...(man.source ? { sourceWorkingAssignmentId: man.source.id } : {}),
-              targetAssignmentVersion: man.target.version,
-              ...(man.source ? { sourceAssignmentVersion: man.source.version } : {}),
-              expiresAt: shift.scheduledEndAt,
-            },
-          });
-        }
-        await this.audit.write(
-          auditInput(context, scope.supplierId, 'HENKATEN_SUBMITTED', created.id, {
+      }
+      await this.audit.write(
+        auditInput(context, scope.supplierId, 'HENKATEN_SUBMITTED', created.id, {
+          identifier,
+          category: created.category,
+          lineId: created.lineId,
+          lineShiftId: lineShift.id,
+          jobId: created.jobId,
+          partId: created.partId,
+          assignmentAppliedImmediately: Boolean(man),
+        }),
+        tx,
+      );
+      await this.outbox.enqueue(
+        {
+          eventType: 'HENKATEN_OPENED',
+          aggregateType: 'Henkaten',
+          aggregateId: created.id,
+          aggregateVersion: created.version,
+          supplierId: scope.supplierId,
+          actor: { userId: principal.userId, role: principal.role },
+          correlationId: context.correlationId,
+          payload: {
             identifier,
             category: created.category,
             lineId: created.lineId,
-            jobId: created.jobId,
-            partId: created.partId,
-          }),
-          tx,
-        );
-        await this.outbox.enqueue(
-          {
-            eventType: 'HENKATEN_OPENED',
-            aggregateType: 'Henkaten',
-            aggregateId: created.id,
-            aggregateVersion: created.version,
-            supplierId: scope.supplierId,
-            actor: { userId: principal.userId, role: principal.role },
-            correlationId: context.correlationId,
-            payload: {
-              identifier,
-              category: created.category,
-              lineId: created.lineId,
-              partNumber: created.partNumberSnapshot,
-            },
+            partNumber: created.partNumberSnapshot,
           },
-          tx,
-        );
-        await this.outbox.enqueue(
-          {
-            eventType: 'WARNING_OPENED',
-            aggregateType: 'Henkaten',
-            aggregateId: created.id,
-            aggregateVersion: created.version,
-            supplierId: scope.supplierId,
-            actor: { userId: principal.userId, role: principal.role },
-            correlationId: context.correlationId,
-            payload: { partNumber: created.partNumberSnapshot },
-          },
-          tx,
-        );
-        if (man) {
-          await this.outbox.enqueue(
-            {
-              eventType: 'MP_RESERVED',
-              aggregateType: 'Henkaten',
-              aggregateId: created.id,
-              aggregateVersion: created.version,
-              supplierId: scope.supplierId,
-              actor: { userId: principal.userId, role: principal.role },
-              correlationId: context.correlationId,
-              payload: {
-                replacementMpMemberId: man.replacement.id,
-                targetWorkingAssignmentId: man.target.id,
-              },
-            },
-            tx,
-          );
-        }
-        return created.id;
-      });
-      return this.get(scope, id, principal);
-    } catch (error) {
-      if (isReservationUniqueConflict(error)) throw reservationConflict();
-      throw error;
-    }
+        },
+        tx,
+      );
+      await this.outbox.enqueue(
+        {
+          eventType: 'WARNING_OPENED',
+          aggregateType: 'Henkaten',
+          aggregateId: created.id,
+          aggregateVersion: created.version,
+          supplierId: scope.supplierId,
+          actor: { userId: principal.userId, role: principal.role },
+          correlationId: context.correlationId,
+          payload: { partNumber: created.partNumberSnapshot },
+        },
+        tx,
+      );
+      return created.id;
+    });
+    return this.get(scope, id, principal);
   }
 
   async withdraw(
@@ -396,6 +455,9 @@ export class HenkatenService {
           version: { increment: 1 },
         },
       });
+      if (current.lineShiftId && current.category === 'MAN') {
+        await this.restoreLineShiftAssignment(tx, scope.supplierId, current.id, principal.userId);
+      }
       await this.finalization.closeTerminalEffects(tx, {
         supplierId: scope.supplierId,
         henkatenId: id,
@@ -409,7 +471,7 @@ export class HenkatenService {
           correlationId: context.correlationId,
         },
         markPendingRoutesNotRequired: true,
-        releaseReservation: true,
+        releaseReservation: !current.lineShiftId,
       });
       await this.audit.write(
         {
@@ -489,6 +551,56 @@ export class HenkatenService {
     return presentHenkatenDetail(row);
   }
 
+  async restoreLineShiftAssignment(
+    tx: Prisma.TransactionClient,
+    supplierId: string,
+    henkatenId: string,
+    actorUserId: string,
+  ) {
+    const target = await tx.henkaten.findFirst({
+      where: { id: henkatenId, supplierId, lineShiftId: { not: null }, category: 'MAN' },
+      include: {
+        manDetail: {
+          include: {
+            lineShiftJobAssignment: { include: { mp: true } },
+            targetWorkingAssignment: true,
+          },
+        },
+      },
+    });
+    const detail = target?.manDetail;
+    const assignment = detail?.lineShiftJobAssignment;
+    if (!target || !detail || !assignment) return;
+    const fallback = await tx.henkaten.findFirst({
+      where: {
+        id: { not: target.id },
+        supplierId,
+        lineShiftId: target.lineShiftId,
+        jobId: target.jobId,
+        category: 'MAN',
+        status: { in: ['OPEN', 'APPROVED'] },
+        effectiveStartAt: target.effectiveStartAt,
+        effectiveEndAt: target.effectiveEndAt,
+        manDetail: { lineShiftJobAssignmentId: assignment.id },
+      },
+      include: { manDetail: { include: { replacementMp: true } } },
+      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+    });
+    const effectiveMp = fallback?.manDetail?.replacementMp ?? assignment.mp;
+    await tx.workingAssignment.update({
+      where: { id: detail.targetWorkingAssignmentId },
+      data: {
+        effectiveMpMemberId: effectiveMp?.id ?? null,
+        candidateMpMemberId: effectiveMp?.id ?? null,
+        mpNameSnapshot: effectiveMp?.fullName ?? null,
+        mpRegistrationSnapshot: effectiveMp?.registrationNumber ?? null,
+        state: effectiveMp ? 'ASSIGNED' : 'VACANT',
+        version: { increment: 1 },
+        updatedById: actorUserId,
+      },
+    });
+  }
+
   async formOptions(scope: TenantScope, query: HenkatenFormOptionsQuery) {
     const partSearch = query.part ? normalizeLookup(query.part) : null;
     const [checklist, parts, members] = await Promise.all([
@@ -523,24 +635,9 @@ export class HenkatenService {
           id: true,
           fullName: true,
           registrationNumber: true,
-          reservations: { where: { releasedAt: null }, select: { id: true }, take: 1 },
           tanokoMappings: {
             where: { supplierId: scope.supplierId },
             select: { jobId: true, level: true },
-          },
-          effectiveWorkingAssignments: {
-            where: { active: true },
-            orderBy: { updatedAt: 'desc' },
-            take: 1,
-            select: {
-              id: true,
-              version: true,
-              shiftRunId: true,
-              lineId: true,
-              jobId: true,
-              line: { select: { name: true } },
-              job: { select: { name: true } },
-            },
           },
         },
         orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
@@ -567,27 +664,14 @@ export class HenkatenService {
         partNumber: part.partNumber,
         partName: part.partName,
       })),
-      replacementMembers: members.map((member) => {
-        const assignment = member.effectiveWorkingAssignments[0];
-        return {
-          id: member.id,
-          fullName: member.fullName,
-          registrationNumber: member.registrationNumber,
-          reserved: member.reservations.length > 0,
-          skillLevels: member.tanokoMappings,
-          currentAssignment: assignment
-            ? {
-                id: assignment.id,
-                version: assignment.version,
-                shiftRunId: assignment.shiftRunId,
-                lineId: assignment.lineId,
-                lineName: assignment.line.name,
-                jobId: assignment.jobId,
-                jobName: assignment.job.name,
-              }
-            : null,
-        };
-      }),
+      replacementMembers: members.map((member) => ({
+        id: member.id,
+        fullName: member.fullName,
+        registrationNumber: member.registrationNumber,
+        reserved: false,
+        skillLevels: member.tanokoMappings,
+        currentAssignment: null,
+      })),
     };
   }
 
@@ -907,95 +991,6 @@ export class HenkatenService {
       },
     };
   }
-
-  private async validateMan(
-    tx: Prisma.TransactionClient,
-    supplierId: string,
-    shiftRunId: string,
-    input: Extract<CreateHenkatenRequest, { category: 'MAN' }>,
-  ) {
-    await tx.$queryRaw`SELECT id FROM "WorkingAssignment" WHERE id = ${input.targetWorkingAssignmentId}::uuid FOR UPDATE`;
-    const target = await tx.workingAssignment.findFirst({
-      where: {
-        id: input.targetWorkingAssignmentId,
-        supplierId,
-        shiftRunId,
-        jobId: input.jobId,
-        includedInPlan: true,
-      },
-    });
-    if (!target) throw missing('Target Working Assignment');
-    if (target.version !== input.targetAssignmentVersion) throw versionConflict();
-    const replaced =
-      input.replaced.kind === 'MP'
-        ? await tx.member.findFirst({
-            where: { id: input.replaced.memberId, supplierId, active: true, role: 'MP' },
-          })
-        : null;
-    if (
-      (input.replaced.kind === 'VACANT' && target.effectiveMpMemberId) ||
-      (input.replaced.kind === 'MP' &&
-        (!replaced || target.effectiveMpMemberId !== input.replaced.memberId))
-    ) {
-      throw assignmentConflict();
-    }
-    const replacement = await tx.member.findFirst({
-      where: {
-        id: input.replacementMpMemberId,
-        supplierId,
-        active: true,
-        role: 'MP',
-      },
-    });
-    if (!replacement) throw missing('Active replacement MP');
-    await assertTanokoEligible(tx, supplierId, replacement.id, target.jobId);
-    if (replacement.id === replaced?.id) throw assignmentConflict();
-    const source = await tx.workingAssignment.findFirst({
-      where: {
-        supplierId,
-        effectiveMpMemberId: replacement.id,
-        active: true,
-      },
-    });
-    if (source) {
-      if (
-        !input.sourceWorkingAssignmentId ||
-        input.sourceWorkingAssignmentId !== source.id ||
-        input.sourceAssignmentVersion !== source.version
-      ) {
-        throw versionConflict();
-      }
-    } else if (input.sourceWorkingAssignmentId || input.sourceAssignmentVersion) {
-      throw assignmentConflict();
-    }
-    const reservation = await tx.mPReservation.findFirst({
-      where: {
-        supplierId,
-        releasedAt: null,
-        OR: [{ replacementMpMemberId: replacement.id }, { targetWorkingAssignmentId: target.id }],
-      },
-    });
-    if (reservation) throw reservationConflict();
-    const issue = input.resolutionIssueId
-      ? await tx.assignmentIssue.findFirst({
-          where: {
-            id: input.resolutionIssueId,
-            supplierId,
-            shiftRunId,
-            lineId: target.lineId,
-            jobId: target.jobId,
-            status: 'OPEN',
-          },
-        })
-      : null;
-    const existingIssue = await tx.assignmentIssue.findFirst({
-      where: { supplierId, shiftRunId, jobId: target.jobId, status: 'OPEN' },
-    });
-    if ((input.resolutionIssueId && !issue) || (existingIssue && existingIssue.id !== issue?.id)) {
-      throw assignmentConflict();
-    }
-    return { target, source, replaced, replacement, issue };
-  }
 }
 
 function roleWhere(principal?: RequestPrincipal): Prisma.HenkatenWhereInput {
@@ -1021,6 +1016,79 @@ function roleWhere(principal?: RequestPrincipal): Prisma.HenkatenWhereInput {
         ],
       }
     : { shiftRun: { lineLeaderMemberId: principal.memberId } };
+}
+
+async function ensureAutomaticOccurrence(
+  tx: Prisma.TransactionClient,
+  supplierId: string,
+  sourceEpoch: number,
+  lineShift: Awaited<ReturnType<LineShiftService['resolveOccurrence']>>['row'],
+  businessDate: string,
+  start: Date,
+  end: Date,
+  actorUserId: string,
+) {
+  const existing = await tx.shiftRun.findFirst({
+    where: {
+      supplierId,
+      lineId: lineShift.lineId,
+      shiftTemplateId: lineShift.shiftTemplateId,
+      businessDate: new Date(`${businessDate}T00:00:00.000Z`),
+    },
+    include: { workingAssignments: true },
+  });
+  if (existing) return existing;
+  const created = await tx.shiftRun.create({
+    data: {
+      supplierId,
+      lineId: lineShift.lineId,
+      shiftTemplateId: lineShift.shiftTemplateId,
+      status: 'NOT_STARTED',
+      businessDate: new Date(`${businessDate}T00:00:00.000Z`),
+      scheduledStartAt: start,
+      scheduledEndAt: end,
+      timezoneSnapshot: lineShift.shiftTemplate.timezone,
+      lineCodeSnapshot: lineShift.line.code,
+      lineNameSnapshot: lineShift.line.name,
+      shiftNameSnapshot: lineShift.shiftTemplate.name,
+      shiftStartMinuteSnapshot: lineShift.shiftTemplate.startMinute,
+      shiftEndMinuteSnapshot: lineShift.shiftTemplate.endMinute,
+      defaultAssignmentSetVersion: lineShift.version,
+      sourceEpoch,
+      supervisorMemberId: lineShift.supervisorMemberId,
+      supervisorNameSnapshot: lineShift.supervisor?.fullName ?? null,
+      lineLeaderMemberId: lineShift.lineLeaderMemberId,
+      lineLeaderNameSnapshot: lineShift.lineLeader?.fullName ?? null,
+      latestPreflight: [],
+      latestPreflightAt: new Date(),
+      createdById: actorUserId,
+      updatedById: actorUserId,
+    },
+  });
+  if (lineShift.jobAssignments.length) {
+    await tx.workingAssignment.createMany({
+      data: lineShift.jobAssignments.map((assignment) => ({
+        supplierId,
+        shiftRunId: created.id,
+        lineId: lineShift.lineId,
+        jobId: assignment.jobId,
+        jobNameSnapshot: assignment.job.name,
+        jobDisplayOrderSnapshot: assignment.job.displayOrder,
+        effectiveMpMemberId: assignment.mpMemberId,
+        candidateMpMemberId: assignment.mpMemberId,
+        mpNameSnapshot: assignment.mp?.fullName ?? null,
+        mpRegistrationSnapshot: assignment.mp?.registrationNumber ?? null,
+        state: assignment.mpMemberId ? ('ASSIGNED' as const) : ('VACANT' as const),
+        active: true,
+        includedInPlan: true,
+        updatedById: actorUserId,
+      })),
+    });
+  }
+  return tx.shiftRun.findUniqueOrThrow({
+    where: { id: created.id },
+    include: { workingAssignments: true },
+  });
 }
 
 function presentWarning(row: {
@@ -1114,16 +1182,6 @@ function auditInput(
   };
 }
 
-function isReservationUniqueConflict(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    error.code === 'P2002' &&
-    JSON.stringify(error).includes('MPReservation')
-  );
-}
-
 function forbidden() {
   return new ProblemException({
     status: 403,
@@ -1156,29 +1214,12 @@ function idempotencyConflict() {
     detail: 'The Idempotency-Key was already used with a different request.',
   });
 }
-function reservationConflict() {
-  return new ProblemException({
-    status: 409,
-    code: 'RESERVATION_CONFLICT',
-    title: 'Reservation conflict',
-    detail: 'The replacement MP or target job already has an active reservation.',
-  });
-}
-
-function invalidTransition() {
-  return new ProblemException({
-    status: 409,
-    code: 'INVALID_TRANSITION',
-    title: 'Invalid transition',
-    detail: 'Only Man Henkaten can be submitted for a planned Shift Run.',
-  });
-}
-function assignmentConflict() {
+function shiftSelectionConflict() {
   return new ProblemException({
     status: 409,
     code: 'STATE_CONFLICT',
-    title: 'Assignment conflict',
-    detail: 'The submitted Man assignment no longer matches current Working Assignment.',
+    title: 'Shift selection conflict',
+    detail: 'Henkaten harus menggunakan shift yang sedang berjalan.',
   });
 }
 

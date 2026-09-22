@@ -26,7 +26,7 @@ export const checklistSubmissionAnswerSchema = z
   .strict();
 
 const submissionBase = {
-  shiftRunId: opaqueIdSchema,
+  lineShiftId: opaqueIdSchema,
   jobId: opaqueIdSchema,
   partId: opaqueIdSchema,
   checklistVersionId: opaqueIdSchema,
@@ -41,16 +41,8 @@ export const createHenkatenRequestSchema = z.discriminatedUnion('category', [
     .object({
       ...submissionBase,
       category: z.literal('MAN'),
-      targetWorkingAssignmentId: opaqueIdSchema,
-      targetAssignmentVersion: optimisticVersionSchema,
-      replaced: z.discriminatedUnion('kind', [
-        z.object({ kind: z.literal('VACANT') }).strict(),
-        z.object({ kind: z.literal('MP'), memberId: opaqueIdSchema }).strict(),
-      ]),
+      lineShiftJobAssignmentId: opaqueIdSchema,
       replacementMpMemberId: opaqueIdSchema,
-      sourceWorkingAssignmentId: opaqueIdSchema.optional(),
-      sourceAssignmentVersion: optimisticVersionSchema.optional(),
-      resolutionIssueId: opaqueIdSchema.optional(),
     })
     .strict(),
   ...(['MACHINE', 'MATERIAL', 'METHOD'] as const).map((category) =>
@@ -104,6 +96,7 @@ export const henkatenSummarySchema = z
     id: opaqueIdSchema,
     identifier: z.string().min(1).max(150),
     shiftRunId: opaqueIdSchema,
+    lineShiftId: opaqueIdSchema.nullable(),
     lineId: opaqueIdSchema,
     jobId: opaqueIdSchema,
     partId: opaqueIdSchema,
@@ -113,6 +106,8 @@ export const henkatenSummarySchema = z
     category: henkatenCategorySchema,
     businessDate: businessDateSchema,
     occurredAt: utcTimestampSchema,
+    effectiveStartAt: utcTimestampSchema.nullable(),
+    effectiveEndAt: utcTimestampSchema.nullable(),
     line: z.object({ code: z.string(), name: z.string() }).strict(),
     jobName: z.string(),
     part: z.object({ number: z.string(), name: z.string() }).strict(),
@@ -167,6 +162,7 @@ export const henkatenDetailSchema = henkatenSummarySchema
     man: z
       .object({
         targetWorkingAssignmentId: opaqueIdSchema,
+        lineShiftJobAssignmentId: opaqueIdSchema.nullable(),
         sourceWorkingAssignmentId: opaqueIdSchema.nullable(),
         replacedMpMemberId: opaqueIdSchema.nullable(),
         replacedWasVacant: z.boolean(),

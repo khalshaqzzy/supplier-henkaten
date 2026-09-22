@@ -89,8 +89,9 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
     }
     await supplier.getByRole('button', { name: 'Buat data' }).click();
     if (role !== 'MP') {
-      await expect(supplier.getByText('Simpan temporary credential dengan aman')).toBeVisible();
-      await supplier.getByLabel(/Saya sudah menyimpan dan akan menyalurkan credential/).check();
+      await expect(supplier.getByRole('heading', { name: 'Simpan informasi akun' })).toBeVisible();
+      await expect(supplier.getByText('Temporary password', { exact: true })).toBeVisible();
+      await supplier.getByLabel('Saya sudah menyimpan informasi akun.').check();
       await supplier.getByRole('button', { name: 'Selesai' }).click();
     } else {
       await expect(supplier).toHaveURL(/\/master-data\/members\/[^/]+$/);
@@ -108,21 +109,25 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
     await expect(supplier.getByText('Version 1', { exact: false })).toBeVisible();
   }
 
-  await supplier.goto(`${runtime.supplierOrigin}/master-data/default-assignments`);
-  await expect(supplier.getByRole('heading', { name: 'Default Assignment' })).toBeVisible();
-  for (const [memberLabel, optionLabel] of [
-    ['Supervisor Onboarding', 'Supervisor Onboarding · REG-ONBOARD-1'],
-    ['Line Leader Onboarding', 'Line Leader Onboarding · REG-ONBOARD-2'],
-    ['MP Onboarding', 'MP Onboarding · REG-ONBOARD-4'],
-  ] as const) {
-    await supplier.getByRole('button', { name: 'Assign' }).first().click();
-    const assignmentSheet = supplier.getByRole('dialog');
-    await expect(assignmentSheet).toBeVisible();
-    await assignmentSheet.getByLabel('Member tersedia').selectOption({ label: optionLabel });
-    await assignmentSheet.getByRole('button', { name: 'Konfirmasi perubahan' }).click();
-    await expect(assignmentSheet).toBeHidden();
-    await expect(supplier.getByText(memberLabel, { exact: true }).first()).toBeVisible();
-  }
+  await supplier.goto(`${runtime.supplierOrigin}/master-data/line-setup`);
+  await expect(supplier.getByRole('heading', { name: 'Line Setup' })).toBeVisible();
+  await supplier.getByLabel('Shift baru').selectOption({ label: 'Shift Pagi · 06:00–14:00' });
+  await supplier.getByRole('button', { name: 'Tambah shift' }).click();
+  await expect(supplier.getByRole('heading', { name: 'Shift Pagi · 06:00–14:00' })).toBeVisible();
+  await supplier
+    .getByLabel('Supervisor')
+    .selectOption({ label: 'Supervisor Onboarding · REG-ONBOARD-1' });
+  await supplier
+    .getByLabel('Line Leader')
+    .selectOption({ label: 'Line Leader Onboarding · REG-ONBOARD-2' });
+  await supplier
+    .locator('.defaults-table__row')
+    .filter({ hasText: 'Install Component' })
+    .locator('select')
+    .selectOption({ label: 'MP Onboarding · REG-ONBOARD-4' });
+  await supplier.getByRole('button', { name: 'Simpan assignment' }).click();
+  await expect(supplier.getByLabel('Supervisor')).toHaveValue(/.+/);
+  await expect(supplier.getByLabel('Line Leader')).toHaveValue(/.+/);
 
   await supplier.goto(`${runtime.supplierOrigin}/setup`);
   await expect(supplier.getByText('Siap beroperasi')).toBeVisible();

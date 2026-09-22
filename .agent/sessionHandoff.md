@@ -517,3 +517,53 @@ Phase 15.9 remains `in_progress`.
 2. Verify all CI jobs (including Production containers and routing & Release candidate gate) are green.
 3. Deploy to staging under the existing Phase 15.9 process and conduct touch-device UAT before any
    production claim.
+
+## Current Handoff — Recurring Line–Shift Operations
+
+Date: 2026-09-22
+
+Status: implementation and local verification complete; ready for PR to `staging`. No deployment
+or staging UAT claim.
+
+The approved model removes supplier Shift Run preflight, Start Shift, Emergency Start, End Shift,
+active-shift dependency, MP reservation, MP exclusivity, and donor-vacancy cascade. `LineShift` now
+owns shift-specific Supervisor, Line Leader, and per-job MP defaults; only Supplier Admin may edit.
+Active schedules on one line cannot overlap.
+
+Henkaten submission resolves a clock-derived occurrence. During an interval it auto-selects the
+current Line–Shift; outside an interval the LL selects a shift and the effect starts at its next
+scheduled start. Man replacement applies immediately to that occurrence and checks only active MP
+plus exact-job Tanoko >= 3. Duplicate MP assignment is unrestricted. Reject/Withdraw restores the
+latest other effective override or the default, while the next recurrence begins from defaults.
+
+Implemented locally: forward-only schema/migration, Line–Shift service/endpoints/contracts/client,
+automatic occurrence compatibility snapshots, immediate Man assignment and restoration, clock-
+derived board, Admin Line Setup, new Henkaten form, removal of supplier Shift UI/routes/endpoints,
+cutover/readiness/catalog updates, local seed Line–Shift configuration, and ADR 0033. Historical
+Shift Run tables and TMMIN read-only endpoints remain for compatibility. Supplier creation contracts
+now require `lineShiftId`; the old ShiftRun/reservation creation path was removed.
+
+Verification completed: clean reset plus all 13 migrations; upgrade from the 12-migration
+`origin/staging` state; lint; formatting; full TypeScript; generated API client and OpenAPI document
+parity; 188 repository/script unit tests; 28 API integration tests; and production builds for API
+plus both frontends with `VITE_API_ORIGIN=https://api.example.test`. Integration coverage includes
+current/next occurrence, duplicate MP, immediate replacement, reject/withdraw restoration, removed
+Shift endpoints, and Admin Line Setup behavior. The replacement onboarding journey creates a
+Line–Shift and edits its Supervisor/LL/MP assignment; all six isolated Playwright journeys passed
+on Chromium and Edge. Dedicated during-shift and outside-shift Henkaten browser journeys remain
+deferred to staging UAT.
+
+The production-like Compose acceptance built all five runtime images, applied all migrations,
+bootstrapped the protected administrator idempotently, and passed health, routing, headers,
+non-root, and restart-persistence checks. Actionlint, ShellCheck, Hadolint, deployment validation,
+the deployment harness, Ubuntu 22.04 bootstrap input validation, security-exception validation,
+`pnpm audit --audit-level high`, Gitleaks, Trivy filesystem scanning, and HIGH/CRITICAL scans of all
+five images passed. The `js-yaml` override was raised to 4.3.2 to remove the newly disclosed audit
+finding. Line Setup now requests the API-supported member page limit of 100 instead of 500.
+
+Fresh-database local-seed smoke also passed through the built API with the production-like outbox
+worker enabled. Evidence after completion: 2 suppliers, 6 lines, 24 jobs, 6 shift templates, 18
+LineShifts, 72 LineShiftJobAssignments, 6 saved Canvas layouts, 0 ShiftRuns, and 0 pending outbox
+events. Board layout scope now derives from active Line/LineShift configuration rather than an
+active ShiftRun. The smoke database and temporary API were removed afterward; the main local
+database was not changed by this verification.

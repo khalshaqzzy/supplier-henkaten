@@ -7,8 +7,8 @@ Date: 2026-09-16
 
 The paper Tanoko matrix records operators across columns and line-specific jobs down rows.
 A durable proficiency record is needed to qualify Man replacements without introducing a
-separate HR, licensing, or training-criteria system. Existing assignment and reservation rules
-remain authoritative for operational availability.
+separate HR, licensing, or training-criteria system. The later Line–Shift operating model in ADR
+0033 removes assignment exclusivity and reservation; Tanoko remains the replacement gate.
 
 ## Decision and rationale
 
@@ -34,10 +34,8 @@ stores immutable descriptive snapshots. Mapping update, change history and gener
 written in one supplier-locked serializable transaction with expectedVersion checks. Clearing a
 level preserves the versioned mapping, preventing a stale editor from recreating an old value.
 
-Man submission and final atomic movement require current level 3 or 4 for the exact target job.
-Downgrades during pending approval are permitted; the movement transaction fails without
-persisting approval effects when current proficiency is insufficient. Already completed
-assignments are not retroactively moved by a proficiency change.
+Man submission requires current level 3 or 4 for the exact target job and applies immediately to
+the selected occurrence. A later downgrade does not retroactively change that submitted record.
 
 Reads are refreshed after local writes, on focus and every 30 seconds. Polling does not overwrite
 editor drafts. Conflicts require explicit refresh. No offline edit or Tanoko SSE guarantee exists.
@@ -56,10 +54,9 @@ mapping before submitting Man replacements. Synthetic local seed data supplies d
 only. The local seed explicitly assesses every default MP to at least level 3 on its default
 job before assignment, and every Man replacement on its exact target job before submission.
 Other pairs include levels 1–4 and unassessed cells, with Admin/GL reassessment, correction and
-clearing history. These synthetic assessments use the normal versioned API; post-seed checks
-reject any unqualified default assignment. A large supplier's full matrix payload should be measured before further scale expansion;
+clearing history. These synthetic assessments use the normal versioned API. A large supplier's full matrix payload should be measured before further scale expansion;
 column paging bounds the rendered cells but not the read payload. Skill qualifies only the target
-job; all existing reservation and assignment checks continue to apply.
+job; duplicate assignment is permitted under ADR 0033.
 
 ## Validation and follow-up
 

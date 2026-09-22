@@ -5881,6 +5881,35 @@ in_progress delivery phase. No deployment or production UAT is claimed.
 - Follow-up: deploy forward migration with normal release process, assess actual large-supplier
   matrix load, and conduct user acceptance on the target shop-floor device.
 
+## Line–Shift operating model amendment — 2026-09-22
+
+Phase/Subphase: Hosted Line–Shift scheduling and Henkaten assignment behavior
+Previous status: Shift Run preflight/start/end, reservation, exclusive MP movement, and default
+assignment lifecycle implemented.
+New status: implementation and local verification complete; ADR 0033 accepted. Cross-browser
+Line Setup E2E passes; staging UAT remains pending.
+Completed implementation: recurring Line–Shift configuration; shift-specific Supervisor/LL/MP;
+clock-derived current/next occurrence; Tanoko-only immediate Man replacement; duplicate MP support;
+reject/withdraw restoration; supplier Shift command/UI removal; Admin Line Setup and updated Henkaten
+form; source/readiness/catalog/seed compatibility changes.
+Files changed: Prisma schema/migration, Contracts, API master data/Henkaten/read models/governance,
+API client, Supplier web, PRD, ADR, handoff, and roadmap.
+Migrations: `20260922001300_line_shift_scheduling` (forward-only, history preserving).
+Contracts changed: LineShift, LineShiftJobAssignment, operational occurrence context, Henkaten
+Line–Shift/effective interval fields, and new assignment mutation requests.
+Tests/checks: clean 13-migration deploy and upgrade from the 12-migration staging state; formatting,
+lint, TypeScript, generated API client/OpenAPI parity, 188 repository/script unit tests, 28 API
+integration tests, production build, and diff whitespace check pass. All six isolated Playwright
+journeys pass on Chromium and Edge; onboarding now covers Admin Line Setup and shift assignment.
+The production-like five-image Compose acceptance, deployment quality checks, Gitleaks, Trivy
+filesystem/image scans, and package audit also pass. A separate fresh-database runtime seed
+completed through the built API with 2 suppliers, 18 LineShifts, 72 shift assignments, 6 Canvas
+layouts, no ShiftRuns, and no pending outbox events.
+Decisions/ADR: ADR 0033.
+Blockers: none for local implementation.
+Next recommended subphase: run staging UAT of Line Setup and during/outside-shift Henkaten flows;
+add dedicated browser coverage for both clock contexts if staging behavior is accepted.
+
 - Seed extension: varied levels 1–4/unassessed mappings, Admin/GL audit examples, and automatic
   synthetic assessment to at least level 3 before assigning a default MP or submitting a Man
   replacement. Post-seed checks verify all default MP/job pairs remain qualified.

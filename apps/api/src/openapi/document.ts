@@ -43,6 +43,7 @@ import {
   checklistVersionSchema,
   createJobRequestSchema,
   createLineRequestSchema,
+  createLineShiftRequestSchema,
   createMemberRequestSchema,
   createPartRequestSchema,
   createShiftTemplateRequestSchema,
@@ -51,6 +52,9 @@ import {
   jobSchema,
   linePageSchema,
   lineSchema,
+  lineShiftListSchema,
+  lineShiftOperationalContextSchema,
+  lineShiftSchema,
   masterListQuerySchema,
   memberCredentialResponseSchema,
   memberPageSchema,
@@ -63,35 +67,28 @@ import {
   updateChecklistDraftRequestSchema,
   updateJobRequestSchema,
   updateLineRequestSchema,
+  updateLineShiftAssignmentsRequestSchema,
   updateMemberAccountRequestSchema,
   updateMemberRequestSchema,
   updatePartRequestSchema,
   updateShiftTemplateRequestSchema,
   affectedPartPageSchema,
   affectedPartDetailSchema,
-  assignmentIssuePageSchema,
   clonePrefillSchema,
   createHenkatenRequestSchema,
   decideHenkatenRequestSchema,
-  currentShiftQuerySchema,
-  emergencyStartShiftRequestSchema,
-  endShiftRequestSchema,
   henkatenDetailSchema,
   henkatenFormOptionsQuerySchema,
   henkatenFormOptionsSchema,
   henkatenListQuerySchema,
   henkatenPageSchema,
   henkatenTransitionSchema,
-  prepareShiftRequestSchema,
-  preStartResolutionContextSchema,
   rerouteSupervisorRequestSchema,
   shiftListQuerySchema,
   shiftRunDetailSchema,
   shiftRunPageSchema,
-  startShiftRequestSchema,
   warningInstanceSchema,
   withdrawHenkatenRequestSchema,
-  workingAssignmentSchema,
   assignmentBoardSchema,
   boardLayoutResponseSchema,
   boardLayoutSaveRequestSchema,
@@ -621,101 +618,6 @@ function operationalPaths() {
   };
   const supplierOnly = { path: z.object({ supplierId: z.string().uuid() }) };
   return {
-    '/api/v1/supplier/shifts': {
-      get: {
-        requestParams: { query: shiftListQuerySchema },
-        responses: { '200': json('Shift Runs', shiftRunPageSchema) },
-      },
-    },
-    '/api/v1/supplier/shifts/current': {
-      get: {
-        requestParams: { query: currentShiftQuerySchema },
-        responses: {
-          '200': json('Current Shift Run', shiftRunDetailSchema.nullable()),
-        },
-      },
-    },
-    '/api/v1/supplier/shifts/preflight': {
-      post: {
-        requestBody: body(prepareShiftRequestSchema),
-        responses: {
-          '201': json('Durable Shift Run plan and preflight', shiftRunDetailSchema),
-          '409': problem,
-        },
-      },
-    },
-    '/api/v1/supplier/shifts/assignment-issues': {
-      get: {
-        responses: { '200': json('Assignment Issues', assignmentIssuePageSchema) },
-      },
-    },
-    '/api/v1/supplier/shifts/{id}': {
-      get: {
-        requestParams: shiftId,
-        responses: { '200': json('Shift Run', shiftRunDetailSchema), '404': problem },
-      },
-    },
-    '/api/v1/supplier/shifts/{id}/preflight': {
-      get: {
-        requestParams: shiftId,
-        responses: { '200': json('Shift Run preflight', shiftRunDetailSchema), '404': problem },
-      },
-    },
-    '/api/v1/supplier/shifts/{id}/working-assignments': {
-      get: {
-        requestParams: shiftId,
-        responses: {
-          '200': json(
-            'Working Assignments',
-            z.object({ items: z.array(workingAssignmentSchema) }).strict(),
-          ),
-        },
-      },
-    },
-    '/api/v1/supplier/shifts/{id}/assignment-issues': {
-      get: {
-        requestParams: shiftId,
-        responses: { '200': json('Assignment Issues', assignmentIssuePageSchema) },
-      },
-    },
-    '/api/v1/supplier/shifts/{id}/resolution-context': {
-      get: {
-        requestParams: shiftId,
-        responses: {
-          '200': json('Pre-start resolution context', preStartResolutionContextSchema),
-        },
-      },
-    },
-    '/api/v1/supplier/shifts/{id}/start': {
-      post: {
-        requestParams: shiftId,
-        requestBody: body(startShiftRequestSchema),
-        responses: { '201': json('Started Shift Run', shiftRunDetailSchema), '409': problem },
-      },
-    },
-    '/api/v1/supplier/shifts/{id}/emergency-start': {
-      post: {
-        requestParams: shiftId,
-        requestBody: body(emergencyStartShiftRequestSchema),
-        responses: {
-          '201': json('Emergency-started Shift Run', shiftRunDetailSchema),
-          '409': problem,
-        },
-      },
-    },
-    '/api/v1/supplier/shifts/{id}/end': {
-      post: {
-        requestParams: {
-          ...shiftId,
-          header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }),
-        },
-        requestBody: body(endShiftRequestSchema),
-        responses: {
-          '201': json('Ended Shift Run', shiftRunDetailSchema),
-          '409': problem,
-        },
-      },
-    },
     '/api/v1/tmmin/suppliers/{supplierId}/shifts': {
       get: {
         requestParams: { ...supplierOnly, query: shiftListQuerySchema },
@@ -975,6 +877,29 @@ function masterDataPaths() {
     '/api/v1/supplier/master-data/lines/{id}': mutablePath(updateLineRequestSchema, lineSchema),
     '/api/v1/supplier/master-data/lines/{id}/activate': action(lineSchema),
     '/api/v1/supplier/master-data/lines/{id}/deactivate': action(lineSchema),
+    '/api/v1/supplier/master-data/lines/{lineId}/shifts': {
+      get: {
+        requestParams: { path: z.object({ lineId: z.string().uuid() }) },
+        responses: { '200': json('Line shifts', lineShiftListSchema) },
+      },
+      post: {
+        requestParams: { path: z.object({ lineId: z.string().uuid() }) },
+        requestBody: body(createLineShiftRequestSchema),
+        responses: { '201': json('Line shift', lineShiftSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/line-shifts/operational-context': {
+      get: { responses: { '200': json('Line shift context', lineShiftOperationalContextSchema) } },
+    },
+    '/api/v1/supplier/master-data/line-shifts/{id}/assignments': {
+      patch: {
+        requestParams: { path: z.object({ id: z.string().uuid() }) },
+        requestBody: body(updateLineShiftAssignmentsRequestSchema),
+        responses: { '200': json('Line shift', lineShiftSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/line-shifts/{id}/activate': action(lineShiftSchema),
+    '/api/v1/supplier/master-data/line-shifts/{id}/deactivate': action(lineShiftSchema),
     '/api/v1/supplier/master-data/lines/{lineId}/jobs': {
       get: {
         requestParams: { ...linePath, query: masterListQuerySchema },

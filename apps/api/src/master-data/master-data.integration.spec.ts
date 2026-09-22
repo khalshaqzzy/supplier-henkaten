@@ -27,7 +27,6 @@ describe('supplier master data', () => {
   let leaderId: string;
   let mpId: string;
   let lineId: string;
-  let jobId: string;
 
   beforeAll(async () => {
     process.env['NODE_ENV'] = 'test';
@@ -162,7 +161,6 @@ describe('supplier master data', () => {
       name: 'Torque Station',
     });
     expect(job.status).toBe(201);
-    jobId = job.body.id;
     expect(
       (
         await supplierPost('/api/v1/supplier/master-data/parts', {
@@ -171,16 +169,13 @@ describe('supplier master data', () => {
         })
       ).status,
     ).toBe(201);
-    expect(
-      (
-        await supplierPost('/api/v1/supplier/master-data/shift-templates', {
-          name: 'Night Shift',
-          startTime: '22:00',
-          endTime: '06:00',
-          timezone: 'Asia/Jakarta',
-        })
-      ).body.crossesMidnight,
-    ).toBe(true);
+    const shiftTemplate = await supplierPost('/api/v1/supplier/master-data/shift-templates', {
+      name: 'Night Shift',
+      startTime: '22:00',
+      endTime: '06:00',
+      timezone: 'Asia/Jakarta',
+    });
+    expect(shiftTemplate.body.crossesMidnight).toBe(true);
 
     for (const category of ['MAN', 'MACHINE', 'MATERIAL', 'METHOD']) {
       const draft = await supplierPatch(
@@ -202,27 +197,38 @@ describe('supplier master data', () => {
       ).rejects.toThrow();
     }
 
-    expect(
-      (
-        await supplierPost(`/api/v1/supplier/master-data/lines/${lineId}/default-supervisor`, {
-          memberId: supervisorId,
-        })
-      ).status,
-    ).toBe(201);
-    expect(
-      (
-        await supplierPost(`/api/v1/supplier/master-data/lines/${lineId}/default-line-leader`, {
-          memberId: leaderId,
-        })
-      ).status,
-    ).toBe(201);
-    expect(
-      (
-        await supplierPost(`/api/v1/supplier/master-data/jobs/${jobId}/default-mp`, {
-          memberId: mpId,
-        })
-      ).status,
-    ).toBe(201);
+    const secondJob = await supplierPost(`/api/v1/supplier/master-data/lines/${lineId}/jobs`, {
+      name: 'Inspection Station',
+    });
+    expect(secondJob.status).toBe(201);
+    const lineShift = await supplierPost(`/api/v1/supplier/master-data/lines/${lineId}/shifts`, {
+      shiftTemplateId: shiftTemplate.body.id,
+    });
+    expect(lineShift.status).toBe(201);
+    const lineShiftBody = lineShift.body as {
+      id: string;
+      version: number;
+      assignments: Array<{ jobId: string }>;
+    };
+    const configured = await supplierPatch(
+      `/api/v1/supplier/master-data/line-shifts/${lineShiftBody.id}/assignments`,
+      {
+        expectedVersion: lineShiftBody.version,
+        supervisorMemberId: supervisorId,
+        lineLeaderMemberId: leaderId,
+        jobs: lineShiftBody.assignments.map((assignment) => ({
+          jobId: assignment.jobId,
+          mpMemberId: mpId,
+        })),
+      },
+    );
+    expect(configured.status).toBe(200);
+    const configuredBody = configured.body as {
+      assignments: Array<{ mpMemberId: string | null }>;
+    };
+    expect(configuredBody.assignments.every((assignment) => assignment.mpMemberId === mpId)).toBe(
+      true,
+    );
 
     const blocked = await supplierPost(`/api/v1/supplier/master-data/members/${mpId}/deactivate`, {
       expectedVersion: 1,

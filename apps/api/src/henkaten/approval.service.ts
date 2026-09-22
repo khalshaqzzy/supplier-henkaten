@@ -61,6 +61,7 @@ export class ApprovalService {
           select: {
             id: true,
             shiftRunId: true,
+            lineShiftId: true,
             manDetail: {
               select: {
                 sourceWorkingAssignment: {
@@ -133,7 +134,7 @@ export class ApprovalService {
             : otherApproved
               ? ('APPROVED' as const)
               : null;
-        if (terminal === 'APPROVED' && current.category === 'MAN') {
+        if (terminal === 'APPROVED' && current.category === 'MAN' && !current.lineShiftId) {
           await this.movements.apply(tx, scope.supplierId, current.id, resultVersion, {
             userId: principal.userId,
             role: principal.role,
@@ -153,6 +154,14 @@ export class ApprovalService {
             version: { increment: 1 },
           },
         });
+        if (terminal === 'REJECTED' && current.category === 'MAN' && current.lineShiftId) {
+          await this.henkatens.restoreLineShiftAssignment(
+            tx,
+            scope.supplierId,
+            current.id,
+            principal.userId,
+          );
+        }
         if (terminal) {
           await this.finalization.closeTerminalEffects(tx, {
             supplierId: scope.supplierId,
@@ -167,7 +176,7 @@ export class ApprovalService {
               correlationId: context.correlationId,
             },
             markPendingRoutesNotRequired: terminal === 'REJECTED',
-            releaseReservation: terminal === 'REJECTED',
+            releaseReservation: terminal === 'REJECTED' && !current.lineShiftId,
           });
         }
         await this.audit.write(

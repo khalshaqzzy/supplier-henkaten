@@ -9,9 +9,10 @@ import { RealtimeService } from './realtime.service.js';
 import { RealtimeEventPump } from './realtime-event-pump.js';
 import { PushModule } from '../push/push.module.js';
 import { BoardLayoutService } from './board-layout.service.js';
+import { MasterDataModule } from '../master-data/master-data.module.js';
 
 @Module({
-  imports: [OperationsModule, AdministrationModule, PushModule],
+  imports: [OperationsModule, AdministrationModule, PushModule, MasterDataModule],
   controllers: [SupplierReadModelController, TmminReadModelController],
   providers: [
     NotificationService,
