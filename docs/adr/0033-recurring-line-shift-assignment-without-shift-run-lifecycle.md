@@ -51,6 +51,12 @@ The recurring model deliberately permits duplicate MP assignment. Any attendance
 workforce-conflict policy would be a separate future requirement and must not be reintroduced as a
 Henkaten blocker implicitly.
 
+Removing the legacy partial unique index on active `WorkingAssignment.effectiveMpMemberId` is
+therefore an intentional metadata-only schema change: it removes an obsolete uniqueness invariant
+without deleting assignment or Henkaten rows. The migration uses the exact-name
+`migration-policy: allow-drop-index` declaration; the CI checker accepts only the immediately
+following exact `DROP INDEX IF EXISTS` statement and continues rejecting every unannotated `DROP`.
+
 ## Validation
 
 The forward migration preserves historical rows and backfills Line–Shift configuration from active

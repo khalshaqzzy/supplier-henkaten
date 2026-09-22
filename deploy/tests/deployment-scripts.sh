@@ -77,6 +77,28 @@ if (
 ); then
   fail "destructive DROP migration was accepted"
 fi
+printf '%s\n' \
+  '-- migration-policy: allow-drop-index WorkingAssignment_one_active_effective_mp_key' \
+  'DROP INDEX IF EXISTS "WorkingAssignment_one_active_effective_mp_key";' \
+  >"${migration_repo}/apps/api/prisma/migrations/0002_additive/migration.sql"
+git -C "${migration_repo}" add .
+git -C "${migration_repo}" commit --quiet -m allowed-index-removal
+(
+  cd "${migration_repo}"
+  "${SCRIPTS}/check-migrations.sh" "${migration_base}" >/dev/null
+) || fail "explicit exact-name DROP INDEX exception was rejected"
+printf '%s\n' \
+  '-- migration-policy: allow-drop-index Wrong_index' \
+  'DROP INDEX IF EXISTS "WorkingAssignment_one_active_effective_mp_key";' \
+  >"${migration_repo}/apps/api/prisma/migrations/0002_additive/migration.sql"
+git -C "${migration_repo}" add .
+git -C "${migration_repo}" commit --quiet -m mismatched-index-removal
+if (
+  cd "${migration_repo}"
+  "${SCRIPTS}/check-migrations.sh" "${migration_base}" >/dev/null 2>&1
+); then
+  fail "mismatched DROP INDEX exception was accepted"
+fi
 
 fake_bin="${TEST_ROOT}/bin"
 mkdir -p "${fake_bin}"

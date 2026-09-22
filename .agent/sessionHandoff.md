@@ -561,6 +561,12 @@ the deployment harness, Ubuntu 22.04 bootstrap input validation, security-except
 five images passed. The `js-yaml` override was raised to 4.3.2 to remove the newly disclosed audit
 finding. Line Setup now requests the API-supported member page limit of 100 instead of 500.
 
+PR #17 initially failed its static migration gate because the intentional removal of the legacy MP
+uniqueness index matched the blanket `DROP` rule. The checker now supports an exact-name,
+immediately-following `migration-policy: allow-drop-index` declaration, with deployment-harness
+coverage for accepted exact matches and rejected missing/mismatched declarations. Other `DROP`
+statements remain forbidden.
+
 Fresh-database local-seed smoke also passed through the built API with the production-like outbox
 worker enabled. Evidence after completion: 2 suppliers, 6 lines, 24 jobs, 6 shift templates, 18
 LineShifts, 72 LineShiftJobAssignments, 6 saved Canvas layouts, 0 ShiftRuns, and 0 pending outbox

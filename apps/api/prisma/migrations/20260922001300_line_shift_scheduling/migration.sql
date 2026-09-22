@@ -1,6 +1,7 @@
 -- Replace manually started Shift Runs with recurring Line–Shift configuration for new operations.
 -- Legacy ShiftRun/WorkingAssignment data remains intact for historical reads.
 
+-- migration-policy: allow-drop-index WorkingAssignment_one_active_effective_mp_key
 DROP INDEX IF EXISTS "WorkingAssignment_one_active_effective_mp_key";
 
 CREATE TABLE "LineShift" (
