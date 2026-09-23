@@ -67,9 +67,22 @@ worker result. An isolated 240-record seed verifies PCR/No-PCR/review/manual dis
 local demo was reseeded and both portals were inspected in a browser. Before production rollout,
 probe the PCR worker with a synthetic record, then evaluate real Indonesian positive and negative
 samples with TMMIN QD and tune the confidence threshold where warranted. Public Ling tests through
-`curl` and the OpenAI JavaScript SDK succeeded; the PCR worker itself has not been tested against
-the live endpoint.
+`curl` and the OpenAI JavaScript SDK succeeded; a later local evaluation exercised the PCR worker
+against the live endpoint as described below.
 Pre-PR verification also passed the upgrade from the staging migration set, Chromium journeys,
 deployment shell/workflow checks, production-like container routing and persistence, and
 filesystem/image secret and vulnerability scans. Edge installation on the local macOS host was
 blocked by its system installer; the Linux CI journey remains required.
+
+A subsequent 70-case local live-worker evaluation submitted synthetic Hosted Henkaten through the
+Supplier API. All 28 clear PCR and 24 of 25 clear No-PCR examples were classified as expected.
+The remaining clear negative included adversarial text and received PCR at confidence 1.00. Of
+17 incomplete reports, only seven reached Review; eight were PCR and two No-PCR, including an
+unspecified alternative material trial at confidence 1.00. Several positive assessments asserted
+unsupported changes or cited wrong control items, and 14 of 37 PCR narratives missed the
+approximate length target. These observations do not alter the durable queue or human-correction
+decision. They add a release follow-up: TMMIN QD should adjudicate ambiguous Indonesian cases,
+and classifier regression coverage should include incomplete evidence, adversarial text, and
+grounded control references before automatic No-PCR is relied upon. Full evidence is in
+`docs/reports/pcr-classifier-70-case-evaluation-2026-09-23/`; analysis is in
+`docs/reports/pcr-classifier-70-case-local-evaluation-2026-09-23.md`.

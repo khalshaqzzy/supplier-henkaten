@@ -5936,9 +5936,15 @@ reseed, browser review of both portals, and production build with configured API
 Generated OpenAPI and API client are current; the staged-file drift check passed. The local
 gitignored env and seven GitHub `staging` environment secrets now carry PCR endpoint, model, key,
 and worker configuration; the reusable deploy workflow renders these into runtime env. Compose
-and deployment-script checks pass. PCR worker inference remains untested end-to-end after the
-decision to stop inference investigation. Before production activation, evaluate Indonesian
-examples with TMMIN QD; inference outages route to Review rather than No-PCR. Public inference
+and deployment-script checks pass. A later local 70-case live-worker evaluation classified all
+28 clear PCR and 24 of 25 clear No-PCR cases as expected. Of 17 incomplete cases, seven reached
+Review, eight became PCR, and two became No-PCR, including one unspecified material trial at
+confidence 1.00. The full input/output archive and analysis are in
+`docs/reports/pcr-classifier-70-case-evaluation-2026-09-23/` and
+`docs/reports/pcr-classifier-70-case-local-evaluation-2026-09-23.md`. TMMIN QD adjudication,
+adversarial and missing-evidence regression coverage, and grounding of explanation/control
+references are open before production reliance on automatic No-PCR. Inference outages route to
+Review rather than No-PCR. Public inference
 403/1010 diagnosis is recorded in `docs/reports/inference-server-403-2026-09-23.md`.
 Pre-PR parity also passed fresh and upgrade migrations, all three Chromium journeys, actionlint,
 ShellCheck, Hadolint, a Linux deployment harness, production-like routing/persistence, Gitleaks,

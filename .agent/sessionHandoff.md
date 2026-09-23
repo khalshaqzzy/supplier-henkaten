@@ -1,5 +1,48 @@
 # Session Handoff — PCR indication for Henkaten
 
+## Local classifier evaluation — 2026-09-23
+
+### Documentation commit checks
+
+The 70-case report and evidence archive were checked in a detached clean-artifact worktree using
+Node 22.23.1 and pnpm 11.16.0. `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`,
+`pnpm typecheck`, `pnpm test:unit`, `pnpm openapi:check`, and
+`VITE_API_ORIGIN=https://api.example.invalid pnpm build` passed. A separate Compose project and
+disposable PostgreSQL test database passed `docker compose config --quiet`, `pnpm db:up`,
+`pnpm db:wait`, `pnpm db:verify`, `pnpm db:test:reset`, `pnpm db:test:migrate`, and 31 API integration
+tests; that project was stopped with `pnpm db:down`. A second isolated project passed fresh and
+`origin/staging`-to-current migration deployment and was also stopped. All three Chromium journeys
+passed with `pnpm test:e2e:chromium`; local Edge installation remains unavailable on macOS.
+
+`pnpm migrations:destructive-check <origin/staging SHA>`, `pnpm deployment:validate`,
+`pnpm test:deployment`, `pnpm security:exceptions:check`, `pnpm security:audit`, and `bash -n` passed.
+The macOS deployment harness reported that Linux `flock` contention needs its CI gate. Pinned
+Actionlint, ShellCheck, Hadolint, Ubuntu bootstrap validation, Gitleaks v8.24.3 directory scan,
+and Trivy v0.70.0 filesystem vulnerability/secret/misconfiguration scan passed with no findings.
+The 70 archived messages, input hashes, decisions, and unique record IDs were rechecked. The
+already-running demo PostgreSQL restarted during Docker-heavy checks and its API lost the database
+connection; only the demo API container was restarted, then `/health` returned 200 and both
+containers were healthy. Production container routing and image scans were not rerun locally for
+this documentation-only patch; the open PR's staging CI will rerun them after push.
+
+Seventy distinct synthetic Hosted Henkaten were submitted through the running local API in two
+batches, using a seeded NPM Line Leader and valid current Line–Shift/checklist data. The live Ling
+worker completed all 70. Of 53 clear cases, all 28 PCR and 24 of 25 No-PCR were classified as
+expected. One unchanged-lot case with adversarial text became PCR at confidence 1.00. Of 17
+deliberately incomplete cases, seven reached Review, eight became PCR, and two became No-PCR;
+one unspecified alternative material trial was No-PCR at confidence 1.00. Six Review results had
+low-confidence validated output, while one had no validated model output. Several PCR narratives
+asserted missing facts or wrong control references; 14 of 37 were outside the approximate
+100–150-word target. The complete exact model messages and persisted output for each case are in
+`docs/reports/pcr-classifier-70-case-evaluation-2026-09-23/`, with analysis in
+`docs/reports/pcr-classifier-70-case-local-evaluation-2026-09-23.md`. No classifier code or
+configuration was changed. Seventy Open NPM Henkaten remain in the local demo for inspection;
+the pre-existing Compose stack remains running. Next: TMMIN QD adjudication, targeted adversarial
+and missing-evidence regression coverage, and grounded explanation checks before production
+reliance on automatic No-PCR. Verification: 70/70 HTTP 201 submissions, 70/70 terminal
+assessments, database evidence inspection, archive completeness checks, report formatting and
+`git diff --check`.
+
 Date: 2026-09-23
 Branch: `feat/ai-pcr`
 Status: implemented and validated locally; prepared for PR to `staging`. No staging deployment or
@@ -32,10 +75,9 @@ locally. No key appears in tracked or nonignored new files. The local Compose st
 after verification without deleting the seeded database volume.
 The separate inference report at `docs/reports/inference-server-403-2026-09-23.md` records the
 user-provided successful Ling tool-call tests through `curl` and OpenAI JavaScript SDK and the
-Python `urllib` Cloudflare 1010 result. PCR worker inference was not exercised end-to-end after
-the request to stop investigating inference. Before activating on staging, evaluate Indonesian
-cases with TMMIN QD. Generated OpenAPI/client content is current, and the staged-file drift check
-passed.
+Python `urllib` Cloudflare 1010 result. The later 70-case local evaluation above exercised PCR
+worker inference end to end. Before activating on staging, evaluate Indonesian cases with TMMIN
+QD. Generated OpenAPI/client content is current, and the staged-file drift check passed.
 
 Pre-PR local parity used Node 22.23.1, pnpm 11.16.0, frozen install, and cleaned build artifacts.
 Format, lint, typecheck,
