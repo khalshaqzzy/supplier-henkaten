@@ -36,10 +36,18 @@ AUTH_THROTTLE_SECRET=22222222222222222222222222222222 \
 TMMIN_BOOTSTRAP_USERNAME=bootstrap_admin \
 TMMIN_BOOTSTRAP_DISPLAY_NAME="TMMIN Bootstrap Admin" \
 TMMIN_BOOTSTRAP_PASSWORD=33333333333333333333333333333333 \
+PCR_OPENAI_BASE_URL=https://inference.example.invalid/v1 \
+PCR_OPENAI_API_KEY=synthetic_gateway_key_for_test_only \
+PCR_OPENAI_MODEL=inclusionAI/Ling-3.0-tiny-fp8 \
+PCR_CONFIDENCE_THRESHOLD=0.75 \
+PCR_INFERENCE_TIMEOUT_MS=90000 \
+PCR_WORKER_ENABLED=true \
+PCR_WORKER_POLL_MS=1000 \
   "${SCRIPTS}/render-runtime-env.sh" staging aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 42 >"${rendered_env}"
 chmod 600 "${rendered_env}"
 "${SCRIPTS}/validate-runtime-env.sh" "${rendered_env}" >/dev/null
 grep -Fxq 'DEPLOY_RUN_NUMBER=42' "${rendered_env}" || fail "rendered run number is missing"
+grep -Fxq 'PCR_OPENAI_API_KEY=synthetic_gateway_key_for_test_only' "${rendered_env}" || fail "PCR gateway key was not rendered"
 
 invalid_env="${TEST_ROOT}/invalid.env"
 # shellcheck disable=SC2016

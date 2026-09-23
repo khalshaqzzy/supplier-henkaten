@@ -5915,3 +5915,32 @@ add dedicated browser coverage for both clock contexts if staging behavior is ac
 - Seed extension: varied levels 1–4/unassessed mappings, Admin/GL audit examples, and automatic
   synthetic assessment to at least level 3 before assigning a default MP or submitting a Man
   replacement. Post-seed checks verify all default MP/job pairs remain qualified.
+
+## PCR indication amendment — 2026-09-23
+
+Status: implemented locally and prepared for a PR to `staging`; browser verification and local
+demo reseed completed. ADR 0034 records the durable worker, threshold/review behavior, and manual
+correction boundary.
+
+Scope: Hosted submission queues an assessment atomically; External ingestion queues or refreshes
+only on changed evidence. A leased worker calls local Ling through OpenAI-compatible completions,
+validates one structured tool call, and stores PCR/No-PCR/Review separately from Henkaten status.
+TMMIN Admin/Quality correct a versioned decision with a reason; audit and outbox notifications
+preserve the decision trail. Supplier and TMMIN lists expose PCR priority tabs and stable priority
+pagination. Supplier submit waits on a resumable assessment screen. Design A supplies the detail
+assessment surface, and both portals use a solid orange active sidebar item.
+
+Acceptance checks: isolated 14-migration deploy, formatting, lint, full typecheck, unit suite,
+31 integration tests, isolated 240-Henkaten seed with PCR/No-PCR/Review/manual examples, local
+reseed, browser review of both portals, and production build with configured API origin passed.
+Generated OpenAPI and API client are current; the staged-file drift check passed. The local
+gitignored env and seven GitHub `staging` environment secrets now carry PCR endpoint, model, key,
+and worker configuration; the reusable deploy workflow renders these into runtime env. Compose
+and deployment-script checks pass. PCR worker inference remains untested end-to-end after the
+decision to stop inference investigation. Before production activation, evaluate Indonesian
+examples with TMMIN QD; inference outages route to Review rather than No-PCR. Public inference
+403/1010 diagnosis is recorded in `docs/reports/inference-server-403-2026-09-23.md`.
+Pre-PR parity also passed fresh and upgrade migrations, all three Chromium journeys, actionlint,
+ShellCheck, Hadolint, a Linux deployment harness, production-like routing/persistence, Gitleaks,
+and Trivy filesystem plus five image scans. Local Edge installation was unavailable without sudo
+on macOS; the Linux CI Edge journey remains the browser gate.

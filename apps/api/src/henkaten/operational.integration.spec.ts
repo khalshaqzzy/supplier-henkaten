@@ -10,6 +10,8 @@ import { AppModule } from '../app.module.js';
 import { PasswordService } from '../auth/password.service.js';
 import { correlationMiddleware } from '../common/request-context.js';
 import { PrismaService } from '../persistence/prisma.service.js';
+import { PcrService } from '../pcr/pcr.service.js';
+import { NotificationService } from '../read-models/notification.service.js';
 
 const supplierOrigin = 'http://localhost:5173';
 const password = 'Line-Shift-Integration-Password-123';
@@ -43,6 +45,7 @@ describe('Line Shift Henkaten operations', () => {
     process.env['SESSION_CSRF_SECRET'] = 'integration-test-csrf-secret-at-least-32';
     process.env['AUTH_THROTTLE_SECRET'] = 'integration-test-throttle-secret-32';
     process.env['OUTBOX_ENABLED'] = 'false';
+    process.env['PCR_WORKER_ENABLED'] = 'false';
 
     const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = module.createNestApplication();
@@ -275,9 +278,18 @@ describe('Line Shift Henkaten operations', () => {
   });
 
   it('applies a duplicate MP immediately without reservation and restores on reject', async () => {
-    const created = await createManHenkaten();
+    const idempotencyKey = randomUUID();
+    const created = await createManHenkaten(idempotencyKey);
     expect(created.status).toBe(201);
     const henkatenId = created.body.id as string;
+    const assessment = await prisma.pcrAssessment.findUniqueOrThrow({
+      where: { henkatenId },
+    });
+    expect(assessment.status).toBe('PENDING');
+    expect(created.body.pcr).toMatchObject({ status: 'PENDING', version: 1 });
+    const replayed = await createManHenkaten(idempotencyKey);
+    expect(replayed.body.id).toBe(henkatenId);
+    expect(await prisma.pcrAssessment.count({ where: { henkatenId } })).toBe(1);
     const occurrence = await prisma.shiftRun.findUniqueOrThrow({
       where: { id: created.body.shiftRunId as string },
       include: { workingAssignments: true },
@@ -324,13 +336,195 @@ describe('Line Shift Henkaten operations', () => {
     expect(restored.effectiveMpMemberId).toBe(defaultMpId);
   });
 
-  async function createManHenkaten() {
+  it('lets TMMIN Quality correct PCR with a reason and rejects stale or Supplier corrections', async () => {
+    const created = await createManHenkaten();
+    expect(created.status).toBe(201);
+    const henkatenId = created.body.id as string;
+    const username = `pcr-quality-${randomUUID()}`;
+    const quality = await prisma.user.create({
+      data: {
+        realm: 'TMMIN',
+        role: 'TMMIN_QUALITY',
+        username,
+        normalizedUsername: username.toLowerCase(),
+        displayName: 'PCR Quality Reviewer',
+        passwordHash: await app.get(PasswordService).hash(password),
+        mustChangePassword: false,
+      },
+    });
+    const login = await request(app.getHttpServer())
+      .post('/api/v1/auth/tmmin/login')
+      .set('Origin', 'http://localhost:5174')
+      .send({ username, password });
+    expect(login.status).toBe(200);
+    const tmminCookie = Array.isArray(login.headers['set-cookie'])
+      ? login.headers['set-cookie']
+      : [login.headers['set-cookie'] as string];
+    const path = `/api/v1/tmmin/henkatens/HOSTED/${supplierId}/${henkatenId}/pcr-decision`;
+    const correction = {
+      status: 'PCR',
+      reason: 'Manufacturing method and approved tool settings have changed.',
+      expectedVersion: 1,
+    };
+    const supplierAttempt = await request(app.getHttpServer())
+      .post(path)
+      .set('Origin', 'http://localhost:5174')
+      .set('Cookie', leaderCookie)
+      .set('X-CSRF-Token', leaderCsrf)
+      .send(correction);
+    expect(supplierAttempt.status).toBe(401);
+
+    // Hold an in-flight model result while TMMIN makes the authoritative correction.
+    const assessment = await prisma.pcrAssessment.findUniqueOrThrow({ where: { henkatenId } });
+    await prisma.pcrAssessment.updateMany({
+      where: { status: 'PENDING', id: { not: assessment.id } },
+      data: { status: 'REVIEW' },
+    });
+    const pcrWorker = app.get(PcrService);
+    const originalInfer = Reflect.get(pcrWorker, 'infer');
+    let releaseInference = () => {};
+    const inferenceGate = new Promise<void>((resolve) => {
+      releaseInference = resolve;
+    });
+    let signalInference = () => {};
+    const inferenceStarted = new Promise<void>((resolve) => {
+      signalInference = resolve;
+    });
+    Reflect.set(pcrWorker, 'infer', async () => {
+      signalInference();
+      await inferenceGate;
+      return {
+        model: 'test-model',
+        output: { needsPcr: false, confidence: 0.99, matchedControlItems: [], assessment: null },
+      };
+    });
+    const lateWorker = pcrWorker.processOne();
+    await inferenceStarted;
+
+    const corrected = await request(app.getHttpServer())
+      .post(path)
+      .set('Origin', 'http://localhost:5174')
+      .set('Cookie', tmminCookie)
+      .set('X-CSRF-Token', login.body.csrfToken as string)
+      .send(correction);
+    releaseInference();
+    await lateWorker;
+    Reflect.set(pcrWorker, 'infer', originalInfer);
+    expect(corrected.status).toBe(200);
+    expect(corrected.body).toMatchObject({
+      status: 'PCR',
+      decisionSource: 'TMMIN',
+      assessment: correction.reason,
+      version: 2,
+    });
+    expect((await prisma.pcrAssessment.findUniqueOrThrow({ where: { henkatenId } })).status).toBe(
+      'PCR',
+    );
+    const stale = await request(app.getHttpServer())
+      .post(path)
+      .set('Origin', 'http://localhost:5174')
+      .set('Cookie', tmminCookie)
+      .set('X-CSRF-Token', login.body.csrfToken as string)
+      .send(correction);
+    expect(stale.status).toBe(409);
+    const detail = await request(app.getHttpServer())
+      .get(`/api/v1/supplier/henkatens/${henkatenId}`)
+      .set('Cookie', leaderCookie);
+    expect(detail.status).toBe(200);
+    expect(detail.body.pcr.assessment).toBe(correction.reason);
+
+    const pcrEvent = await prisma.outboxEvent.findFirstOrThrow({
+      where: { aggregateId: henkatenId, eventType: 'PCR_DECISION_CORRECTED', aggregateVersion: 2 },
+    });
+    const notifications = app.get(NotificationService);
+    await notifications.consume(pcrEvent);
+    await notifications.consume(pcrEvent);
+    const createdById = (await prisma.henkaten.findUniqueOrThrow({ where: { id: henkatenId } }))
+      .createdById;
+    const pcrNotifications = await prisma.notification.findMany({
+      where: { sourceEventId: pcrEvent.id },
+    });
+    expect(pcrNotifications.some(({ recipientUserId }) => recipientUserId === quality.id)).toBe(
+      true,
+    );
+    expect(pcrNotifications.some(({ recipientUserId }) => recipientUserId === createdById)).toBe(
+      true,
+    );
+    expect(
+      pcrNotifications.filter(({ recipientUserId }) => recipientUserId === createdById),
+    ).toHaveLength(1);
+
+    const removed = await request(app.getHttpServer())
+      .post(path)
+      .set('Origin', 'http://localhost:5174')
+      .set('Cookie', tmminCookie)
+      .set('X-CSRF-Token', login.body.csrfToken as string)
+      .send({
+        status: 'NO_PCR',
+        reason: 'Review confirms no controlled process change.',
+        expectedVersion: 2,
+      });
+    expect(removed.status).toBe(200);
+    expect(removed.body).toMatchObject({ status: 'NO_PCR', assessment: null, version: 3 });
+    const removedEvent = await prisma.outboxEvent.findFirstOrThrow({
+      where: { aggregateId: henkatenId, eventType: 'PCR_DECISION_CORRECTED', aggregateVersion: 3 },
+    });
+    await notifications.consume(removedEvent);
+    const supplierNotice = await prisma.notification.findUniqueOrThrow({
+      where: {
+        sourceEventId_recipientUserId: {
+          sourceEventId: removedEvent.id,
+          recipientUserId: createdById,
+        },
+      },
+    });
+    expect(supplierNotice.body).toContain('No-PCR');
+    expect(
+      await prisma.outboxEvent.count({
+        where: { aggregateId: henkatenId, eventType: 'PCR_DECISION_CORRECTED' },
+      }),
+    ).toBe(2);
+
+    const historical = await createManHenkaten();
+    expect(historical.status).toBe(201);
+    await prisma.pcrAssessment.delete({ where: { henkatenId: historical.body.id as string } });
+    const historicalPath = `/api/v1/tmmin/henkatens/HOSTED/${supplierId}/${historical.body.id as string}/pcr-decision`;
+    const firstDecision = await request(app.getHttpServer())
+      .post(historicalPath)
+      .set('Origin', 'http://localhost:5174')
+      .set('Cookie', tmminCookie)
+      .set('X-CSRF-Token', login.body.csrfToken as string)
+      .send({
+        status: 'PCR',
+        reason: 'Historical evidence confirms a new manufacturing tool and process setting.',
+        expectedVersion: 0,
+      });
+    expect(firstDecision.status).toBe(200);
+    expect(firstDecision.body).toMatchObject({
+      status: 'PCR',
+      decisionSource: 'TMMIN',
+      version: 1,
+    });
+    const staleFirstDecision = await request(app.getHttpServer())
+      .post(historicalPath)
+      .set('Origin', 'http://localhost:5174')
+      .set('Cookie', tmminCookie)
+      .set('X-CSRF-Token', login.body.csrfToken as string)
+      .send({
+        status: 'PCR',
+        reason: 'Historical evidence confirms a new manufacturing tool and process setting.',
+        expectedVersion: 0,
+      });
+    expect(staleFirstDecision.status).toBe(409);
+  });
+
+  async function createManHenkaten(idempotencyKey = randomUUID()) {
     return request(app.getHttpServer())
       .post('/api/v1/supplier/henkatens')
       .set('Origin', supplierOrigin)
       .set('Cookie', leaderCookie)
       .set('X-CSRF-Token', leaderCsrf)
-      .set('Idempotency-Key', randomUUID())
+      .set('Idempotency-Key', idempotencyKey)
       .send({
         category: 'MAN',
         lineShiftId,

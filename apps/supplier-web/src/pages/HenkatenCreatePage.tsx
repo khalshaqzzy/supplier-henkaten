@@ -123,7 +123,7 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
           : { ...base, category, affectedObject, replacementObject };
       return supplierApi.createHenkaten(body, intentKey);
     },
-    onSuccess: (created) => navigate(`/henkatens/${created.id}`, { replace: true }),
+    onSuccess: (created) => navigate(`/henkatens/${created.id}/assessment`, { replace: true }),
     onError: (error) => {
       setProblem(
         error instanceof ApiProblemError ? error.problem.detail : 'Henkaten tidak dapat disimpan.',

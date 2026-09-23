@@ -62,6 +62,7 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
     ...(params.get('approvalStatus')
       ? { approvalStatus: params.get('approvalStatus') as HenkatenListQuery['approvalStatus'] }
       : {}),
+    ...(!approvalQueue && params.get('pcr') === 'PCR' ? { pcrStatus: 'PCR' as const } : {}),
   };
   if (approvalQueue) {
     query.approvalRoute =
@@ -99,6 +100,16 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
           ) : undefined
         }
       />
+      {!approvalQueue && (
+        <nav className="pcr-tabs" aria-label="Tampilan Henkaten">
+          <Link className={params.get('pcr') !== 'PCR' ? 'is-current' : ''} to="/henkatens">
+            Semua
+          </Link>
+          <Link className={params.get('pcr') === 'PCR' ? 'is-current' : ''} to="/henkatens?pcr=PCR">
+            PCR
+          </Link>
+        </nav>
+      )}
       <FilterBar>
         {approvalQueue && (
           <label>
@@ -251,6 +262,7 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
                   <tr key={item.id}>
                     <td data-label="Identifier">
                       <strong>{item.identifier}</strong>
+                      {item.pcr?.status === 'PCR' && <PcrBadge />}
                     </td>
                     <td data-label="4M">
                       <span className={`category-badge is-${item.category.toLowerCase()}`}>
@@ -398,6 +410,7 @@ export function HenkatenDetailPage() {
         description={`Dibuat ${formatDate(item.occurredAt, item.timezone)}`}
         status={
           <div className="henkaten-header-status">
+            {item.pcr?.status === 'PCR' && <PcrBadge />}
             <span className={`status-label is-${item.status.toLowerCase()}`}>
               {humanize(item.status)}
             </span>
@@ -436,6 +449,21 @@ export function HenkatenDetailPage() {
         <FactItem label="Part" value={item.part.number} detail={item.part.name} />
         <FactItem label="Dibuat oleh" value={item.creatorName} />
       </FactStrip>
+      {item.pcr?.status === 'PCR' && item.pcr.assessment && (
+        <section className="pcr-assessment" aria-labelledby="pcr-assessment-heading">
+          <h2 id="pcr-assessment-heading">PCR assessment</h2>
+          <p className="pcr-assessment__reason">{item.pcr.assessment}</p>
+          <p className="pcr-assessment__action">
+            Henkaten ini terindikasi memerlukan PCR. Ajukan PCR melalui jalur yang berlaku. Jika ada
+            kendala teknis atau hasil penilaian tampak keliru, hubungi TMMIN QD.
+          </p>
+        </section>
+      )}
+      {item.pcr?.status === 'REVIEW' && (
+        <div className="pcr-review-notice" role="status">
+          Penilaian PCR perlu ditinjau oleh TMMIN QD.
+        </div>
+      )}
       <div className="henkaten-detail__layout">
         <div className="henkaten-detail__content">
           {(item.cancellationReason || item.withdrawalReason || item.clonedFromHenkatenId) && (
@@ -663,6 +691,9 @@ function RouteStatus({ value }: { value: string }) {
       {humanize(value)}
     </span>
   );
+}
+function PcrBadge() {
+  return <span className="pcr-badge">PCR</span>;
 }
 function HenkatenSkeleton() {
   return (

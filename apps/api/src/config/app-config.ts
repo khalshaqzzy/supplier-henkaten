@@ -47,6 +47,13 @@ const environmentSchema = z
     AUTH_IP_LOGIN_LIMIT: z.coerce.number().int().min(5).default(50),
     AUTH_GLOBAL_LIMIT_PER_MINUTE: z.coerce.number().int().min(30).default(300),
     PHOTO_STORAGE_ROOT: z.string().min(1).default('.local/uploads/member-photos'),
+    PCR_OPENAI_BASE_URL: z.string().default(''),
+    PCR_OPENAI_API_KEY: z.string().default(''),
+    PCR_OPENAI_MODEL: z.string().default('inclusionAI/Ling-3.0-tiny-fp8'),
+    PCR_CONFIDENCE_THRESHOLD: z.coerce.number().min(0).max(1).default(0.75),
+    PCR_INFERENCE_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(180_000).default(90_000),
+    PCR_WORKER_ENABLED: booleanEnvironmentSchema('true'),
+    PCR_WORKER_POLL_MS: z.coerce.number().int().min(250).max(30_000).default(1_000),
   })
   .superRefine((value, context) => {
     const endpointHosts = value.PUSH_ENDPOINT_HOSTS.split(',').map((host) => host.trim());
@@ -141,6 +148,13 @@ export type AppConfig = {
   authIpLoginLimit: number;
   authGlobalLimitPerMinute: number;
   photoStorageRoot: string;
+  pcrOpenAiBaseUrl: string;
+  pcrOpenAiApiKey: string;
+  pcrOpenAiModel: string;
+  pcrConfidenceThreshold: number;
+  pcrInferenceTimeoutMs: number;
+  pcrWorkerEnabled: boolean;
+  pcrWorkerPollMs: number;
 };
 
 export function loadAppConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -191,6 +205,13 @@ export function loadAppConfig(environment: NodeJS.ProcessEnv = process.env): App
     authIpLoginLimit: parsed.AUTH_IP_LOGIN_LIMIT,
     authGlobalLimitPerMinute: parsed.AUTH_GLOBAL_LIMIT_PER_MINUTE,
     photoStorageRoot: parsed.PHOTO_STORAGE_ROOT,
+    pcrOpenAiBaseUrl: parsed.PCR_OPENAI_BASE_URL,
+    pcrOpenAiApiKey: parsed.PCR_OPENAI_API_KEY,
+    pcrOpenAiModel: parsed.PCR_OPENAI_MODEL,
+    pcrConfidenceThreshold: parsed.PCR_CONFIDENCE_THRESHOLD,
+    pcrInferenceTimeoutMs: parsed.PCR_INFERENCE_TIMEOUT_MS,
+    pcrWorkerEnabled: parsed.PCR_WORKER_ENABLED,
+    pcrWorkerPollMs: parsed.PCR_WORKER_POLL_MS,
   };
 }
 

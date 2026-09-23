@@ -1,4 +1,64 @@
-# Session Handoff — Compact Tanoko Matrix and Proficiency Enforcement
+# Session Handoff — PCR indication for Henkaten
+
+Date: 2026-09-23
+Branch: `feat/ai-pcr`
+Status: implemented and validated locally; prepared for PR to `staging`. No staging deployment or
+UAT claim.
+
+Hosted submissions now persist `PcrAssessment` in the creation transaction. External ingestion
+refreshes assessment only when evidence changes. A separate leased worker uses the local Ling
+OpenAI-compatible Chat Completions endpoint, a forced validated tool call and 8192 output tokens.
+Low confidence, invalid output and failures move to Review. TMMIN Admin/Quality can correct with a
+mandatory reason and optimistic version; a late worker cannot overwrite the correction. AI raw
+output and confidence remain server-side; full English assessment appears only for current PCR.
+Supplier and TMMIN have PCR tabs, priority pagination, indicators, and scoped notifications;
+TMMIN also has review tabs and correction UI. Design A is applied to detail, submit waits on a
+refresh-safe assessment screen, and active sidebar items are solid orange. The local seed includes
+PCR/No-PCR/Review/manual examples while preserving 2 suppliers and 240 Henkaten.
+
+Validation: formatting, lint, typecheck, unit suite, production build, 31 API integration tests on
+a freshly migrated disposable database, and OpenAPI check passed. An isolated 240-record seed and
+`pnpm local:reseed` completed; the main local database has 2 suppliers and 240 Henkaten (PCR 6,
+No-PCR 230, Review 4). Browser review covered both portals, PCR/review tabs, detail assessment,
+orange active navigation, and the TMMIN page title shortened to `Henkaten`. ADR 0034 and PRD
+amendment define the decision boundary.
+
+The valid gateway key was read without changing `dx-2`. The gitignored local `.env` now has the
+public inference endpoint, model, key, threshold, timeout, and worker settings (file mode 0600).
+All seven names were set as GitHub `staging` environment secrets through `gh`; the reusable deploy
+workflow now validates and renders them into runtime env. Compose configuration and actual-key
+runtime rendering were checked without printing values. The deployment script harness passes
+locally. No key appears in tracked or nonignored new files. The local Compose stack was stopped
+after verification without deleting the seeded database volume.
+The separate inference report at `docs/reports/inference-server-403-2026-09-23.md` records the
+user-provided successful Ling tool-call tests through `curl` and OpenAI JavaScript SDK and the
+Python `urllib` Cloudflare 1010 result. PCR worker inference was not exercised end-to-end after
+the request to stop investigating inference. Before activating on staging, evaluate Indonesian
+cases with TMMIN QD. Generated OpenAPI/client content is current, and the staged-file drift check
+passed.
+
+Pre-PR local parity used Node 22.23.1, pnpm 11.16.0, frozen install, and cleaned build artifacts.
+Format, lint, typecheck,
+unit tests, OpenAPI drift, and production application build passed. A disposable Docker database
+passed all 31 integration tests, fresh migration, and the upgrade from `origin/staging` migrations.
+All three Chromium journeys passed after updating the Henkaten title selector. The local macOS
+Edge installer requires sudo and could not install Edge; CI's Linux Edge journey remains the
+browser gate. Actionlint, ShellCheck, Hadolint, deployment validation, and the deployment harness
+passed, including the harness inside Linux with real `flock`. Five production images built and
+passed routing, non-root, and restart persistence checks. Gitleaks v8.24.3 found no leaks; Trivy
+v0.70.0 reported no HIGH/CRITICAL findings for the filesystem and all five production images.
+The high-severity dependency audit exited successfully with the repository's existing exception.
+Local ignored credentials were temporarily moved outside the scan path and restored. The PCR
+worker was not sent a live inference request in this parity run.
+
+The feature branch already contained four earlier commits absent from `origin/staging`: line
+schedules, migration-policy repair, local seed repair, and UI typography rules. A PR from this
+branch to `staging` includes those predecessors along with the PCR implementation. No existing
+commit was rewritten.
+
+---
+
+# Previous Session Handoff — Compact Tanoko Matrix and Proficiency Enforcement
 
 Date: 2026-09-16
 Branch: `feat/tanoko`
@@ -583,3 +643,39 @@ dashboard response before writing credentials. Evidence after completion: 2 supp
 3 or 4. No preflight, Start Shift, End Shift, reservation, or MP exclusivity path is used. The smoke
 database, temporary API, photos, and credentials were removed afterward; the main local database was
 not changed by this verification.
+
+## Current Handoff — PCR screening, 2026-09-23
+
+The user-approved PCR plan is implemented locally on `feat/ai-pcr`; no staging or production
+deployment has been performed. Hosted submit queues PCR screening in its transaction. External
+ingest requeues only when screening evidence changes. A separate leased worker calls Ling through
+one forced OpenAI-compatible tool call (`max_tokens: 8192`), with the 45 control items and PCR
+guidance in the English prompt. Invalid, unavailable, or below-threshold results become Review.
+Admin and Quality can correct decisions with version and required reason, including a first manual
+decision for an unassessed historical record (`expectedVersion: 0`); audit and outbox preserve
+both the AI result and subsequent action. The two portals expose scoped PCR views, notification
+tabs, and the Design A assessment only for a current PCR decision. The TMMIN page title is now
+“Henkaten”; the orange active sidebar item and compact Quality workspace label were verified in
+the browser.
+
+Local `local:reseed` was run after an isolated seed smoke. The demo remains two suppliers and
+240 Henkaten: 6 PCR, 230 No-PCR, 4 Review, including manual correction examples across Open and
+Closed records. Demo credentials were rotated in the git-ignored local credentials file. The
+main local database is ready for UI review at ports 5173 and 5174.
+
+Checks passed: all 14 migrations on a clean disposable test database; `pnpm format:check`,
+`pnpm lint`, `pnpm typecheck`, production build with explicit `VITE_API_ORIGIN`, repository unit
+tests, 31 API integration tests, and `git diff --check`. Integration checks now cover idempotent
+Hosted queueing, External status-only retention and evidence-change requeueing, TMMIN role/version
+checks, first manual decisions on historical records, notification deduplication, and a late AI
+result racing with manual correction. Browser
+inspection confirmed Supplier and TMMIN PCR tabs, the Review tab, table badges, priority order,
+PCR detail and the shortened title. The OpenAPI document check passes; the repository's combined
+`openapi:check` still reports the expected Git HEAD difference for the newly generated API client
+until these changes are committed.
+
+The local runtime has no PCR endpoint/key configured, so new live submissions currently resolve
+to Review. Diagnosis of the separate public inference 403/1010 is in
+`docs/reports/inference-server-403-2026-09-23.md`. No key or server configuration was changed.
+Before live model UAT, configure the runtime secret and verify the application HTTP client against
+the inference endpoint, then review Indonesian positive/negative cases with TMMIN QD.

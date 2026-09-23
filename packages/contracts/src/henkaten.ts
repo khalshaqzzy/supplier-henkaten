@@ -18,6 +18,7 @@ import {
   utcTimestampSchema,
 } from './common.js';
 import { businessDateSchema, workingAssignmentSchema } from './shifts.js';
+import { pcrAssessmentSchema, pcrStatusSchema } from './pcr.js';
 
 const requiredText = z.string().trim().min(1).max(2_000);
 
@@ -113,6 +114,7 @@ export const henkatenSummarySchema = z
     part: z.object({ number: z.string(), name: z.string() }).strict(),
     routes: approvalRouteSummarySchema,
     version: optimisticVersionSchema,
+    pcr: pcrAssessmentSchema.nullable(),
   })
   .strict();
 
@@ -212,6 +214,7 @@ export const henkatenListQuerySchema = z
     to: utcTimestampSchema.optional(),
     approvalStatus: approvalRouteStatusSchema.optional(),
     approvalRoute: approvalRouteSchema.optional(),
+    pcrStatus: pcrStatusSchema.optional(),
   })
   .strict();
 export type HenkatenListQuery = z.infer<typeof henkatenListQuerySchema>;

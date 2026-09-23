@@ -8,12 +8,12 @@ import type {
   CreateHenkatenRequest,
   HenkatenFormOptionsQuery,
   HenkatenListQuery,
+  PcrStatus,
   TmminHenkatenQuery,
 } from '@tmmin-henkaten/contracts';
 
 import type { Prisma } from '../generated/prisma/client.js';
 import type { MutationContext } from '../administration/mutation-context.js';
-import { decodeCursor, encodeCursor } from '../administration/presenters.js';
 import { versionConflict } from '../administration/user-admin.service.js';
 import { ProblemException } from '../common/problem.js';
 import type { RequestPrincipal } from '../common/request-context.js';
@@ -26,6 +26,7 @@ import { OperationalFinalizationService } from '../operations/operational-finali
 import { PrismaService } from '../persistence/prisma.service.js';
 import { runSerializable } from '../persistence/transaction.js';
 import { presentWorking } from '../shifts/shift-presenters.js';
+import { PcrService, presentPcrAssessment } from '../pcr/pcr.service.js';
 import {
   henkatenDetailInclude,
   presentHenkatenDetail,
@@ -40,6 +41,7 @@ export class HenkatenService {
     private readonly outbox: OutboxService,
     private readonly finalization: OperationalFinalizationService,
     private readonly lineShifts: LineShiftService,
+    private readonly pcr: PcrService,
   ) {}
 
   async create(
@@ -319,6 +321,14 @@ export class HenkatenService {
         },
       });
 
+      await this.pcr.queueHosted(tx, created.id, scope.supplierId, {
+        category: created.category,
+        cause: created.cause,
+        detail: created.detail,
+        affectedObject: created.affectedObject,
+        replacementObject: created.replacementObject,
+      });
+
       if (man) {
         const updatedTarget = await tx.workingAssignment.update({
           where: { id: targetWorking.id },
@@ -488,56 +498,82 @@ export class HenkatenService {
   }
 
   async list(scope: TenantScope, query: HenkatenListQuery, principal?: RequestPrincipal) {
-    const cursor = decodeCursor(query.cursor);
-    const rows = await this.prisma.henkaten.findMany({
-      where: {
-        supplierId: scope.supplierId,
-        ...(query.status ? { status: query.status } : {}),
-        ...(query.category ? { category: query.category } : {}),
-        ...(query.lineId ? { lineId: query.lineId } : {}),
-        ...(query.shiftRunId ? { shiftRunId: query.shiftRunId } : {}),
-        ...(query.part
-          ? {
-              OR: [
-                { partNumberSnapshot: { contains: query.part, mode: 'insensitive' } },
-                { partNameSnapshot: { contains: query.part, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-        ...(query.from || query.to
-          ? {
-              occurredAt: {
-                ...(query.from ? { gte: new Date(query.from) } : {}),
-                ...(query.to ? { lte: new Date(query.to) } : {}),
+    const cursor = decodePriorityCursor(query.cursor);
+    const baseWhere: Prisma.HenkatenWhereInput = {
+      supplierId: scope.supplierId,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.category ? { category: query.category } : {}),
+      ...(query.pcrStatus ? { pcrAssessment: { status: query.pcrStatus } } : {}),
+      ...(query.lineId ? { lineId: query.lineId } : {}),
+      ...(query.shiftRunId ? { shiftRunId: query.shiftRunId } : {}),
+      ...(query.part
+        ? {
+            OR: [
+              { partNumberSnapshot: { contains: query.part, mode: 'insensitive' } },
+              { partNameSnapshot: { contains: query.part, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+      ...(query.from || query.to
+        ? {
+            occurredAt: {
+              ...(query.from ? { gte: new Date(query.from) } : {}),
+              ...(query.to ? { lte: new Date(query.to) } : {}),
+            },
+          }
+        : {}),
+      ...(query.approvalStatus || query.approvalRoute
+        ? {
+            approvalRoutes: {
+              some: {
+                ...(query.approvalStatus ? { status: query.approvalStatus } : {}),
+                ...(query.approvalRoute ? { route: query.approvalRoute } : {}),
               },
-            }
-          : {}),
-        ...(query.approvalStatus || query.approvalRoute
-          ? {
-              approvalRoutes: {
-                some: {
-                  ...(query.approvalStatus ? { status: query.approvalStatus } : {}),
-                  ...(query.approvalRoute ? { route: query.approvalRoute } : {}),
-                },
-              },
-            }
-          : {}),
-        ...roleWhere(principal),
-      },
-      include: {
-        approvalRoutes: { include: { decision: true }, orderBy: { route: 'asc' } },
-      },
-      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-      take: query.limit + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    });
+            },
+          }
+        : {}),
+      ...roleWhere(principal),
+    };
+    const buckets = priorityBuckets(query.status, query.pcrStatus);
+    const rows: Array<{
+      bucket: number;
+      row: Prisma.HenkatenGetPayload<{
+        include: { approvalRoutes: { include: { decision: true } }; pcrAssessment: true };
+      }>;
+    }> = [];
+    for (let bucket = 0; bucket < buckets.length && rows.length <= query.limit; bucket++) {
+      if (cursor && bucket < cursor.bucket) continue;
+      const found = await this.prisma.henkaten.findMany({
+        where: {
+          AND: [
+            baseWhere,
+            buckets[bucket]!,
+            ...(cursor && bucket === cursor.bucket ? [priorityKeyset(cursor)] : []),
+          ],
+        },
+        include: {
+          approvalRoutes: { include: { decision: true }, orderBy: { route: 'asc' } },
+          pcrAssessment: true,
+        },
+        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+        take: query.limit + 1 - rows.length,
+      });
+      rows.push(...found.map((row) => ({ bucket, row })));
+    }
     const hasNextPage = rows.length > query.limit;
-    const items = hasNextPage ? rows.slice(0, query.limit) : rows;
+    const items = rows.slice(0, query.limit);
     return {
-      items: items.map(presentHenkatenSummary),
+      items: items.map(({ row }) => presentHenkatenSummary(row)),
       pageInfo: {
         hasNextPage,
-        nextCursor: hasNextPage && items.at(-1) ? encodeCursor(items.at(-1)!.id) : null,
+        nextCursor:
+          hasNextPage && items.at(-1)
+            ? encodePriorityCursor({
+                bucket: items.at(-1)!.bucket,
+                occurredAt: items.at(-1)!.row.occurredAt.toISOString(),
+                id: items.at(-1)!.row.id,
+              })
+            : null,
       },
     };
   }
@@ -842,15 +878,7 @@ export class HenkatenService {
   }
 
   async globalList(query: TmminHenkatenQuery) {
-    const cursor = decodeGlobalCursor(query.cursor);
-    const cursorWhere = cursor
-      ? {
-          OR: [
-            { updatedAt: { lt: cursor.updatedAt } },
-            { updatedAt: cursor.updatedAt, id: { lt: cursor.id } },
-          ],
-        }
-      : {};
+    const cursor = decodePriorityCursor(query.cursor);
     const commonDate =
       query.from || query.to
         ? {
@@ -860,133 +888,181 @@ export class HenkatenService {
             },
           }
         : {};
-    const [hosted, external] = await Promise.all([
-      query.sourceMode === 'EXTERNAL'
-        ? Promise.resolve([])
-        : this.prisma.henkaten.findMany({
-            where: {
-              ...cursorWhere,
-              ...commonDate,
-              ...(query.supplierId ? { supplierId: query.supplierId } : {}),
-              ...(query.status ? { status: query.status } : {}),
-              ...(query.category ? { category: query.category } : {}),
-              ...(query.line
-                ? { lineNameSnapshot: { contains: query.line, mode: 'insensitive' as const } }
-                : {}),
-              ...(query.part
-                ? {
-                    OR: [
-                      {
-                        partNumberSnapshot: {
-                          contains: query.part,
+    const buckets = priorityBuckets(query.status, query.pcrStatus);
+    const pages = await Promise.all(
+      buckets.map(async (bucketWhere, bucket) => {
+        if (cursor && bucket < cursor.bucket)
+          return {
+            bucket,
+            rows: [] as Array<{
+              kind: 'HOSTED' | 'EXTERNAL';
+              recordId: string;
+              occurredAt: string;
+            }>,
+          };
+        const bucketCursorWhere = cursor && bucket === cursor.bucket ? priorityKeyset(cursor) : {};
+        const [hosted, external] = await Promise.all([
+          query.sourceMode === 'EXTERNAL'
+            ? Promise.resolve([])
+            : this.prisma.henkaten.findMany({
+                where: {
+                  ...commonDate,
+                  AND: [bucketWhere, bucketCursorWhere],
+                  ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+                  ...(query.status ? { status: query.status } : {}),
+                  ...(query.category ? { category: query.category } : {}),
+                  ...(query.pcrStatus ? { pcrAssessment: { status: query.pcrStatus } } : {}),
+                  ...(query.line
+                    ? { lineNameSnapshot: { contains: query.line, mode: 'insensitive' as const } }
+                    : {}),
+                  ...(query.part
+                    ? {
+                        OR: [
+                          {
+                            partNumberSnapshot: {
+                              contains: query.part,
+                              mode: 'insensitive' as const,
+                            },
+                          },
+                          {
+                            partNameSnapshot: {
+                              contains: query.part,
+                              mode: 'insensitive' as const,
+                            },
+                          },
+                        ],
+                      }
+                    : {}),
+                },
+                include: {
+                  supplier: { select: { code: true, name: true } },
+                  approvalRoutes: true,
+                  pcrAssessment: true,
+                },
+                orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+                take: query.limit + 1,
+              }),
+          query.sourceMode === 'HOSTED'
+            ? Promise.resolve([])
+            : this.prisma.externalHenkatenProjection.findMany({
+                where: {
+                  ...commonDate,
+                  AND: [bucketWhere, bucketCursorWhere],
+                  ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+                  ...(query.status ? { status: query.status } : {}),
+                  ...(query.category ? { category: query.category } : {}),
+                  ...(query.pcrStatus ? { pcrAssessment: { status: query.pcrStatus } } : {}),
+                  ...(query.line
+                    ? {
+                        lineSnapshot: {
+                          path: ['name'],
+                          string_contains: query.line,
                           mode: 'insensitive' as const,
                         },
-                      },
-                      {
-                        partNameSnapshot: {
-                          contains: query.part,
-                          mode: 'insensitive' as const,
-                        },
-                      },
-                    ],
-                  }
-                : {}),
-            },
-            include: {
-              supplier: { select: { code: true, name: true } },
-              approvalRoutes: true,
-            },
-            orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-            take: query.limit + 1,
+                      }
+                    : {}),
+                  ...(query.part
+                    ? {
+                        OR: [
+                          {
+                            partSnapshot: {
+                              path: ['number'],
+                              string_contains: query.part,
+                              mode: 'insensitive' as const,
+                            },
+                          },
+                          {
+                            partSnapshot: {
+                              path: ['name'],
+                              string_contains: query.part,
+                              mode: 'insensitive' as const,
+                            },
+                          },
+                        ],
+                      }
+                    : {}),
+                },
+                include: { supplier: { select: { code: true, name: true } }, pcrAssessment: true },
+                orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+                take: query.limit + 1,
+              }),
+        ]);
+        const mapped = [
+          ...hosted.map((row) => ({
+            kind: 'HOSTED' as const,
+            recordId: row.id,
+            supplierId: row.supplierId,
+            supplierCode: row.supplier.code,
+            supplierName: row.supplier.name,
+            sourceMode: row.sourceMode,
+            sourceEpoch: row.sourceEpoch,
+            displayId: row.identifier,
+            status: row.status,
+            category: row.category,
+            lineName: row.lineNameSnapshot,
+            jobName: row.jobNameSnapshot,
+            partNumber: row.partNumberSnapshot,
+            partName: row.partNameSnapshot,
+            occurredAt: row.occurredAt.toISOString(),
+            updatedAt: row.updatedAt.toISOString(),
+            pcr: presentPcrAssessment(row.pcrAssessment),
+            supervisorStatus:
+              row.approvalRoutes.find((route) => route.route === 'SUPERVISOR')?.status ??
+              'NOT_REQUIRED',
+            qcStatus:
+              row.approvalRoutes.find((route) => route.route === 'QC')?.status ?? 'NOT_REQUIRED',
+          })),
+          ...external.map((row) => {
+            const line = objectRecord(row.lineSnapshot);
+            const job = objectRecord(row.jobSnapshot);
+            const part = objectRecord(row.partSnapshot);
+            return {
+              kind: 'EXTERNAL' as const,
+              recordId: row.id,
+              supplierId: row.supplierId,
+              supplierCode: row.supplier.code,
+              supplierName: row.supplier.name,
+              sourceMode: 'EXTERNAL' as const,
+              sourceEpoch: row.sourceEpoch,
+              displayId: row.sourceHenkatenId,
+              sourceVersion: row.sourceVersion,
+              status: row.status,
+              category: row.category,
+              lineName: safeText(line['name']),
+              jobName: safeText(job['name']),
+              partNumber: safeText(part['number']),
+              partName: safeText(part['name']),
+              occurredAt: row.occurredAt.toISOString(),
+              updatedAt: row.updatedAt.toISOString(),
+              pcr: presentPcrAssessment(row.pcrAssessment),
+            };
           }),
-      query.sourceMode === 'HOSTED'
-        ? Promise.resolve([])
-        : this.prisma.externalHenkatenProjection.findMany({
-            where: {
-              ...cursorWhere,
-              ...commonDate,
-              ...(query.supplierId ? { supplierId: query.supplierId } : {}),
-              ...(query.status ? { status: query.status } : {}),
-              ...(query.category ? { category: query.category } : {}),
-            },
-            include: { supplier: { select: { code: true, name: true } } },
-            orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-            take: query.limit + 1,
-          }),
-    ]);
-    const mapped = [
-      ...hosted.map((row) => ({
-        kind: 'HOSTED' as const,
-        recordId: row.id,
-        supplierId: row.supplierId,
-        supplierCode: row.supplier.code,
-        supplierName: row.supplier.name,
-        sourceMode: row.sourceMode,
-        sourceEpoch: row.sourceEpoch,
-        displayId: row.identifier,
-        status: row.status,
-        category: row.category,
-        lineName: row.lineNameSnapshot,
-        jobName: row.jobNameSnapshot,
-        partNumber: row.partNumberSnapshot,
-        partName: row.partNameSnapshot,
-        occurredAt: row.occurredAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
-        supervisorStatus:
-          row.approvalRoutes.find((route) => route.route === 'SUPERVISOR')?.status ??
-          'NOT_REQUIRED',
-        qcStatus:
-          row.approvalRoutes.find((route) => route.route === 'QC')?.status ?? 'NOT_REQUIRED',
-      })),
-      ...external.map((row) => {
-        const line = objectRecord(row.lineSnapshot);
-        const job = objectRecord(row.jobSnapshot);
-        const part = objectRecord(row.partSnapshot);
-        return {
-          kind: 'EXTERNAL' as const,
-          recordId: row.id,
-          supplierId: row.supplierId,
-          supplierCode: row.supplier.code,
-          supplierName: row.supplier.name,
-          sourceMode: 'EXTERNAL' as const,
-          sourceEpoch: row.sourceEpoch,
-          displayId: row.sourceHenkatenId,
-          sourceVersion: row.sourceVersion,
-          status: row.status,
-          category: row.category,
-          lineName: safeText(line['name']),
-          jobName: safeText(job['name']),
-          partNumber: safeText(part['number']),
-          partName: safeText(part['name']),
-          occurredAt: row.occurredAt.toISOString(),
-          updatedAt: row.updatedAt.toISOString(),
-        };
+        ].sort(
+          (left, right) =>
+            right.occurredAt.localeCompare(left.occurredAt) ||
+            right.recordId.localeCompare(left.recordId),
+        );
+        return { bucket, rows: mapped };
       }),
-    ]
-      .filter((row) => {
-        if (row.kind !== 'EXTERNAL') return true;
-        const lineMatches =
-          !query.line || row.lineName.toLowerCase().includes(query.line.toLowerCase());
-        const partMatches =
-          !query.part ||
-          `${row.partNumber} ${row.partName}`.toLowerCase().includes(query.part.toLowerCase());
-        return lineMatches && partMatches;
-      })
-      .sort(
-        (left, right) =>
-          right.updatedAt.localeCompare(left.updatedAt) ||
-          right.recordId.localeCompare(left.recordId),
-      );
+    );
+    const mapped = pages.flatMap((page) =>
+      page.rows.map((row) => ({ ...row, bucket: page.bucket })),
+    );
     const hasNextPage = mapped.length > query.limit;
-    const items = mapped.slice(0, query.limit);
-    const last = items.at(-1);
+    const pageRows = mapped.slice(0, query.limit);
+    const items = pageRows.map(({ bucket: _bucket, ...row }) => row);
+    const last = pageRows.at(-1);
     return {
       items,
       pageInfo: {
         hasNextPage,
         nextCursor:
           hasNextPage && last
-            ? encodeGlobalCursor({ updatedAt: last.updatedAt, id: last.recordId })
+            ? encodePriorityCursor({
+                bucket: last.bucket,
+                occurredAt: last.occurredAt,
+                id: last.recordId,
+              })
             : null,
       },
     };
@@ -1223,19 +1299,55 @@ function shiftSelectionConflict() {
   });
 }
 
-function encodeGlobalCursor(value: { updatedAt: string; id: string }): string {
+type PriorityCursor = { bucket: number; occurredAt: string; id: string };
+
+function priorityBuckets(status?: string, pcrStatus?: PcrStatus): Prisma.HenkatenWhereInput[] {
+  const open = { status: 'OPEN' as const };
+  const closed = { status: { not: 'OPEN' as const } };
+  if (status && status !== 'OPEN') return [closed];
+  if (pcrStatus) return status === 'OPEN' ? [open] : [open, closed];
+  const openPcr = { AND: [open, { pcrAssessment: { is: { status: 'PCR' as const } } }] };
+  const openOther = {
+    AND: [
+      open,
+      {
+        OR: [
+          { pcrAssessment: { is: null } },
+          { pcrAssessment: { isNot: { status: 'PCR' as const } } },
+        ],
+      },
+    ],
+  };
+  return status === 'OPEN' ? [openPcr, openOther] : [openPcr, openOther, closed];
+}
+
+function priorityKeyset(cursor: PriorityCursor) {
+  return {
+    OR: [
+      { occurredAt: { lt: new Date(cursor.occurredAt) } },
+      { occurredAt: new Date(cursor.occurredAt), id: { lt: cursor.id } },
+    ],
+  };
+}
+
+function encodePriorityCursor(value: PriorityCursor): string {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
 }
 
-function decodeGlobalCursor(value?: string): { updatedAt: Date; id: string } | undefined {
+function decodePriorityCursor(value?: string): PriorityCursor | undefined {
   if (!value) return undefined;
   try {
-    const decoded = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as {
-      updatedAt?: unknown;
-      id?: unknown;
-    };
-    if (typeof decoded.updatedAt !== 'string' || typeof decoded.id !== 'string') return undefined;
-    return { updatedAt: new Date(decoded.updatedAt), id: decoded.id };
+    const decoded = JSON.parse(
+      Buffer.from(value, 'base64url').toString('utf8'),
+    ) as Partial<PriorityCursor>;
+    if (
+      !Number.isInteger(decoded.bucket) ||
+      typeof decoded.occurredAt !== 'string' ||
+      Number.isNaN(Date.parse(decoded.occurredAt)) ||
+      typeof decoded.id !== 'string'
+    )
+      return undefined;
+    return decoded as PriorityCursor;
   } catch {
     return undefined;
   }

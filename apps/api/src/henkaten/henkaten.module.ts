@@ -10,9 +10,10 @@ import {
 } from './henkaten.controller.js';
 import { HenkatenService } from './henkaten.service.js';
 import { ApprovalService } from './approval.service.js';
+import { PcrModule } from '../pcr/pcr.module.js';
 
 @Module({
-  imports: [OperationsModule, MasterDataModule],
+  imports: [OperationsModule, MasterDataModule, PcrModule],
   controllers: [
     SupplierHenkatenController,
     TmminHenkatenController,

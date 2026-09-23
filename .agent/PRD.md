@@ -2276,7 +2276,7 @@ Metrik adoption, cycle time approval, reject rate, dan aging dipantau melalui da
 - bulk CSV/Excel import/export;
 - document/photo attachment pada Henkaten selain member photo;
 - native mobile app;
-- AI/ML/vector search;
+- AI/ML di luar penilaian indikasi PCR Henkaten; vector search;
 - supplier external assignment board di TMMIN;
 - hosted approval bagi supplier External;
 - MFA;
@@ -2382,3 +2382,37 @@ Ringkasan keputusan yang tidak boleh ditafsirkan ulang saat implementasi:
 - correction memakai Withdraw + Clone;
 - foto member opsional dengan initials fallback;
 - process difficulty dan seluruh fitur non-Henkaten tidak masuk scope.
+
+## Amendment — PCR indication for Henkaten (2026-09-23)
+
+Hosted Henkaten submission durably queues an independent PCR assessment. External ingestion queues
+the same assessment when cause, event detail, or before/after evidence changes; status-only updates
+retain the decision. Existing records are not backfilled. Assessment status (`Pending`, `PCR`,
+`No-PCR`, `Perlu tinjauan`) is independent of Henkaten Open/Closed and approval routes. PCR is an
+advisory priority for submitting a Process Change Request through the established channel; it
+neither submits nor approves a PCR and never changes Henkaten approval automatically.
+
+The local Ling inference uses OpenAI-compatible Chat Completions with one forced structured tool
+call and `max_tokens: 8192`. The English prompt covers the supplied 45-item control matrix and PCR
+guidance, explicitly handles Indonesian input as untrusted data, and distinguishes controlled
+method/material/tool/location/permanent-inspection/Safety/Regulations/Emissions changes from routine
+personnel, unchanged material lots, equivalent repair and temporary inspection. A configurable
+confidence threshold defaults to 0.75. Unavailable inference, invalid tool output, and low
+confidence result in `Perlu tinjauan`, never an automatic No-PCR. The full English assessment is
+targeted at 100–150 words and is exposed only for a current PCR decision. Confidence, raw AI
+output, prompt version and model remain server-side for audit.
+
+TMMIN Admin and Quality can correct PCR/No-PCR through a versioned mutation with a mandatory
+reason. Their decision is authoritative for display; the original AI result remains recorded.
+Supplier Line Leader, Supervisor, QC, and Admin see PCR indicators according to their existing
+Henkaten scope. TMMIN Admin/Quality see PCR and review tabs, correction controls, and dedicated
+notification tabs. All lists sort Open PCR ahead of other Open Henkaten, then Closed by occurrence
+time. The PCR tab includes both Open and Closed records. The Supplier submit screen waits for the
+assessment result and resumes after refresh. PCR detail shows the assessment and instruction to
+submit through the established route and contact TMMIN QD for technical difficulty or a suspected
+classification error. Notifications use the transactional outbox and access-scoped deep links.
+
+Local seed retains two suppliers and 240 Henkaten. It creates deterministic PCR, No-PCR, review,
+and manual-correction examples on Open and Closed records without bulk model inference. Production
+requires explicit PCR inference endpoint and credential configuration; absent or failed inference
+safely routes new assessments to TMMIN review.

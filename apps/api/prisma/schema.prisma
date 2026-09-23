@@ -78,6 +78,19 @@ enum HenkatenCategory {
   METHOD
 }
 
+enum PcrStatus {
+  PENDING
+  PCR
+  NO_PCR
+  REVIEW
+}
+
+enum PcrDecisionSource {
+  AI
+  TMMIN
+  SEED
+}
+
 enum MemberPhotoState {
   CURRENT
   PENDING_DELETE
@@ -206,6 +219,7 @@ model Supplier {
   assignmentIssues        AssignmentIssue[]
   henkatenDailySequences  HenkatenDailySequence[]
   henkatens               Henkaten[]
+  pcrAssessments          PcrAssessment[]
   mpReservations          MPReservation[]
   warningInstances        WarningInstance[]
   approvalRoutes          HenkatenApprovalRoute[]
@@ -552,6 +566,7 @@ model ExternalHenkatenProjection {
   supplier          Supplier                 @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   ingestionEvents   ExternalIngestionEvent[]
   warning           WarningInstance?
+  pcrAssessment     PcrAssessment?
 
   @@unique([id, supplierId])
   @@unique([supplierId, sourceEpoch, sourceHenkatenId])
@@ -1133,6 +1148,7 @@ model Henkaten {
   transitions                  HenkatenTransition[]
   reservation                  MPReservation?
   warning                      WarningInstance?
+  pcrAssessment                PcrAssessment?
   approvalRoutes               HenkatenApprovalRoute[]
   approvalDecisions            ApprovalDecision[]
   approvalRoutingHistory       ApprovalRouteRouting[]
@@ -1149,6 +1165,37 @@ model Henkaten {
   @@index([supplierId, lineId, occurredAt(sort: Desc)])
   @@index([supplierId, lineShiftId, effectiveStartAt, effectiveEndAt])
   @@index([supplierId, normalizedPartNumberSnapshot, status])
+}
+
+model PcrAssessment {
+  id                   String            @id @default(uuid()) @db.Uuid
+  supplierId           String            @db.Uuid
+  henkatenId           String?           @unique @db.Uuid
+  externalProjectionId String?           @unique @db.Uuid
+  status               PcrStatus         @default(PENDING)
+  decisionSource       PcrDecisionSource?
+  assessment           String?           @db.Text
+  aiNeedsPcr           Boolean?
+  aiConfidence         Float?
+  aiAssessment         String?           @db.Text
+  aiMatchedItems       Int[]             @default([])
+  model                String?           @db.VarChar(200)
+  promptVersion        String?           @db.VarChar(50)
+  inputHash            String            @db.Char(64)
+  leaseToken           String?           @db.Uuid
+  leasedAt             DateTime?         @db.Timestamptz(3)
+  attemptCount         Int               @default(0)
+  version              Int               @default(1)
+  reviewedById         String?           @db.Uuid
+  reviewedAt           DateTime?         @db.Timestamptz(3)
+  createdAt            DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
+  supplier             Supplier          @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  henkaten             Henkaten?         @relation(fields: [henkatenId], references: [id], onDelete: Restrict)
+  externalProjection   ExternalHenkatenProjection? @relation(fields: [externalProjectionId], references: [id], onDelete: Restrict)
+
+  @@index([status, leasedAt, createdAt])
+  @@index([supplierId, status, updatedAt(sort: Desc)])
 }
 
 model HenkatenChecklistSnapshot {

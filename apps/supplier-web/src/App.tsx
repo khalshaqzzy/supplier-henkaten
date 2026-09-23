@@ -15,6 +15,7 @@ import { BoardPage } from './pages/BoardPage';
 import { DefaultAssignmentsPage } from './pages/DefaultAssignmentsPage';
 import { HenkatenDetailPage, HenkatenListPage } from './pages/HenkatenPages';
 import { HenkatenCreatePage } from './pages/HenkatenCreatePage';
+import { PcrWaitPage } from './pages/PcrWaitPage';
 import {
   ChecklistDetailPage,
   ChecklistOverviewPage,
@@ -124,6 +125,14 @@ function ProductRoutes() {
           element={
             <CapabilityRoute capability="SUPPLIER_HENKATEN_SUBMIT">
               <HenkatenCreatePage clone />
+            </CapabilityRoute>
+          }
+        />
+        <Route
+          path="henkatens/:henkatenId/assessment"
+          element={
+            <CapabilityRoute capability="SUPPLIER_HENKATEN_READ">
+              <PcrWaitPage />
             </CapabilityRoute>
           }
         />

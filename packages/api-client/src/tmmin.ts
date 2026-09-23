@@ -36,6 +36,8 @@ import {
   tmminDashboardExtendedSchema,
   tmminHenkatenPageSchema,
   tmminHenkatenQuerySchema,
+  pcrAssessmentSchema,
+  pcrCorrectionRequestSchema,
   userCredentialResponseSchema,
   userPageSchema,
   userSummarySchema,
@@ -49,6 +51,7 @@ import {
   type SupplierListQuery,
   type TmminDashboardQuery,
   type TmminHenkatenQuery,
+  type PcrCorrectionRequest,
   type TmminLoginRequest,
   type UpdateSupplierRequest,
 } from '@tmmin-henkaten/contracts';
@@ -264,6 +267,19 @@ export class TmminApi {
   hostedHenkaten(supplierId: string, id: string) {
     return this.client.request(`/api/v1/tmmin/suppliers/${supplierId}/henkatens/${id}`, {
       responseSchema: henkatenDetailSchema,
+    });
+  }
+
+  correctPcr(
+    kind: 'HOSTED' | 'EXTERNAL',
+    supplierId: string,
+    id: string,
+    body: PcrCorrectionRequest,
+  ) {
+    return this.client.request(`/api/v1/tmmin/henkatens/${kind}/${supplierId}/${id}/pcr-decision`, {
+      method: 'POST',
+      body: pcrCorrectionRequestSchema.parse(body),
+      responseSchema: pcrAssessmentSchema,
     });
   }
 

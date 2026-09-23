@@ -222,6 +222,7 @@ export interface paths {
                 | 'SUPPLIER_HENKATEN_DECIDE'
                 | 'SUPPLIER_APPROVAL_REROUTE'
                 | 'TMMIN_HENKATEN_READ'
+                | 'TMMIN_PCR_CORRECT'
                 | 'SUPPLIER_NOTIFICATION_READ'
                 | 'SUPPLIER_BOARD_READ'
                 | 'SUPPLIER_BOARD_LAYOUT_MANAGE'
@@ -376,6 +377,7 @@ export interface paths {
                 | 'SUPPLIER_HENKATEN_DECIDE'
                 | 'SUPPLIER_APPROVAL_REROUTE'
                 | 'TMMIN_HENKATEN_READ'
+                | 'TMMIN_PCR_CORRECT'
                 | 'SUPPLIER_NOTIFICATION_READ'
                 | 'SUPPLIER_BOARD_READ'
                 | 'SUPPLIER_BOARD_LAYOUT_MANAGE'
@@ -521,6 +523,7 @@ export interface paths {
                 | 'SUPPLIER_HENKATEN_DECIDE'
                 | 'SUPPLIER_APPROVAL_REROUTE'
                 | 'TMMIN_HENKATEN_READ'
+                | 'TMMIN_PCR_CORRECT'
                 | 'SUPPLIER_NOTIFICATION_READ'
                 | 'SUPPLIER_BOARD_READ'
                 | 'SUPPLIER_BOARD_LAYOUT_MANAGE'
@@ -668,6 +671,7 @@ export interface paths {
                 | 'SUPPLIER_HENKATEN_DECIDE'
                 | 'SUPPLIER_APPROVAL_REROUTE'
                 | 'TMMIN_HENKATEN_READ'
+                | 'TMMIN_PCR_CORRECT'
                 | 'SUPPLIER_NOTIFICATION_READ'
                 | 'SUPPLIER_BOARD_READ'
                 | 'SUPPLIER_BOARD_LAYOUT_MANAGE'
@@ -10642,6 +10646,7 @@ export interface paths {
           to?: string;
           approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NOT_REQUIRED';
           approvalRoute?: 'SUPERVISOR' | 'QC';
+          pcrStatus?: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
         };
         header?: never;
         path?: never;
@@ -10744,6 +10749,15 @@ export interface paths {
                   };
                 };
                 version: number;
+                pcr: {
+                  /** @enum {string} */
+                  status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                  decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                  assessment: string | null;
+                  version: number;
+                  /** Format: date-time */
+                  updatedAt: string;
+                } | null;
               }[];
               pageInfo: {
                 nextCursor: string | null;
@@ -10962,6 +10976,15 @@ export interface paths {
                 };
               };
               version: number;
+              pcr: {
+                /** @enum {string} */
+                status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                assessment: string | null;
+                version: number;
+                /** Format: date-time */
+                updatedAt: string;
+              } | null;
               timezone: string;
               shiftName: string;
               creatorName: string;
@@ -11293,6 +11316,15 @@ export interface paths {
                 };
               };
               version: number;
+              pcr: {
+                /** @enum {string} */
+                status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                assessment: string | null;
+                version: number;
+                /** Format: date-time */
+                updatedAt: string;
+              } | null;
               timezone: string;
               shiftName: string;
               creatorName: string;
@@ -11600,6 +11632,15 @@ export interface paths {
                 };
               };
               version: number;
+              pcr: {
+                /** @enum {string} */
+                status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                assessment: string | null;
+                version: number;
+                /** Format: date-time */
+                updatedAt: string;
+              } | null;
               timezone: string;
               shiftName: string;
               creatorName: string;
@@ -11857,6 +11898,15 @@ export interface paths {
                 };
               };
               version: number;
+              pcr: {
+                /** @enum {string} */
+                status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                assessment: string | null;
+                version: number;
+                /** Format: date-time */
+                updatedAt: string;
+              } | null;
               timezone: string;
               shiftName: string;
               creatorName: string;
@@ -12113,6 +12163,15 @@ export interface paths {
                 };
               };
               version: number;
+              pcr: {
+                /** @enum {string} */
+                status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                assessment: string | null;
+                version: number;
+                /** Format: date-time */
+                updatedAt: string;
+              } | null;
               timezone: string;
               shiftName: string;
               creatorName: string;
@@ -12395,6 +12454,7 @@ export interface paths {
           to?: string;
           approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NOT_REQUIRED';
           approvalRoute?: 'SUPERVISOR' | 'QC';
+          pcrStatus?: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
         };
         header?: never;
         path: {
@@ -12499,6 +12559,15 @@ export interface paths {
                   };
                 };
                 version: number;
+                pcr: {
+                  /** @enum {string} */
+                  status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                  decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                  assessment: string | null;
+                  version: number;
+                  /** Format: date-time */
+                  updatedAt: string;
+                } | null;
               }[];
               pageInfo: {
                 nextCursor: string | null;
@@ -12784,6 +12853,15 @@ export interface paths {
                 };
               };
               version: number;
+              pcr: {
+                /** @enum {string} */
+                status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                assessment: string | null;
+                version: number;
+                /** Format: date-time */
+                updatedAt: string;
+              } | null;
               timezone: string;
               shiftName: string;
               creatorName: string;
@@ -13088,6 +13166,7 @@ export interface paths {
           cursor?: string;
           limit?: number;
           unreadOnly?: 'true' | 'false';
+          pcrTab?: 'PCR' | 'REVIEW';
         };
         header?: never;
         path?: never;
@@ -13118,7 +13197,10 @@ export interface paths {
                   | 'SHIFT_OVERRIDE'
                   | 'EXTERNAL_WARNING'
                   | 'EXTERNAL_INGESTION_ERROR'
-                  | 'SECURITY';
+                  | 'SECURITY'
+                  | 'PCR_FLAGGED'
+                  | 'PCR_REVIEW_REQUIRED'
+                  | 'PCR_CORRECTED';
                 title: string;
                 body: string;
                 resourceType: string;
@@ -13236,7 +13318,10 @@ export interface paths {
                 | 'SHIFT_OVERRIDE'
                 | 'EXTERNAL_WARNING'
                 | 'EXTERNAL_INGESTION_ERROR'
-                | 'SECURITY';
+                | 'SECURITY'
+                | 'PCR_FLAGGED'
+                | 'PCR_REVIEW_REQUIRED'
+                | 'PCR_CORRECTED';
               title: string;
               body: string;
               resourceType: string;
@@ -15093,6 +15178,7 @@ export interface paths {
           category?: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
           line?: string;
           part?: string;
+          pcrStatus?: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
         };
         header?: never;
         path?: never;
@@ -15130,6 +15216,15 @@ export interface paths {
                     occurredAt: string;
                     /** Format: date-time */
                     updatedAt: string;
+                    pcr: {
+                      /** @enum {string} */
+                      status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                      decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                      assessment: string | null;
+                      version: number;
+                      /** Format: date-time */
+                      updatedAt: string;
+                    } | null;
                     /** @constant */
                     kind: 'HOSTED';
                     displayId: string;
@@ -15160,6 +15255,15 @@ export interface paths {
                     occurredAt: string;
                     /** Format: date-time */
                     updatedAt: string;
+                    pcr: {
+                      /** @enum {string} */
+                      status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                      decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                      assessment: string | null;
+                      version: number;
+                      /** Format: date-time */
+                      updatedAt: string;
+                    } | null;
                     /** @constant */
                     kind: 'EXTERNAL';
                     displayId: string;
@@ -15183,6 +15287,107 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/tmmin/henkatens/{kind}/{supplierId}/{recordId}/pcr-decision': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          kind: 'HOSTED' | 'EXTERNAL';
+          supplierId: string;
+          recordId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @enum {string} */
+            status: 'PCR' | 'NO_PCR';
+            reason: string;
+            expectedVersion: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Corrected PCR decision */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {string} */
+              status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+              decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+              assessment: string | null;
+              version: number;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/tmmin/notifications': {
     parameters: {
       query?: never;
@@ -15196,6 +15401,7 @@ export interface paths {
           cursor?: string;
           limit?: number;
           unreadOnly?: 'true' | 'false';
+          pcrTab?: 'PCR' | 'REVIEW';
         };
         header?: never;
         path?: never;
@@ -15226,7 +15432,10 @@ export interface paths {
                   | 'SHIFT_OVERRIDE'
                   | 'EXTERNAL_WARNING'
                   | 'EXTERNAL_INGESTION_ERROR'
-                  | 'SECURITY';
+                  | 'SECURITY'
+                  | 'PCR_FLAGGED'
+                  | 'PCR_REVIEW_REQUIRED'
+                  | 'PCR_CORRECTED';
                 title: string;
                 body: string;
                 resourceType: string;
@@ -15344,7 +15553,10 @@ export interface paths {
                 | 'SHIFT_OVERRIDE'
                 | 'EXTERNAL_WARNING'
                 | 'EXTERNAL_INGESTION_ERROR'
-                | 'SECURITY';
+                | 'SECURITY'
+                | 'PCR_FLAGGED'
+                | 'PCR_REVIEW_REQUIRED'
+                | 'PCR_CORRECTED';
               title: string;
               body: string;
               resourceType: string;
@@ -15914,6 +16126,15 @@ export interface paths {
                 occurredAt: string;
                 /** Format: date-time */
                 updatedAt: string;
+                pcr: {
+                  /** @enum {string} */
+                  status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                  decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                  assessment: string | null;
+                  version: number;
+                  /** Format: date-time */
+                  updatedAt: string;
+                } | null;
               }[];
               pageInfo: {
                 nextCursor: string | null;
@@ -15994,6 +16215,15 @@ export interface paths {
               occurredAt: string;
               /** Format: date-time */
               updatedAt: string;
+              pcr: {
+                /** @enum {string} */
+                status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                assessment: string | null;
+                version: number;
+                /** Format: date-time */
+                updatedAt: string;
+              } | null;
               change: {
                 [key: string]: unknown;
               };

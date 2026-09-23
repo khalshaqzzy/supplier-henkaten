@@ -327,6 +327,7 @@ describe('Supplier application foundation', () => {
         qc: route('QC', 'PENDING'),
       },
       version: 2,
+      pcr: null,
       timezone: 'Asia/Jakarta',
       shiftName: 'Shift Pagi',
       creatorName: 'Line Leader',

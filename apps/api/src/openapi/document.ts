@@ -1,4 +1,6 @@
 import {
+  pcrAssessmentSchema,
+  pcrCorrectionRequestSchema,
   tanokoMatrixSchema,
   tanokoMappingSchema,
   tanokoSaveSchema,
@@ -580,6 +582,19 @@ function readModelPaths() {
         responses: {
           '200': json('Global Hosted and External Henkaten explorer', tmminHenkatenPageSchema),
         },
+      },
+    },
+    '/api/v1/tmmin/henkatens/{kind}/{supplierId}/{recordId}/pcr-decision': {
+      post: {
+        requestParams: {
+          path: z.object({
+            kind: z.enum(['HOSTED', 'EXTERNAL']),
+            supplierId: z.string().uuid(),
+            recordId: z.string().uuid(),
+          }),
+        },
+        requestBody: body(pcrCorrectionRequestSchema),
+        responses: { '200': json('Corrected PCR decision', pcrAssessmentSchema), '409': problem },
       },
     },
     '/api/v1/tmmin/notifications': {

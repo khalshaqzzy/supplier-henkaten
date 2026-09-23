@@ -14,6 +14,7 @@ import {
 } from '@tmmin-henkaten/contracts';
 
 import { PrismaClient } from '../generated/prisma/client.js';
+import { PCR_PROMPT_VERSION } from '../pcr/pcr-prompt.js';
 import {
   LOCAL_SEED_HENKATEN_PER_SUPPLIER,
   LOCAL_SEED_HISTORICAL_SHIFT_COUNT,
@@ -201,6 +202,7 @@ async function main() {
     for (const plan of createLocalSeedPlan()) {
       const runtime = await provisionSupplier(plan, tmmin, manifest, portraits);
       await seedHenkatens(prisma, runtime);
+      await seedPcrExamples(prisma, runtime);
       await seedCanvasLayouts(runtime);
       runtimes.push(runtime);
     }
@@ -708,6 +710,203 @@ async function seedHenkatens(prisma: PrismaClient, runtime: SupplierRuntime) {
   }
 }
 
+const assignedPcrSeedExamples = new Map<string, Set<number>>();
+const pcrSeedNarratives = [
+  {
+    category: 'MACHINE',
+    open: true,
+    cause: 'Pemasangan torque tool baru dengan merek dan karakteristik kontrol berbeda',
+    detail:
+      'Nut runner lama diganti dengan tool baru; metode pengencangan, setting torsi, dan validasi kualitas pada part produksi massal berubah.',
+    affectedObject: 'Nut runner lama',
+    replacementObject: 'Torque tool dengan merek dan karakteristik baru',
+  },
+  {
+    category: 'METHOD',
+    open: false,
+    cause: 'Perubahan metode produksi pada proses pengelasan',
+    detail:
+      'Supplier mengubah parameter arus dan kecepatan welding pada part mass production untuk menyesuaikan proses baru.',
+    affectedObject: 'Parameter welding disetujui sebelumnya',
+    replacementObject: 'Arus dan kecepatan welding baru',
+  },
+  {
+    category: 'MATERIAL',
+    open: true,
+    cause: 'Penggunaan material pengganti pada proses produksi',
+    detail:
+      'Informasi perubahan spesifikasi dan sumber material belum lengkap; perlu konfirmasi apakah hanya lot baru atau perubahan material.',
+    affectedObject: 'Material yang disetujui',
+    replacementObject: 'Material pengganti belum teridentifikasi',
+  },
+  {
+    category: 'MACHINE',
+    open: false,
+    cause: 'Perbaikan tool dengan komponen pengganti',
+    detail:
+      'Belum jelas apakah bentuk dan fungsi tool tetap sesuai approval awal atau mengalami modifikasi.',
+    affectedObject: 'Tool sebelum perbaikan',
+    replacementObject: 'Tool setelah penggantian komponen',
+  },
+  {
+    category: 'MATERIAL',
+    open: false,
+    cause: 'Perubahan spesifikasi raw material untuk part produksi massal',
+    detail:
+      'Grade bahan baku dan pemasok material berubah dari spesifikasi yang sebelumnya disetujui.',
+    affectedObject: 'Grade dan pemasok lama',
+    replacementObject: 'Grade dan pemasok baru',
+  },
+  {
+    category: 'MATERIAL',
+    open: true,
+    cause: 'Pergantian lot material sesuai FIFO',
+    detail:
+      'Lot baru berasal dari pemasok dan grade yang sama, dengan spesifikasi tetap; traceability dan incoming inspection sudah diverifikasi.',
+    affectedObject: 'Lot sebelumnya',
+    replacementObject: 'Lot berikutnya dengan spesifikasi sama',
+  },
+] as const;
+
+function selectPcrSeedNarrative(runtime: SupplierRuntime, record: SeedHenkatenPlan) {
+  const assigned = assignedPcrSeedExamples.get(runtime.plan.code) ?? new Set<number>();
+  assignedPcrSeedExamples.set(runtime.plan.code, assigned);
+  const index = pcrSeedNarratives.findIndex(
+    (example, candidate) =>
+      !assigned.has(candidate) &&
+      example.category === record.category &&
+      example.open === record.outcome.startsWith('OPEN_'),
+  );
+  if (index < 0) return null;
+  assigned.add(index);
+  return pcrSeedNarratives[index]!;
+}
+
+async function seedPcrExamples(prisma: PrismaClient, runtime: SupplierRuntime) {
+  const supplierId = runtime.supplier.id;
+  await prisma.pcrAssessment.updateMany({
+    where: { supplierId, status: 'PENDING' },
+    data: {
+      status: 'NO_PCR',
+      decisionSource: 'SEED',
+      aiNeedsPcr: false,
+      aiConfidence: 0.94,
+      model: 'local-seed-fixture',
+      promptVersion: PCR_PROMPT_VERSION,
+    },
+  });
+  const examples = [
+    {
+      category: 'MACHINE',
+      open: true,
+      status: 'PCR',
+      cause: 'Pemasangan torque tool baru dengan merek dan karakteristik kontrol berbeda',
+      detail:
+        'Nut runner lama diganti dengan tool baru; metode pengencangan, setting torsi, dan validasi kualitas pada part produksi massal berubah.',
+      assessment:
+        'The supplier is introducing a different torque tool and changing the equipment settings used for a mass production part. This is a controlled process change rather than routine replacement or restoration of the same tool to its approved condition. The reported change matches the control items for tool replacement and equipment setting changes, both of which require a Process Change Request. The supplier should submit a PCR through the established channel before implementing the change and prepare evidence for the revised torque settings, first part verification, and traceability of affected production. TMMIN QD should review the proposed controls and approval requirements. This assessment indicates that PCR follow up is needed; it does not grant approval to implement the change.',
+    },
+    {
+      category: 'METHOD',
+      open: false,
+      status: 'PCR',
+      cause: 'Perubahan metode produksi pada proses pengelasan',
+      detail:
+        'Supplier mengubah parameter arus dan kecepatan welding pada part mass production untuk menyesuaikan proses baru.',
+      assessment:
+        'The event describes a change to welding current and process speed for an existing mass production part. These parameters define the manufacturing method and can affect the resulting joint quality, so this is a process change under the manufacturing method control item. It is not a temporary check or an ordinary return to a previously approved setting. A Process Change Request should be submitted through the established channel before the revised method is implemented. The supplier should document the former and proposed settings, affected part numbers, change timing, validation results, and traceability of parts produced during the transition. TMMIN QD should confirm the applicable review and approval steps. This is an indication for follow up, not an approval of the new process.',
+    },
+    {
+      category: 'MATERIAL',
+      open: true,
+      status: 'REVIEW',
+      cause: 'Penggunaan material pengganti pada proses produksi',
+      detail:
+        'Informasi perubahan spesifikasi dan sumber material belum lengkap; perlu konfirmasi apakah hanya lot baru atau perubahan material.',
+    },
+    {
+      category: 'MACHINE',
+      open: false,
+      status: 'REVIEW',
+      cause: 'Perbaikan tool dengan komponen pengganti',
+      detail:
+        'Belum jelas apakah bentuk dan fungsi tool tetap sesuai approval awal atau mengalami modifikasi.',
+    },
+    {
+      category: 'MATERIAL',
+      open: false,
+      status: 'PCR',
+      manual: true,
+      cause: 'Perubahan spesifikasi raw material untuk part produksi massal',
+      detail:
+        'Grade bahan baku dan pemasok material berubah dari spesifikasi yang sebelumnya disetujui.',
+      assessment:
+        'TMMIN QD menetapkan PCR karena spesifikasi dan sumber raw material berubah untuk part produksi massal. Supplier perlu mengajukan PCR melalui jalur yang berlaku sebelum implementasi.',
+    },
+    {
+      category: 'MATERIAL',
+      open: true,
+      status: 'NO_PCR',
+      manual: true,
+      cause: 'Pergantian lot material sesuai FIFO',
+      detail:
+        'Lot baru berasal dari pemasok dan grade yang sama, dengan spesifikasi tetap; traceability dan incoming inspection sudah diverifikasi.',
+    },
+  ] as const;
+  for (const [index, example] of examples.entries()) {
+    const record = await prisma.henkaten.findFirst({
+      where: {
+        supplierId,
+        category: example.category,
+        cause: example.cause,
+        status: example.open ? 'OPEN' : { not: 'OPEN' },
+      },
+    });
+    if (!record) throw new Error(`No Henkaten available for PCR seed example ${index}.`);
+    await prisma.$transaction(async (tx) => {
+      await tx.pcrAssessment.update({
+        where: { henkatenId: record.id },
+        data: {
+          status: example.status,
+          decisionSource: 'manual' in example ? 'TMMIN' : 'SEED',
+          assessment: 'assessment' in example ? example.assessment : null,
+          aiNeedsPcr: 'manual' in example ? example.status === 'NO_PCR' : example.status === 'PCR',
+          aiConfidence: example.status === 'REVIEW' ? 0.56 : 0.93,
+          aiAssessment:
+            'assessment' in example && !('manual' in example) ? example.assessment : null,
+          aiMatchedItems:
+            example.status === 'PCR'
+              ? [example.category === 'MACHINE' ? 27 : example.category === 'METHOD' ? 20 : 35]
+              : [],
+          reviewedAt: 'manual' in example ? new Date() : null,
+          version: { increment: 'manual' in example ? 2 : 1 },
+        },
+      });
+      if ('manual' in example)
+        await tx.auditEvent.create({
+          data: {
+            actorKind: 'USER',
+            actorRole: 'TMMIN_QUALITY',
+            supplierId,
+            action: 'PCR_DECISION_CORRECTED',
+            resourceType: 'Henkaten',
+            resourceId: record.id,
+            changeSummary: {
+              from: example.status === 'PCR' ? 'NO_PCR' : 'PCR',
+              to: example.status,
+              reason:
+                example.status === 'PCR'
+                  ? example.assessment
+                  : 'Lot baru masih dalam spesifikasi dan sumber yang sama.',
+            },
+            correlationId: `local-pcr-example-${runtime.plan.code}-${index}`,
+            result: 'SUCCESS',
+          },
+        });
+    });
+  }
+}
+
 async function currentOccurrence(leader: SessionClient): Promise<LineShiftOccurrence> {
   const context = await leader.api.request<{
     currentLineShiftIds: string[];
@@ -738,7 +937,9 @@ async function createSeedHenkaten(
   const assignment = occurrence.assignments.find(({ jobId }) => jobId === job.id);
   if (!assignment) throw new Error('Seed job is missing from the current Line Shift assignment.');
   const checklist = runtime.checklists[record.category];
-  const narrative = henkatenNarrative(record.category, record.narrativeVariant ?? ordinal);
+  const narrative =
+    selectPcrSeedNarrative(runtime, record) ??
+    henkatenNarrative(record.category, record.narrativeVariant ?? ordinal);
   const base = {
     lineShiftId: occurrence.id,
     jobId: job.id,

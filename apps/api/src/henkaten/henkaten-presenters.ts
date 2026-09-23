@@ -8,11 +8,13 @@ import type {
   MPReservation,
   ApprovalDecision,
   AssignmentMovement,
+  PcrAssessment,
 } from '../generated/prisma/client.js';
 import { databaseDate } from '../shifts/shift-time.js';
+import { presentPcrAssessment } from '../pcr/pcr.service.js';
 
 type RouteRow = HenkatenApprovalRoute & { decision: ApprovalDecision | null };
-type SummaryRow = Henkaten & { approvalRoutes: RouteRow[] };
+type SummaryRow = Henkaten & { approvalRoutes: RouteRow[]; pcrAssessment: PcrAssessment | null };
 
 export function routeSummary(routes: RouteRow[]) {
   const supervisor = routes.find(({ route }) => route === 'SUPERVISOR');
@@ -43,10 +45,12 @@ export function presentHenkatenSummary(row: SummaryRow) {
     part: { number: row.partNumberSnapshot, name: row.partNameSnapshot },
     routes: routeSummary(row.approvalRoutes),
     version: row.version,
+    pcr: presentPcrAssessment(row.pcrAssessment),
   };
 }
 
 type DetailRow = Henkaten & {
+  pcrAssessment: PcrAssessment | null;
   checklistSnapshot: (HenkatenChecklistSnapshot & { answers: HenkatenChecklistAnswer[] }) | null;
   manDetail: ManHenkatenDetail | null;
   reservation: MPReservation | null;
@@ -127,6 +131,7 @@ export function presentHenkatenDetail(row: DetailRow) {
 }
 
 export const henkatenDetailInclude = {
+  pcrAssessment: true,
   checklistSnapshot: {
     include: { answers: { orderBy: { displayOrderSnapshot: 'asc' as const } } },
   },
