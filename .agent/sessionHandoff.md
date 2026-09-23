@@ -530,6 +530,11 @@ active-shift dependency, MP reservation, MP exclusivity, and donor-vacancy casca
 owns shift-specific Supervisor, Line Leader, and per-job MP defaults; only Supplier Admin may edit.
 Active schedules on one line cannot overlap.
 
+UI copy rule: keep only labels, values, statuses, errors, and action-critical instructions. Remove
+explanatory typography about system behavior or technical guarantees (such as lifecycle, hosting,
+immutability, session storage, and server-side validation); assume operators know the workflow.
+Apply this consistently to existing and new components while keeping the screens polished.
+
 Henkaten submission resolves a clock-derived occurrence. During an interval it auto-selects the
 current Line–Shift; outside an interval the LL selects a shift and the effect starts at its next
 scheduled start. Man replacement applies immediately to that occurrence and checks only active MP

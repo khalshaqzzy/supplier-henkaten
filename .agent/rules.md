@@ -270,6 +270,13 @@ When updating `.agent`:
 - avoid unsupported assumptions about hospital policy, external integrations, or clinical validation
 - keep deployment secrets out of repo docs except as names/placeholders
 
+For product UI, keep copy limited to labels, values, statuses, errors, and instructions needed to
+complete an action or make a decision. Do not add explanatory typography that describes internal
+behavior, architecture, or guarantees the user does not need to act on (for example lifecycle,
+hosting, immutability, session storage, or server-side validation). Prefer concise, familiar
+language; assume users understand the operational workflow. Apply this rule to existing components
+when editing their screens, not only to new UI.
+
 ## 10. Required End-of-session Updates
 
 After every substantive task/session, update:
