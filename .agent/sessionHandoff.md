@@ -2,7 +2,8 @@
 
 Date: 2026-09-23
 Branch: `feat/update-mp-card-on-board`
-Status: implemented and locally verified; PR to `staging` pending. No deployment claim.
+Status: implemented and locally verified; PR #19 to `staging` is open. No deployment claim.
+PR: https://github.com/khalshaqzzy/supplier-henkaten/pull/19
 
 The Supplier Canvas `JOB_SLOT` card now centers 26-pixel 4M dots in the white row between the
 assignment badge and the portrait. The photo begins lower, while its bottom edge and the MP identity
@@ -27,7 +28,8 @@ staging env validation, remote Compose config, and high-severity dependency audi
 existing high-severity exception). The deployment harness and security-exception check require
 `jq`, which is unavailable in the host Git Bash environment. Database integration and isolated
 browser journeys were not rerun for this Canvas-only rendering change. No PR check monitoring is
-requested. Next: commit, push this branch, open the PR to `staging`, and append its link here.
+requested. The implementation commit passed Gitleaks v8.24.3 commit scanning. Next: review PR #19;
+do not claim staging deployment until a separate release action has completed.
 
 ---
 
