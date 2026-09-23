@@ -20,6 +20,7 @@ import {
   userSummarySchema,
 } from './administration.js';
 import { hostedPreparationSchema, temporaryCredentialSchema } from './administration.js';
+import { pcrAssessmentSchema, pcrStatusSchema } from './pcr.js';
 
 export const tmminListStatusSchema = z.enum(['ALL', 'ACTIVE', 'INACTIVE']);
 export const supplierListSortSchema = z.enum(['NAME_ASC', 'UPDATED_DESC']);
@@ -275,6 +276,7 @@ export const tmminHenkatenQuerySchema = z
     category: henkatenCategorySchema.optional(),
     line: z.string().trim().min(1).max(200).optional(),
     part: z.string().trim().min(1).max(200).optional(),
+    pcrStatus: pcrStatusSchema.optional(),
   })
   .strict();
 export type TmminHenkatenQuery = z.infer<typeof tmminHenkatenQuerySchema>;
@@ -294,6 +296,7 @@ const tmminHenkatenBase = {
   partName: z.string(),
   occurredAt: utcTimestampSchema,
   updatedAt: utcTimestampSchema,
+  pcr: pcrAssessmentSchema.nullable(),
 };
 
 export const tmminHenkatenSummarySchema = z.discriminatedUnion('kind', [

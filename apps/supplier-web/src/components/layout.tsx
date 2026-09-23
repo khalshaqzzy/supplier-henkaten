@@ -10,7 +10,6 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
-  Settings2,
   ShieldCheck,
   UserRound,
   UsersRound,
@@ -87,13 +86,6 @@ const navigation: NavigationItem[] = [
     label: 'Tanoko',
     capability: 'SUPPLIER_TANOKO_READ',
     icon: Grid2X2,
-    group: 'OPERASIONAL',
-  },
-  {
-    to: '/shifts',
-    label: 'Shift',
-    capability: 'SUPPLIER_SHIFT_READ',
-    icon: Settings2,
     group: 'OPERASIONAL',
   },
   {
@@ -255,7 +247,7 @@ export function ProductLayout() {
         >
           <X />
         </IconButton>
-        <BrandLockup context={preparation ? 'Hosted Preparation' : 'Supplier Portal'} />
+        <BrandLockup context={preparation ? 'Persiapan Supplier' : 'Supplier Portal'} />
         <div className="product-workspace">
           <span>{supplier.code}</span>
           <strong>{supplier.name}</strong>
@@ -306,7 +298,6 @@ export function ProductLayout() {
             <Factory aria-hidden="true" />
             <span>
               <strong>{supplier.sourceMode}</strong>
-              <small>Source epoch {supplier.sourceEpoch}</small>
             </span>
           </div>
         </div>

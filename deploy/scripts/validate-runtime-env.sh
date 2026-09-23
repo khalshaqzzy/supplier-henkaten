@@ -35,6 +35,13 @@ done
 [[ "${CADDY_SCHEME:-}" == "" || "${CADDY_SCHEME}" == "http://" ]] || die "CADDY_SCHEME must be empty or http://."
 [[ "${PUBLISHED_HTTP_PORT:-}" =~ ^[0-9]+$ && "${PUBLISHED_HTTPS_PORT:-}" =~ ^[0-9]+$ ]] || die "Published Caddy ports must be numeric."
 [[ "${PUSH_ENABLED:-false}" =~ ^(true|false)$ ]] || die "PUSH_ENABLED must be true or false."
+if [[ -n "${PCR_OPENAI_API_KEY:-}" ]]; then
+  [[ "${PCR_OPENAI_BASE_URL:-}" =~ ^https://[A-Za-z0-9.-]+(/[A-Za-z0-9._/-]*)?$ ]] || die "PCR_OPENAI_BASE_URL is invalid."
+  [[ "${PCR_OPENAI_API_KEY}" =~ ^[A-Za-z0-9_+/=-]{16,}$ ]] || die "PCR_OPENAI_API_KEY is invalid."
+  [[ "${PCR_OPENAI_MODEL:-}" =~ ^[A-Za-z0-9._/-]+$ ]] || die "PCR_OPENAI_MODEL is invalid."
+  [[ "${PCR_CONFIDENCE_THRESHOLD:-}" =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]] || die "PCR_CONFIDENCE_THRESHOLD is invalid."
+  [[ "${PCR_INFERENCE_TIMEOUT_MS:-}" =~ ^[1-9][0-9]*$ && "${PCR_WORKER_POLL_MS:-}" =~ ^[1-9][0-9]*$ && "${PCR_WORKER_ENABLED:-}" =~ ^(true|false)$ ]] || die "PCR worker settings are invalid."
+fi
 if [[ "${PUSH_ENABLED:-false}" == "true" ]]; then
   [[ "${PUSH_VAPID_PUBLIC_KEY:-}" =~ ^[A-Za-z0-9_-]{40,512}$ ]] || die "PUSH_VAPID_PUBLIC_KEY is invalid."
   [[ "${PUSH_VAPID_PRIVATE_KEY:-}" =~ ^[A-Za-z0-9_-]{20,512}$ ]] || die "PUSH_VAPID_PRIVATE_KEY is invalid."

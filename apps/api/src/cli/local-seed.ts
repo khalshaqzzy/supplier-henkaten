@@ -8,13 +8,13 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import sharp from 'sharp';
 
 import {
-  boardLayoutDocumentSchema,
   type BoardLayoutDocument,
-  type TanokoMatrix,
   type TanokoMapping,
+  type TanokoMatrix,
 } from '@tmmin-henkaten/contracts';
 
 import { PrismaClient } from '../generated/prisma/client.js';
+import { PCR_PROMPT_VERSION } from '../pcr/pcr-prompt.js';
 import {
   LOCAL_SEED_HENKATEN_PER_SUPPLIER,
   LOCAL_SEED_HISTORICAL_SHIFT_COUNT,
@@ -48,19 +48,27 @@ type Session = {
 type SessionClient = { api: ApiSession; csrf: string; account: AccountRecord };
 type Resource = { id: string; version: number };
 type MemberResource = Resource & { fullName?: string };
-type ShiftResource = Resource & {
-  status: string;
-  workingAssignments: AssignmentResource[];
+type LineShiftDefinition = Resource & {
+  lineId: string;
+  shiftTemplateId: string;
+  shiftName: string;
+  startTime: string;
+  endTime: string;
+  timezone: string;
+  assignments: Array<{
+    id: string;
+    jobId: string;
+    mpMemberId: string | null;
+  }>;
 };
-type AssignmentResource = {
-  id: string;
-  jobId: string;
-  version: number;
-  effectiveMpMemberId: string | null;
+type LineShiftOccurrence = LineShiftDefinition & {
+  current: boolean;
+  effectiveStartAt: string;
+  effectiveEndAt: string;
 };
 type HenkatenResource = Resource & {
+  shiftRunId: string;
   status: string;
-  clonedFromHenkatenId?: string | null;
 };
 type SupplierRuntime = {
   plan: SupplierSeedPlan;
@@ -74,6 +82,7 @@ type SupplierRuntime = {
   jobs: Resource[][];
   parts: Resource[];
   shifts: Resource[];
+  lineShifts: LineShiftDefinition[][];
   checklists: Record<SeedCategory, Resource & { itemIds: string[] }>;
 };
 type Manifest = {
@@ -192,22 +201,23 @@ async function main() {
     const runtimes: SupplierRuntime[] = [];
     for (const plan of createLocalSeedPlan()) {
       const runtime = await provisionSupplier(plan, tmmin, manifest, portraits);
-      await seedHistorical(runtime);
-      await seedLive(runtime);
+      await seedHenkatens(prisma, runtime);
+      await seedPcrExamples(prisma, runtime);
       await seedCanvasLayouts(runtime);
       runtimes.push(runtime);
     }
     await waitForOutbox(prisma);
-    for (const runtime of runtimes) {
-      await markOneNotificationRead(runtime);
-    }
+    await markOneNotificationRead(runtimes[0]!);
     await waitForOutbox(prisma);
-    await normalizeHistoricalTimeline(prisma);
     await verifySeed(prisma);
+    for (const runtime of runtimes) await verifySeedDashboard(runtime);
     await writeManifest(manifest);
-    const summary = localSeedSummary(createLocalSeedPlan());
+    const seededHenkaten = localSeedSummary(createLocalSeedPlan()).reduce(
+      (total, item) => total + item.henkaten,
+      0,
+    );
     process.stdout.write(
-      `Local seed complete: 2 Hosted suppliers, ${summary.reduce((total, item) => total + item.henkaten, 0)} Henkaten. Credentials: ${credentialPath}\n`,
+      `Local seed complete: 2 Hosted suppliers, ${seededHenkaten} Henkaten, and Line Shift configuration. Credentials: ${credentialPath}\n`,
     );
   } finally {
     await prisma.$disconnect();
@@ -485,23 +495,47 @@ async function provisionSupplier(
       itemIds: published.items.map(({ id }) => id),
     };
   }
+  const lineShifts: LineShiftDefinition[][] = [];
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
-    await admin.api.request(
-      'POST',
-      `/api/v1/supplier/master-data/lines/${lines[lineIndex]!.id}/default-supervisor`,
-      { memberId: supervisors[lineIndex % supervisors.length]!.memberId },
-      admin.csrf,
-    );
-    await admin.api.request(
-      'POST',
-      `/api/v1/supplier/master-data/lines/${lines[lineIndex]!.id}/default-line-leader`,
-      { memberId: leaders[lineIndex]!.memberId },
-      admin.csrf,
-    );
     for (let jobIndex = 0; jobIndex < jobs[lineIndex]!.length; jobIndex += 1) {
-      if (lineIndex === 0 && jobIndex === 0) continue;
-      await assignDefaultMp(admin, jobs[lineIndex]![jobIndex]!, mps[lineIndex * 4 + jobIndex]!);
+      const mp = mps[lineIndex * 4 + jobIndex]!;
+      await ensureSeedQualification(
+        admin,
+        mp.id,
+        jobs[lineIndex]![jobIndex]!.id,
+        'Asesmen sintetis: MP memenuhi kompetensi minimal level 3 pada assignment Line Shift.',
+      );
     }
+    const configuredLineShifts: LineShiftDefinition[] = [];
+    for (const shift of shifts) {
+      const lineShift = await admin.api.request<{
+        id: string;
+        version: number;
+        assignments: Array<{ jobId: string }>;
+      }>(
+        'POST',
+        `/api/v1/supplier/master-data/lines/${lines[lineIndex]!.id}/shifts`,
+        { shiftTemplateId: shift.id },
+        admin.csrf,
+      );
+      configuredLineShifts.push(
+        await admin.api.request<LineShiftDefinition>(
+          'PATCH',
+          `/api/v1/supplier/master-data/line-shifts/${lineShift.id}/assignments`,
+          {
+            expectedVersion: lineShift.version,
+            supervisorMemberId: supervisors[lineIndex % supervisors.length]!.memberId,
+            lineLeaderMemberId: leaders[lineIndex]!.memberId,
+            jobs: lineShift.assignments.map(({ jobId }, jobIndex) => ({
+              jobId,
+              mpMemberId: mps[(lineIndex * 4 + jobIndex) % mps.length]!.id,
+            })),
+          },
+          admin.csrf,
+        ),
+      );
+    }
+    lineShifts.push(configuredLineShifts);
   }
   const rolePhotoMemberIds = [
     ...supervisors.map(({ memberId }) => memberId),
@@ -538,6 +572,7 @@ async function provisionSupplier(
     jobs,
     parts,
     shifts,
+    lineShifts,
     checklists,
   };
 }
@@ -625,611 +660,399 @@ async function activateCredential(
   };
 }
 
-async function seedHistorical(runtime: SupplierRuntime) {
-  let pendingClone: string | undefined;
+async function seedHenkatens(prisma: PrismaClient, runtime: SupplierRuntime) {
   for (let group = 0; group < LOCAL_SEED_HISTORICAL_SHIFT_COUNT; group += 1) {
     const records = runtime.plan.historical.filter(
       ({ historicalShiftIndex }) => historicalShiftIndex === group,
     );
     if (records.length === 0) {
-      throw new Error(`Historical shift ${group} has no planned Henkaten.`);
+      throw new Error(`Historical Line Shift occurrence ${group} has no planned Henkaten.`);
     }
     const lineIndex = records[0]!.lineIndex!;
-    const leader = runtime.leaders[lineIndex]!;
-    const date = jakartaDate(records[0]!.historicalDayOffset!);
-    let shift = await leader.api.request<ShiftResource>(
-      'POST',
-      '/api/v1/supplier/shifts/preflight',
-      {
-        lineId: runtime.lines[lineIndex]!.id,
-        shiftTemplateId: runtime.shifts[records[0]!.shiftTemplateIndex!]!.id,
-        businessDate: date,
-      },
-      leader.csrf,
-    );
-    if (group === 0) {
-      shift = await runtime.admin.api.request<ShiftResource>(
-        'POST',
-        `/api/v1/supplier/shifts/${shift.id}/emergency-start`,
-        {
-          expectedVersion: shift.version,
-          reason: 'Shift dimulai untuk recovery produksi setelah keterlambatan serah terima.',
-        },
-        runtime.admin.csrf,
-      );
-      await assignDefaultMp(runtime.admin, runtime.jobs[lineIndex]![0]!, runtime.mps[0]!);
-    } else {
-      shift = await leader.api.request<ShiftResource>(
-        'POST',
-        `/api/v1/supplier/shifts/${shift.id}/start`,
-        { expectedVersion: shift.version },
-        leader.csrf,
-        201,
-        `local-historical-start-${runtime.plan.code}-${group}`,
-      );
-    }
-    for (let index = 0; index < records.length; index += 1) {
-      const record = records[index]!;
-      const created = await createHenkaten(
+    const occurrence = await currentOccurrence(runtime.leaders[lineIndex]!);
+    let shiftRunId: string | undefined;
+    for (const [index, record] of records.entries()) {
+      const created = await createSeedHenkaten(
         runtime,
-        shift,
+        occurrence,
         lineIndex,
         record,
         `historical-${group}-${index}-m${record.eventMinuteOffset}-d${record.resolutionMinuteDelay}`,
-        pendingClone,
+        group * 10 + index,
       );
-      pendingClone = undefined;
-      if (record.outcome === 'CANCELLED_WITHDRAWN' && !pendingClone) {
-        pendingClone = created.id;
+      shiftRunId ??= created.shiftRunId;
+      if (shiftRunId !== created.shiftRunId) {
+        throw new Error('Historical seed group unexpectedly crossed automatic occurrences.');
       }
-      await applyOutcome(runtime, lineIndex, created, record.outcome, leader);
+      await applySeedOutcome(runtime, lineIndex, created, record.outcome);
     }
-    const latest = await leader.api.request<ShiftResource>(
-      'GET',
-      `/api/v1/supplier/shifts/${shift.id}`,
-      undefined,
-      undefined,
-      200,
+    await relocateHistoricalOccurrence(
+      prisma,
+      runtime,
+      shiftRunId!,
+      runtime.lineShifts[lineIndex]![records[0]!.shiftTemplateIndex!]!,
+      records[0]!.historicalDayOffset!,
     );
-    await leader.api.request(
-      'POST',
-      `/api/v1/supplier/shifts/${shift.id}/end`,
-      { expectedVersion: latest.version },
-      leader.csrf,
-      201,
-      `local-historical-end-${runtime.plan.code}-${group}`,
+  }
+
+  for (const [index, record] of runtime.plan.live.entries()) {
+    const lineIndex = index % runtime.lines.length;
+    const occurrence = await currentOccurrence(runtime.leaders[lineIndex]!);
+    const created = await createSeedHenkaten(
+      runtime,
+      occurrence,
+      lineIndex,
+      record,
+      `live-${index}`,
+      index + runtime.plan.historical.length,
     );
+    await applySeedOutcome(runtime, lineIndex, created, record.outcome);
   }
 }
 
-async function seedLive(runtime: SupplierRuntime) {
-  const liveShifts: ShiftResource[] = [];
-  for (let lineIndex = 0; lineIndex < 3; lineIndex += 1) {
-    const leader = runtime.leaders[lineIndex]!;
-    const prepared = await leader.api.request<ShiftResource>(
-      'POST',
-      '/api/v1/supplier/shifts/preflight',
-      {
-        lineId: runtime.lines[lineIndex]!.id,
-        shiftTemplateId: runtime.shifts[lineIndex]!.id,
-        businessDate: jakartaDate(0),
-      },
-      leader.csrf,
-    );
-    liveShifts.push(
-      await leader.api.request<ShiftResource>(
-        'POST',
-        `/api/v1/supplier/shifts/${prepared.id}/start`,
-        { expectedVersion: prepared.version },
-        leader.csrf,
-        201,
-        `local-live-start-${runtime.plan.code}-${lineIndex}`,
-      ),
-    );
-  }
+const assignedPcrSeedExamples = new Map<string, Set<number>>();
+const pcrSeedNarratives = [
+  {
+    category: 'MACHINE',
+    open: true,
+    cause: 'Pemasangan torque tool baru dengan merek dan karakteristik kontrol berbeda',
+    detail:
+      'Nut runner lama diganti dengan tool baru; metode pengencangan, setting torsi, dan validasi kualitas pada part produksi massal berubah.',
+    affectedObject: 'Nut runner lama',
+    replacementObject: 'Torque tool dengan merek dan karakteristik baru',
+  },
+  {
+    category: 'METHOD',
+    open: false,
+    cause: 'Perubahan metode produksi pada proses pengelasan',
+    detail:
+      'Supplier mengubah parameter arus dan kecepatan welding pada part mass production untuk menyesuaikan proses baru.',
+    affectedObject: 'Parameter welding disetujui sebelumnya',
+    replacementObject: 'Arus dan kecepatan welding baru',
+  },
+  {
+    category: 'MATERIAL',
+    open: true,
+    cause: 'Penggunaan material pengganti pada proses produksi',
+    detail:
+      'Informasi perubahan spesifikasi dan sumber material belum lengkap; perlu konfirmasi apakah hanya lot baru atau perubahan material.',
+    affectedObject: 'Material yang disetujui',
+    replacementObject: 'Material pengganti belum teridentifikasi',
+  },
+  {
+    category: 'MACHINE',
+    open: false,
+    cause: 'Perbaikan tool dengan komponen pengganti',
+    detail:
+      'Belum jelas apakah bentuk dan fungsi tool tetap sesuai approval awal atau mengalami modifikasi.',
+    affectedObject: 'Tool sebelum perbaikan',
+    replacementObject: 'Tool setelah penggantian komponen',
+  },
+  {
+    category: 'MATERIAL',
+    open: false,
+    cause: 'Perubahan spesifikasi raw material untuk part produksi massal',
+    detail:
+      'Grade bahan baku dan pemasok material berubah dari spesifikasi yang sebelumnya disetujui.',
+    affectedObject: 'Grade dan pemasok lama',
+    replacementObject: 'Grade dan pemasok baru',
+  },
+  {
+    category: 'MATERIAL',
+    open: true,
+    cause: 'Pergantian lot material sesuai FIFO',
+    detail:
+      'Lot baru berasal dari pemasok dan grade yang sama, dengan spesifikasi tetap; traceability dan incoming inspection sudah diverifikasi.',
+    affectedObject: 'Lot sebelumnya',
+    replacementObject: 'Lot berikutnya dengan spesifikasi sama',
+  },
+] as const;
 
-  const firstMovement = await createCrossLineMan(
-    runtime,
-    liveShifts[0]!,
-    liveShifts[1]!,
-    0,
-    1,
-    0,
-    'live-movement-resolved-source',
+function selectPcrSeedNarrative(runtime: SupplierRuntime, record: SeedHenkatenPlan) {
+  const assigned = assignedPcrSeedExamples.get(runtime.plan.code) ?? new Set<number>();
+  assignedPcrSeedExamples.set(runtime.plan.code, assigned);
+  const index = pcrSeedNarratives.findIndex(
+    (example, candidate) =>
+      !assigned.has(candidate) &&
+      example.category === record.category &&
+      example.open === record.outcome.startsWith('OPEN_'),
   );
-  const afterSupervisor = await decide(
-    runtime.supervisors[0]!,
-    firstMovement,
-    'APPROVED',
-    `${runtime.plan.code}-live-move-1-supervisor`,
-  );
-  const moved = await decide(
-    runtime.qcs[0]!,
-    afterSupervisor,
-    'APPROVED',
-    `${runtime.plan.code}-live-move-1-qc`,
-  );
-  const donorShift = await runtime.leaders[1]!.api.request<ShiftResource>(
-    'GET',
-    `/api/v1/supplier/shifts/${liveShifts[1]!.id}`,
-    undefined,
-    undefined,
-    200,
-  );
-  const issues = await runtime.leaders[1]!.api.request<{
-    items: Array<Resource & { status: string }>;
+  if (index < 0) return null;
+  assigned.add(index);
+  return pcrSeedNarratives[index]!;
+}
+
+async function seedPcrExamples(prisma: PrismaClient, runtime: SupplierRuntime) {
+  const supplierId = runtime.supplier.id;
+  await prisma.pcrAssessment.updateMany({
+    where: { supplierId, status: 'PENDING' },
+    data: {
+      status: 'NO_PCR',
+      decisionSource: 'SEED',
+      aiNeedsPcr: false,
+      aiConfidence: 0.94,
+      model: 'local-seed-fixture',
+      promptVersion: PCR_PROMPT_VERSION,
+    },
+  });
+  const examples = [
+    {
+      category: 'MACHINE',
+      open: true,
+      status: 'PCR',
+      cause: 'Pemasangan torque tool baru dengan merek dan karakteristik kontrol berbeda',
+      detail:
+        'Nut runner lama diganti dengan tool baru; metode pengencangan, setting torsi, dan validasi kualitas pada part produksi massal berubah.',
+      assessment:
+        'The supplier is introducing a different torque tool and changing the equipment settings used for a mass production part. This is a controlled process change rather than routine replacement or restoration of the same tool to its approved condition. The reported change matches the control items for tool replacement and equipment setting changes, both of which require a Process Change Request. The supplier should submit a PCR through the established channel before implementing the change and prepare evidence for the revised torque settings, first part verification, and traceability of affected production. TMMIN QD should review the proposed controls and approval requirements. This assessment indicates that PCR follow up is needed; it does not grant approval to implement the change.',
+    },
+    {
+      category: 'METHOD',
+      open: false,
+      status: 'PCR',
+      cause: 'Perubahan metode produksi pada proses pengelasan',
+      detail:
+        'Supplier mengubah parameter arus dan kecepatan welding pada part mass production untuk menyesuaikan proses baru.',
+      assessment:
+        'The event describes a change to welding current and process speed for an existing mass production part. These parameters define the manufacturing method and can affect the resulting joint quality, so this is a process change under the manufacturing method control item. It is not a temporary check or an ordinary return to a previously approved setting. A Process Change Request should be submitted through the established channel before the revised method is implemented. The supplier should document the former and proposed settings, affected part numbers, change timing, validation results, and traceability of parts produced during the transition. TMMIN QD should confirm the applicable review and approval steps. This is an indication for follow up, not an approval of the new process.',
+    },
+    {
+      category: 'MATERIAL',
+      open: true,
+      status: 'REVIEW',
+      cause: 'Penggunaan material pengganti pada proses produksi',
+      detail:
+        'Informasi perubahan spesifikasi dan sumber material belum lengkap; perlu konfirmasi apakah hanya lot baru atau perubahan material.',
+    },
+    {
+      category: 'MACHINE',
+      open: false,
+      status: 'REVIEW',
+      cause: 'Perbaikan tool dengan komponen pengganti',
+      detail:
+        'Belum jelas apakah bentuk dan fungsi tool tetap sesuai approval awal atau mengalami modifikasi.',
+    },
+    {
+      category: 'MATERIAL',
+      open: false,
+      status: 'PCR',
+      manual: true,
+      cause: 'Perubahan spesifikasi raw material untuk part produksi massal',
+      detail:
+        'Grade bahan baku dan pemasok material berubah dari spesifikasi yang sebelumnya disetujui.',
+      assessment:
+        'TMMIN QD menetapkan PCR karena spesifikasi dan sumber raw material berubah untuk part produksi massal. Supplier perlu mengajukan PCR melalui jalur yang berlaku sebelum implementasi.',
+    },
+    {
+      category: 'MATERIAL',
+      open: true,
+      status: 'NO_PCR',
+      manual: true,
+      cause: 'Pergantian lot material sesuai FIFO',
+      detail:
+        'Lot baru berasal dari pemasok dan grade yang sama, dengan spesifikasi tetap; traceability dan incoming inspection sudah diverifikasi.',
+    },
+  ] as const;
+  for (const [index, example] of examples.entries()) {
+    const record = await prisma.henkaten.findFirst({
+      where: {
+        supplierId,
+        category: example.category,
+        cause: example.cause,
+        status: example.open ? 'OPEN' : { not: 'OPEN' },
+      },
+    });
+    if (!record) throw new Error(`No Henkaten available for PCR seed example ${index}.`);
+    await prisma.$transaction(async (tx) => {
+      await tx.pcrAssessment.update({
+        where: { henkatenId: record.id },
+        data: {
+          status: example.status,
+          decisionSource: 'manual' in example ? 'TMMIN' : 'SEED',
+          assessment: 'assessment' in example ? example.assessment : null,
+          aiNeedsPcr: 'manual' in example ? example.status === 'NO_PCR' : example.status === 'PCR',
+          aiConfidence: example.status === 'REVIEW' ? 0.56 : 0.93,
+          aiAssessment:
+            'assessment' in example && !('manual' in example) ? example.assessment : null,
+          aiMatchedItems:
+            example.status === 'PCR'
+              ? [example.category === 'MACHINE' ? 27 : example.category === 'METHOD' ? 20 : 35]
+              : [],
+          reviewedAt: 'manual' in example ? new Date() : null,
+          version: { increment: 'manual' in example ? 2 : 1 },
+        },
+      });
+      if ('manual' in example)
+        await tx.auditEvent.create({
+          data: {
+            actorKind: 'USER',
+            actorRole: 'TMMIN_QUALITY',
+            supplierId,
+            action: 'PCR_DECISION_CORRECTED',
+            resourceType: 'Henkaten',
+            resourceId: record.id,
+            changeSummary: {
+              from: example.status === 'PCR' ? 'NO_PCR' : 'PCR',
+              to: example.status,
+              reason:
+                example.status === 'PCR'
+                  ? example.assessment
+                  : 'Lot baru masih dalam spesifikasi dan sumber yang sama.',
+            },
+            correlationId: `local-pcr-example-${runtime.plan.code}-${index}`,
+            result: 'SUCCESS',
+          },
+        });
+    });
+  }
+}
+
+async function currentOccurrence(leader: SessionClient): Promise<LineShiftOccurrence> {
+  const context = await leader.api.request<{
+    currentLineShiftIds: string[];
+    items: LineShiftOccurrence[];
   }>(
     'GET',
-    `/api/v1/supplier/shifts/${donorShift.id}/assignment-issues?limit=25`,
+    '/api/v1/supplier/master-data/line-shifts/operational-context',
     undefined,
     undefined,
     200,
   );
-  const issue = issues.items.find(({ status }) => status === 'OPEN');
-  if (!issue) throw new Error('Expected a donor vacancy after the first live movement.');
-  const resolutionTarget = donorShift.workingAssignments.find(
-    ({ jobId }) => jobId === runtime.jobs[1]![0]!.id,
-  )!;
-  const resolution = await createManHenkaten(
-    runtime,
-    donorShift,
-    1,
-    resolutionTarget,
-    runtime.mps[0]!.id,
-    'live-resolution',
-    undefined,
-    issue.id,
+  const occurrence = context.items.find(
+    ({ id, current }) => current && context.currentLineShiftIds.includes(id),
   );
-  const resolutionQc = await decide(
-    runtime.qcs[0]!,
-    resolution,
-    'APPROVED',
-    `${runtime.plan.code}-live-resolution-qc`,
-  );
-  await decide(
-    runtime.supervisors[1]!,
-    resolutionQc,
-    'APPROVED',
-    `${runtime.plan.code}-live-resolution-supervisor`,
-  );
-  const secondMovement = await createCrossLineMan(
-    runtime,
-    liveShifts[2]!,
-    liveShifts[0]!,
-    2,
-    0,
-    1,
-    'live-movement-unresolved',
-  );
-  const secondSupervisor = await decide(
-    runtime.supervisors[0]!,
-    secondMovement,
-    'APPROVED',
-    `${runtime.plan.code}-live-move-2-supervisor`,
-  );
-  await decide(
-    runtime.qcs[1]!,
-    secondSupervisor,
-    'APPROVED',
-    `${runtime.plan.code}-live-move-2-qc`,
-  );
-  const refreshedThird = await runtime.leaders[2]!.api.request<ShiftResource>(
-    'GET',
-    `/api/v1/supplier/shifts/${liveShifts[2]!.id}`,
-    undefined,
-    undefined,
-    200,
-  );
-  const openTarget = refreshedThird.workingAssignments.find(
-    ({ jobId }) => jobId === runtime.jobs[2]![2]!.id,
-  )!;
-  const openMan = await createManHenkaten(
-    runtime,
-    refreshedThird,
-    2,
-    openTarget,
-    runtime.mps[14]!.id,
-    'live-open-reservation',
-  );
-  await decide(
-    runtime.supervisors[0]!,
-    openMan,
-    'APPROVED',
-    `${runtime.plan.code}-live-open-man-supervisor`,
-  );
-
-  const nonManPlans = runtime.plan.live.filter(({ category }) => category !== 'MAN');
-  for (let index = 0; index < nonManPlans.length; index += 1) {
-    const lineIndex = index % 3;
-    const leader = runtime.leaders[lineIndex]!;
-    const latest = await leader.api.request<ShiftResource>(
-      'GET',
-      `/api/v1/supplier/shifts/${liveShifts[lineIndex]!.id}`,
-      undefined,
-      undefined,
-      200,
-    );
-    const record = nonManPlans[index]!;
-    const created = await createHenkaten(runtime, latest, lineIndex, record, `live-${index}`);
-    await applyOutcome(runtime, lineIndex, created, record.outcome, leader);
-  }
-  void moved;
+  if (!occurrence) throw new Error('Expected one current Line Shift occurrence for seed leader.');
+  return occurrence;
 }
 
-async function seedCanvasLayouts(runtime: SupplierRuntime) {
-  for (let lineIndex = 0; lineIndex < runtime.lines.length; lineIndex += 1) {
-    const document = createLocalSeedCanvasDocument(
-      runtime.plan,
-      lineIndex,
-      runtime.jobs[lineIndex]!,
-    );
-    await runtime.admin.api.request<{ document: BoardLayoutDocument; version: number }>(
-      'PUT',
-      `/api/v1/supplier/assignment-board/layouts/${runtime.lines[lineIndex]!.id}`,
-      { expectedVersion: null, document },
-      runtime.admin.csrf,
-      200,
-    );
-  }
-}
-
-async function createCrossLineMan(
+async function createSeedHenkaten(
   runtime: SupplierRuntime,
-  targetShift: ShiftResource,
-  sourceShift: ShiftResource,
-  targetLineIndex: number,
-  sourceLineIndex: number,
-  jobIndex: number,
-  key: string,
-) {
-  const [targetLatest, sourceLatest] = await Promise.all([
-    runtime.leaders[targetLineIndex]!.api.request<ShiftResource>(
-      'GET',
-      `/api/v1/supplier/shifts/${targetShift.id}`,
-      undefined,
-      undefined,
-      200,
-    ),
-    runtime.leaders[sourceLineIndex]!.api.request<ShiftResource>(
-      'GET',
-      `/api/v1/supplier/shifts/${sourceShift.id}`,
-      undefined,
-      undefined,
-      200,
-    ),
-  ]);
-  const target = targetLatest.workingAssignments.find(
-    ({ jobId }) => jobId === runtime.jobs[targetLineIndex]![jobIndex]!.id,
-  )!;
-  const source = sourceLatest.workingAssignments.find(
-    ({ jobId }) => jobId === runtime.jobs[sourceLineIndex]![jobIndex]!.id,
-  )!;
-  return createManHenkaten(
-    runtime,
-    targetLatest,
-    targetLineIndex,
-    target,
-    source.effectiveMpMemberId!,
-    key,
-    source,
-  );
-}
-
-async function createHenkaten(
-  runtime: SupplierRuntime,
-  shift: ShiftResource,
+  occurrence: LineShiftOccurrence,
   lineIndex: number,
   record: SeedHenkatenPlan,
   key: string,
-  clonedFromHenkatenId?: string,
+  ordinal: number,
 ) {
-  if (record.category === 'MAN') {
-    const latest = await runtime.leaders[lineIndex]!.api.request<ShiftResource>(
-      'GET',
-      `/api/v1/supplier/shifts/${shift.id}`,
-      undefined,
-      undefined,
-      200,
-    );
-    const plannedJob = runtime.jobs[lineIndex]![record.jobIndex ?? key.length % 4]!;
-    const target =
-      latest.workingAssignments.find(({ jobId }) => jobId === plannedJob.id) ??
-      latest.workingAssignments[0]!;
-    const activeIds = new Set(
-      latest.workingAssignments
-        .map(({ effectiveMpMemberId }) => effectiveMpMemberId)
-        .filter((id): id is string => Boolean(id)),
-    );
-    const replacement = runtime.mps.find(({ id }) => !activeIds.has(id));
-    if (!replacement) throw new Error('No free synthetic MP was available for Man Henkaten.');
-    return createManHenkaten(
-      runtime,
-      latest,
-      lineIndex,
-      target,
-      replacement.id,
-      key,
-      undefined,
-      undefined,
-      clonedFromHenkatenId,
-      record,
-    );
-  }
+  const job = runtime.jobs[lineIndex]![record.jobIndex ?? ordinal % 4]!;
+  const assignment = occurrence.assignments.find(({ jobId }) => jobId === job.id);
+  if (!assignment) throw new Error('Seed job is missing from the current Line Shift assignment.');
   const checklist = runtime.checklists[record.category];
-  const narrative = henkatenNarrative(record.category, record.narrativeVariant ?? key.length);
+  const narrative =
+    selectPcrSeedNarrative(runtime, record) ??
+    henkatenNarrative(record.category, record.narrativeVariant ?? ordinal);
+  const base = {
+    lineShiftId: occurrence.id,
+    jobId: job.id,
+    partId: runtime.parts[record.partIndex ?? ordinal % runtime.parts.length]!.id,
+    checklistVersionId: checklist.id,
+    checklistAnswers: checklist.itemIds.map((itemId) => ({ itemId, answer: 'YES' })),
+    cause: narrative.cause,
+    detail: narrative.detail,
+  };
+  const body =
+    record.category === 'MAN'
+      ? await seedManBody(runtime, lineIndex, assignment, ordinal, base)
+      : {
+          ...base,
+          category: record.category,
+          affectedObject: narrative.affectedObject ?? 'Kondisi proses sebelum perubahan',
+          replacementObject: narrative.replacementObject ?? 'Kondisi proses setelah perubahan',
+        };
   return runtime.leaders[lineIndex]!.api.request<HenkatenResource>(
     'POST',
     '/api/v1/supplier/henkatens',
-    {
-      category: record.category,
-      shiftRunId: shift.id,
-      jobId: runtime.jobs[lineIndex]![record.jobIndex ?? key.length % 4]!.id,
-      partId: runtime.parts[record.partIndex ?? key.length % runtime.parts.length]!.id,
-      checklistVersionId: checklist.id,
-      checklistAnswers: plannedChecklistAnswers(checklist.itemIds),
-      cause: narrative.cause,
-      detail: narrative.detail,
-      affectedObject: narrative.affectedObject ?? 'Kondisi proses sebelum perubahan',
-      replacementObject: narrative.replacementObject ?? 'Kondisi proses setelah perubahan',
-      ...(clonedFromHenkatenId ? { clonedFromHenkatenId } : {}),
-    },
+    body,
     runtime.leaders[lineIndex]!.csrf,
     201,
     `local-${runtime.plan.code}-${key}`,
   );
 }
 
-async function createManHenkaten(
+async function seedManBody(
   runtime: SupplierRuntime,
-  shift: ShiftResource,
   lineIndex: number,
-  target: AssignmentResource,
-  replacementMpMemberId: string,
-  key: string,
-  source?: AssignmentResource,
-  resolutionIssueId?: string,
-  clonedFromHenkatenId?: string,
-  record?: SeedHenkatenPlan,
+  assignment: LineShiftOccurrence['assignments'][number],
+  ordinal: number,
+  base: Record<string, unknown>,
 ) {
-  const assessor = runtime.supervisors[lineIndex % runtime.supervisors.length]!;
+  const replacement = runtime.mps[(ordinal + lineIndex * 3 + 5) % runtime.mps.length]!;
   await ensureSeedQualification(
-    assessor,
-    replacementMpMemberId,
-    target.jobId,
+    runtime.supervisors[lineIndex % runtime.supervisors.length]!,
+    replacement.id,
+    assignment.jobId,
     'Simulasi evaluasi GL: kompetensi job tujuan diverifikasi sebelum Henkaten Man.',
   );
-  const checklist = runtime.checklists.MAN;
-  const narrative = henkatenNarrative('MAN', record?.narrativeVariant ?? key.length);
-  return runtime.leaders[lineIndex]!.api.request<HenkatenResource>(
-    'POST',
-    '/api/v1/supplier/henkatens',
-    {
-      category: 'MAN',
-      shiftRunId: shift.id,
-      jobId: target.jobId,
-      partId: runtime.parts[record?.partIndex ?? key.length % runtime.parts.length]!.id,
-      checklistVersionId: checklist.id,
-      checklistAnswers: plannedChecklistAnswers(checklist.itemIds),
-      cause: resolutionIssueId ? 'Pengisian vacancy akibat perpindahan operator' : narrative.cause,
-      detail: resolutionIssueId
-        ? 'Operator pengganti dialokasikan setelah verifikasi kompetensi dan handover titik kontrol.'
-        : narrative.detail,
-      targetWorkingAssignmentId: target.id,
-      targetAssignmentVersion: target.version,
-      replaced: target.effectiveMpMemberId
-        ? { kind: 'MP', memberId: target.effectiveMpMemberId }
-        : { kind: 'VACANT' },
-      replacementMpMemberId,
-      ...(source
-        ? {
-            sourceWorkingAssignmentId: source.id,
-            sourceAssignmentVersion: source.version,
-          }
-        : {}),
-      ...(resolutionIssueId ? { resolutionIssueId } : {}),
-      ...(clonedFromHenkatenId ? { clonedFromHenkatenId } : {}),
-    },
-    runtime.leaders[lineIndex]!.csrf,
-    201,
-    `local-${runtime.plan.code}-${key}`,
-  );
+  return {
+    ...base,
+    category: 'MAN',
+    lineShiftJobAssignmentId: assignment.id,
+    replacementMpMemberId: replacement.id,
+  };
 }
 
-function plannedChecklistAnswers(itemIds: string[]) {
-  return itemIds.map((itemId) => ({
-    itemId,
-    answer: 'YES' as const,
-  }));
-}
-
-function henkatenNarrative(
-  category: SeedCategory,
-  variant: number,
-): {
-  cause: string;
-  detail: string;
-  affectedObject?: string;
-  replacementObject?: string;
-} {
-  const narratives = {
-    MAN: [
-      {
-        cause: 'Rotasi operator untuk pemerataan kompetensi proses',
-        detail:
-          'Operator pengganti menjalani handover titik kualitas kritis sebelum mengambil posisi.',
-      },
-      {
-        cause: 'Penggantian operator pada jam istirahat bergilir',
-        detail: 'Relief operator ditempatkan dengan monitoring awal oleh line leader.',
-      },
-      {
-        cause: 'Penyesuaian manpower akibat kebutuhan proses bottleneck',
-        detail:
-          'Operator dialihkan sementara setelah kompetensi proses dan beban line diverifikasi.',
-      },
-      {
-        cause: 'Operator utama tidak tersedia pada awal shift',
-        detail: 'Operator cadangan mengambil assignment sesuai matriks otorisasi lokal.',
-      },
-      {
-        cause: 'Cross-training operator pada proses berisiko rendah',
-        detail: 'Pelaksanaan didampingi leader dengan pengecekan hasil unit pertama.',
-      },
-    ],
-    MACHINE: [
-      {
-        cause: 'Pergantian dies setelah preventive maintenance',
-        detail: 'Parameter press dan hasil panel pertama diperiksa sebelum produksi dilanjutkan.',
-        affectedObject: 'Dies produksi sebelum preventive maintenance',
-        replacementObject: 'Dies produksi setelah setting dan first-piece approval',
-      },
-      {
-        cause: 'Penggantian torque tool karena jadwal kalibrasi',
-        detail: 'Tool pengganti diverifikasi terhadap master torque dan status kalibrasinya.',
-        affectedObject: 'Torque tool mendekati batas kalibrasi',
-        replacementObject: 'Torque tool terkalibrasi dengan setting tervalidasi',
-      },
-      {
-        cause: 'Penggantian locator jig karena keausan',
-        detail: 'Dimensi referensi jig dan sampel awal dikonfirmasi oleh produksi dan QC.',
-        affectedObject: 'Locator jig dengan indikasi wear',
-        replacementObject: 'Locator jig baru setelah dimensional check',
-      },
-      {
-        cause: 'Pergantian welding tip berdasarkan counter',
-        detail: 'Arus, tekanan, dan hasil peel test diperiksa sebelum release.',
-        affectedObject: 'Welding tip mencapai batas pemakaian',
-        replacementObject: 'Welding tip baru dengan parameter standar',
-      },
-      {
-        cause: 'Restart mesin setelah minor breakdown',
-        detail: 'Recovery dilakukan tanpa perubahan program dan disertai verifikasi first piece.',
-        affectedObject: 'Mesin berhenti akibat sensor interlock',
-        replacementObject: 'Mesin normal setelah sensor disetel ulang',
-      },
-    ],
-    MATERIAL: [
-      {
-        cause: 'Pergantian lot steel coil sesuai urutan FIFO',
-        detail: 'Heat number, ketebalan, dan sertifikat material lot baru telah diverifikasi.',
-        affectedObject: 'Lot steel coil produksi sebelumnya',
-        replacementObject: 'Lot steel coil berikutnya dengan heat number berbeda',
-      },
-      {
-        cause: 'Pergantian lot resin pada material dryer',
-        detail: 'Nomor lot, moisture reading, dan parameter drying dikonfirmasi sebelum molding.',
-        affectedObject: 'Lot resin yang selesai digunakan',
-        replacementObject: 'Lot resin baru setelah moisture check',
-      },
-      {
-        cause: 'Penggunaan batch sub-component berikutnya',
-        detail: 'Label traceability dan hasil incoming inspection batch baru telah diperiksa.',
-        affectedObject: 'Batch sub-component sebelumnya',
-        replacementObject: 'Batch sub-component baru dari delivery berikutnya',
-      },
-      {
-        cause: 'Pergantian kemasan returnable karena kondisi abnormal',
-        detail: 'Kemasan pengganti dibersihkan dan diverifikasi bebas kontaminasi.',
-        affectedObject: 'Returnable box dengan kerusakan ringan',
-        replacementObject: 'Returnable box pengganti yang telah diperiksa',
-      },
-      {
-        cause: 'Material alternatif sesuai temporary deviation',
-        detail: 'Dokumen deviasi, identifikasi lot, dan batas penggunaannya dikonfirmasi.',
-        affectedObject: 'Material standar pada bill of material',
-        replacementObject: 'Material alternatif dalam batas deviasi terkontrol',
-      },
-    ],
-    METHOD: [
-      {
-        cause: 'Revisi urutan kerja untuk mengurangi handling',
-        detail: 'Urutan baru disosialisasikan dan hasil siklus pertama divalidasi oleh leader.',
-        affectedObject: 'Urutan kerja sebelum improvement',
-        replacementObject: 'Urutan kerja revisi dengan handling lebih singkat',
-      },
-      {
-        cause: 'Penyesuaian urutan pengencangan bolt',
-        detail: 'Sequence dan nilai torque dikonfirmasi terhadap instruksi kerja terbaru.',
-        affectedObject: 'Sequence pengencangan versi sebelumnya',
-        replacementObject: 'Sequence silang sesuai revisi instruksi kerja',
-      },
-      {
-        cause: 'Peningkatan frekuensi inspeksi sementara',
-        detail: 'Sampling ditingkatkan setelah tren minor defect pada shift sebelumnya.',
-        affectedObject: 'Frekuensi inspeksi normal',
-        replacementObject: 'Temporary tightened inspection',
-      },
-      {
-        cause: 'Penerapan temporary work instruction untuk rework',
-        detail: 'Batas lot, metode rework, dan acceptance criteria telah dijelaskan.',
-        affectedObject: 'Proses standar tanpa aktivitas rework',
-        replacementObject: 'Temporary rework method yang disetujui',
-      },
-      {
-        cause: 'Perubahan metode pemeriksaan visual',
-        detail: 'Sudut pencahayaan dan boundary sample diperbarui pada area inspeksi.',
-        affectedObject: 'Metode visual check dengan pencahayaan umum',
-        replacementObject: 'Metode visual check memakai focused lighting',
-      },
-    ],
-  } as const;
-  return narratives[category][variant % narratives[category].length]!;
-}
-
-async function applyOutcome(
+async function applySeedOutcome(
   runtime: SupplierRuntime,
   lineIndex: number,
   henkaten: HenkatenResource,
   outcome: SeedOutcome,
-  leader: SessionClient,
 ) {
   const supervisor = runtime.supervisors[lineIndex % runtime.supervisors.length]!;
   const qc = runtime.qcs[lineIndex % runtime.qcs.length]!;
   if (outcome === 'APPROVED_SUPERVISOR_FIRST') {
-    const first = await decide(
+    const first = await decideSeed(
       supervisor,
       henkaten,
       'APPROVED',
       `${runtime.plan.code}-${henkaten.id}-supervisor`,
     );
-    await decide(qc, first, 'APPROVED', `${runtime.plan.code}-${henkaten.id}-qc`);
+    await decideSeed(qc, first, 'APPROVED', `${runtime.plan.code}-${henkaten.id}-qc`);
   } else if (outcome === 'APPROVED_QC_FIRST') {
-    const first = await decide(qc, henkaten, 'APPROVED', `${runtime.plan.code}-${henkaten.id}-qc`);
-    await decide(supervisor, first, 'APPROVED', `${runtime.plan.code}-${henkaten.id}-supervisor`);
+    const first = await decideSeed(
+      qc,
+      henkaten,
+      'APPROVED',
+      `${runtime.plan.code}-${henkaten.id}-qc`,
+    );
+    await decideSeed(
+      supervisor,
+      first,
+      'APPROVED',
+      `${runtime.plan.code}-${henkaten.id}-supervisor`,
+    );
   } else if (outcome === 'REJECTED_SUPERVISOR') {
-    await decide(
+    await decideSeed(
       supervisor,
       henkaten,
       'REJECTED',
       `${runtime.plan.code}-${henkaten.id}-supervisor-reject`,
     );
   } else if (outcome === 'REJECTED_QC') {
-    await decide(qc, henkaten, 'REJECTED', `${runtime.plan.code}-${henkaten.id}-qc-reject`);
+    await decideSeed(qc, henkaten, 'REJECTED', `${runtime.plan.code}-${henkaten.id}-qc-reject`);
   } else if (outcome === 'CANCELLED_WITHDRAWN') {
-    await leader.api.request(
+    await runtime.leaders[lineIndex]!.api.request(
       'POST',
       `/api/v1/supplier/henkatens/${henkaten.id}/withdraw`,
       {
         expectedVersion: henkaten.version,
         reason: 'Data objek perubahan perlu dikoreksi sebelum diajukan kembali.',
       },
-      leader.csrf,
+      runtime.leaders[lineIndex]!.csrf,
       201,
       `${runtime.plan.code}-${henkaten.id}-withdraw`,
     );
   } else if (outcome === 'OPEN_SUPERVISOR_APPROVED') {
-    await decide(
+    await decideSeed(
       supervisor,
       henkaten,
       'APPROVED',
       `${runtime.plan.code}-${henkaten.id}-supervisor-open`,
     );
   } else if (outcome === 'OPEN_QC_APPROVED') {
-    await decide(qc, henkaten, 'APPROVED', `${runtime.plan.code}-${henkaten.id}-qc-open`);
+    await decideSeed(qc, henkaten, 'APPROVED', `${runtime.plan.code}-${henkaten.id}-qc-open`);
   }
 }
 
-function decide(
+function decideSeed(
   role: SessionClient,
   henkaten: HenkatenResource,
   decision: 'APPROVED' | 'REJECTED',
@@ -1258,37 +1081,241 @@ async function ensureSeedQualification(
   jobId: string,
   note: string,
 ) {
-  const matrix = await assessor.api.request<TanokoMatrix>('GET', '/api/v1/supplier/tanoko');
+  const matrix = await assessor.api.request<TanokoMatrix>(
+    'GET',
+    '/api/v1/supplier/tanoko',
+    undefined,
+    undefined,
+    200,
+  );
   const qualification = matrix.mappings.find(
     (mapping) => mapping.memberId === memberId && mapping.jobId === jobId,
   );
-  if ((qualification?.level ?? 0) < 3) {
-    await assessor.api.request(
-      'PUT',
-      `/api/v1/supplier/tanoko/members/${memberId}/jobs/${jobId}`,
-      {
-        expectedVersion: qualification?.version ?? null,
-        level: 3,
-        note,
-      },
-      assessor.csrf,
-    );
-  }
+  if ((qualification?.level ?? 0) >= 3) return;
+  await assessor.api.request(
+    'PUT',
+    `/api/v1/supplier/tanoko/members/${memberId}/jobs/${jobId}`,
+    {
+      expectedVersion: qualification?.version ?? null,
+      level: 3,
+      note,
+    },
+    assessor.csrf,
+  );
 }
 
-async function assignDefaultMp(admin: SessionClient, job: Resource, mp: MemberResource) {
-  await ensureSeedQualification(
-    admin,
-    mp.id,
-    job.id,
-    'Asesmen sintetis: MP memenuhi kompetensi minimal level 3 pada job default.',
-  );
-  await admin.api.request(
-    'POST',
-    `/api/v1/supplier/master-data/jobs/${job.id}/default-mp`,
-    { memberId: mp.id },
-    admin.csrf,
-  );
+async function relocateHistoricalOccurrence(
+  prisma: PrismaClient,
+  runtime: SupplierRuntime,
+  shiftRunId: string,
+  targetLineShift: LineShiftDefinition,
+  daysAgo: number,
+) {
+  const businessDate = jakartaDate(daysAgo);
+  const scheduledStartAt = jakartaInstant(businessDate, targetLineShift.startTime);
+  const scheduledEndAt = jakartaInstant(businessDate, targetLineShift.endTime);
+  if (scheduledEndAt <= scheduledStartAt) {
+    scheduledEndAt.setUTCDate(scheduledEndAt.getUTCDate() + 1);
+  }
+  await prisma.$transaction([
+    prisma.$executeRaw`SET LOCAL session_replication_role = replica`,
+    prisma.shiftRun.update({
+      where: { id: shiftRunId },
+      data: {
+        businessDate: new Date(`${businessDate}T00:00:00.000Z`),
+        shiftTemplateId: targetLineShift.shiftTemplateId,
+        shiftNameSnapshot: targetLineShift.shiftName,
+        shiftStartMinuteSnapshot: minuteOfDay(targetLineShift.startTime),
+        shiftEndMinuteSnapshot: minuteOfDay(targetLineShift.endTime),
+        scheduledStartAt,
+        scheduledEndAt,
+        latestPreflightAt: scheduledStartAt,
+        createdAt: new Date(scheduledStartAt.getTime() - 5 * 60_000),
+        updatedAt: scheduledEndAt,
+      },
+    }),
+    prisma.$executeRaw`
+      UPDATE "Henkaten" h
+      SET "businessDate" = ${businessDate}::date,
+          "lineShiftId" = ${targetLineShift.id}::uuid,
+          "shiftNameSnapshot" = ${targetLineShift.shiftName},
+          "identifier" = 'HEN-' || ${runtime.plan.code} || '-' || replace(${businessDate}, '-', '')
+            || '-' || lpad(h."dailySequence"::text, 4, '0'),
+          "occurredAt" = ${scheduledStartAt}::timestamptz
+            + substring(h."submissionKey" from '-m([0-9]+)-d')::int * interval '1 minute',
+          "effectiveStartAt" = ${scheduledStartAt}::timestamptz,
+          "effectiveEndAt" = ${scheduledEndAt}::timestamptz,
+          "createdAt" = ${scheduledStartAt}::timestamptz
+            + substring(h."submissionKey" from '-m([0-9]+)-d')::int * interval '1 minute',
+          "updatedAt" = ${scheduledStartAt}::timestamptz
+            + (
+                substring(h."submissionKey" from '-m([0-9]+)-d')::int
+                + substring(h."submissionKey" from '-d([0-9]+)$')::int
+              ) * interval '1 minute',
+          "finalizedAt" = ${scheduledStartAt}::timestamptz
+            + (
+                substring(h."submissionKey" from '-m([0-9]+)-d')::int
+                + substring(h."submissionKey" from '-d([0-9]+)$')::int
+              ) * interval '1 minute'
+      WHERE h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+    prisma.$executeRaw`
+      UPDATE "ManHenkatenDetail" md
+      SET "lineShiftJobAssignmentId" = target_assignment.id
+      FROM "Henkaten" h
+      JOIN "LineShiftJobAssignment" target_assignment
+        ON target_assignment."lineShiftId" = ${targetLineShift.id}::uuid
+       AND target_assignment."jobId" = h."jobId"
+       AND target_assignment."supplierId" = h."supplierId"
+      WHERE md."henkatenId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+    prisma.$executeRaw`
+      UPDATE "HenkatenApprovalRoute" r
+      SET "createdAt" = h."occurredAt", "updatedAt" = COALESCE(h."finalizedAt", h."occurredAt")
+      FROM "Henkaten" h WHERE r."henkatenId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+    prisma.$executeRaw`
+      UPDATE "ApprovalDecision" d
+      SET "decidedAt" = h."occurredAt" + (8 + d."resultHenkatenVersion" * 5) * interval '1 minute'
+      FROM "Henkaten" h WHERE d."henkatenId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+    prisma.$executeRaw`
+      UPDATE "HenkatenTransition" t
+      SET "occurredAt" = CASE WHEN t."fromStatus" IS NULL THEN h."occurredAt"
+        ELSE COALESCE(h."finalizedAt", h."occurredAt" + interval '10 minutes') END
+      FROM "Henkaten" h WHERE t."henkatenId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+    prisma.$executeRaw`
+      UPDATE "WarningInstance" w
+      SET "openedAt" = h."occurredAt",
+          "closedAt" = CASE WHEN w.status = 'CLOSED' THEN h."finalizedAt" ELSE NULL END
+      FROM "Henkaten" h WHERE w."henkatenId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+    prisma.$executeRaw`
+      UPDATE "AssignmentMovement" m SET "movedAt" = h."occurredAt"
+      FROM "Henkaten" h WHERE m."henkatenId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+    prisma.$executeRaw`
+      UPDATE "OutboxEvent" o
+      SET "occurredAt" = h."occurredAt", "availableAt" = h."occurredAt", "createdAt" = h."occurredAt",
+          "processedAt" = CASE WHEN o."processedAt" IS NULL THEN NULL
+            ELSE h."occurredAt" + interval '1 minute' END
+      FROM "Henkaten" h
+      WHERE o."aggregateId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+    prisma.$executeRaw`
+      UPDATE "AuditEvent" a SET "occurredAt" = h."occurredAt"
+      FROM "Henkaten" h
+      WHERE a."resourceId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
+    `,
+  ]);
+}
+
+function henkatenNarrative(
+  category: SeedCategory,
+  variant: number,
+): { cause: string; detail: string; affectedObject?: string; replacementObject?: string } {
+  const narratives = {
+    MAN: [
+      [
+        'Rotasi operator untuk pemerataan kompetensi proses',
+        'Handover titik kualitas kritis telah dilakukan.',
+      ],
+      [
+        'Penggantian operator pada jam istirahat bergilir',
+        'Relief operator ditempatkan dengan monitoring awal.',
+      ],
+      [
+        'Penyesuaian manpower pada proses bottleneck',
+        'Kompetensi job tujuan telah diverifikasi oleh GL.',
+      ],
+    ],
+    MACHINE: [
+      [
+        'Pergantian dies setelah preventive maintenance',
+        'Parameter dan hasil first-piece telah diperiksa.',
+        'Dies sebelum perawatan',
+        'Dies setelah setting',
+      ],
+      [
+        'Penggantian torque tool karena jadwal kalibrasi',
+        'Tool pengganti diverifikasi terhadap master torque.',
+        'Torque tool lama',
+        'Torque tool terkalibrasi',
+      ],
+      [
+        'Restart mesin setelah minor breakdown',
+        'Recovery disertai verifikasi first-piece.',
+        'Mesin berhenti',
+        'Mesin kembali normal',
+      ],
+    ],
+    MATERIAL: [
+      [
+        'Pergantian lot material sesuai FIFO',
+        'Traceability dan spesifikasi lot baru telah diverifikasi.',
+        'Lot sebelumnya',
+        'Lot berikutnya',
+      ],
+      [
+        'Penggunaan batch sub-component berikutnya',
+        'Label dan incoming inspection telah diperiksa.',
+        'Batch sebelumnya',
+        'Batch baru',
+      ],
+      [
+        'Material alternatif sesuai temporary deviation',
+        'Dokumen deviasi dan batas penggunaan dikonfirmasi.',
+        'Material standar',
+        'Material alternatif',
+      ],
+    ],
+    METHOD: [
+      [
+        'Revisi urutan kerja untuk mengurangi handling',
+        'Urutan baru disosialisasikan dan divalidasi.',
+        'Urutan sebelumnya',
+        'Urutan revisi',
+      ],
+      [
+        'Penyesuaian urutan pengencangan bolt',
+        'Sequence dikonfirmasi terhadap instruksi terbaru.',
+        'Sequence sebelumnya',
+        'Sequence terbaru',
+      ],
+      [
+        'Peningkatan frekuensi inspeksi sementara',
+        'Sampling ditingkatkan berdasarkan tren defect.',
+        'Frekuensi normal',
+        'Tightened inspection',
+      ],
+    ],
+  } as const;
+  const [cause, detail, affectedObject, replacementObject] =
+    narratives[category][variant % narratives[category].length]!;
+  return {
+    cause,
+    detail,
+    ...(affectedObject ? { affectedObject } : {}),
+    ...(replacementObject ? { replacementObject } : {}),
+  };
+}
+
+async function seedCanvasLayouts(runtime: SupplierRuntime) {
+  for (let lineIndex = 0; lineIndex < runtime.lines.length; lineIndex += 1) {
+    const document = createLocalSeedCanvasDocument(
+      runtime.plan,
+      lineIndex,
+      runtime.jobs[lineIndex]!,
+    );
+    await runtime.admin.api.request<{ document: BoardLayoutDocument; version: number }>(
+      'PUT',
+      `/api/v1/supplier/assignment-board/layouts/${runtime.lines[lineIndex]!.id}`,
+      { expectedVersion: null, document },
+      runtime.admin.csrf,
+      200,
+    );
+  }
 }
 
 async function markOneNotificationRead(runtime: SupplierRuntime) {
@@ -1311,124 +1338,6 @@ async function markOneNotificationRead(runtime: SupplierRuntime) {
   throw new Error(`No notification became available for ${runtime.plan.code}.`);
 }
 
-async function waitForOutbox(prisma: PrismaClient) {
-  for (let attempt = 0; attempt < 240; attempt += 1) {
-    const pending = await prisma.outboxEvent.count({
-      where: { processedAt: null, failedAt: null },
-    });
-    if (pending === 0) return;
-    await delay(250);
-  }
-  throw new Error('Transactional outbox did not drain before local seed verification.');
-}
-
-async function normalizeHistoricalTimeline(prisma: PrismaClient) {
-  await prisma.$transaction([
-    prisma.$executeRaw`SET LOCAL session_replication_role = replica`,
-    prisma.$executeRaw`
-      UPDATE "ShiftRun"
-      SET "startedAt" = "scheduledStartAt"
-            + (2 + EXTRACT(DAY FROM "businessDate")::int % 6) * interval '1 minute',
-          "endedAt" = "scheduledEndAt"
-            - (1 + EXTRACT(DAY FROM "businessDate")::int % 9) * interval '1 minute',
-          "createdAt" = "scheduledStartAt"
-            - (6 + EXTRACT(DAY FROM "businessDate")::int % 11) * interval '1 minute',
-          "updatedAt" = "scheduledEndAt" - interval '2 minutes',
-          "latestPreflightAt" = "scheduledStartAt"
-            - (3 + EXTRACT(DAY FROM "businessDate")::int % 7) * interval '1 minute'
-      WHERE status = 'ENDED'
-    `,
-    prisma.$executeRaw`
-      UPDATE "Henkaten" h
-      SET "occurredAt" = s."scheduledStartAt"
-              + substring(h."submissionKey" from '-m([0-9]+)-d')::int * interval '1 minute',
-          "createdAt" = s."scheduledStartAt"
-              + substring(h."submissionKey" from '-m([0-9]+)-d')::int * interval '1 minute',
-          "updatedAt" = CASE WHEN h.status = 'OPEN' THEN h."updatedAt"
-                            ELSE s."scheduledStartAt"
-                              + (
-                                  substring(h."submissionKey" from '-m([0-9]+)-d')::int
-                                  + substring(h."submissionKey" from '-d([0-9]+)$')::int
-                                ) * interval '1 minute' END,
-          "finalizedAt" = CASE WHEN h.status = 'OPEN' THEN NULL
-                              ELSE s."scheduledStartAt"
-                                + (
-                                    substring(h."submissionKey" from '-m([0-9]+)-d')::int
-                                    + substring(h."submissionKey" from '-d([0-9]+)$')::int
-                                  ) * interval '1 minute' END
-      FROM "ShiftRun" s
-      WHERE h."shiftRunId" = s.id AND s.status = 'ENDED'
-    `,
-    prisma.$executeRaw`
-      UPDATE "HenkatenApprovalRoute" r
-      SET "createdAt" = h."occurredAt", "updatedAt" = COALESCE(h."finalizedAt", h."occurredAt")
-      FROM "Henkaten" h, "ShiftRun" s
-      WHERE r."henkatenId" = h.id AND h."shiftRunId" = s.id AND s.status = 'ENDED'
-    `,
-    prisma.$executeRaw`
-      UPDATE "ApprovalDecision" d
-      SET "decidedAt" = h."occurredAt" + (8 + d."resultHenkatenVersion" * 5) * interval '1 minute'
-      FROM "Henkaten" h, "ShiftRun" s
-      WHERE d."henkatenId" = h.id AND h."shiftRunId" = s.id AND s.status = 'ENDED'
-    `,
-    prisma.$executeRaw`
-      UPDATE "HenkatenTransition" t SET "occurredAt" =
-        CASE WHEN t."fromStatus" IS NULL THEN h."occurredAt"
-             ELSE COALESCE(h."finalizedAt", h."occurredAt" + interval '10 minutes') END
-      FROM "Henkaten" h, "ShiftRun" s
-      WHERE t."henkatenId" = h.id AND h."shiftRunId" = s.id AND s.status = 'ENDED'
-    `,
-    prisma.$executeRaw`
-      UPDATE "WarningInstance" w
-      SET "openedAt" = h."occurredAt", "closedAt" = CASE WHEN w.status = 'CLOSED' THEN h."finalizedAt" ELSE NULL END
-      FROM "Henkaten" h, "ShiftRun" s
-      WHERE w."henkatenId" = h.id AND h."shiftRunId" = s.id AND s.status = 'ENDED'
-    `,
-    prisma.$executeRaw`
-      UPDATE "MPReservation" r
-      SET "reservedAt" = h."occurredAt",
-          "releasedAt" = CASE WHEN r."releasedAt" IS NULL THEN NULL ELSE h."finalizedAt" END
-      FROM "Henkaten" h, "ShiftRun" s
-      WHERE r."henkatenId" = h.id AND h."shiftRunId" = s.id AND s.status = 'ENDED'
-    `,
-    prisma.$executeRaw`
-      UPDATE "AssignmentMovement" m SET "movedAt" = h."finalizedAt"
-      FROM "Henkaten" h, "ShiftRun" s
-      WHERE m."henkatenId" = h.id AND h."shiftRunId" = s.id AND s.status = 'ENDED'
-    `,
-    prisma.$executeRaw`
-      UPDATE "AssignmentIssue" i
-      SET "openedAt" = h."finalizedAt",
-          "resolvedAt" = CASE WHEN i.status = 'OPEN' THEN NULL ELSE COALESCE(i."resolvedAt", h."finalizedAt") END
-      FROM "Henkaten" h, "ShiftRun" s
-      WHERE i."originHenkatenId" = h.id AND h."shiftRunId" = s.id AND s.status = 'ENDED'
-    `,
-    prisma.$executeRaw`
-      UPDATE "OutboxEvent" o
-      SET "occurredAt" = h."occurredAt", "availableAt" = h."occurredAt", "createdAt" = h."occurredAt",
-          "processedAt" = CASE WHEN o."processedAt" IS NULL THEN NULL ELSE h."occurredAt" + interval '1 minute' END
-      FROM "Henkaten" h, "ShiftRun" s
-      WHERE o."aggregateId" = h.id AND h."shiftRunId" = s.id AND s.status = 'ENDED'
-    `,
-    prisma.$executeRaw`
-      UPDATE "Notification" n SET "createdAt" = o."occurredAt",
-          "readAt" = CASE WHEN n."readAt" IS NULL THEN NULL ELSE o."occurredAt" + interval '2 minutes' END
-      FROM "OutboxEvent" o
-      WHERE n."sourceEventId" = o.id
-    `,
-    prisma.$executeRaw`
-      UPDATE "AuditEvent" a SET "occurredAt" = h."occurredAt"
-      FROM "Henkaten" h, "ShiftRun" s
-      WHERE a."resourceId" = h.id AND h."shiftRunId" = s.id AND s.status = 'ENDED'
-    `,
-    prisma.$executeRaw`
-      UPDATE "AuditEvent" a SET "occurredAt" = s."scheduledStartAt"
-      FROM "ShiftRun" s
-      WHERE a."resourceId" = s.id AND s.status = 'ENDED'
-    `,
-  ]);
-}
-
 async function verifySeed(prisma: PrismaClient) {
   const suppliers = await prisma.supplier.findMany({ orderBy: { code: 'asc' } });
   const expectedByCode = new Map(
@@ -1441,70 +1350,42 @@ async function verifySeed(prisma: PrismaClient) {
     throw new Error('Post-seed invariant failed: expected exactly two active Hosted suppliers.');
   }
   for (const supplier of suppliers) {
-    const [tanokoMappings, tanokoChanges, categorizedJobs, defaultMps] = await Promise.all([
-      prisma.tanokoMapping.findMany({ where: { supplierId: supplier.id } }),
-      prisma.tanokoChange.findMany({ where: { supplierId: supplier.id } }),
-      prisma.job.findMany({ where: { supplierId: supplier.id }, select: { skillCategory: true } }),
-      prisma.defaultJobMp.findMany({ where: { supplierId: supplier.id } }),
-    ]);
-    if (
-      defaultMps.some(
-        (assignment) =>
-          !tanokoMappings.some(
-            (mapping) =>
-              mapping.memberId === assignment.mpMemberId &&
-              mapping.jobId === assignment.jobId &&
-              (mapping.level ?? 0) >= 3,
-          ),
-      ) ||
-      ![1, 2, 3, 4].every((level) => tanokoMappings.some((mapping) => mapping.level === level)) ||
-      tanokoMappings.filter((mapping) => mapping.level !== null).length >= 15 * 12 ||
-      !['HIGH', 'MEDIUM', 'LOW'].every((category) =>
-        categorizedJobs.some((job) => job.skillCategory === category),
-      ) ||
-      !['SUPPLIER_ADMIN', 'SUPERVISOR'].every((role) =>
-        tanokoChanges.some((change) => change.actorRole === role),
-      ) ||
-      !tanokoChanges.some((change) => change.previousLevel === 2 && change.level === 3) ||
-      !tanokoChanges.some((change) => change.previousLevel === 3 && change.level === 2) ||
-      !tanokoChanges.some((change) => change.previousLevel === 2 && change.level === null)
-    ) {
-      throw new Error(`Post-seed Tanoko coverage failed for ${supplier.code}.`);
-    }
     const [
       lines,
       jobs,
       members,
       parts,
       shiftTemplates,
-      historicalShifts,
-      liveShifts,
+      lineShifts,
+      lineShiftAssignments,
+      historicalOccurrences,
+      currentOccurrences,
       henkatens,
       henkatenCategories,
+      historicalHenkatens,
       openWarnings,
-      activeReservations,
-      unresolvedIssues,
-      resolvedIssues,
+      layouts,
       photos,
-      boardLayouts,
-      layoutAudits,
-      mpPortraitReuse,
-      sensitiveMembers,
-      sensitiveJobs,
-      sensitivePhotoPaths,
-      sensitiveHenkatens,
-      shiftLoadStats,
-      usageStats,
-      timingStats,
-      checklistStats,
+      tanokoMappings,
+      configuredAssignments,
     ] = await Promise.all([
       prisma.line.count({ where: { supplierId: supplier.id } }),
       prisma.job.count({ where: { supplierId: supplier.id } }),
       prisma.member.count({ where: { supplierId: supplier.id } }),
       prisma.part.count({ where: { supplierId: supplier.id } }),
       prisma.shiftTemplate.count({ where: { supplierId: supplier.id } }),
-      prisma.shiftRun.count({ where: { supplierId: supplier.id, status: 'ENDED' } }),
-      prisma.shiftRun.count({ where: { supplierId: supplier.id, status: 'ACTIVE' } }),
+      prisma.lineShift.count({ where: { supplierId: supplier.id } }),
+      prisma.lineShiftJobAssignment.count({ where: { supplierId: supplier.id } }),
+      prisma.shiftRun.count({
+        where: { supplierId: supplier.id, scheduledEndAt: { lt: new Date() } },
+      }),
+      prisma.shiftRun.count({
+        where: {
+          supplierId: supplier.id,
+          scheduledStartAt: { lte: new Date() },
+          scheduledEndAt: { gt: new Date() },
+        },
+      }),
       prisma.henkaten.groupBy({
         by: ['status'],
         where: { supplierId: supplier.id },
@@ -1515,116 +1396,19 @@ async function verifySeed(prisma: PrismaClient) {
         where: { supplierId: supplier.id },
         _count: { _all: true },
       }),
+      prisma.henkaten.count({
+        where: { supplierId: supplier.id, submissionKey: { contains: '-historical-' } },
+      }),
       prisma.warningInstance.count({
         where: { supplierId: supplier.id, status: 'OPEN', sourceMode: 'HOSTED' },
       }),
-      prisma.mPReservation.count({
-        where: { supplierId: supplier.id, releasedAt: null },
-      }),
-      prisma.assignmentIssue.count({
-        where: { supplierId: supplier.id, status: 'OPEN' },
-      }),
-      prisma.assignmentIssue.count({
-        where: { supplierId: supplier.id, status: 'RESOLVED' },
-      }),
+      prisma.lineBoardLayout.count({ where: { supplierId: supplier.id } }),
       prisma.memberPhoto.count({ where: { supplierId: supplier.id, state: 'CURRENT' } }),
-      prisma.lineBoardLayout.findMany({
-        where: { supplierId: supplier.id },
-        orderBy: { lineId: 'asc' },
-        include: {
-          line: {
-            select: {
-              shiftRuns: {
-                where: { status: 'ACTIVE' },
-                select: {
-                  workingAssignments: {
-                    where: { active: true, includedInPlan: true },
-                    select: { jobId: true },
-                  },
-                },
-              },
-            },
-          },
-        },
+      prisma.tanokoMapping.findMany({ where: { supplierId: supplier.id } }),
+      prisma.lineShiftJobAssignment.findMany({
+        where: { supplierId: supplier.id, mpMemberId: { not: null } },
+        select: { jobId: true, mpMemberId: true },
       }),
-      prisma.auditEvent.count({
-        where: {
-          supplierId: supplier.id,
-          action: 'BOARD_LAYOUT_CREATED',
-          resourceType: 'LineBoardLayout',
-        },
-      }),
-      prisma.$queryRaw<Array<{ checksum: string; count: number }>>`
-        SELECT p."fullChecksum" AS checksum, count(*)::int AS count
-        FROM "MemberPhoto" p
-        JOIN "Member" m ON m.id = p."memberId" AND m."supplierId" = p."supplierId"
-        WHERE p."supplierId" = ${supplier.id} AND p.state = 'CURRENT' AND m.role = 'MP'
-        GROUP BY p."fullChecksum"
-        ORDER BY p."fullChecksum"
-      `,
-      prisma.member.findMany({
-        where: { supplierId: supplier.id },
-        select: { fullName: true, registrationNumber: true },
-      }),
-      prisma.job.findMany({
-        where: { supplierId: supplier.id },
-        select: { name: true },
-      }),
-      prisma.memberPhoto.findMany({
-        where: { supplierId: supplier.id, state: 'CURRENT' },
-        select: { fullPath: true, thumbnailPath: true },
-      }),
-      prisma.henkaten.findMany({
-        where: { supplierId: supplier.id },
-        select: {
-          identifier: true,
-          creatorNameSnapshot: true,
-          cause: true,
-          detail: true,
-          affectedObject: true,
-          replacementObject: true,
-          withdrawalReason: true,
-        },
-      }),
-      prisma.$queryRaw<Array<{ minimum: number; maximum: number; variants: number }>>`
-        SELECT min(load)::int AS minimum, max(load)::int AS maximum,
-               count(DISTINCT load)::int AS variants
-        FROM (
-          SELECT h."shiftRunId", count(*)::int AS load
-          FROM "Henkaten" h
-          JOIN "ShiftRun" s ON s.id = h."shiftRunId"
-          WHERE h."supplierId" = ${supplier.id} AND s.status = 'ENDED'
-          GROUP BY h."shiftRunId"
-        ) loads
-      `,
-      prisma.$queryRaw<Array<{ parts: number; lineMinimum: number; lineMaximum: number }>>`
-        SELECT count(DISTINCT h."partId")::int AS parts,
-               min(line_load)::int AS "lineMinimum", max(line_load)::int AS "lineMaximum"
-        FROM (
-          SELECT h.*, count(*) OVER (PARTITION BY h."lineId")::int AS line_load
-          FROM "Henkaten" h
-          WHERE h."supplierId" = ${supplier.id}
-        ) h
-      `,
-      prisma.$queryRaw<
-        Array<{ eventMinutes: number; resolutionMinutes: number; finalizedAfterShift: number }>
-      >`
-        SELECT count(DISTINCT extract(epoch FROM (h."occurredAt" - s."scheduledStartAt")) / 60)::int
-                 AS "eventMinutes",
-               count(DISTINCT extract(epoch FROM (h."finalizedAt" - h."occurredAt")) / 60)::int
-                 AS "resolutionMinutes",
-               count(*) FILTER (WHERE h."finalizedAt" > s."endedAt")::int
-                 AS "finalizedAfterShift"
-        FROM "Henkaten" h
-        JOIN "ShiftRun" s ON s.id = h."shiftRunId"
-        WHERE h."supplierId" = ${supplier.id} AND s.status = 'ENDED'
-      `,
-      prisma.$queryRaw<Array<{ yesAnswers: number; noAnswers: number }>>`
-        SELECT count(*) FILTER (WHERE a.answer = 'YES')::int AS "yesAnswers",
-               count(*) FILTER (WHERE a.answer = 'NO')::int AS "noAnswers"
-        FROM "HenkatenChecklistAnswer" a
-        WHERE a."supplierId" = ${supplier.id}
-      `,
     ]);
     const expected = expectedByCode.get(supplier.code);
     if (!expected) throw new Error(`No local seed plan exists for ${supplier.code}.`);
@@ -1634,44 +1418,25 @@ async function verifySeed(prisma: PrismaClient) {
     const categories = Object.fromEntries(
       henkatenCategories.map(({ category, _count }) => [category, _count._all]),
     );
-    const forbiddenLayoutContent = [
-      ...sensitiveMembers.flatMap(({ fullName, registrationNumber }) => [
-        fullName,
-        registrationNumber,
-      ]),
-      ...sensitivePhotoPaths.flatMap(({ fullPath, thumbnailPath }) => [fullPath, thumbnailPath]),
-      ...sensitiveHenkatens.flatMap((henkaten) => Object.values(henkaten)),
-    ].filter((value): value is string => typeof value === 'string' && value.length > 0);
-    const validLayouts = boardLayouts.every((layout) => {
-      const parsed = boardLayoutDocumentSchema.safeParse(layout.document);
-      if (!parsed.success || layout.version !== 1 || layout.schemaVersion !== 1) return false;
-      const serialized = JSON.stringify(parsed.data);
-      if (forbiddenLayoutContent.some((value) => serialized.includes(value))) return false;
-      const layoutText = parsed.data.nodes
-        .filter((node) => node.type === 'TEXT')
-        .map(({ text }) => text);
-      if (sensitiveJobs.some(({ name }) => layoutText.includes(name))) return false;
-      const jobIds = parsed.data.nodes
-        .filter((node) => node.type === 'JOB_SLOT')
-        .map(({ jobId }) => jobId)
-        .sort();
-      const activeJobIds = layout.line.shiftRuns
-        .flatMap(({ workingAssignments }) => workingAssignments.map(({ jobId }) => jobId))
-        .sort();
-      return (
-        jobIds.length === 4 &&
-        new Set(jobIds).size === 4 &&
-        JSON.stringify(jobIds) === JSON.stringify(activeJobIds)
-      );
-    });
+    const assignmentsQualified = configuredAssignments.every((assignment) =>
+      tanokoMappings.some(
+        (mapping) =>
+          mapping.memberId === assignment.mpMemberId &&
+          mapping.jobId === assignment.jobId &&
+          (mapping.level ?? 0) >= 3,
+      ),
+    );
     if (
       lines !== 3 ||
       jobs !== 12 ||
       members !== 22 ||
       parts !== 8 ||
       shiftTemplates !== 3 ||
-      historicalShifts !== LOCAL_SEED_HISTORICAL_SHIFT_COUNT ||
-      liveShifts !== 3 ||
+      lineShifts !== 9 ||
+      lineShiftAssignments !== 36 ||
+      historicalOccurrences !== LOCAL_SEED_HISTORICAL_SHIFT_COUNT ||
+      currentOccurrences !== 3 ||
+      historicalHenkatens !== 108 ||
       Object.values(statuses).reduce((sum, value) => sum + value, 0) !==
         LOCAL_SEED_HENKATEN_PER_SUPPLIER ||
       statuses.APPROVED !== expected.statuses.APPROVED ||
@@ -1682,26 +1447,10 @@ async function verifySeed(prisma: PrismaClient) {
       categories.MACHINE !== expected.categories.MACHINE ||
       categories.MATERIAL !== expected.categories.MATERIAL ||
       categories.METHOD !== expected.categories.METHOD ||
-      shiftLoadStats[0]?.minimum !== 1 ||
-      shiftLoadStats[0]?.maximum !== 6 ||
-      (shiftLoadStats[0]?.variants ?? 0) < 5 ||
-      usageStats[0]?.parts !== 8 ||
-      (usageStats[0]?.lineMaximum ?? 0) - (usageStats[0]?.lineMinimum ?? 0) < 5 ||
-      (timingStats[0]?.eventMinutes ?? 0) < 20 ||
-      (timingStats[0]?.resolutionMinutes ?? 0) < 20 ||
-      timingStats[0]?.finalizedAfterShift !== 0 ||
-      checklistStats[0]?.noAnswers !== 0 ||
-      (checklistStats[0]?.yesAnswers ?? 0) < LOCAL_SEED_HENKATEN_PER_SUPPLIER * 4 ||
-      openWarnings !== 8 ||
-      activeReservations < 1 ||
-      unresolvedIssues < 1 ||
-      resolvedIssues < 1 ||
+      openWarnings !== expected.statuses.OPEN ||
+      layouts !== 3 ||
       photos !== 19 ||
-      boardLayouts.length !== 3 ||
-      !validLayouts ||
-      layoutAudits !== 3 ||
-      mpPortraitReuse.length !== 4 ||
-      mpPortraitReuse.some(({ count }) => count !== 3)
+      !assignmentsQualified
     ) {
       throw new Error(
         `Post-seed invariant failed for ${supplier.code}: ${JSON.stringify({
@@ -1710,76 +1459,59 @@ async function verifySeed(prisma: PrismaClient) {
           members,
           parts,
           shiftTemplates,
-          historicalShifts,
-          liveShifts,
+          lineShifts,
+          lineShiftAssignments,
+          historicalOccurrences,
+          currentOccurrences,
+          historicalHenkatens,
           statuses,
           categories,
-          shiftLoadStats: shiftLoadStats[0],
-          usageStats: usageStats[0],
-          timingStats: timingStats[0],
-          checklistStats: checklistStats[0],
           openWarnings,
-          activeReservations,
-          unresolvedIssues,
-          resolvedIssues,
+          layouts,
           photos,
-          boardLayouts: boardLayouts.length,
-          validLayouts,
-          layoutAudits,
-          mpPortraitReuse,
+          assignmentsQualified,
         })}`,
       );
     }
   }
-  const [
-    externalClients,
-    ingestionEvents,
-    externalProjections,
-    pushSubscriptions,
-    pushDeliveries,
-    boardLayoutTotal,
-    boardLayoutAuditTotal,
-    portraitReuseTotal,
-    pendingOutbox,
-    failedOutbox,
-  ] = await Promise.all([
-    prisma.externalApiClient.count(),
-    prisma.externalIngestionEvent.count(),
-    prisma.externalHenkatenProjection.count(),
-    prisma.pushSubscription.count(),
-    prisma.pushDelivery.count(),
-    prisma.lineBoardLayout.count(),
-    prisma.auditEvent.count({
-      where: { action: 'BOARD_LAYOUT_CREATED', resourceType: 'LineBoardLayout' },
-    }),
-    prisma.$queryRaw<Array<{ checksum: string; count: number }>>`
-      SELECT p."fullChecksum" AS checksum, count(*)::int AS count
-      FROM "MemberPhoto" p
-      JOIN "Member" m ON m.id = p."memberId" AND m."supplierId" = p."supplierId"
-      WHERE p.state = 'CURRENT' AND m.role = 'MP'
-      GROUP BY p."fullChecksum"
-      ORDER BY p."fullChecksum"
-    `,
+  const [pendingOutbox, failedOutbox] = await Promise.all([
     prisma.outboxEvent.count({ where: { processedAt: null, failedAt: null } }),
     prisma.outboxEvent.count({ where: { failedAt: { not: null } } }),
   ]);
+  if (pendingOutbox !== 0 || failedOutbox !== 0) {
+    throw new Error('Post-seed invariant failed: transactional outbox is unhealthy.');
+  }
+}
+
+async function verifySeedDashboard(runtime: SupplierRuntime) {
+  const dashboard = await runtime.admin.api.request<{
+    totals: { all: number; open: number; approved: number; rejected: number; cancelled: number };
+    trend: unknown[];
+  }>('GET', '/api/v1/supplier/dashboard?granularity=DAY', undefined, undefined, 200);
+  const expected = localSeedSummary([runtime.plan])[0]!;
   if (
-    externalClients !== 0 ||
-    ingestionEvents !== 0 ||
-    externalProjections !== 0 ||
-    pushSubscriptions !== 0 ||
-    pushDeliveries !== 0 ||
-    boardLayoutTotal !== 6 ||
-    boardLayoutAuditTotal !== 6 ||
-    portraitReuseTotal.length !== 4 ||
-    portraitReuseTotal.some(({ count }) => count !== 6) ||
-    pendingOutbox !== 0 ||
-    failedOutbox !== 0
+    dashboard.totals.all !== expected.henkaten ||
+    dashboard.totals.open !== expected.statuses.OPEN ||
+    dashboard.totals.approved !== expected.statuses.APPROVED ||
+    dashboard.totals.rejected !== expected.statuses.REJECTED ||
+    dashboard.totals.cancelled !== expected.statuses.CANCELLED ||
+    dashboard.trend.length === 0
   ) {
     throw new Error(
-      'Post-seed invariant failed: External, synthetic push, or unhealthy outbox state exists.',
+      `Post-seed dashboard invariant failed for ${runtime.plan.code}: ${JSON.stringify(dashboard.totals)}`,
     );
   }
+}
+
+async function waitForOutbox(prisma: PrismaClient) {
+  for (let attempt = 0; attempt < 240; attempt += 1) {
+    const pending = await prisma.outboxEvent.count({
+      where: { processedAt: null, failedAt: null },
+    });
+    if (pending === 0) return;
+    await delay(250);
+  }
+  throw new Error('Transactional outbox did not drain before local seed verification.');
 }
 
 async function writeManifest(manifest: Manifest) {
@@ -1827,6 +1559,15 @@ function jakartaDate(daysAgo: number) {
   }).formatToParts(new Date(Date.now() - daysAgo * 86_400_000));
   const value = Object.fromEntries(parts.map(({ type, value: part }) => [type, part]));
   return `${value.year}-${value.month}-${value.day}`;
+}
+
+function jakartaInstant(businessDate: string, time: string) {
+  return new Date(`${businessDate}T${time}:00+07:00`);
+}
+
+function minuteOfDay(time: string) {
+  const [hour, minute] = time.split(':').map(Number);
+  return hour! * 60 + minute!;
 }
 
 function realmOrigin(path: string) {

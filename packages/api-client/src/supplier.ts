@@ -10,7 +10,6 @@ import { z } from 'zod';
 import {
   assignmentBoardSchema,
   boardLayoutResponseSchema,
-  assignmentIssuePageSchema,
   auditPageSchema,
   checklistDraftSchema,
   checklistVersionSchema,
@@ -23,6 +22,9 @@ import {
   jobPageSchema,
   jobSchema,
   linePageSchema,
+  lineShiftListSchema,
+  lineShiftOperationalContextSchema,
+  lineShiftSchema,
   lineSchema,
   memberCredentialResponseSchema,
   memberPageSchema,
@@ -34,15 +36,11 @@ import {
   pushSubscriptionSchema,
   partPageSchema,
   partSchema,
-  preStartResolutionContextSchema,
   sessionResponseSchema,
-  shiftRunDetailSchema,
-  shiftRunPageSchema,
   shiftTemplatePageSchema,
   shiftTemplateSchema,
   supplierDashboardSchema,
   supplierSetupReadinessSchema,
-  workingAssignmentSchema,
   type AuditQuery,
   type BoardQuery,
   type BoardLayoutSaveRequest,
@@ -51,9 +49,10 @@ import {
   type DashboardQuery,
   type HenkatenFormOptionsQuery,
   type HenkatenListQuery,
+  type CreateLineShiftRequest,
+  type UpdateLineShiftAssignmentsRequest,
   type MasterListQuery,
   type NotificationListQuery,
-  type ShiftListQuery,
   type SupplierLoginRequest,
 } from '@tmmin-henkaten/contracts';
 
@@ -61,11 +60,6 @@ import { ApiClient } from './core';
 
 const versionsSchema = z.object({ items: z.array(checklistVersionSchema) }).strict();
 const transitionsSchema = z.array(henkatenTransitionSchema);
-const assignmentsSchema = z
-  .object({ items: z.array(workingAssignmentSchema) })
-  .strict()
-  .transform(({ items }) => items);
-
 export class SupplierApi {
   constructor(private readonly client: ApiClient) {}
 
@@ -464,6 +458,42 @@ export class SupplierApi {
     });
   }
 
+  lineShifts(lineId: string) {
+    return this.client.request(`/api/v1/supplier/master-data/lines/${lineId}/shifts`, {
+      responseSchema: lineShiftListSchema,
+    });
+  }
+
+  lineShiftOperationalContext() {
+    return this.client.request('/api/v1/supplier/master-data/line-shifts/operational-context', {
+      responseSchema: lineShiftOperationalContextSchema,
+    });
+  }
+
+  createLineShift(lineId: string, body: CreateLineShiftRequest) {
+    return this.client.request(`/api/v1/supplier/master-data/lines/${lineId}/shifts`, {
+      method: 'POST',
+      body,
+      responseSchema: lineShiftSchema,
+    });
+  }
+
+  updateLineShiftAssignments(id: string, body: UpdateLineShiftAssignmentsRequest) {
+    return this.client.request(`/api/v1/supplier/master-data/line-shifts/${id}/assignments`, {
+      method: 'PATCH',
+      body,
+      responseSchema: lineShiftSchema,
+    });
+  }
+
+  lineShiftAction(id: string, action: 'activate' | 'deactivate', expectedVersion: number) {
+    return this.client.request(`/api/v1/supplier/master-data/line-shifts/${id}/${action}`, {
+      method: 'POST',
+      body: { expectedVersion },
+      responseSchema: lineShiftSchema,
+    });
+  }
+
   assignDefault(kind: 'supervisor' | 'leader' | 'mp', resourceId: string, body: unknown) {
     const path =
       kind === 'supervisor'
@@ -499,88 +529,6 @@ export class SupplierApi {
       method: 'POST',
       body,
       responseSchema: defaultAssignmentsSchema,
-    });
-  }
-
-  shifts(query: ShiftListQuery = { limit: 30 }) {
-    return this.client.request('/api/v1/supplier/shifts', {
-      query,
-      responseSchema: shiftRunPageSchema,
-    });
-  }
-
-  currentShift(query: { lineId?: string } = {}) {
-    return this.client.request('/api/v1/supplier/shifts/current', {
-      query,
-      responseSchema: shiftRunDetailSchema.nullable(),
-    });
-  }
-
-  prepareShift(body: unknown) {
-    return this.client.request('/api/v1/supplier/shifts/preflight', {
-      method: 'POST',
-      body,
-      responseSchema: shiftRunDetailSchema,
-    });
-  }
-
-  shift(id: string) {
-    return this.client.request(`/api/v1/supplier/shifts/${id}`, {
-      responseSchema: shiftRunDetailSchema,
-    });
-  }
-
-  shiftPreflight(id: string) {
-    return this.client.request(`/api/v1/supplier/shifts/${id}/preflight`, {
-      responseSchema: shiftRunDetailSchema,
-    });
-  }
-
-  startShift(id: string, body: unknown, idempotencyKey: string) {
-    return this.client.request(`/api/v1/supplier/shifts/${id}/start`, {
-      method: 'POST',
-      body,
-      idempotencyKey,
-      responseSchema: shiftRunDetailSchema,
-    });
-  }
-
-  emergencyStartShift(id: string, body: unknown, idempotencyKey: string) {
-    return this.client.request(`/api/v1/supplier/shifts/${id}/emergency-start`, {
-      method: 'POST',
-      body,
-      idempotencyKey,
-      responseSchema: shiftRunDetailSchema,
-    });
-  }
-
-  endShift(id: string, body: unknown, idempotencyKey: string) {
-    return this.client.request(`/api/v1/supplier/shifts/${id}/end`, {
-      method: 'POST',
-      body,
-      idempotencyKey,
-      responseSchema: shiftRunDetailSchema,
-    });
-  }
-
-  shiftIssues(id?: string) {
-    return this.client.request(
-      id
-        ? `/api/v1/supplier/shifts/${id}/assignment-issues`
-        : '/api/v1/supplier/shifts/assignment-issues',
-      { responseSchema: assignmentIssuePageSchema },
-    );
-  }
-
-  resolutionContext(id: string) {
-    return this.client.request(`/api/v1/supplier/shifts/${id}/resolution-context`, {
-      responseSchema: preStartResolutionContextSchema,
-    });
-  }
-
-  workingAssignments(id: string) {
-    return this.client.request(`/api/v1/supplier/shifts/${id}/working-assignments`, {
-      responseSchema: assignmentsSchema,
     });
   }
 

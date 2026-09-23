@@ -307,6 +307,9 @@ describe('Supplier application foundation', () => {
       id,
       identifier: 'HEN-SUP-001-20260728-0001',
       shiftRunId: '00000000-0000-4000-8000-000000000011',
+      lineShiftId: null,
+      effectiveStartAt: null,
+      effectiveEndAt: null,
       lineId: '00000000-0000-4000-8000-000000000012',
       jobId: '00000000-0000-4000-8000-000000000013',
       partId: '00000000-0000-4000-8000-000000000014',
@@ -324,6 +327,7 @@ describe('Supplier application foundation', () => {
         qc: route('QC', 'PENDING'),
       },
       version: 2,
+      pcr: null,
       timezone: 'Asia/Jakarta',
       shiftName: 'Shift Pagi',
       creatorName: 'Line Leader',
@@ -374,7 +378,6 @@ describe('Supplier application foundation', () => {
     expect(screen.getByRole('heading', { name: 'Penyebab & detail' })).toBeTruthy();
     expect(screen.getByText('Lot lama')).toBeTruthy();
     expect(screen.getByText('Lot baru')).toBeTruthy();
-    expect(screen.getByText(/Data immutable/i)).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Approve' }));
     expect(screen.getByRole('dialog', { name: /Approve route QC/i })).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Konfirmasi Approve' }));

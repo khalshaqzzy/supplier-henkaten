@@ -36,6 +36,7 @@ describe('External API credential and ingestion boundary', () => {
     process.env['SESSION_CSRF_SECRET'] = 'integration-test-csrf-secret-at-least-32';
     process.env['AUTH_THROTTLE_SECRET'] = 'integration-test-throttle-secret-32';
     process.env['OUTBOX_ENABLED'] = 'false';
+    process.env['PCR_WORKER_ENABLED'] = 'false';
 
     const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = module.createNestApplication();
@@ -133,6 +134,13 @@ describe('External API credential and ingestion boundary', () => {
     const accepted = await ingest(opened);
     expect(accepted.status).toBe(202);
     expect(accepted.body.status).toBe('ACCEPTED');
+    const openedProjection = await prisma.externalHenkatenProjection.findFirstOrThrow({
+      where: { supplierId, sourceHenkatenId: 'supplier-henkaten-1' },
+    });
+    const openedAssessment = await prisma.pcrAssessment.findUniqueOrThrow({
+      where: { externalProjectionId: openedProjection.id },
+    });
+    expect(openedAssessment.status).toBe('PENDING');
     const duplicate = await ingest(opened);
     expect(duplicate.status).toBe(200);
     expect(duplicate.body.status).toBe('DUPLICATE');
@@ -172,6 +180,12 @@ describe('External API credential and ingestion boundary', () => {
     });
     projectionId = projection.id;
     expect(projection.status).toBe('APPROVED');
+    const statusOnlyAssessment = await prisma.pcrAssessment.findUniqueOrThrow({
+      where: { externalProjectionId: projectionId },
+    });
+    expect(statusOnlyAssessment.id).toBe(openedAssessment.id);
+    expect(statusOnlyAssessment.inputHash).toBe(openedAssessment.inputHash);
+    expect(statusOnlyAssessment.version).toBe(openedAssessment.version);
     await expect(
       prisma.warningInstance.findUniqueOrThrow({
         where: { externalProjectionId: projection.id },
@@ -187,6 +201,72 @@ describe('External API credential and ingestion boundary', () => {
         data: { eventType: 'TAMPERED' },
       }),
     ).rejects.toThrow();
+  });
+
+  it('requeues External screening only when the cause or detail changes', async () => {
+    const sourceHenkatenId = `source-${randomUUID()}`;
+    const opened = event({
+      eventId: `opened-${randomUUID()}`,
+      sourceHenkatenId,
+      sourceVersion: 1,
+      eventType: 'HENKATEN_OPENED',
+      status: 'OPEN',
+    });
+    expect((await ingest(opened)).status).toBe(202);
+    const projection = await prisma.externalHenkatenProjection.findFirstOrThrow({
+      where: { supplierId, sourceHenkatenId },
+    });
+    const before = await prisma.pcrAssessment.findUniqueOrThrow({
+      where: { externalProjectionId: projection.id },
+    });
+    const changed = {
+      ...event({
+        eventId: `updated-${randomUUID()}`,
+        sourceHenkatenId,
+        sourceVersion: 2,
+        eventType: 'HENKATEN_OPEN_UPDATED',
+        status: 'OPEN',
+      }),
+      change: {
+        ...opened.change,
+        cause: 'Metode pengencangan dan setting torsi berubah',
+        detail: 'Tool baru dengan parameter proses yang berbeda dipakai pada produksi massal.',
+      },
+    };
+    expect((await ingest(changed)).status).toBe(202);
+    const after = await prisma.pcrAssessment.findUniqueOrThrow({
+      where: { externalProjectionId: projection.id },
+    });
+    expect(after.id).toBe(before.id);
+    expect(after.inputHash).not.toBe(before.inputHash);
+    expect(after.version).toBe(before.version + 1);
+    expect(after.status).toBe('PENDING');
+    expect((await ingest(changed)).body.status).toBe('DUPLICATE');
+    expect(
+      (
+        await prisma.pcrAssessment.findUniqueOrThrow({
+          where: { externalProjectionId: projection.id },
+        })
+      ).version,
+    ).toBe(after.version);
+  });
+
+  it('accepts a first TMMIN decision for an unassessed historical External projection', async () => {
+    await prisma.pcrAssessment.delete({ where: { externalProjectionId: projectionId } });
+    const correction = await tmminPost(
+      `/api/v1/tmmin/henkatens/EXTERNAL/${supplierId}/${projectionId}/pcr-decision`,
+      {
+        status: 'PCR',
+        reason: 'The source record reports a different manufacturing tool and process condition.',
+        expectedVersion: 0,
+      },
+    );
+    expect(correction.status).toBe(200);
+    expect(correction.body).toMatchObject({
+      status: 'PCR',
+      decisionSource: 'TMMIN',
+      version: 1,
+    });
   });
 
   it('processes batch items independently and exposes TMMIN traceability', async () => {

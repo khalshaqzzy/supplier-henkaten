@@ -14,6 +14,7 @@ import {
 import { MasterDataAccessService } from './master-data-access.service.js';
 import { MemberService } from './member.service.js';
 import { PhotoService } from './photo.service.js';
+import { LineShiftService } from './line-shift.service.js';
 import { TmminMasterDataController } from './tmmin-master-data.controller.js';
 
 @Module({
@@ -33,7 +34,14 @@ import { TmminMasterDataController } from './tmmin-master-data.controller.js';
     ChecklistService,
     AssignmentService,
     PhotoService,
+    LineShiftService,
   ],
-  exports: [MasterDataAccessService, ChecklistService, AssignmentService, PhotoService],
+  exports: [
+    MasterDataAccessService,
+    ChecklistService,
+    AssignmentService,
+    PhotoService,
+    LineShiftService,
+  ],
 })
 export class MasterDataModule {}

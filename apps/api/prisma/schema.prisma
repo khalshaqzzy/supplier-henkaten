@@ -78,6 +78,19 @@ enum HenkatenCategory {
   METHOD
 }
 
+enum PcrStatus {
+  PENDING
+  PCR
+  NO_PCR
+  REVIEW
+}
+
+enum PcrDecisionSource {
+  AI
+  TMMIN
+  SEED
+}
+
 enum MemberPhotoState {
   CURRENT
   PENDING_DELETE
@@ -193,6 +206,8 @@ model Supplier {
   jobs                    Job[]
   parts                   Part[]
   shiftTemplates          ShiftTemplate[]
+  lineShifts              LineShift[]
+  lineShiftJobAssignments LineShiftJobAssignment[]
   checklistTemplates      ChecklistTemplate[]
   checklistVersions       ChecklistVersion[]
   defaultAssignmentSet    DefaultAssignmentSet?
@@ -204,6 +219,7 @@ model Supplier {
   assignmentIssues        AssignmentIssue[]
   henkatenDailySequences  HenkatenDailySequence[]
   henkatens               Henkaten[]
+  pcrAssessments          PcrAssessment[]
   mpReservations          MPReservation[]
   warningInstances        WarningInstance[]
   approvalRoutes          HenkatenApprovalRoute[]
@@ -550,6 +566,7 @@ model ExternalHenkatenProjection {
   supplier          Supplier                 @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   ingestionEvents   ExternalIngestionEvent[]
   warning           WarningInstance?
+  pcrAssessment     PcrAssessment?
 
   @@unique([id, supplierId])
   @@unique([supplierId, sourceEpoch, sourceHenkatenId])
@@ -580,6 +597,9 @@ model Member {
   assignedJobs                 DefaultJobMp[]
   supervisedShiftRuns          ShiftRun[]              @relation("ShiftRunSupervisor")
   ledShiftRuns                 ShiftRun[]              @relation("ShiftRunLineLeader")
+  supervisedLineShifts         LineShift[]              @relation("LineShiftSupervisor")
+  ledLineShifts                LineShift[]              @relation("LineShiftLineLeader")
+  lineShiftJobAssignments      LineShiftJobAssignment[]
   effectiveWorkingAssignments  WorkingAssignment[]     @relation("WorkingEffectiveMp")
   candidateWorkingAssignments  WorkingAssignment[]     @relation("WorkingCandidateMp")
   replacedManHenkatens         ManHenkatenDetail[]     @relation("ManReplacedMp")
@@ -644,6 +664,7 @@ model Line {
   defaultSupervisor  DefaultLineSupervisor?
   defaultLineLeader  DefaultLineLeader?
   shiftRuns          ShiftRun[]
+  lineShifts         LineShift[]
   workingAssignments WorkingAssignment[]
   assignmentIssues   AssignmentIssue[]
   henkatens          Henkaten[]
@@ -693,6 +714,7 @@ model Job {
   supplier           Supplier             @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   line               Line                 @relation(fields: [lineId, supplierId], references: [id, supplierId], onDelete: Restrict)
   defaultMp          DefaultJobMp?
+  lineShiftAssignments LineShiftJobAssignment[]
   workingAssignments WorkingAssignment[]
   assignmentIssues   AssignmentIssue[]
   henkatens          Henkaten[]
@@ -742,6 +764,7 @@ model ShiftTemplate {
   updatedById  String?    @db.Uuid
   supplier     Supplier   @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   shiftRuns    ShiftRun[]
+  lineShifts   LineShift[]
 
   @@unique([id, supplierId])
   @@index([supplierId, active, displayOrder])
@@ -815,6 +838,59 @@ model DefaultAssignmentSet {
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
   updatedById String?  @db.Uuid
   supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+}
+
+/// Recurring shift configuration for one production line. It has no runtime
+/// start/end lifecycle; schedule boundaries are derived from ShiftTemplate.
+model LineShift {
+  id                 String                   @id @default(uuid()) @db.Uuid
+  supplierId         String                   @db.Uuid
+  lineId             String                   @db.Uuid
+  shiftTemplateId    String                   @db.Uuid
+  supervisorMemberId String?                  @db.Uuid
+  lineLeaderMemberId String?                  @db.Uuid
+  active             Boolean                  @default(true)
+  version            Int                      @default(1)
+  createdAt          DateTime                 @default(now()) @db.Timestamptz(3)
+  createdById        String?                  @db.Uuid
+  updatedAt          DateTime                 @updatedAt @db.Timestamptz(3)
+  updatedById        String?                  @db.Uuid
+  supplier           Supplier                 @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  line               Line                     @relation(fields: [lineId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  shiftTemplate      ShiftTemplate            @relation(fields: [shiftTemplateId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  supervisor         Member?                  @relation("LineShiftSupervisor", fields: [supervisorMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  lineLeader         Member?                  @relation("LineShiftLineLeader", fields: [lineLeaderMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  jobAssignments     LineShiftJobAssignment[]
+  henkatens          Henkaten[]
+
+  @@unique([id, supplierId])
+  @@unique([supplierId, lineId, shiftTemplateId])
+  @@index([supplierId, lineId, active])
+  @@index([supplierId, lineLeaderMemberId, active])
+  @@index([supplierId, supervisorMemberId, active])
+}
+
+model LineShiftJobAssignment {
+  id          String    @id @default(uuid()) @db.Uuid
+  supplierId  String    @db.Uuid
+  lineShiftId String    @db.Uuid
+  jobId       String    @db.Uuid
+  mpMemberId  String?   @db.Uuid
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  createdById String?   @db.Uuid
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+  updatedById String?   @db.Uuid
+  supplier    Supplier  @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  lineShift   LineShift @relation(fields: [lineShiftId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  job         Job       @relation(fields: [jobId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  mp          Member?   @relation(fields: [mpMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  manDetails  ManHenkatenDetail[]
+
+  @@unique([id, supplierId])
+  @@unique([supplierId, lineShiftId, jobId])
+  @@index([supplierId, lineShiftId])
+  @@index([supplierId, mpMemberId])
 }
 
 model DefaultLineSupervisor {
@@ -1019,6 +1095,7 @@ model Henkaten {
   id                           String                      @id @default(uuid()) @db.Uuid
   supplierId                   String                      @db.Uuid
   shiftRunId                   String                      @db.Uuid
+  lineShiftId                  String?                     @db.Uuid
   lineId                       String                      @db.Uuid
   jobId                        String                      @db.Uuid
   partId                       String                      @db.Uuid
@@ -1044,6 +1121,8 @@ model Henkaten {
   affectedObject               String?                     @db.VarChar(2000)
   replacementObject            String?                     @db.VarChar(2000)
   occurredAt                   DateTime                    @db.Timestamptz(3)
+  effectiveStartAt             DateTime?                   @db.Timestamptz(3)
+  effectiveEndAt               DateTime?                   @db.Timestamptz(3)
   cancellationReason           HenkatenCancellationReason?
   withdrawalReason             String?                     @db.VarChar(1000)
   finalizedAt                  DateTime?                   @db.Timestamptz(3)
@@ -1057,6 +1136,7 @@ model Henkaten {
   updatedAt                    DateTime                    @updatedAt @db.Timestamptz(3)
   supplier                     Supplier                    @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   shiftRun                     ShiftRun                    @relation(fields: [shiftRunId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  lineShift                    LineShift?                  @relation(fields: [lineShiftId, supplierId], references: [id, supplierId], onDelete: Restrict)
   line                         Line                        @relation(fields: [lineId, supplierId], references: [id, supplierId], onDelete: Restrict)
   job                          Job                         @relation(fields: [jobId, supplierId], references: [id, supplierId], onDelete: Restrict)
   part                         Part                        @relation(fields: [partId, supplierId], references: [id, supplierId], onDelete: Restrict)
@@ -1068,6 +1148,7 @@ model Henkaten {
   transitions                  HenkatenTransition[]
   reservation                  MPReservation?
   warning                      WarningInstance?
+  pcrAssessment                PcrAssessment?
   approvalRoutes               HenkatenApprovalRoute[]
   approvalDecisions            ApprovalDecision[]
   approvalRoutingHistory       ApprovalRouteRouting[]
@@ -1082,7 +1163,39 @@ model Henkaten {
   @@index([supplierId, status, occurredAt(sort: Desc)])
   @@index([supplierId, category, occurredAt(sort: Desc)])
   @@index([supplierId, lineId, occurredAt(sort: Desc)])
+  @@index([supplierId, lineShiftId, effectiveStartAt, effectiveEndAt])
   @@index([supplierId, normalizedPartNumberSnapshot, status])
+}
+
+model PcrAssessment {
+  id                   String            @id @default(uuid()) @db.Uuid
+  supplierId           String            @db.Uuid
+  henkatenId           String?           @unique @db.Uuid
+  externalProjectionId String?           @unique @db.Uuid
+  status               PcrStatus         @default(PENDING)
+  decisionSource       PcrDecisionSource?
+  assessment           String?           @db.Text
+  aiNeedsPcr           Boolean?
+  aiConfidence         Float?
+  aiAssessment         String?           @db.Text
+  aiMatchedItems       Int[]             @default([])
+  model                String?           @db.VarChar(200)
+  promptVersion        String?           @db.VarChar(50)
+  inputHash            String            @db.Char(64)
+  leaseToken           String?           @db.Uuid
+  leasedAt             DateTime?         @db.Timestamptz(3)
+  attemptCount         Int               @default(0)
+  version              Int               @default(1)
+  reviewedById         String?           @db.Uuid
+  reviewedAt           DateTime?         @db.Timestamptz(3)
+  createdAt            DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
+  supplier             Supplier          @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  henkaten             Henkaten?         @relation(fields: [henkatenId], references: [id], onDelete: Restrict)
+  externalProjection   ExternalHenkatenProjection? @relation(fields: [externalProjectionId], references: [id], onDelete: Restrict)
+
+  @@index([status, leasedAt, createdAt])
+  @@index([supplierId, status, updatedAt(sort: Desc)])
 }
 
 model HenkatenChecklistSnapshot {
@@ -1120,6 +1233,7 @@ model ManHenkatenDetail {
   supplierId                String             @db.Uuid
   henkatenId                String             @unique @db.Uuid
   targetWorkingAssignmentId String             @db.Uuid
+  lineShiftJobAssignmentId  String?            @db.Uuid
   sourceWorkingAssignmentId String?            @db.Uuid
   replacedMpMemberId        String?            @db.Uuid
   replacedWasVacant         Boolean
@@ -1131,6 +1245,7 @@ model ManHenkatenDetail {
   resolutionIssueId         String?            @db.Uuid
   henkaten                  Henkaten           @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
   targetWorkingAssignment   WorkingAssignment  @relation("ManTargetWorking", fields: [targetWorkingAssignmentId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  lineShiftJobAssignment    LineShiftJobAssignment? @relation(fields: [lineShiftJobAssignmentId, supplierId], references: [id, supplierId], onDelete: Restrict)
   sourceWorkingAssignment   WorkingAssignment? @relation("ManSourceWorking", fields: [sourceWorkingAssignmentId, supplierId], references: [id, supplierId], onDelete: Restrict)
   replacedMp                Member?            @relation("ManReplacedMp", fields: [replacedMpMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
   replacementMp             Member             @relation("ManReplacementMp", fields: [replacementMpMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
@@ -1139,6 +1254,7 @@ model ManHenkatenDetail {
   @@unique([id, supplierId])
   @@unique([henkatenId, supplierId])
   @@index([supplierId, replacementMpMemberId])
+  @@index([supplierId, lineShiftJobAssignmentId])
   @@index([supplierId, resolutionIssueId])
 }
 

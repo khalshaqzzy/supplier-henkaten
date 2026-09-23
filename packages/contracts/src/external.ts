@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { pcrAssessmentSchema } from './pcr.js';
 
 import {
   correlationIdSchema,
@@ -278,6 +279,7 @@ export const externalProjectionSchema = z
     part: partSnapshotSchema,
     occurredAt: utcTimestampSchema,
     updatedAt: utcTimestampSchema,
+    pcr: pcrAssessmentSchema.nullable(),
   })
   .strict();
 

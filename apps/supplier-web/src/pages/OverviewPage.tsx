@@ -13,7 +13,6 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import type { DashboardQuery } from '@tmmin-henkaten/contracts';
 import {
-  Alert,
   Button,
   ChartFrame,
   EmptyState,
@@ -22,7 +21,6 @@ import {
   Input,
   LastUpdated,
   NativeSelect,
-  Panel,
   Skeleton,
 } from '@tmmin-henkaten/ui';
 
@@ -80,9 +78,9 @@ export function OverviewPage() {
   return (
     <div className="product-page">
       <PageHeader
-        eyebrow={identity.purpose === 'HOSTED_PREPARATION' ? 'Mode persiapan' : 'Operasi Hosted'}
+        eyebrow={identity.purpose === 'HOSTED_PREPARATION' ? 'Persiapan' : 'Operasional'}
         title="Overview Supplier"
-        description="Pantau Henkaten, approval, dan risiko operasional sesuai scope Anda."
+        description=""
         actions={
           identity.role === 'LINE_LEADER' ? (
             <Link className="hds-button hds-button--primary hds-button--md" to="/henkatens/new">
@@ -248,7 +246,7 @@ export function OverviewPage() {
       {dashboard.isError && (
         <ErrorState
           title="Overview tidak dapat dimuat"
-          description="Data lama tidak diubah menjadi nol. Coba muat ulang overview."
+          description=""
           action={<Button onClick={() => void dashboard.refetch()}>Coba lagi</Button>}
         />
       )}
@@ -295,7 +293,7 @@ export function OverviewPage() {
           {dashboard.data.totals.all === 0 ? (
             <EmptyState
               title="Belum ada Henkaten"
-              description="Mulai dari setup dan Start Shift sebelum membuat Henkaten pertama."
+              description=""
               action={<Link to="/setup">Buka setup</Link>}
             />
           ) : (
@@ -307,7 +305,7 @@ export function OverviewPage() {
               <div className="overview-widget overview-widget--trend">
                 <ChartFrame
                   title="Tren Henkaten 4M"
-                  description="Volume kategori per periode pada scope aktif."
+                  description=""
                   data={dashboard.data.trend.map((item) => ({
                     ...item,
                     period: formatTrendPeriod(
@@ -327,14 +325,14 @@ export function OverviewPage() {
               </div>
               <RankedDistribution
                 title="Henkaten per line"
-                description="Line dengan volume tertinggi."
+                description=""
                 items={dashboard.data.byLine}
                 emptyLabel="Belum ada distribusi line"
                 layout="line"
               />
               <RankedDistribution
                 title="Henkaten per part"
-                description="Part dengan Henkaten terbanyak."
+                description=""
                 items={dashboard.data.byPart}
                 emptyLabel="Belum ada distribusi part"
                 layout="part"
@@ -342,7 +340,7 @@ export function OverviewPage() {
               <div className="overview-widget overview-widget--outcome">
                 <ChartFrame
                   title="Tren outcome"
-                  description="Keputusan terminal per periode."
+                  description=""
                   data={dashboard.data.trend.map((item) => ({
                     ...item,
                     period: formatTrendPeriod(
@@ -372,66 +370,6 @@ export function OverviewPage() {
                   ]}
                 />
               </div>
-              <Panel
-                title="Assignment issue"
-                description="Issue yang masih membutuhkan resolusi."
-                className="overview-widget overview-widget--issues"
-                action={
-                  hasCapability('SUPPLIER_SHIFT_READ') ? (
-                    <Link className="overview-widget-link" to="/shifts">
-                      Buka Shift
-                    </Link>
-                  ) : undefined
-                }
-              >
-                {dashboard.data.assignmentIssues.length ? (
-                  <div className="overview-operational-list">
-                    {dashboard.data.assignmentIssues.map((item) => (
-                      <div key={item.type}>
-                        <span className={item.type === 'VACANCY' ? 'is-danger' : 'is-warning'}>
-                          <AlertTriangle aria-hidden="true" />
-                        </span>
-                        <div>
-                          <strong>
-                            {item.type === 'VACANCY' ? 'Posisi kosong' : 'Konflik assignment'}
-                          </strong>
-                          <small>Masih terbuka pada scope aktif</small>
-                        </div>
-                        <strong>{item.count}</strong>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <Alert tone="success" title="Tidak ada issue terbuka">
-                    Seluruh assignment pada scope saat ini dalam kondisi terkendali.
-                  </Alert>
-                )}
-              </Panel>
-              <Panel
-                title="Emergency override"
-                description={`${dashboard.data.totals.emergencyOverrides} override pada filter aktif.`}
-                className="overview-widget overview-widget--overrides"
-              >
-                {dashboard.data.recentOverrides.length ? (
-                  <div className="overview-override-list">
-                    {dashboard.data.recentOverrides.slice(0, 4).map((item) => (
-                      <Link key={item.shiftRunId} to={`/shifts/${item.shiftRunId}`}>
-                        <span>
-                          <strong>{item.lineName}</strong>
-                          <small title={item.reason}>{item.reason}</small>
-                        </span>
-                        <time dateTime={item.startedAt}>
-                          {formatTime(item.startedAt, supplier.timezone)}
-                        </time>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <Alert tone="success" title="Tidak ada override">
-                    Tidak ada Emergency Start pada scope saat ini.
-                  </Alert>
-                )}
-              </Panel>
               <RecentActivityFeed
                 items={dashboard.data.recentActivity}
                 expanded={activityExpanded}
@@ -459,12 +397,6 @@ export function OverviewPage() {
               <Link to="/approvals">
                 <ShieldCheck aria-hidden="true" />
                 Antrean Approval
-              </Link>
-            )}
-            {hasCapability('SUPPLIER_SHIFT_READ') && (
-              <Link to="/shifts">
-                <Clock3 aria-hidden="true" />
-                Ringkasan Shift
               </Link>
             )}
           </nav>

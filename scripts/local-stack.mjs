@@ -183,6 +183,7 @@ function bootstrapAndSeed() {
 async function runSeedLifecycle(mode) {
   assertWorkspace();
   prepareCredentialDirectory();
+  process.env.PCR_WORKER_ENABLED = 'false';
   process.env.AUTH_IP_LOGIN_LIMIT = '1000';
   process.env.AUTH_GLOBAL_LIMIT_PER_MINUTE = '20000';
   if (mode === 'start-clean') {
@@ -206,6 +207,9 @@ async function runSeedLifecycle(mode) {
   }
   await startCore();
   bootstrapAndSeed();
+  process.env.PCR_WORKER_ENABLED = 'true';
+  runDocker(['up', '--detach', '--force-recreate', 'api']);
+  await waitForEndpoint(endpoints[0][0], endpoints[0][1]);
   await startFrontends();
   process.stdout.write(
     `Local full stack seeded and ready. Credentials: ${credentialPath}\nSupplier: ${endpoints[1][1]}\nTMMIN: ${endpoints[2][1]}\n`,

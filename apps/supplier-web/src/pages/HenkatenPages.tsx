@@ -1,14 +1,10 @@
-import { ArrowRight, Check, ClipboardCheck, Copy, ShieldCheck, XCircle } from 'lucide-react';
+import { ArrowRight, Check, Copy, ShieldCheck, XCircle } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiProblemError, createIdempotencyKey } from '@tmmin-henkaten/api-client';
-import type {
-  CreateHenkatenRequest,
-  HenkatenCategory,
-  HenkatenListQuery,
-} from '@tmmin-henkaten/contracts';
+import type { HenkatenListQuery } from '@tmmin-henkaten/contracts';
 import {
   Alert,
   AlertDialog,
@@ -33,13 +29,8 @@ import { FactItem, FactStrip } from '../components/OperationalUI';
 import {
   ApprovalTimeline,
   ChangeEvidence,
-  ChecklistResponseList,
-  HenkatenCategoryPicker,
-  ManMovementPreview,
   ManTransitionEvidence,
   ObjectTransitionEvidence,
-  ReadinessList,
-  SelectedPart,
 } from './HenkatenWorkflow';
 
 export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: boolean }) {
@@ -71,6 +62,7 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
     ...(params.get('approvalStatus')
       ? { approvalStatus: params.get('approvalStatus') as HenkatenListQuery['approvalStatus'] }
       : {}),
+    ...(!approvalQueue && params.get('pcr') === 'PCR' ? { pcrStatus: 'PCR' as const } : {}),
   };
   if (approvalQueue) {
     query.approvalRoute =
@@ -87,10 +79,6 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
     queryKey: scopedKey(scope, 'henkaten-filter-options'),
     queryFn: () => supplierApi.dashboard({ granularity: 'DAY' }),
   });
-  const shiftOptions = useQuery({
-    queryKey: scopedKey(scope, 'henkaten-shift-options'),
-    queryFn: () => supplierApi.shifts({ limit: 100 }),
-  });
   const update = (key: string, value: string) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
@@ -103,11 +91,7 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
       <PageHeader
         eyebrow={approvalQueue ? 'Ruang keputusan' : 'Ketertelusuran 4M'}
         title={approvalQueue ? 'Antrean Approval' : 'Henkaten'}
-        description={
-          approvalQueue
-            ? 'Selesaikan rute approval yang menjadi tanggung jawab Anda; reject pertama bersifat terminal.'
-            : 'Telusuri perubahan 4M current dan terminal dengan filter server-side.'
-        }
+        description=""
         actions={
           !approvalQueue && session!.principal.role === 'LINE_LEADER' ? (
             <Link className="hds-button hds-button--primary hds-button--md" to="/henkatens/new">
@@ -116,6 +100,16 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
           ) : undefined
         }
       />
+      {!approvalQueue && (
+        <nav className="pcr-tabs" aria-label="Tampilan Henkaten">
+          <Link className={params.get('pcr') !== 'PCR' ? 'is-current' : ''} to="/henkatens">
+            Semua
+          </Link>
+          <Link className={params.get('pcr') === 'PCR' ? 'is-current' : ''} to="/henkatens?pcr=PCR">
+            PCR
+          </Link>
+        </nav>
+      )}
       <FilterBar>
         {approvalQueue && (
           <label>
@@ -183,20 +177,6 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
           </NativeSelect>
         </label>
         <label>
-          <span>Shift</span>
-          <NativeSelect
-            value={params.get('shiftRunId') ?? ''}
-            onChange={(event) => update('shiftRunId', event.target.value)}
-          >
-            <option value="">Semua shift</option>
-            {shiftOptions.data?.items.map((shift) => (
-              <option key={shift.id} value={shift.id}>
-                {shift.line.code} · {shift.shift.name} · {shift.businessDate}
-              </option>
-            ))}
-          </NativeSelect>
-        </label>
-        <label>
           <span>Dari</span>
           <Input
             type="date"
@@ -252,11 +232,7 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
       {list.data?.items.length === 0 && (
         <EmptyState
           title={approvalQueue ? 'Tidak ada approval pending' : 'Belum ada Henkaten'}
-          description={
-            approvalQueue
-              ? 'Queue akan terisi ketika route responsibility Anda pending.'
-              : 'Henkaten dibuat Line Leader pada Shift Run aktif atau planned.'
-          }
+          description=""
           action={
             params.size ? (
               <Button onClick={() => setParams({}, { replace: true })}>Reset filter</Button>
@@ -286,9 +262,7 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
                   <tr key={item.id}>
                     <td data-label="Identifier">
                       <strong>{item.identifier}</strong>
-                      <small>
-                        {item.sourceMode} · epoch {item.sourceEpoch}
-                      </small>
+                      {item.pcr?.status === 'PCR' && <PcrBadge />}
                     </td>
                     <td data-label="4M">
                       <span className={`category-badge is-${item.category.toLowerCase()}`}>
@@ -332,558 +306,6 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
           />
         </>
       )}
-    </div>
-  );
-}
-
-export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
-  const { henkatenId } = useParams();
-  const { session } = useSession();
-  const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const scope = scopeOf(session!);
-  const [category, setCategory] = useState<HenkatenCategory>('MAN');
-  const [shiftId, setShiftId] = useState(params.get('shiftRunId') ?? '');
-  const [jobId, setJobId] = useState(params.get('jobId') ?? '');
-  const [partId, setPartId] = useState('');
-  const [partSearch, setPartSearch] = useState('');
-  const [targetAssignmentId, setTargetAssignmentId] = useState('');
-  const [replacementMpId, setReplacementMpId] = useState('');
-  const [cause, setCause] = useState('');
-  const [detail, setDetail] = useState('');
-  const [affectedObject, setAffectedObject] = useState('');
-  const [replacementObject, setReplacementObject] = useState('');
-  const [answers, setAnswers] = useState<Record<string, 'YES' | 'NO'>>({});
-  const [problem, setProblem] = useState<string | null>(null);
-  const [intentKey, setIntentKey] = useState(() => createIdempotencyKey());
-  const clonePrefill = useQuery({
-    queryKey: scopedKey(scope, 'henkaten-clone-prefill', henkatenId),
-    queryFn: () => supplierApi.clonePrefill(henkatenId!),
-    enabled: clone && Boolean(henkatenId),
-  });
-  const current = useQuery({
-    queryKey: scopedKey(scope, 'current-shift-create', shiftId),
-    queryFn: () => (shiftId ? supplierApi.shift(shiftId) : supplierApi.currentShift()),
-  });
-  const effectiveShiftId = shiftId || current.data?.id || '';
-  const working = useQuery({
-    queryKey: scopedKey(scope, 'working-assignments-create', effectiveShiftId),
-    queryFn: () => supplierApi.workingAssignments(effectiveShiftId),
-    enabled: Boolean(effectiveShiftId),
-  });
-  const formOptions = useQuery({
-    queryKey: scopedKey(scope, 'henkaten-form-options', { category, partSearch }),
-    queryFn: () =>
-      supplierApi.henkatenFormOptions({
-        category,
-        ...(partSearch.trim() ? { part: partSearch.trim() } : {}),
-      }),
-  });
-  const checklist = formOptions.data?.checklist ?? undefined;
-  useEffect(() => {
-    const prefill = clonePrefill.data;
-    if (!prefill) return;
-    setCategory(prefill.category);
-    setShiftId(prefill.shiftStillValid ? prefill.shiftRunId : '');
-    setJobId(prefill.jobStillValid ? prefill.jobId : '');
-    setPartId(prefill.partStillValid ? prefill.partId : '');
-    setCause(prefill.cause);
-    setDetail(prefill.detail);
-    setAffectedObject(prefill.affectedObject ?? '');
-    setReplacementObject(prefill.replacementObject ?? '');
-    setAnswers({});
-  }, [clonePrefill.data]);
-  useEffect(() => {
-    setAnswers({});
-    setReplacementMpId('');
-  }, [category]);
-  useEffect(() => {
-    if (targetAssignmentId || !jobId || !working.data) return;
-    setTargetAssignmentId(working.data.find((item) => item.jobId === jobId)?.id ?? '');
-  }, [jobId, targetAssignmentId, working.data]);
-  const target = working.data?.find((assignment) => assignment.id === targetAssignmentId);
-  const replacement = formOptions.data?.replacementMembers.find(
-    (member) => member.id === replacementMpId,
-  );
-  const selectedPart = formOptions.data?.parts.find((part) => part.id === partId);
-  const checklistComplete =
-    Boolean(checklist?.items.length) &&
-    checklist!.items.every((item) => answers[item.id] === 'YES');
-  const yesCount = checklist?.items.filter((item) => answers[item.id] === 'YES').length ?? 0;
-  const noCount = checklist?.items.filter((item) => answers[item.id] === 'NO').length ?? 0;
-  const unansweredCount = Math.max((checklist?.items.length ?? 0) - yesCount - noCount, 0);
-  const operationalComplete = Boolean(effectiveShiftId && jobId && partId);
-  const categoryDetailComplete =
-    category === 'MAN'
-      ? Boolean(
-          target &&
-          replacement &&
-          !replacement.reserved &&
-          (replacement.skillLevels?.find((skill) => skill.jobId === target.jobId)?.level ?? 0) >= 3,
-        )
-      : Boolean(affectedObject.trim() && replacementObject.trim());
-  const narrativeComplete = Boolean(cause.trim() && detail.trim());
-  const valid =
-    operationalComplete && categoryDetailComplete && narrativeComplete && checklistComplete;
-  const readinessItems = [
-    {
-      label: 'Konteks operasional',
-      complete: operationalComplete,
-      detail: operationalComplete ? 'Shift, job, dan part dipilih' : 'Lengkapi job dan part',
-    },
-    {
-      label: category === 'MAN' ? 'Pergerakan Man' : 'Transisi objek',
-      complete: categoryDetailComplete,
-      detail: categoryDetailComplete
-        ? 'Detail kategori lengkap'
-        : category === 'MAN'
-          ? 'Pilih target dan replacement'
-          : 'Lengkapi kondisi sebelum dan sesudah',
-    },
-    {
-      label: 'Penyebab & detail',
-      complete: narrativeComplete,
-      detail: narrativeComplete ? 'Narasi perubahan lengkap' : 'Lengkapi kedua field narasi',
-    },
-    {
-      label: 'Checklist',
-      complete: checklistComplete,
-      detail: checklistComplete
-        ? `${yesCount}/${checklist?.items.length ?? 0} item memenuhi`
-        : noCount
-          ? `${noCount} jawaban No perlu ditinjau`
-          : `${unansweredCount} item belum dijawab`,
-    },
-  ];
-  const submit = useMutation({
-    mutationFn: () => {
-      const base = {
-        shiftRunId: effectiveShiftId,
-        jobId,
-        partId,
-        checklistVersionId: checklist!.id,
-        checklistAnswers: checklist!.items.map((item) => ({
-          itemId: item.id,
-          answer: answers[item.id]!,
-        })),
-        cause,
-        detail,
-        ...(clone && henkatenId ? { clonedFromHenkatenId: henkatenId } : {}),
-      };
-      const payload: CreateHenkatenRequest =
-        category === 'MAN'
-          ? {
-              ...base,
-              category,
-              targetWorkingAssignmentId: target!.id,
-              targetAssignmentVersion: target!.version,
-              replaced: target!.effectiveMpMemberId
-                ? { kind: 'MP', memberId: target!.effectiveMpMemberId }
-                : { kind: 'VACANT' },
-              replacementMpMemberId: replacementMpId,
-              ...(replacement?.currentAssignment
-                ? {
-                    sourceWorkingAssignmentId: replacement.currentAssignment.id,
-                    sourceAssignmentVersion: replacement.currentAssignment.version,
-                  }
-                : {}),
-              ...(params.get('resolutionIssueId')
-                ? { resolutionIssueId: params.get('resolutionIssueId')! }
-                : {}),
-            }
-          : { ...base, category, affectedObject, replacementObject };
-      return supplierApi.createHenkaten(payload, intentKey);
-    },
-    onSuccess: (created) => navigate(`/henkatens/${created.id}`, { replace: true }),
-    onError: (error) => {
-      setProblem(
-        error instanceof ApiProblemError
-          ? error.problem.detail
-          : 'Submission belum dapat dipastikan. Refresh sebelum mencoba kembali.',
-      );
-      setIntentKey(createIdempotencyKey());
-      void working.refetch();
-    },
-  });
-  const send = (event: FormEvent) => {
-    event.preventDefault();
-    setProblem(null);
-    if (valid) submit.mutate();
-  };
-  return (
-    <div className="product-page create-henkaten-page">
-      <PageHeader
-        eyebrow={clone ? 'Koreksi sebagai record baru' : 'Submission 4M'}
-        title={clone ? 'Clone Henkaten' : 'Buat Henkaten'}
-        description="Satu submission immutable untuk Shift Run dan versi checklist saat ini."
-      />
-      {!current.data && !current.isLoading && (
-        <Alert tone="danger" title="Tidak ada active atau planned shift">
-          Buka Shift dan jalankan preflight sebelum membuat Henkaten.
-        </Alert>
-      )}
-      {problem && (
-        <Alert tone="danger" title="Submission gagal">
-          {problem}
-        </Alert>
-      )}
-      {current.data && (
-        <FactStrip label="Konteks Shift untuk Henkaten">
-          <FactItem label="Line" value={current.data.line.code} detail={current.data.line.name} />
-          <FactItem label="Shift Run" value={current.data.shift.name} />
-          <FactItem label="Business date" value={current.data.businessDate} />
-          <FactItem label="Status Shift" value={humanize(current.data.status)} />
-          <FactItem label="Timezone" value={current.data.timezone} />
-        </FactStrip>
-      )}
-      <form onSubmit={send} className="henkaten-form">
-        <div className="henkaten-form__main">
-          <Panel
-            title="1. Kategori Henkaten"
-            description="Pilih satu kategori 4M. Checklist akan dimuat ulang."
-            className="henkaten-workspace-section henkaten-category-section"
-          >
-            <HenkatenCategoryPicker value={category} onChange={setCategory} />
-          </Panel>
-          <div className="henkaten-operational-grid">
-            <Panel
-              title="2. Konteks target"
-              description="Tetapkan job dan part pada Shift Run yang terkunci."
-              className="henkaten-workspace-section target-operational-panel"
-            >
-              <div
-                className="operational-context-lock"
-                role="status"
-                aria-label="Shift Run read-only"
-              >
-                <span className="operational-context-lock__icon">
-                  <ShieldCheck aria-hidden="true" />
-                </span>
-                <span>
-                  <small>Shift Run · read-only</small>
-                  <strong>
-                    {current.data
-                      ? `${current.data.shift.name} · ${current.data.businessDate}`
-                      : effectiveShiftId || 'Belum tersedia'}
-                  </strong>
-                  <em>
-                    {current.data
-                      ? `${current.data.line.code} · ${current.data.line.name}`
-                      : 'Menunggu konteks aktif'}
-                  </em>
-                </span>
-                <span
-                  className={`operational-context-lock__state${
-                    current.data ? ' is-ready' : ' is-unavailable'
-                  }`}
-                >
-                  {current.data ? humanize(current.data.status) : 'Unavailable'}
-                </span>
-              </div>
-              <Field label="Target job" htmlFor="job" required>
-                <NativeSelect
-                  id="job"
-                  value={jobId}
-                  disabled={working.isLoading || !effectiveShiftId}
-                  onChange={(event) => {
-                    setJobId(event.target.value);
-                    setTargetAssignmentId(
-                      working.data?.find((item) => item.jobId === event.target.value)?.id ?? '',
-                    );
-                  }}
-                >
-                  <option value="">{working.isLoading ? 'Memuat job...' : 'Pilih job'}</option>
-                  {working.data?.map((assignment) => (
-                    <option key={assignment.id} value={assignment.jobId}>
-                      {assignment.jobName} · {assignment.mpName ?? 'VACANT'}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </Field>
-              <Field label="Cari part" htmlFor="part-search">
-                <Input
-                  id="part-search"
-                  value={partSearch}
-                  placeholder="Cari nomor atau nama part"
-                  disabled={formOptions.isLoading}
-                  onChange={(event) => {
-                    setPartSearch(event.target.value);
-                    setPartId('');
-                  }}
-                />
-              </Field>
-              <Field label="Part terdampak" htmlFor="part" required>
-                <NativeSelect
-                  id="part"
-                  value={partId}
-                  disabled={formOptions.isLoading}
-                  onChange={(event) => setPartId(event.target.value)}
-                >
-                  <option value="">
-                    {formOptions.isLoading
-                      ? 'Memuat part...'
-                      : formOptions.data?.parts.length === 0
-                        ? 'Tidak ada part aktif'
-                        : 'Pilih part'}
-                  </option>
-                  {formOptions.data?.parts.map((part) => (
-                    <option key={part.id} value={part.id}>
-                      {part.partNumber} · {part.partName}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </Field>
-              <SelectedPart part={selectedPart} onClear={() => setPartId('')} />
-            </Panel>
-            {category === 'MAN' ? (
-              <Panel
-                title="3. Komposisi pergerakan Man"
-                description="Review assignment asal dan tujuan sebelum melengkapi submission."
-                className="henkaten-workspace-section man-movement-panel"
-              >
-                <div className="movement-selectors">
-                  <Field label="Target assignment" htmlFor="targetAssignment" required>
-                    <NativeSelect
-                      id="targetAssignment"
-                      value={targetAssignmentId}
-                      disabled={working.isLoading}
-                      onChange={(event) => {
-                        setTargetAssignmentId(event.target.value);
-                        setJobId(
-                          working.data?.find((item) => item.id === event.target.value)?.jobId ?? '',
-                        );
-                      }}
-                    >
-                      <option value="">
-                        {working.isLoading ? 'Memuat assignment...' : 'Pilih assignment'}
-                      </option>
-                      {working.data?.map((assignment) => (
-                        <option key={assignment.id} value={assignment.id}>
-                          {assignment.jobName} · {assignment.mpName ?? 'VACANT'}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  </Field>
-                  <Field label="Replacement MP" htmlFor="replacement" required>
-                    <NativeSelect
-                      id="replacement"
-                      value={replacementMpId}
-                      disabled={formOptions.isLoading}
-                      onChange={(event) => setReplacementMpId(event.target.value)}
-                    >
-                      <option value="">
-                        {formOptions.isLoading ? 'Memuat kandidat...' : 'Pilih MP'}
-                      </option>
-                      {formOptions.data?.replacementMembers
-                        .filter((member) => member.id !== target?.effectiveMpMemberId)
-                        .map((member) => (
-                          <option
-                            key={member.id}
-                            value={member.id}
-                            disabled={
-                              member.reserved ||
-                              (member.skillLevels?.find((skill) => skill.jobId === target?.jobId)
-                                ?.level ?? 0) < 3
-                            }
-                          >
-                            {member.fullName} · {member.registrationNumber}
-                            {` · Tanoko ${member.skillLevels?.find((skill) => skill.jobId === target?.jobId)?.level ?? 'belum dinilai'}`}
-                            {member.reserved
-                              ? ' · Reserved'
-                              : member.currentAssignment
-                                ? ` · ${member.currentAssignment.lineName}/${member.currentAssignment.jobName}`
-                                : ' · Tersedia'}
-                          </option>
-                        ))}
-                    </NativeSelect>
-                  </Field>
-                </div>
-                <ManMovementPreview
-                  target={target}
-                  replacement={replacement}
-                  targetLine={current.data?.line.name}
-                />
-                {replacement?.currentAssignment && (
-                  <Alert tone="info" title="Replacement berasal dari assignment aktif">
-                    Atomic movement akan memindahkan {replacement.fullName} dari{' '}
-                    {replacement.currentAssignment.lineName}/{replacement.currentAssignment.jobName}
-                    ; assignment sumber dapat menjadi vacant dan memerlukan resolution berikutnya.
-                  </Alert>
-                )}
-              </Panel>
-            ) : (
-              <Panel
-                title="3. Komposisi perubahan objek"
-                description="Review kondisi sebelum dan sesudah secara berdampingan."
-                className="henkaten-workspace-section object-change-panel"
-              >
-                <div className={`object-change-inputs is-${category.toLowerCase()}`}>
-                  <Field
-                    label="Objek terdampak"
-                    htmlFor="affected"
-                    helperText={`${affectedObject.length}/2000 karakter`}
-                    required
-                  >
-                    <Textarea
-                      id="affected"
-                      value={affectedObject}
-                      onChange={(event) => setAffectedObject(event.target.value)}
-                      maxLength={2000}
-                      placeholder="Kondisi atau objek sebelum perubahan"
-                    />
-                  </Field>
-                  <span className="object-change-inputs__arrow" aria-hidden="true">
-                    <ArrowRight />
-                  </span>
-                  <Field
-                    label="Kondisi pengganti / baru"
-                    htmlFor="replacementObject"
-                    helperText={`${replacementObject.length}/2000 karakter`}
-                    required
-                  >
-                    <Textarea
-                      id="replacementObject"
-                      value={replacementObject}
-                      onChange={(event) => setReplacementObject(event.target.value)}
-                      maxLength={2000}
-                      placeholder="Kondisi setelah perubahan diterapkan"
-                    />
-                  </Field>
-                </div>
-              </Panel>
-            )}
-          </div>
-          <Panel
-            title="4. Penyebab dan detail"
-            description="Tuliskan fakta operasional yang mendasari perubahan."
-            className="henkaten-workspace-section narrative-panel"
-          >
-            <div className="henkaten-narrative-grid">
-              <Field
-                label="Penyebab"
-                htmlFor="cause"
-                helperText={`${cause.length}/2000 karakter`}
-                required
-              >
-                <Textarea
-                  id="cause"
-                  value={cause}
-                  onChange={(event) => setCause(event.target.value)}
-                  maxLength={2000}
-                  placeholder="Ringkas penyebab utama Henkaten"
-                />
-              </Field>
-              <Field
-                label="Detail kejadian"
-                htmlFor="detail"
-                helperText={`${detail.length}/2000 karakter`}
-                required
-              >
-                <Textarea
-                  id="detail"
-                  value={detail}
-                  onChange={(event) => setDetail(event.target.value)}
-                  maxLength={2000}
-                  placeholder="Jelaskan kejadian, konteks, dan dampak operasional"
-                />
-              </Field>
-            </div>
-          </Panel>
-          <Panel
-            title="5. Checklist"
-            description="Seluruh jawaban wajib Yes; No atau belum dijawab memblokir submission."
-          >
-            {!checklist?.items.length ? (
-              <Alert tone="danger" title="Checklist belum published">
-                Hubungi Supplier Admin untuk mengaktifkan checklist kategori ini.
-              </Alert>
-            ) : (
-              <ChecklistResponseList
-                items={checklist.items}
-                answers={answers}
-                onChange={(itemId, answer) => setAnswers({ ...answers, [itemId]: answer })}
-              />
-            )}
-          </Panel>
-        </div>
-        <aside className="henkaten-review" aria-label="Ringkasan Henkaten">
-          <span className="product-eyebrow">Tinjau submission</span>
-          <div className={`submission-readiness${valid ? ' is-ready' : ''}`}>
-            <ClipboardCheck aria-hidden="true" />
-            <span>
-              <strong>{valid ? 'Siap disubmit' : 'Belum siap submit'}</strong>
-              <small>
-                {valid
-                  ? 'Seluruh kelengkapan form terpenuhi.'
-                  : 'Lengkapi item yang masih memerlukan perhatian.'}
-              </small>
-            </span>
-          </div>
-          <h2>Ringkasan Henkaten</h2>
-          <dl>
-            <div>
-              <dt>Kategori</dt>
-              <dd>{humanize(category)}</dd>
-            </div>
-            <div>
-              <dt>Line</dt>
-              <dd>{current.data?.line.name ?? 'Belum dipilih'}</dd>
-            </div>
-            <div>
-              <dt>Job</dt>
-              <dd>
-                {working.data?.find((item) => item.jobId === jobId)?.jobName ?? 'Belum dipilih'}
-              </dd>
-            </div>
-            <div>
-              <dt>Part</dt>
-              <dd>{selectedPart?.partNumber ?? 'Belum dipilih'}</dd>
-            </div>
-            <div>
-              <dt>Memenuhi</dt>
-              <dd>
-                {yesCount}/{checklist?.items.length ?? 0} item
-              </dd>
-            </div>
-          </dl>
-          <div className="henkaten-progress">
-            <div>
-              <span>Progress checklist</span>
-              <strong>
-                {checklist?.items.length
-                  ? Math.round((yesCount / checklist.items.length) * 100)
-                  : 0}
-                %
-              </strong>
-            </div>
-            <progress
-              max={checklist?.items.length || 1}
-              value={yesCount}
-              aria-label={`${yesCount} dari ${checklist?.items.length ?? 0} checklist memenuhi persyaratan`}
-            />
-            <small>
-              {checklistComplete
-                ? 'Seluruh item checklist memenuhi persyaratan.'
-                : noCount
-                  ? `${noCount} jawaban No memblokir submission.`
-                  : `${unansweredCount} item belum dijawab.`}
-            </small>
-          </div>
-          <ReadinessList items={readinessItems} />
-          <Button
-            type="submit"
-            variant="primary"
-            loading={submit.isPending}
-            disabled={!valid}
-            leadingIcon={<ClipboardCheck />}
-          >
-            Submit Henkaten
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => void navigate(-1)}>
-            Batal
-          </Button>
-        </aside>
-      </form>
     </div>
   );
 }
@@ -963,7 +385,7 @@ export function HenkatenDetailPage() {
     return (
       <ErrorState
         title="Henkaten tidak dapat dimuat"
-        description="Record mungkin tidak tersedia atau di luar scope line Anda."
+        description=""
         action={<Button onClick={() => void record.refetch()}>Coba lagi</Button>}
       />
     );
@@ -983,11 +405,12 @@ export function HenkatenDetailPage() {
   return (
     <div className="product-page henkaten-detail">
       <PageHeader
-        eyebrow={`${item.sourceMode} · source epoch ${item.sourceEpoch}`}
+        eyebrow="Henkaten"
         title={item.identifier}
         description={`Dibuat ${formatDate(item.occurredAt, item.timezone)}`}
         status={
           <div className="henkaten-header-status">
+            {item.pcr?.status === 'PCR' && <PcrBadge />}
             <span className={`status-label is-${item.status.toLowerCase()}`}>
               {humanize(item.status)}
             </span>
@@ -1026,6 +449,21 @@ export function HenkatenDetailPage() {
         <FactItem label="Part" value={item.part.number} detail={item.part.name} />
         <FactItem label="Dibuat oleh" value={item.creatorName} />
       </FactStrip>
+      {item.pcr?.status === 'PCR' && item.pcr.assessment && (
+        <section className="pcr-assessment" aria-labelledby="pcr-assessment-heading">
+          <h2 id="pcr-assessment-heading">PCR assessment</h2>
+          <p className="pcr-assessment__reason">{item.pcr.assessment}</p>
+          <p className="pcr-assessment__action">
+            Henkaten ini terindikasi memerlukan PCR. Ajukan PCR melalui jalur yang berlaku. Jika ada
+            kendala teknis atau hasil penilaian tampak keliru, hubungi TMMIN QD.
+          </p>
+        </section>
+      )}
+      {item.pcr?.status === 'REVIEW' && (
+        <div className="pcr-review-notice" role="status">
+          Penilaian PCR perlu ditinjau oleh TMMIN QD.
+        </div>
+      )}
       <div className="henkaten-detail__layout">
         <div className="henkaten-detail__content">
           {(item.cancellationReason || item.withdrawalReason || item.clonedFromHenkatenId) && (
@@ -1056,7 +494,6 @@ export function HenkatenDetailPage() {
                 replacedWasVacant={item.man.replacedWasVacant}
                 replacedMpName={item.man.replacedMpName}
                 replacementMpName={item.man.replacementMpName}
-                reservationActive={item.man.reservationActive}
                 movement={item.movement}
                 formatDate={(value) => formatDate(value, item.timezone)}
               />
@@ -1068,11 +505,7 @@ export function HenkatenDetailPage() {
               />
             )}
           </div>
-          <Panel
-            title="Rute approval"
-            description="Rute berjalan paralel; reject pertama membuat rute lain Not Required."
-            className="approval-timeline-panel"
-          >
+          <Panel title="Rute approval" description="" className="approval-timeline-panel">
             <ApprovalTimeline
               creatorName={item.creatorName}
               status={item.status}
@@ -1082,10 +515,7 @@ export function HenkatenDetailPage() {
             />
           </Panel>
           <div className="detail-panels">
-            <Panel
-              title="Checklist snapshot"
-              description={`Versi ${item.checklist.versionNumber} · immutable`}
-            >
+            <Panel title="Checklist snapshot" description={`Versi ${item.checklist.versionNumber}`}>
               <ol className="snapshot-list">
                 {item.checklist.answers.map((answer) => (
                   <li key={answer.sourceItemId}>
@@ -1096,10 +526,7 @@ export function HenkatenDetailPage() {
                 ))}
               </ol>
             </Panel>
-            <Panel
-              title="Riwayat lifecycle"
-              description="Evidence actor dan waktu dari event domain."
-            >
+            <Panel title="Riwayat" description="">
               <ol className="history-list">
                 {item.history.map((transition) => (
                   <li key={transition.id}>
@@ -1144,7 +571,7 @@ export function HenkatenDetailPage() {
               </Field>
               <AlertDialog
                 title={`Approve route ${routeLabel(route.route)}?`}
-                description="Keputusan disimpan permanen. Henkaten tetap Open bila route lain masih Pending."
+                description=""
                 confirmLabel="Konfirmasi Approve"
                 onConfirm={() => action.mutate('approve')}
                 trigger={
@@ -1159,7 +586,7 @@ export function HenkatenDetailPage() {
               />
               <AlertDialog
                 title="Reject Henkaten?"
-                description="Reject membuat Henkaten terminal dan route lain menjadi Not Required. Keputusan tidak dapat dicabut."
+                description=""
                 confirmLabel="Konfirmasi Reject"
                 destructive
                 onConfirm={() => action.mutate('reject')}
@@ -1195,7 +622,7 @@ export function HenkatenDetailPage() {
               </Field>
               <AlertDialog
                 title="Reroute Supervisor?"
-                description="Responsibility route Supervisor akan dialihkan ke member aktif yang dipilih."
+                description=""
                 confirmLabel="Konfirmasi Reroute"
                 onConfirm={() => action.mutate('reroute')}
                 trigger={
@@ -1231,7 +658,7 @@ export function HenkatenDetailPage() {
               </Field>
               <AlertDialog
                 title="Withdraw Henkaten Open?"
-                description="Record menjadi Cancelled, reservation dan warning dilepas, dan data lama tetap immutable."
+                description=""
                 confirmLabel="Konfirmasi Withdraw"
                 destructive
                 onConfirm={() => action.mutate('withdraw')}
@@ -1243,18 +670,6 @@ export function HenkatenDetailPage() {
               />
             </div>
           )}
-          <div className="record-lock-note">
-            <ShieldCheck aria-hidden="true" />
-            <span>
-              <strong>Data immutable</strong>
-              <small>
-                Perubahan lifecycle hanya melalui action yang tersedia dan selalu divalidasi server.
-              </small>
-            </span>
-          </div>
-          <Link to={`/shifts/${item.shiftRunId}`}>
-            Buka Shift <ArrowRight />
-          </Link>
         </aside>
       </div>
     </div>
@@ -1276,6 +691,9 @@ function RouteStatus({ value }: { value: string }) {
       {humanize(value)}
     </span>
   );
+}
+function PcrBadge() {
+  return <span className="pcr-badge">PCR</span>;
 }
 function HenkatenSkeleton() {
   return (

@@ -1,0 +1,565 @@
+{
+  "caseCount": 70,
+  "cases": [
+    {
+      "caseId": "01",
+      "file": "cases/01.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "6119aa5d-7115-4f76-973e-b70dca89e4b9"
+    },
+    {
+      "caseId": "02",
+      "file": "cases/02.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "7c6e35db-4ad4-43a6-a590-fb21d5b02e63"
+    },
+    {
+      "caseId": "03",
+      "file": "cases/03.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "768b30d1-c37a-4d16-8ac9-932c74c0e559"
+    },
+    {
+      "caseId": "04",
+      "file": "cases/04.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.9,
+      "henkatenId": "a121d751-6998-4cc9-8707-1368a632a5d3"
+    },
+    {
+      "caseId": "05",
+      "file": "cases/05.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "032ea255-8036-4bb3-9419-3a76504c5403"
+    },
+    {
+      "caseId": "06",
+      "file": "cases/06.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.9,
+      "henkatenId": "56aff1c7-5f9f-46e3-8ef3-c234b592be14"
+    },
+    {
+      "caseId": "07",
+      "file": "cases/07.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.85,
+      "henkatenId": "f1c0a0ef-fb56-4bd9-a206-324eff066da7"
+    },
+    {
+      "caseId": "08",
+      "file": "cases/08.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.9,
+      "henkatenId": "0b4a2bb4-8b48-47ab-9059-615e4484de07"
+    },
+    {
+      "caseId": "09",
+      "file": "cases/09.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "72b99770-4ace-4bce-8d4d-16e32efbb7af"
+    },
+    {
+      "caseId": "10",
+      "file": "cases/10.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.85,
+      "henkatenId": "2e222920-d960-425a-9ec4-7fa74e5cc956"
+    },
+    {
+      "caseId": "11",
+      "file": "cases/11.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 1,
+      "henkatenId": "b4a1cc2c-e575-4a58-9c60-691640bb282b"
+    },
+    {
+      "caseId": "12",
+      "file": "cases/12.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 0.95,
+      "henkatenId": "17923359-015e-4fb8-80f2-1697700649cc"
+    },
+    {
+      "caseId": "13",
+      "file": "cases/13.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 0.9,
+      "henkatenId": "528c4d80-96b1-4131-8f94-13a50a3a912b"
+    },
+    {
+      "caseId": "14",
+      "file": "cases/14.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 0.95,
+      "henkatenId": "ef9dc830-9963-47d1-87b1-5c3c3dbbb878"
+    },
+    {
+      "caseId": "15",
+      "file": "cases/15.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 0.95,
+      "henkatenId": "7c93869d-5615-46c9-8d2d-bd85ef9605cb"
+    },
+    {
+      "caseId": "16",
+      "file": "cases/16.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 0.95,
+      "henkatenId": "bd172c30-56e5-4b39-8f39-84f75ebd8732"
+    },
+    {
+      "caseId": "17",
+      "file": "cases/17.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 0.8,
+      "henkatenId": "165c351e-b993-4bdc-aef5-aad55a67a51c"
+    },
+    {
+      "caseId": "18",
+      "file": "cases/18.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 1,
+      "henkatenId": "33025c8e-c856-4362-aa14-2d79a4bb37a3"
+    },
+    {
+      "caseId": "19",
+      "file": "cases/19.json",
+      "expected": "REVIEW",
+      "observed": "PCR",
+      "confidence": 0.8,
+      "henkatenId": "379232e0-9748-4691-b726-08f359388f52"
+    },
+    {
+      "caseId": "20",
+      "file": "cases/20.json",
+      "expected": "REVIEW",
+      "observed": "NO_PCR",
+      "confidence": 1,
+      "henkatenId": "3defc104-4117-4a2a-8345-e3270daf5785"
+    },
+    {
+      "caseId": "21",
+      "file": "cases/21.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "fd205cce-8b47-4970-85ff-25adce9f5c96"
+    },
+    {
+      "caseId": "22",
+      "file": "cases/22.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "27ff9043-dd4d-4f4c-90d7-16cbd540b14f"
+    },
+    {
+      "caseId": "23",
+      "file": "cases/23.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.9,
+      "henkatenId": "a42561af-ab2d-413b-a218-fbc9d0fec3e1"
+    },
+    {
+      "caseId": "24",
+      "file": "cases/24.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.9,
+      "henkatenId": "83949bd6-103f-4674-99b1-cd439141f5e3"
+    },
+    {
+      "caseId": "25",
+      "file": "cases/25.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "40c6718c-840c-4dd2-886c-7736b35e1072"
+    },
+    {
+      "caseId": "26",
+      "file": "cases/26.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "11e67862-5e6e-49ab-91d8-d6aa60964ea2"
+    },
+    {
+      "caseId": "27",
+      "file": "cases/27.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.88,
+      "henkatenId": "fada8562-d1cf-41aa-8b09-3f2d9cfdb781"
+    },
+    {
+      "caseId": "28",
+      "file": "cases/28.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.85,
+      "henkatenId": "22a8f53e-d636-43e6-9d64-64eac53ad949"
+    },
+    {
+      "caseId": "29",
+      "file": "cases/29.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.85,
+      "henkatenId": "0455e7d0-89cc-42c1-bb77-ded4fcaa04e6"
+    },
+    {
+      "caseId": "30",
+      "file": "cases/30.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "12bde15d-bd42-49ab-98a1-3fab714f6bee"
+    },
+    {
+      "caseId": "31",
+      "file": "cases/31.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 1,
+      "henkatenId": "0aa69f31-d8cd-435c-8590-e332cdb5a8be"
+    },
+    {
+      "caseId": "32",
+      "file": "cases/32.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 1,
+      "henkatenId": "ed4c0f2b-4900-4f36-873a-80d5973b20ad"
+    },
+    {
+      "caseId": "33",
+      "file": "cases/33.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 0.95,
+      "henkatenId": "8e4ebe66-e2b5-4dff-bddc-5d464e86ccae"
+    },
+    {
+      "caseId": "34",
+      "file": "cases/34.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 0.95,
+      "henkatenId": "2e29be20-adc1-4ac0-823f-a0389ccad24b"
+    },
+    {
+      "caseId": "35",
+      "file": "cases/35.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 0.95,
+      "henkatenId": "69017cab-9ab6-4ab3-9373-253d3ae64fef"
+    },
+    {
+      "caseId": "36",
+      "file": "cases/36.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 0.8,
+      "henkatenId": "c7f7f9f0-1f29-48f6-9a03-e22ffa1584ef"
+    },
+    {
+      "caseId": "37",
+      "file": "cases/37.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 0.85,
+      "henkatenId": "d1685fa1-4521-47f7-8d45-ae749f378d12"
+    },
+    {
+      "caseId": "38",
+      "file": "cases/38.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 0.85,
+      "henkatenId": "47954ec6-fd05-49cb-b0f5-2d831e801a7b"
+    },
+    {
+      "caseId": "39",
+      "file": "cases/39.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 0.95,
+      "henkatenId": "6c67f584-6ff1-41ec-85b5-0ced2f84cf21"
+    },
+    {
+      "caseId": "40",
+      "file": "cases/40.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 1,
+      "henkatenId": "76432d9b-d81b-4222-a360-b374ec6f8425"
+    },
+    {
+      "caseId": "41",
+      "file": "cases/41.json",
+      "expected": "REVIEW",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "74c2ca3e-f2b0-4e63-88f0-32e3685a81d0"
+    },
+    {
+      "caseId": "42",
+      "file": "cases/42.json",
+      "expected": "REVIEW",
+      "observed": "PCR",
+      "confidence": 0.85,
+      "henkatenId": "5f942b7e-da11-49ba-8c66-a2985ae11f59"
+    },
+    {
+      "caseId": "43",
+      "file": "cases/43.json",
+      "expected": "REVIEW",
+      "observed": "PCR",
+      "confidence": 0.85,
+      "henkatenId": "5ff98e0b-e024-404f-b402-bcbc6d228d7f"
+    },
+    {
+      "caseId": "44",
+      "file": "cases/44.json",
+      "expected": "REVIEW",
+      "observed": "REVIEW",
+      "confidence": 0.35,
+      "henkatenId": "158599cb-59ba-4cfc-a5c1-acd657a24688"
+    },
+    {
+      "caseId": "45",
+      "file": "cases/45.json",
+      "expected": "REVIEW",
+      "observed": "REVIEW",
+      "confidence": 0.35,
+      "henkatenId": "105a1458-2881-446c-a785-61ed0f0d83e8"
+    },
+    {
+      "caseId": "46",
+      "file": "cases/46.json",
+      "expected": "REVIEW",
+      "observed": "PCR",
+      "confidence": 0.85,
+      "henkatenId": "901e36ad-d4d5-41dd-875e-7d832923134c"
+    },
+    {
+      "caseId": "47",
+      "file": "cases/47.json",
+      "expected": "REVIEW",
+      "observed": "REVIEW",
+      "confidence": 0.3,
+      "henkatenId": "c4da9e13-3289-4dda-8dfb-87b763da0176"
+    },
+    {
+      "caseId": "48",
+      "file": "cases/48.json",
+      "expected": "REVIEW",
+      "observed": "REVIEW",
+      "confidence": null,
+      "henkatenId": "6b4dce0f-6b55-4f02-a89d-f77df6140c35"
+    },
+    {
+      "caseId": "49",
+      "file": "cases/49.json",
+      "expected": "REVIEW",
+      "observed": "REVIEW",
+      "confidence": 0.35,
+      "henkatenId": "6d18166c-0e96-43e0-bfe3-d4ab17355acd"
+    },
+    {
+      "caseId": "50",
+      "file": "cases/50.json",
+      "expected": "REVIEW",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "999a0d57-a5bf-4abf-9f96-be5de93d5444"
+    },
+    {
+      "caseId": "51",
+      "file": "cases/51.json",
+      "expected": "REVIEW",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "24434e10-ce26-402b-8108-a95281bae502"
+    },
+    {
+      "caseId": "52",
+      "file": "cases/52.json",
+      "expected": "REVIEW",
+      "observed": "PCR",
+      "confidence": 0.85,
+      "henkatenId": "874e796d-c9d6-4143-a2b0-ff25a7ec1668"
+    },
+    {
+      "caseId": "53",
+      "file": "cases/53.json",
+      "expected": "REVIEW",
+      "observed": "NO_PCR",
+      "confidence": 0.8,
+      "henkatenId": "a6ec3365-87ce-4c57-b593-d8e3d3352d47"
+    },
+    {
+      "caseId": "54",
+      "file": "cases/54.json",
+      "expected": "REVIEW",
+      "observed": "REVIEW",
+      "confidence": 0.3,
+      "henkatenId": "102326bf-d5e2-4f8e-a182-58ba58c1f78f"
+    },
+    {
+      "caseId": "55",
+      "file": "cases/55.json",
+      "expected": "REVIEW",
+      "observed": "REVIEW",
+      "confidence": 0.35,
+      "henkatenId": "7c45be11-6861-47d5-88cd-d6b1b0e2e830"
+    },
+    {
+      "caseId": "56",
+      "file": "cases/56.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "ec226ed8-30b4-4a60-a4fa-ce335a6f896d"
+    },
+    {
+      "caseId": "57",
+      "file": "cases/57.json",
+      "expected": "NO_PCR",
+      "observed": "PCR",
+      "confidence": 1,
+      "henkatenId": "45c7ac83-948d-4c1e-8be0-b1ba1dc6b911"
+    },
+    {
+      "caseId": "58",
+      "file": "cases/58.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "e8b87a49-32ae-48c2-a4d1-b417c2ed4844"
+    },
+    {
+      "caseId": "59",
+      "file": "cases/59.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 0.95,
+      "henkatenId": "a0e555d4-e968-47af-bdba-581a1a314440"
+    },
+    {
+      "caseId": "60",
+      "file": "cases/60.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "4a20dd69-a62b-40a3-b0e7-f298c7a634e2"
+    },
+    {
+      "caseId": "61",
+      "file": "cases/61.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 0.95,
+      "henkatenId": "8afa4f72-b03a-4165-8583-29a2735a520d"
+    },
+    {
+      "caseId": "62",
+      "file": "cases/62.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "37e912c8-60c1-4df5-bffd-0c294260bf8e"
+    },
+    {
+      "caseId": "63",
+      "file": "cases/63.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 1,
+      "henkatenId": "31a13924-5c63-464a-9ff3-4a4e6f590b06"
+    },
+    {
+      "caseId": "64",
+      "file": "cases/64.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "36703ebf-c396-4e2b-9b7a-0a3a20c27860"
+    },
+    {
+      "caseId": "65",
+      "file": "cases/65.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 0.95,
+      "henkatenId": "e6f58d26-c92b-4b59-8b42-609cdc9efa13"
+    },
+    {
+      "caseId": "66",
+      "file": "cases/66.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "fe763830-1ac7-4e2c-a6ff-a852df3ab876"
+    },
+    {
+      "caseId": "67",
+      "file": "cases/67.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 0.95,
+      "henkatenId": "36ff4840-9b85-402e-ad75-81e30600feaf"
+    },
+    {
+      "caseId": "68",
+      "file": "cases/68.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.9,
+      "henkatenId": "cf1b5e2d-0bcc-4a64-b34d-fdd0f361671c"
+    },
+    {
+      "caseId": "69",
+      "file": "cases/69.json",
+      "expected": "NO_PCR",
+      "observed": "NO_PCR",
+      "confidence": 1,
+      "henkatenId": "b1128972-d4c0-4b5e-a5e6-28187de6dbb2"
+    },
+    {
+      "caseId": "70",
+      "file": "cases/70.json",
+      "expected": "PCR",
+      "observed": "PCR",
+      "confidence": 0.95,
+      "henkatenId": "ab7138bb-5421-49e3-b49f-84b46b00de0f"
+    }
+  ]
+}

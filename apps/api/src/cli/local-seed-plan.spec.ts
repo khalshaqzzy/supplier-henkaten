@@ -100,10 +100,9 @@ describe('local seed plan', () => {
       expect(new Set(resolutionMinutes).size).toBeGreaterThan(30);
       expect(
         supplier.historical.some(
-          ({ category, outcome }) => category === 'MAN' && outcome === 'CANCELLED_SHIFT_ENDED',
+          ({ outcome }) => outcome.startsWith('CANCELLED_') && outcome !== 'CANCELLED_WITHDRAWN',
         ),
       ).toBe(false);
-      expect(shifts[0]!.some(({ category }) => category === 'MAN')).toBe(false);
     }
   });
 
@@ -120,7 +119,6 @@ describe('local seed plan', () => {
         'REJECTED_SUPERVISOR',
         'REJECTED_QC',
         'CANCELLED_WITHDRAWN',
-        'CANCELLED_SHIFT_ENDED',
         'OPEN_PENDING',
         'OPEN_SUPERVISOR_APPROVED',
         'OPEN_QC_APPROVED',

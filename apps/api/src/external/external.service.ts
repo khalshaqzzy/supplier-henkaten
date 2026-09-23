@@ -8,7 +8,7 @@ import type {
   ExternalHenkatenEvent,
   ExternalTokenRequest,
 } from '@tmmin-henkaten/contracts';
-import type { Prisma } from '../generated/prisma/client.js';
+import type { Prisma, PcrAssessment } from '../generated/prisma/client.js';
 
 import type { MutationContext } from '../administration/mutation-context.js';
 import { decodeCursor, encodeCursor } from '../administration/presenters.js';
@@ -20,6 +20,7 @@ import { OutboxService } from '../persistence/outbox.service.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 import { runSerializable } from '../persistence/transaction.js';
 import { ExternalRateLimiterService } from './external-rate-limiter.service.js';
+import { PcrService, presentPcrAssessment } from '../pcr/pcr.service.js';
 
 export type ExternalPrincipal = {
   tokenId: string;
@@ -37,6 +38,7 @@ export class ExternalService {
     private readonly audit: AuditWriter,
     private readonly outbox: OutboxService,
     private readonly limiter: ExternalRateLimiterService,
+    private readonly pcr: PcrService,
   ) {}
 
   async createClient(
@@ -377,6 +379,14 @@ export class ExternalService {
                 ...projectionData(event),
               },
             });
+        await this.pcr.queueExternal(tx, projection.id, principal.supplierId, {
+          category: event.changePoint,
+          cause: event.change.cause,
+          detail: event.change.detail,
+          affectedObject: 'affectedObject' in event.change ? event.change.affectedObject : null,
+          replacementObject:
+            'replacementObject' in event.change ? event.change.replacementObject : null,
+        });
         const ingestion = await tx.externalIngestionEvent.create({
           data: {
             supplierId: principal.supplierId,
@@ -484,6 +494,7 @@ export class ExternalService {
     const id = decodeCursor(cursor);
     const rows = await this.prisma.externalHenkatenProjection.findMany({
       where: { supplierId },
+      include: { pcrAssessment: true },
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(id ? { cursor: { id }, skip: 1 } : {}),
@@ -503,6 +514,7 @@ export class ExternalService {
     const row = await this.prisma.externalHenkatenProjection.findFirst({
       where: { id, supplierId },
       include: {
+        pcrAssessment: true,
         ingestionEvents: { orderBy: { sourceVersion: 'asc' } },
       },
     });
@@ -868,6 +880,7 @@ function presentProjection(row: {
   partSnapshot: Prisma.JsonValue;
   occurredAt: Date;
   updatedAt: Date;
+  pcrAssessment?: PcrAssessment | null;
 }) {
   return {
     id: row.id,
@@ -884,6 +897,7 @@ function presentProjection(row: {
     part: row.partSnapshot,
     occurredAt: row.occurredAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    pcr: presentPcrAssessment(row.pcrAssessment),
   };
 }
 

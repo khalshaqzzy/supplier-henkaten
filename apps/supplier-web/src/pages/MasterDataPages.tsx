@@ -37,25 +37,25 @@ import { PageHeader } from '../components/layout';
 const resources = {
   members: {
     title: 'Member & Akun',
-    description: 'Kelola identitas operator, role, akun, dan foto secara individual.',
+    description: '',
     createLabel: 'Tambah member',
     columns: ['Member', 'Registrasi', 'Role', 'Akun', 'Status'],
   },
   lines: {
     title: 'Line & Job',
-    description: 'Kelola line dan urutan job yang menjadi struktur assignment.',
+    description: '',
     createLabel: 'Tambah line',
     columns: ['Line', 'Nama', 'Urutan', 'Status'],
   },
   parts: {
     title: 'Part',
-    description: 'Kelola part number dan nama yang dapat dicari saat membuat Henkaten.',
+    description: '',
     createLabel: 'Tambah part',
     columns: ['Part number', 'Nama part', 'Status'],
   },
   shifts: {
     title: 'Shift Template',
-    description: 'Kelola jam kerja lokal, timezone, dan shift yang melintasi tengah malam.',
+    description: '',
     createLabel: 'Tambah template',
     columns: ['Template', 'Jam', 'Timezone', 'Status'],
   },
@@ -65,19 +65,19 @@ type ResourceKind = keyof typeof resources;
 
 export function MasterDataOverviewPage() {
   const cards = [
-    ['Member & Akun', 'Identitas, credential, dan foto', '/master-data/members'],
-    ['Line & Job', 'Struktur line dan job berurutan', '/master-data/lines'],
-    ['Part', 'Part number dan nama', '/master-data/parts'],
-    ['Shift Template', 'Jam, timezone, dan lintas tengah malam', '/master-data/shifts'],
-    ['Checklist 4M', 'Draft, publish, dan riwayat versi', '/master-data/checklists'],
-    ['Default Assignment', 'Supervisor, LL, dan MP default', '/master-data/default-assignments'],
+    ['Member & Akun', '', '/master-data/members'],
+    ['Line & Job', '', '/master-data/lines'],
+    ['Part', '', '/master-data/parts'],
+    ['Shift Template', '', '/master-data/shifts'],
+    ['Checklist 4M', '', '/master-data/checklists'],
+    ['Line Setup', '', '/master-data/line-setup'],
   ] as const;
   return (
     <div className="product-page">
       <PageHeader
         eyebrow="Konfigurasi Supplier"
         title="Master Data"
-        description="Data referensi individual yang menjadi prerequisite workflow Hosted."
+        description=""
         actions={
           <Link className="hds-button hds-button--secondary hds-button--md" to="/setup">
             Lihat readiness
@@ -92,7 +92,7 @@ export function MasterDataOverviewPage() {
             </span>
             <div>
               <strong>{title}</strong>
-              <small>{description}</small>
+              {description && <small>{description}</small>}
             </div>
             <ArrowRight aria-hidden="true" />
           </Link>
@@ -176,7 +176,7 @@ export function MasterListPage({ kind }: { kind: ResourceKind }) {
       {query.isError && (
         <ErrorState
           title={`${meta.title} tidak dapat dimuat`}
-          description="Coba kembali. Data stale tidak disamarkan sebagai hasil kosong."
+          description=""
           action={<Button onClick={() => void query.refetch()}>Coba lagi</Button>}
         />
       )}
@@ -403,7 +403,7 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
     return (
       <ErrorState
         title="Detail tidak dapat dimuat"
-        description="Resource mungkin sudah tidak tersedia atau berada di luar scope."
+        description=""
         action={<Button onClick={() => void detail.refetch()}>Coba lagi</Button>}
       />
     );
@@ -419,7 +419,7 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
       <PageHeader
         eyebrow={resources[kind].title}
         title={editing ? 'Edit data' : resources[kind].createLabel}
-        description="Perubahan divalidasi kembali oleh server dan memakai version resource terbaru."
+        description=""
       />
       {problem && (
         <Alert tone="danger" title="Perubahan gagal">
@@ -489,12 +489,9 @@ function ResourceLifecycle({
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
   return (
-    <Panel
-      title="Lifecycle"
-      description="Referenced-data blocker diperiksa secara authoritative oleh server."
-    >
+    <Panel title="Status" description="">
       {problem && (
-        <Alert tone="danger" title="Perubahan lifecycle gagal">
+        <Alert tone="danger" title="Perubahan gagal">
           {problem}
         </Alert>
       )}
@@ -544,12 +541,7 @@ function MasterFields({
             required
           />
         </Field>
-        <Field
-          label="Role"
-          htmlFor="role"
-          helperText={editing ? 'Role immutable setelah dibuat.' : undefined}
-          required
-        >
+        <Field label="Role" htmlFor="role" required>
           <NativeSelect
             id="role"
             disabled={editing}
@@ -722,10 +714,7 @@ export function MemberLifecycle({
   });
   const photoPending = photo.isPending || removePhoto.isPending;
   return (
-    <Panel
-      title="Lifecycle & foto"
-      description="Action berdampak tinggi memerlukan konfirmasi eksplisit."
-    >
+    <Panel title="Member & foto" description="">
       {secret && <OneTimeCredential value={secret} onDone={() => setSecret(null)} />}
       {problem && (
         <Alert tone="danger" title="Perubahan member gagal">
@@ -907,10 +896,7 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
   return (
-    <Panel
-      title="Job berurutan"
-      description="Job dipertahankan sebagai resource terpisah untuk assignment dan history."
-    >
+    <Panel title="Job berurutan" description="">
       {problem && (
         <Alert tone="danger" title="Perubahan job gagal">
           {problem}
@@ -1026,8 +1012,7 @@ function OneTimeCredential({
       <UserRound aria-hidden="true" />
       <div>
         <span className="product-eyebrow">Ditampilkan satu kali</span>
-        <h2>Simpan temporary credential dengan aman</h2>
-        <p>Credential tidak dapat ditampilkan kembali setelah panel ini ditutup.</p>
+        <h2>Simpan informasi akun</h2>
         <dl>
           <div>
             <dt>Username</dt>
@@ -1053,7 +1038,7 @@ function OneTimeCredential({
             checked={acknowledged}
             onChange={(event) => setAcknowledged(event.target.checked)}
           />
-          Saya sudah menyimpan dan akan menyalurkan credential melalui proses aman.
+          Saya sudah menyimpan informasi akun.
         </label>
         <Button disabled={!acknowledged} leadingIcon={<Check />} onClick={onDone}>
           Selesai
@@ -1066,11 +1051,7 @@ function OneTimeCredential({
 export function ChecklistOverviewPage() {
   return (
     <div className="product-page">
-      <PageHeader
-        eyebrow="Master Data"
-        title="Checklist 4M"
-        description="Setiap kategori memiliki draft dan versi published yang immutable."
-      />
+      <PageHeader eyebrow="Master Data" title="Checklist 4M" description="" />
       <section className="checklist-category-grid">
         {(['MAN', 'MACHINE', 'MATERIAL', 'METHOD'] as const).map((category) => (
           <Link key={category} to={`/master-data/checklists/${category}`}>
@@ -1136,11 +1117,7 @@ export function ChecklistDetailPage() {
   });
   return (
     <div className="product-page">
-      <PageHeader
-        eyebrow="Checklist 4M"
-        title={label(category)}
-        description="Edit draft, lalu publish sebagai snapshot version baru."
-      />
+      <PageHeader eyebrow="Checklist 4M" title={label(category)} description="" />
       {problem && (
         <Alert tone="danger" title="Perubahan checklist gagal">
           {problem}
@@ -1196,8 +1173,7 @@ export function ChecklistDetailPage() {
                 loading={publish.isPending}
                 onClick={() => {
                   setProblem(null);
-                  if (window.confirm('Publish draft ini sebagai versi immutable baru?'))
-                    publish.mutate();
+                  if (window.confirm('Publish draft ini sebagai versi baru?')) publish.mutate();
                 }}
               >
                 Publish
@@ -1219,7 +1195,7 @@ export function ChecklistDetailPage() {
               </Button>
             </div>
           </Panel>
-          <Panel title="Riwayat versi" description="Versi published tidak dapat diedit.">
+          <Panel title="Riwayat versi" description="">
             <ol className="version-list">
               {versions.data?.items.map((version) => (
                 <li key={version.id}>

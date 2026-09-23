@@ -306,7 +306,7 @@ test('proves TMMIN read-only governance, source cutover, and External ingestion 
   await tmminPage.getByRole('link', { name: 'Lihat detail' }).first().click();
   await expect(tmminPage.getByText('EXTERNAL', { exact: true }).first()).toBeVisible();
   await tmminPage.goto(`${runtime.tmminOrigin}/henkatens?sourceMode=EXTERNAL`);
-  await expect(tmminPage.getByRole('heading', { name: 'Penelusuran Henkaten' })).toBeVisible();
+  await expect(tmminPage.getByRole('heading', { name: 'Henkaten', exact: true })).toBeVisible();
   await expect(tmminPage.getByText(/EXTERNAL · E1/).first()).toBeVisible();
 
   const forbiddenMutation = await qualityContext.request.post(

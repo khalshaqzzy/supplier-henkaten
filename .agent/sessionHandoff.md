@@ -1,4 +1,106 @@
-# Session Handoff — Compact Tanoko Matrix and Proficiency Enforcement
+# Session Handoff — PCR indication for Henkaten
+
+## Local classifier evaluation — 2026-09-23
+
+### Documentation commit checks
+
+The 70-case report and evidence archive were checked in a detached clean-artifact worktree using
+Node 22.23.1 and pnpm 11.16.0. `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`,
+`pnpm typecheck`, `pnpm test:unit`, `pnpm openapi:check`, and
+`VITE_API_ORIGIN=https://api.example.invalid pnpm build` passed. A separate Compose project and
+disposable PostgreSQL test database passed `docker compose config --quiet`, `pnpm db:up`,
+`pnpm db:wait`, `pnpm db:verify`, `pnpm db:test:reset`, `pnpm db:test:migrate`, and 31 API integration
+tests; that project was stopped with `pnpm db:down`. A second isolated project passed fresh and
+`origin/staging`-to-current migration deployment and was also stopped. All three Chromium journeys
+passed with `pnpm test:e2e:chromium`; local Edge installation remains unavailable on macOS.
+
+`pnpm migrations:destructive-check <origin/staging SHA>`, `pnpm deployment:validate`,
+`pnpm test:deployment`, `pnpm security:exceptions:check`, `pnpm security:audit`, and `bash -n` passed.
+The macOS deployment harness reported that Linux `flock` contention needs its CI gate. Pinned
+Actionlint, ShellCheck, Hadolint, Ubuntu bootstrap validation, Gitleaks v8.24.3 directory scan,
+and Trivy v0.70.0 filesystem vulnerability/secret/misconfiguration scan passed with no findings.
+The 70 archived messages, input hashes, decisions, and unique record IDs were rechecked. The
+already-running demo PostgreSQL restarted during Docker-heavy checks and its API lost the database
+connection; only the demo API container was restarted, then `/health` returned 200 and both
+containers were healthy. Production container routing and image scans were not rerun locally for
+this documentation-only patch; the open PR's staging CI will rerun them after push.
+
+Seventy distinct synthetic Hosted Henkaten were submitted through the running local API in two
+batches, using a seeded NPM Line Leader and valid current Line–Shift/checklist data. The live Ling
+worker completed all 70. Of 53 clear cases, all 28 PCR and 24 of 25 No-PCR were classified as
+expected. One unchanged-lot case with adversarial text became PCR at confidence 1.00. Of 17
+deliberately incomplete cases, seven reached Review, eight became PCR, and two became No-PCR;
+one unspecified alternative material trial was No-PCR at confidence 1.00. Six Review results had
+low-confidence validated output, while one had no validated model output. Several PCR narratives
+asserted missing facts or wrong control references; 14 of 37 were outside the approximate
+100–150-word target. The complete exact model messages and persisted output for each case are in
+`docs/reports/pcr-classifier-70-case-evaluation-2026-09-23/`, with analysis in
+`docs/reports/pcr-classifier-70-case-local-evaluation-2026-09-23.md`. No classifier code or
+configuration was changed. Seventy Open NPM Henkaten remain in the local demo for inspection;
+the pre-existing Compose stack remains running. Next: TMMIN QD adjudication, targeted adversarial
+and missing-evidence regression coverage, and grounded explanation checks before production
+reliance on automatic No-PCR. Verification: 70/70 HTTP 201 submissions, 70/70 terminal
+assessments, database evidence inspection, archive completeness checks, report formatting and
+`git diff --check`.
+
+Date: 2026-09-23
+Branch: `feat/ai-pcr`
+Status: implemented and validated locally; prepared for PR to `staging`. No staging deployment or
+UAT claim.
+
+Hosted submissions now persist `PcrAssessment` in the creation transaction. External ingestion
+refreshes assessment only when evidence changes. A separate leased worker uses the local Ling
+OpenAI-compatible Chat Completions endpoint, a forced validated tool call and 8192 output tokens.
+Low confidence, invalid output and failures move to Review. TMMIN Admin/Quality can correct with a
+mandatory reason and optimistic version; a late worker cannot overwrite the correction. AI raw
+output and confidence remain server-side; full English assessment appears only for current PCR.
+Supplier and TMMIN have PCR tabs, priority pagination, indicators, and scoped notifications;
+TMMIN also has review tabs and correction UI. Design A is applied to detail, submit waits on a
+refresh-safe assessment screen, and active sidebar items are solid orange. The local seed includes
+PCR/No-PCR/Review/manual examples while preserving 2 suppliers and 240 Henkaten.
+
+Validation: formatting, lint, typecheck, unit suite, production build, 31 API integration tests on
+a freshly migrated disposable database, and OpenAPI check passed. An isolated 240-record seed and
+`pnpm local:reseed` completed; the main local database has 2 suppliers and 240 Henkaten (PCR 6,
+No-PCR 230, Review 4). Browser review covered both portals, PCR/review tabs, detail assessment,
+orange active navigation, and the TMMIN page title shortened to `Henkaten`. ADR 0034 and PRD
+amendment define the decision boundary.
+
+The valid gateway key was read without changing `dx-2`. The gitignored local `.env` now has the
+public inference endpoint, model, key, threshold, timeout, and worker settings (file mode 0600).
+All seven names were set as GitHub `staging` environment secrets through `gh`; the reusable deploy
+workflow now validates and renders them into runtime env. Compose configuration and actual-key
+runtime rendering were checked without printing values. The deployment script harness passes
+locally. No key appears in tracked or nonignored new files. The local Compose stack was stopped
+after verification without deleting the seeded database volume.
+The separate inference report at `docs/reports/inference-server-403-2026-09-23.md` records the
+user-provided successful Ling tool-call tests through `curl` and OpenAI JavaScript SDK and the
+Python `urllib` Cloudflare 1010 result. The later 70-case local evaluation above exercised PCR
+worker inference end to end. Before activating on staging, evaluate Indonesian cases with TMMIN
+QD. Generated OpenAPI/client content is current, and the staged-file drift check passed.
+
+Pre-PR local parity used Node 22.23.1, pnpm 11.16.0, frozen install, and cleaned build artifacts.
+Format, lint, typecheck,
+unit tests, OpenAPI drift, and production application build passed. A disposable Docker database
+passed all 31 integration tests, fresh migration, and the upgrade from `origin/staging` migrations.
+All three Chromium journeys passed after updating the Henkaten title selector. The local macOS
+Edge installer requires sudo and could not install Edge; CI's Linux Edge journey remains the
+browser gate. Actionlint, ShellCheck, Hadolint, deployment validation, and the deployment harness
+passed, including the harness inside Linux with real `flock`. Five production images built and
+passed routing, non-root, and restart persistence checks. Gitleaks v8.24.3 found no leaks; Trivy
+v0.70.0 reported no HIGH/CRITICAL findings for the filesystem and all five production images.
+The high-severity dependency audit exited successfully with the repository's existing exception.
+Local ignored credentials were temporarily moved outside the scan path and restored. The PCR
+worker was not sent a live inference request in this parity run.
+
+The feature branch already contained four earlier commits absent from `origin/staging`: line
+schedules, migration-policy repair, local seed repair, and UI typography rules. A PR from this
+branch to `staging` includes those predecessors along with the PCR implementation. No existing
+commit was rewritten.
+
+---
+
+# Previous Session Handoff — Compact Tanoko Matrix and Proficiency Enforcement
 
 Date: 2026-09-16
 Branch: `feat/tanoko`
@@ -517,3 +619,105 @@ Phase 15.9 remains `in_progress`.
 2. Verify all CI jobs (including Production containers and routing & Release candidate gate) are green.
 3. Deploy to staging under the existing Phase 15.9 process and conduct touch-device UAT before any
    production claim.
+
+## Current Handoff — Recurring Line–Shift Operations
+
+Date: 2026-09-22
+
+Status: implementation and local verification complete; ready for PR to `staging`. No deployment
+or staging UAT claim.
+
+The approved model removes supplier Shift Run preflight, Start Shift, Emergency Start, End Shift,
+active-shift dependency, MP reservation, MP exclusivity, and donor-vacancy cascade. `LineShift` now
+owns shift-specific Supervisor, Line Leader, and per-job MP defaults; only Supplier Admin may edit.
+Active schedules on one line cannot overlap.
+
+UI copy rule: keep only labels, values, statuses, errors, and action-critical instructions. Remove
+explanatory typography about system behavior or technical guarantees (such as lifecycle, hosting,
+immutability, session storage, and server-side validation); assume operators know the workflow.
+Apply this consistently to existing and new components while keeping the screens polished.
+
+Henkaten submission resolves a clock-derived occurrence. During an interval it auto-selects the
+current Line–Shift; outside an interval the LL selects a shift and the effect starts at its next
+scheduled start. Man replacement applies immediately to that occurrence and checks only active MP
+plus exact-job Tanoko >= 3. Duplicate MP assignment is unrestricted. Reject/Withdraw restores the
+latest other effective override or the default, while the next recurrence begins from defaults.
+
+Implemented locally: forward-only schema/migration, Line–Shift service/endpoints/contracts/client,
+automatic occurrence compatibility snapshots, immediate Man assignment and restoration, clock-
+derived board, Admin Line Setup, new Henkaten form, removal of supplier Shift UI/routes/endpoints,
+cutover/readiness/catalog updates, local seed Line–Shift configuration, and ADR 0033. Historical
+Shift Run tables and TMMIN read-only endpoints remain for compatibility. Supplier creation contracts
+now require `lineShiftId`; the old ShiftRun/reservation creation path was removed.
+
+Verification completed: clean reset plus all 13 migrations; upgrade from the 12-migration
+`origin/staging` state; lint; formatting; full TypeScript; generated API client and OpenAPI document
+parity; 188 repository/script unit tests; 28 API integration tests; and production builds for API
+plus both frontends with `VITE_API_ORIGIN=https://api.example.test`. Integration coverage includes
+current/next occurrence, duplicate MP, immediate replacement, reject/withdraw restoration, removed
+Shift endpoints, and Admin Line Setup behavior. The replacement onboarding journey creates a
+Line–Shift and edits its Supervisor/LL/MP assignment; all six isolated Playwright journeys passed
+on Chromium and Edge. Dedicated during-shift and outside-shift Henkaten browser journeys remain
+deferred to staging UAT.
+
+The production-like Compose acceptance built all five runtime images, applied all migrations,
+bootstrapped the protected administrator idempotently, and passed health, routing, headers,
+non-root, and restart-persistence checks. Actionlint, ShellCheck, Hadolint, deployment validation,
+the deployment harness, Ubuntu 22.04 bootstrap input validation, security-exception validation,
+`pnpm audit --audit-level high`, Gitleaks, Trivy filesystem scanning, and HIGH/CRITICAL scans of all
+five images passed. The `js-yaml` override was raised to 4.3.2 to remove the newly disclosed audit
+finding. Line Setup now requests the API-supported member page limit of 100 instead of 500.
+
+PR #17 initially failed its static migration gate because the intentional removal of the legacy MP
+uniqueness index matched the blanket `DROP` rule. The checker now supports an exact-name,
+immediately-following `migration-policy: allow-drop-index` declaration, with deployment-harness
+coverage for accepted exact matches and rejected missing/mismatched declarations. Other `DROP`
+statements remain forbidden.
+
+Fresh-database local-seed smoke passes through the built API with the production-like outbox worker
+enabled. A regression introduced during the Line–Shift cutover had removed both Henkaten seed calls,
+leaving the dashboard empty even though the retained plan still specified 120 records per supplier.
+The seed now creates all 240 Henkaten through the Line–Shift API, relocates 216 terminal records into
+72 synthetic historical occurrence snapshots, keeps 24 current records, and verifies the Supplier
+dashboard response before writing credentials. Evidence after completion: 2 suppliers; 240 Henkaten;
+16 Open warnings; 18 LineShifts; 72 LineShiftJobAssignments; all three shift templates represented;
+6 Canvas layouts; and 0 pending outbox events. Every configured default MP/job pair is Tanoko level
+3 or 4. No preflight, Start Shift, End Shift, reservation, or MP exclusivity path is used. The smoke
+database, temporary API, photos, and credentials were removed afterward; the main local database was
+not changed by this verification.
+
+## Current Handoff — PCR screening, 2026-09-23
+
+The user-approved PCR plan is implemented locally on `feat/ai-pcr`; no staging or production
+deployment has been performed. Hosted submit queues PCR screening in its transaction. External
+ingest requeues only when screening evidence changes. A separate leased worker calls Ling through
+one forced OpenAI-compatible tool call (`max_tokens: 8192`), with the 45 control items and PCR
+guidance in the English prompt. Invalid, unavailable, or below-threshold results become Review.
+Admin and Quality can correct decisions with version and required reason, including a first manual
+decision for an unassessed historical record (`expectedVersion: 0`); audit and outbox preserve
+both the AI result and subsequent action. The two portals expose scoped PCR views, notification
+tabs, and the Design A assessment only for a current PCR decision. The TMMIN page title is now
+“Henkaten”; the orange active sidebar item and compact Quality workspace label were verified in
+the browser.
+
+Local `local:reseed` was run after an isolated seed smoke. The demo remains two suppliers and
+240 Henkaten: 6 PCR, 230 No-PCR, 4 Review, including manual correction examples across Open and
+Closed records. Demo credentials were rotated in the git-ignored local credentials file. The
+main local database is ready for UI review at ports 5173 and 5174.
+
+Checks passed: all 14 migrations on a clean disposable test database; `pnpm format:check`,
+`pnpm lint`, `pnpm typecheck`, production build with explicit `VITE_API_ORIGIN`, repository unit
+tests, 31 API integration tests, and `git diff --check`. Integration checks now cover idempotent
+Hosted queueing, External status-only retention and evidence-change requeueing, TMMIN role/version
+checks, first manual decisions on historical records, notification deduplication, and a late AI
+result racing with manual correction. Browser
+inspection confirmed Supplier and TMMIN PCR tabs, the Review tab, table badges, priority order,
+PCR detail and the shortened title. The OpenAPI document check passes; the repository's combined
+`openapi:check` still reports the expected Git HEAD difference for the newly generated API client
+until these changes are committed.
+
+The local runtime has no PCR endpoint/key configured, so new live submissions currently resolve
+to Review. Diagnosis of the separate public inference 403/1010 is in
+`docs/reports/inference-server-403-2026-09-23.md`. No key or server configuration was changed.
+Before live model UAT, configure the runtime secret and verify the application HTTP client against
+the inference endpoint, then review Indonesian positive/negative cases with TMMIN QD.

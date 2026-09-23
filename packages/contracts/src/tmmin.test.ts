@@ -39,6 +39,7 @@ describe('TMMIN governance and monitoring contracts', () => {
       occurredAt: '2026-07-25T00:00:00.000Z',
       updatedAt: '2026-07-25T00:00:00.000Z',
       displayId: 'EXT-1',
+      pcr: null,
     };
     expect(
       tmminHenkatenSummarySchema.parse({

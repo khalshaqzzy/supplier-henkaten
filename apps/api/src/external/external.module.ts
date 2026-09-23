@@ -8,10 +8,11 @@ import {
   TmminExternalHealthController,
 } from './external.controller.js';
 import { ExternalRateLimiterService } from './external-rate-limiter.service.js';
+import { PcrModule } from '../pcr/pcr.module.js';
 import { ExternalService } from './external.service.js';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, PcrModule],
   controllers: [
     ExternalClientController,
     ExternalProjectionController,

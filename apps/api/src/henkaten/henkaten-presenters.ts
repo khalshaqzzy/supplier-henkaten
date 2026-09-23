@@ -8,11 +8,13 @@ import type {
   MPReservation,
   ApprovalDecision,
   AssignmentMovement,
+  PcrAssessment,
 } from '../generated/prisma/client.js';
 import { databaseDate } from '../shifts/shift-time.js';
+import { presentPcrAssessment } from '../pcr/pcr.service.js';
 
 type RouteRow = HenkatenApprovalRoute & { decision: ApprovalDecision | null };
-type SummaryRow = Henkaten & { approvalRoutes: RouteRow[] };
+type SummaryRow = Henkaten & { approvalRoutes: RouteRow[]; pcrAssessment: PcrAssessment | null };
 
 export function routeSummary(routes: RouteRow[]) {
   const supervisor = routes.find(({ route }) => route === 'SUPERVISOR');
@@ -26,6 +28,7 @@ export function presentHenkatenSummary(row: SummaryRow) {
     id: row.id,
     identifier: row.identifier,
     shiftRunId: row.shiftRunId,
+    lineShiftId: row.lineShiftId,
     lineId: row.lineId,
     jobId: row.jobId,
     partId: row.partId,
@@ -35,15 +38,19 @@ export function presentHenkatenSummary(row: SummaryRow) {
     category: row.category,
     businessDate: databaseDate(row.businessDate),
     occurredAt: row.occurredAt.toISOString(),
+    effectiveStartAt: row.effectiveStartAt?.toISOString() ?? null,
+    effectiveEndAt: row.effectiveEndAt?.toISOString() ?? null,
     line: { code: row.lineCodeSnapshot, name: row.lineNameSnapshot },
     jobName: row.jobNameSnapshot,
     part: { number: row.partNumberSnapshot, name: row.partNameSnapshot },
     routes: routeSummary(row.approvalRoutes),
     version: row.version,
+    pcr: presentPcrAssessment(row.pcrAssessment),
   };
 }
 
 type DetailRow = Henkaten & {
+  pcrAssessment: PcrAssessment | null;
   checklistSnapshot: (HenkatenChecklistSnapshot & { answers: HenkatenChecklistAnswer[] }) | null;
   manDetail: ManHenkatenDetail | null;
   reservation: MPReservation | null;
@@ -80,6 +87,7 @@ export function presentHenkatenDetail(row: DetailRow) {
     man: row.manDetail
       ? {
           targetWorkingAssignmentId: row.manDetail.targetWorkingAssignmentId,
+          lineShiftJobAssignmentId: row.manDetail.lineShiftJobAssignmentId,
           sourceWorkingAssignmentId: row.manDetail.sourceWorkingAssignmentId,
           replacedMpMemberId: row.manDetail.replacedMpMemberId,
           replacedWasVacant: row.manDetail.replacedWasVacant,
@@ -123,6 +131,7 @@ export function presentHenkatenDetail(row: DetailRow) {
 }
 
 export const henkatenDetailInclude = {
+  pcrAssessment: true,
   checklistSnapshot: {
     include: { answers: { orderBy: { displayOrderSnapshot: 'asc' as const } } },
   },

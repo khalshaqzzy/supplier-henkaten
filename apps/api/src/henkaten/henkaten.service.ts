@@ -1,4 +1,5 @@
 import { assertTanokoEligible } from '../master-data/tanoko-eligibility.js';
+import { LineShiftService } from '../master-data/line-shift.service.js';
 import { createHash } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
@@ -7,12 +8,12 @@ import type {
   CreateHenkatenRequest,
   HenkatenFormOptionsQuery,
   HenkatenListQuery,
+  PcrStatus,
   TmminHenkatenQuery,
 } from '@tmmin-henkaten/contracts';
 
 import type { Prisma } from '../generated/prisma/client.js';
 import type { MutationContext } from '../administration/mutation-context.js';
-import { decodeCursor, encodeCursor } from '../administration/presenters.js';
 import { versionConflict } from '../administration/user-admin.service.js';
 import { ProblemException } from '../common/problem.js';
 import type { RequestPrincipal } from '../common/request-context.js';
@@ -25,6 +26,7 @@ import { OperationalFinalizationService } from '../operations/operational-finali
 import { PrismaService } from '../persistence/prisma.service.js';
 import { runSerializable } from '../persistence/transaction.js';
 import { presentWorking } from '../shifts/shift-presenters.js';
+import { PcrService, presentPcrAssessment } from '../pcr/pcr.service.js';
 import {
   henkatenDetailInclude,
   presentHenkatenDetail,
@@ -38,6 +40,8 @@ export class HenkatenService {
     private readonly audit: AuditWriter,
     private readonly outbox: OutboxService,
     private readonly finalization: OperationalFinalizationService,
+    private readonly lineShifts: LineShiftService,
+    private readonly pcr: PcrService,
   ) {}
 
   async create(
@@ -48,300 +52,365 @@ export class HenkatenService {
     context: MutationContext,
   ) {
     if (principal.role !== 'LINE_LEADER' || !principal.memberId) throw forbidden();
+    const operational = await this.lineShifts.operationalContext(scope, principal);
+    if (
+      operational.currentLineShiftIds.length > 0 &&
+      !operational.currentLineShiftIds.includes(input.lineShiftId)
+    ) {
+      throw shiftSelectionConflict();
+    }
+    return this.createForLineShift(scope, input, idempotencyKey, principal, context);
+  }
+
+  private async createForLineShift(
+    scope: TenantScope,
+    input: CreateHenkatenRequest & { lineShiftId: string },
+    idempotencyKey: string,
+    principal: RequestPrincipal,
+    context: MutationContext,
+  ) {
+    if (!principal.memberId) throw missing('Line Shift');
     const memberId = principal.memberId;
     const payloadHash = createHash('sha256').update(canonicalJson(input)).digest('hex');
-    try {
-      const id = await runSerializable(this.prisma, async (tx) => {
-        await lockSupplier(tx, scope.supplierId);
-        const existing = await tx.henkaten.findFirst({
+    const id = await runSerializable(this.prisma, async (tx) => {
+      await lockSupplier(tx, scope.supplierId);
+      const retry = await tx.henkaten.findFirst({
+        where: {
+          supplierId: scope.supplierId,
+          createdById: principal.userId,
+          submissionKey: idempotencyKey,
+        },
+      });
+      if (retry) {
+        if (retry.submissionPayloadHash !== payloadHash) throw idempotencyConflict();
+        return retry.id;
+      }
+      const occurrence = await this.lineShifts.resolveOccurrence(
+        tx,
+        scope,
+        input.lineShiftId,
+        principal,
+      );
+      const lineShift = occurrence.row;
+      const [supplier, job, part, checklist] = await Promise.all([
+        tx.supplier.findUnique({ where: { id: scope.supplierId } }),
+        tx.job.findFirst({
           where: {
+            id: input.jobId,
             supplierId: scope.supplierId,
-            createdById: principal.userId,
-            submissionKey: idempotencyKey,
+            lineId: lineShift.lineId,
+            active: true,
           },
-        });
-        if (existing) {
-          if (existing.submissionPayloadHash !== payloadHash) throw idempotencyConflict();
-          return existing.id;
-        }
-        const submittedSource =
-          input.category === 'MAN' && input.sourceWorkingAssignmentId
-            ? await tx.workingAssignment.findFirst({
-                where: {
-                  id: input.sourceWorkingAssignmentId,
-                  supplierId: scope.supplierId,
-                },
-                select: { shiftRunId: true },
-              })
-            : null;
-        await lockShiftRuns(tx, [
-          input.shiftRunId,
-          ...(submittedSource ? [submittedSource.shiftRunId] : []),
-        ]);
-        const shift = await tx.shiftRun.findFirst({
+        }),
+        tx.part.findFirst({
+          where: { id: input.partId, supplierId: scope.supplierId, active: true },
+        }),
+        tx.checklistVersion.findFirst({
           where: {
-            id: input.shiftRunId,
+            id: input.checklistVersionId,
             supplierId: scope.supplierId,
-            status: { in: ['NOT_STARTED', 'ACTIVE'] },
-            lineLeaderMemberId: memberId,
+            category: input.category,
+            template: { active: true },
           },
-        });
-        if (!shift) throw missing('Owned active or planned Shift Run');
-        if (shift.status === 'NOT_STARTED' && input.category !== 'MAN') throw invalidTransition();
-        const [supplier, job, part, checklist] = await Promise.all([
-          tx.supplier.findUnique({ where: { id: scope.supplierId } }),
-          tx.job.findFirst({
-            where: {
-              id: input.jobId,
-              supplierId: scope.supplierId,
-              lineId: shift.lineId,
-              active: true,
-            },
-          }),
-          tx.part.findFirst({
-            where: { id: input.partId, supplierId: scope.supplierId, active: true },
-          }),
-          tx.checklistVersion.findFirst({
-            where: {
-              id: input.checklistVersionId,
-              supplierId: scope.supplierId,
-              category: input.category,
-              template: { active: true },
-            },
-            include: {
-              items: { orderBy: { displayOrder: 'asc' } },
-              template: { include: { versions: { orderBy: { versionNumber: 'desc' }, take: 1 } } },
-            },
-          }),
-        ]);
-        if (
-          !supplier ||
-          supplier.sourceMode !== 'HOSTED' ||
-          supplier.sourceEpoch !== principal.sourceEpoch
-        ) {
-          throw sourceMismatch();
-        }
-        if (!job) throw missing('Active job');
-        if (!part) throw missing('Active part');
-        if (
-          !checklist ||
-          checklist.template.versions[0]?.id !== checklist.id ||
-          checklist.items.length !== input.checklistAnswers.length
-        ) {
-          throw checklistInvalid();
-        }
-        const answers = new Map(
-          input.checklistAnswers.map((answer) => [answer.itemId, answer.answer]),
-        );
-        if (
-          answers.size !== checklist.items.length ||
-          checklist.items.some(({ id }) => answers.get(id) !== 'YES')
-        ) {
-          throw checklistInvalid();
-        }
+          include: {
+            items: { orderBy: { displayOrder: 'asc' } },
+            template: { include: { versions: { orderBy: { versionNumber: 'desc' }, take: 1 } } },
+          },
+        }),
+      ]);
+      if (
+        !supplier ||
+        supplier.sourceMode !== 'HOSTED' ||
+        supplier.sourceEpoch !== principal.sourceEpoch
+      )
+        throw sourceMismatch();
+      if (!job) throw missing('Active job');
+      if (!part) throw missing('Active part');
+      const answers = new Map(
+        input.checklistAnswers.map((answer) => [answer.itemId, answer.answer]),
+      );
+      if (
+        !checklist ||
+        checklist.template.versions[0]?.id !== checklist.id ||
+        checklist.items.length !== input.checklistAnswers.length ||
+        answers.size !== checklist.items.length ||
+        checklist.items.some(({ id: itemId }) => answers.get(itemId) !== 'YES')
+      )
+        throw checklistInvalid();
 
-        const man =
-          input.category === 'MAN'
-            ? await this.validateMan(tx, scope.supplierId, shift.id, input)
-            : undefined;
-        if (input.clonedFromHenkatenId) {
-          const source = await tx.henkaten.findFirst({
-            where: { id: input.clonedFromHenkatenId, supplierId: scope.supplierId },
-          });
-          if (!source) throw missing('Cloned Henkaten');
-        }
-        const sequence = await nextSequence(tx, scope.supplierId, shift.businessDate);
-        const dateToken = shift.businessDate.toISOString().slice(0, 10).replaceAll('-', '');
-        const identifier = `HEN-${supplier.code}-${dateToken}-${sequence
-          .toString()
-          .padStart(4, '0')}`;
-        const now = new Date();
-        const created = await tx.henkaten.create({
+      const legacyShift = await ensureAutomaticOccurrence(
+        tx,
+        scope.supplierId,
+        supplier.sourceEpoch,
+        lineShift,
+        occurrence.businessDate,
+        occurrence.start,
+        occurrence.end,
+        principal.userId,
+      );
+      const targetWorking = legacyShift.workingAssignments.find(
+        (assignment) => assignment.jobId === job.id,
+      );
+      if (!targetWorking) throw missing('Line Shift job assignment');
+
+      let man:
+        | {
+            assignment: (typeof lineShift.jobAssignments)[number];
+            replacement: { id: string; fullName: string; registrationNumber: string };
+            replaced: { id: string; fullName: string } | null;
+          }
+        | undefined;
+      if (input.category === 'MAN') {
+        const assignment = lineShift.jobAssignments.find(
+          (item) =>
+            item.jobId === job.id &&
+            (!input.lineShiftJobAssignmentId || item.id === input.lineShiftJobAssignmentId),
+        );
+        if (!assignment) throw missing('Line Shift job assignment');
+        const replacement = await tx.member.findFirst({
+          where: {
+            id: input.replacementMpMemberId,
+            supplierId: scope.supplierId,
+            role: 'MP',
+            active: true,
+          },
+          select: { id: true, fullName: true, registrationNumber: true },
+        });
+        if (!replacement) throw missing('Active replacement MP');
+        await assertTanokoEligible(tx, scope.supplierId, replacement.id, job.id);
+        const previousOverride = await tx.henkaten.findFirst({
+          where: {
+            supplierId: scope.supplierId,
+            lineShiftId: lineShift.id,
+            jobId: job.id,
+            category: 'MAN',
+            status: { in: ['OPEN', 'APPROVED'] },
+            effectiveStartAt: occurrence.start,
+            effectiveEndAt: occurrence.end,
+            manDetail: { lineShiftJobAssignmentId: assignment.id },
+          },
+          include: { manDetail: { include: { replacementMp: true } } },
+          orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+        });
+        const replacedMember = previousOverride?.manDetail?.replacementMp ?? assignment.mp;
+        man = {
+          assignment,
+          replacement,
+          replaced: replacedMember
+            ? { id: replacedMember.id, fullName: replacedMember.fullName }
+            : null,
+        };
+      }
+
+      if (input.clonedFromHenkatenId) {
+        const source = await tx.henkaten.findFirst({
+          where: { id: input.clonedFromHenkatenId, supplierId: scope.supplierId },
+        });
+        if (!source) throw missing('Cloned Henkaten');
+      }
+      const businessDate = new Date(`${occurrence.businessDate}T00:00:00.000Z`);
+      const sequence = await nextSequence(tx, scope.supplierId, businessDate);
+      const identifier = `HEN-${supplier.code}-${occurrence.businessDate.replaceAll('-', '')}-${sequence
+        .toString()
+        .padStart(4, '0')}`;
+      const now = new Date();
+      const created = await tx.henkaten.create({
+        data: {
+          supplierId: scope.supplierId,
+          shiftRunId: legacyShift.id,
+          lineShiftId: lineShift.id,
+          lineId: lineShift.lineId,
+          jobId: job.id,
+          partId: part.id,
+          identifier,
+          dailySequence: sequence,
+          sourceMode: supplier.sourceMode,
+          sourceEpoch: supplier.sourceEpoch,
+          category: input.category,
+          businessDate,
+          timezoneSnapshot: lineShift.shiftTemplate.timezone,
+          shiftNameSnapshot: lineShift.shiftTemplate.name,
+          lineCodeSnapshot: lineShift.line.code,
+          lineNameSnapshot: lineShift.line.name,
+          jobNameSnapshot: job.name,
+          partNumberSnapshot: part.partNumber,
+          normalizedPartNumberSnapshot: normalizeLookup(part.partNumber),
+          partNameSnapshot: part.partName,
+          creatorMemberId: memberId,
+          creatorNameSnapshot: principal.displayName,
+          cause: input.cause,
+          detail: input.detail,
+          ...(input.category !== 'MAN'
+            ? {
+                affectedObject: input.affectedObject,
+                replacementObject: input.replacementObject,
+              }
+            : {}),
+          occurredAt: now,
+          effectiveStartAt: occurrence.start,
+          effectiveEndAt: occurrence.end,
+          ...(input.clonedFromHenkatenId
+            ? { clonedFromHenkatenId: input.clonedFromHenkatenId }
+            : {}),
+          submissionKey: idempotencyKey,
+          submissionPayloadHash: payloadHash,
+          createdById: principal.userId,
+          checklistSnapshot: {
+            create: {
+              checklistVersionId: checklist.id,
+              category: checklist.category,
+              versionNumber: checklist.versionNumber,
+              answers: {
+                create: checklist.items.map((item) => ({
+                  sourceItemId: item.id,
+                  labelSnapshot: item.label,
+                  displayOrderSnapshot: item.displayOrder,
+                  answer: 'YES',
+                })),
+              },
+            },
+          },
+          transitions: {
+            create: {
+              toStatus: 'OPEN',
+              actorUserId: principal.userId,
+              actorRole: principal.role,
+              actorName: principal.displayName,
+              correlationId: context.correlationId,
+            },
+          },
+          warning: {
+            create: {
+              partNumberSnapshot: part.partNumber,
+              normalizedPartNumberSnapshot: normalizeLookup(part.partNumber),
+              partNameSnapshot: part.partName,
+            },
+          },
+          approvalRoutes: {
+            create: [
+              {
+                route: 'SUPERVISOR',
+                initialResponsibleMemberId: lineShift.supervisorMemberId,
+                initialResponsibleNameSnapshot: lineShift.supervisor?.fullName ?? null,
+                currentResponsibleMemberId: lineShift.supervisorMemberId,
+                currentResponsibleNameSnapshot: lineShift.supervisor?.fullName ?? null,
+              },
+              { route: 'QC' },
+            ],
+          },
+          ...(man
+            ? {
+                manDetail: {
+                  create: {
+                    targetWorkingAssignmentId: targetWorking.id,
+                    lineShiftJobAssignmentId: man.assignment.id,
+                    ...(man.replaced
+                      ? {
+                          replacedMpMemberId: man.replaced.id,
+                          replacedMpNameSnapshot: man.replaced.fullName,
+                        }
+                      : {}),
+                    replacedWasVacant: !man.replaced,
+                    replacementMpMemberId: man.replacement.id,
+                    replacementMpNameSnapshot: man.replacement.fullName,
+                    targetAssignmentVersion: targetWorking.version,
+                  },
+                },
+              }
+            : {}),
+        },
+      });
+
+      await this.pcr.queueHosted(tx, created.id, scope.supplierId, {
+        category: created.category,
+        cause: created.cause,
+        detail: created.detail,
+        affectedObject: created.affectedObject,
+        replacementObject: created.replacementObject,
+      });
+
+      if (man) {
+        const updatedTarget = await tx.workingAssignment.update({
+          where: { id: targetWorking.id },
+          data: {
+            effectiveMpMemberId: man.replacement.id,
+            candidateMpMemberId: man.replacement.id,
+            mpNameSnapshot: man.replacement.fullName,
+            mpRegistrationSnapshot: man.replacement.registrationNumber,
+            state: 'ASSIGNED',
+            version: { increment: 1 },
+            updatedById: principal.userId,
+          },
+        });
+        await tx.assignmentMovement.create({
           data: {
             supplierId: scope.supplierId,
-            shiftRunId: shift.id,
-            lineId: shift.lineId,
-            jobId: job.id,
-            partId: part.id,
-            identifier,
-            dailySequence: sequence,
-            sourceMode: supplier.sourceMode,
-            sourceEpoch: supplier.sourceEpoch,
-            category: input.category,
-            businessDate: shift.businessDate,
-            timezoneSnapshot: shift.timezoneSnapshot,
-            shiftNameSnapshot: shift.shiftNameSnapshot,
-            lineCodeSnapshot: shift.lineCodeSnapshot,
-            lineNameSnapshot: shift.lineNameSnapshot,
-            jobNameSnapshot: job.name,
-            partNumberSnapshot: part.partNumber,
-            normalizedPartNumberSnapshot: normalizeLookup(part.partNumber),
-            partNameSnapshot: part.partName,
-            creatorMemberId: memberId,
-            creatorNameSnapshot: principal.displayName,
-            cause: input.cause,
-            detail: input.detail,
-            ...(input.category !== 'MAN'
+            henkatenId: created.id,
+            targetShiftRunId: legacyShift.id,
+            targetWorkingAssignmentId: targetWorking.id,
+            targetLineId: lineShift.lineId,
+            targetJobId: job.id,
+            movedMpMemberId: man.replacement.id,
+            movedMpNameSnapshot: man.replacement.fullName,
+            ...(man.replaced
               ? {
-                  affectedObject: input.affectedObject,
-                  replacementObject: input.replacementObject,
+                  replacedMpMemberId: man.replaced.id,
+                  replacedMpNameSnapshot: man.replaced.fullName,
                 }
               : {}),
-            occurredAt: now,
-            ...(input.clonedFromHenkatenId
-              ? { clonedFromHenkatenId: input.clonedFromHenkatenId }
-              : {}),
-            submissionKey: idempotencyKey,
-            submissionPayloadHash: payloadHash,
-            createdById: principal.userId,
-            checklistSnapshot: {
-              create: {
-                checklistVersionId: checklist.id,
-                category: checklist.category,
-                versionNumber: checklist.versionNumber,
-                answers: {
-                  create: checklist.items.map((item) => ({
-                    sourceItemId: item.id,
-                    labelSnapshot: item.label,
-                    displayOrderSnapshot: item.displayOrder,
-                    answer: 'YES',
-                  })),
-                },
-              },
-            },
-            transitions: {
-              create: {
-                toStatus: 'OPEN',
-                actorUserId: principal.userId,
-                actorRole: principal.role,
-                actorName: principal.displayName,
-                correlationId: context.correlationId,
-              },
-            },
-            warning: {
-              create: {
-                partNumberSnapshot: part.partNumber,
-                normalizedPartNumberSnapshot: normalizeLookup(part.partNumber),
-                partNameSnapshot: part.partName,
-              },
-            },
-            approvalRoutes: {
-              create: [
-                {
-                  route: 'SUPERVISOR',
-                  initialResponsibleMemberId: shift.supervisorMemberId,
-                  initialResponsibleNameSnapshot: shift.supervisorNameSnapshot,
-                  currentResponsibleMemberId: shift.supervisorMemberId,
-                  currentResponsibleNameSnapshot: shift.supervisorNameSnapshot,
-                },
-                { route: 'QC' },
-              ],
-            },
-            ...(man
-              ? {
-                  manDetail: {
-                    create: {
-                      targetWorkingAssignmentId: man.target.id,
-                      ...(man.source ? { sourceWorkingAssignmentId: man.source.id } : {}),
-                      ...(man.replaced
-                        ? {
-                            replacedMpMemberId: man.replaced.id,
-                            replacedMpNameSnapshot: man.replaced.fullName,
-                          }
-                        : {}),
-                      replacedWasVacant: !man.replaced,
-                      replacementMpMemberId: man.replacement.id,
-                      replacementMpNameSnapshot: man.replacement.fullName,
-                      targetAssignmentVersion: man.target.version,
-                      ...(man.source ? { sourceAssignmentVersion: man.source.version } : {}),
-                      ...(man.issue ? { resolutionIssueId: man.issue.id } : {}),
-                    },
-                  },
-                }
-              : {}),
+            targetAssignmentVersionBefore: targetWorking.version,
+            targetAssignmentVersionAfter: updatedTarget.version,
+            movedById: principal.userId,
+            correlationId: context.correlationId,
           },
         });
-        if (man) {
-          await tx.mPReservation.create({
-            data: {
-              supplierId: scope.supplierId,
-              henkatenId: created.id,
-              shiftRunId: shift.id,
-              replacementMpMemberId: man.replacement.id,
-              targetWorkingAssignmentId: man.target.id,
-              ...(man.source ? { sourceWorkingAssignmentId: man.source.id } : {}),
-              targetAssignmentVersion: man.target.version,
-              ...(man.source ? { sourceAssignmentVersion: man.source.version } : {}),
-              expiresAt: shift.scheduledEndAt,
-            },
-          });
-        }
-        await this.audit.write(
-          auditInput(context, scope.supplierId, 'HENKATEN_SUBMITTED', created.id, {
+      }
+      await this.audit.write(
+        auditInput(context, scope.supplierId, 'HENKATEN_SUBMITTED', created.id, {
+          identifier,
+          category: created.category,
+          lineId: created.lineId,
+          lineShiftId: lineShift.id,
+          jobId: created.jobId,
+          partId: created.partId,
+          assignmentAppliedImmediately: Boolean(man),
+        }),
+        tx,
+      );
+      await this.outbox.enqueue(
+        {
+          eventType: 'HENKATEN_OPENED',
+          aggregateType: 'Henkaten',
+          aggregateId: created.id,
+          aggregateVersion: created.version,
+          supplierId: scope.supplierId,
+          actor: { userId: principal.userId, role: principal.role },
+          correlationId: context.correlationId,
+          payload: {
             identifier,
             category: created.category,
             lineId: created.lineId,
-            jobId: created.jobId,
-            partId: created.partId,
-          }),
-          tx,
-        );
-        await this.outbox.enqueue(
-          {
-            eventType: 'HENKATEN_OPENED',
-            aggregateType: 'Henkaten',
-            aggregateId: created.id,
-            aggregateVersion: created.version,
-            supplierId: scope.supplierId,
-            actor: { userId: principal.userId, role: principal.role },
-            correlationId: context.correlationId,
-            payload: {
-              identifier,
-              category: created.category,
-              lineId: created.lineId,
-              partNumber: created.partNumberSnapshot,
-            },
+            partNumber: created.partNumberSnapshot,
           },
-          tx,
-        );
-        await this.outbox.enqueue(
-          {
-            eventType: 'WARNING_OPENED',
-            aggregateType: 'Henkaten',
-            aggregateId: created.id,
-            aggregateVersion: created.version,
-            supplierId: scope.supplierId,
-            actor: { userId: principal.userId, role: principal.role },
-            correlationId: context.correlationId,
-            payload: { partNumber: created.partNumberSnapshot },
-          },
-          tx,
-        );
-        if (man) {
-          await this.outbox.enqueue(
-            {
-              eventType: 'MP_RESERVED',
-              aggregateType: 'Henkaten',
-              aggregateId: created.id,
-              aggregateVersion: created.version,
-              supplierId: scope.supplierId,
-              actor: { userId: principal.userId, role: principal.role },
-              correlationId: context.correlationId,
-              payload: {
-                replacementMpMemberId: man.replacement.id,
-                targetWorkingAssignmentId: man.target.id,
-              },
-            },
-            tx,
-          );
-        }
-        return created.id;
-      });
-      return this.get(scope, id, principal);
-    } catch (error) {
-      if (isReservationUniqueConflict(error)) throw reservationConflict();
-      throw error;
-    }
+        },
+        tx,
+      );
+      await this.outbox.enqueue(
+        {
+          eventType: 'WARNING_OPENED',
+          aggregateType: 'Henkaten',
+          aggregateId: created.id,
+          aggregateVersion: created.version,
+          supplierId: scope.supplierId,
+          actor: { userId: principal.userId, role: principal.role },
+          correlationId: context.correlationId,
+          payload: { partNumber: created.partNumberSnapshot },
+        },
+        tx,
+      );
+      return created.id;
+    });
+    return this.get(scope, id, principal);
   }
 
   async withdraw(
@@ -396,6 +465,9 @@ export class HenkatenService {
           version: { increment: 1 },
         },
       });
+      if (current.lineShiftId && current.category === 'MAN') {
+        await this.restoreLineShiftAssignment(tx, scope.supplierId, current.id, principal.userId);
+      }
       await this.finalization.closeTerminalEffects(tx, {
         supplierId: scope.supplierId,
         henkatenId: id,
@@ -409,7 +481,7 @@ export class HenkatenService {
           correlationId: context.correlationId,
         },
         markPendingRoutesNotRequired: true,
-        releaseReservation: true,
+        releaseReservation: !current.lineShiftId,
       });
       await this.audit.write(
         {
@@ -426,56 +498,82 @@ export class HenkatenService {
   }
 
   async list(scope: TenantScope, query: HenkatenListQuery, principal?: RequestPrincipal) {
-    const cursor = decodeCursor(query.cursor);
-    const rows = await this.prisma.henkaten.findMany({
-      where: {
-        supplierId: scope.supplierId,
-        ...(query.status ? { status: query.status } : {}),
-        ...(query.category ? { category: query.category } : {}),
-        ...(query.lineId ? { lineId: query.lineId } : {}),
-        ...(query.shiftRunId ? { shiftRunId: query.shiftRunId } : {}),
-        ...(query.part
-          ? {
-              OR: [
-                { partNumberSnapshot: { contains: query.part, mode: 'insensitive' } },
-                { partNameSnapshot: { contains: query.part, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-        ...(query.from || query.to
-          ? {
-              occurredAt: {
-                ...(query.from ? { gte: new Date(query.from) } : {}),
-                ...(query.to ? { lte: new Date(query.to) } : {}),
+    const cursor = decodePriorityCursor(query.cursor);
+    const baseWhere: Prisma.HenkatenWhereInput = {
+      supplierId: scope.supplierId,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.category ? { category: query.category } : {}),
+      ...(query.pcrStatus ? { pcrAssessment: { status: query.pcrStatus } } : {}),
+      ...(query.lineId ? { lineId: query.lineId } : {}),
+      ...(query.shiftRunId ? { shiftRunId: query.shiftRunId } : {}),
+      ...(query.part
+        ? {
+            OR: [
+              { partNumberSnapshot: { contains: query.part, mode: 'insensitive' } },
+              { partNameSnapshot: { contains: query.part, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+      ...(query.from || query.to
+        ? {
+            occurredAt: {
+              ...(query.from ? { gte: new Date(query.from) } : {}),
+              ...(query.to ? { lte: new Date(query.to) } : {}),
+            },
+          }
+        : {}),
+      ...(query.approvalStatus || query.approvalRoute
+        ? {
+            approvalRoutes: {
+              some: {
+                ...(query.approvalStatus ? { status: query.approvalStatus } : {}),
+                ...(query.approvalRoute ? { route: query.approvalRoute } : {}),
               },
-            }
-          : {}),
-        ...(query.approvalStatus || query.approvalRoute
-          ? {
-              approvalRoutes: {
-                some: {
-                  ...(query.approvalStatus ? { status: query.approvalStatus } : {}),
-                  ...(query.approvalRoute ? { route: query.approvalRoute } : {}),
-                },
-              },
-            }
-          : {}),
-        ...roleWhere(principal),
-      },
-      include: {
-        approvalRoutes: { include: { decision: true }, orderBy: { route: 'asc' } },
-      },
-      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-      take: query.limit + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    });
+            },
+          }
+        : {}),
+      ...roleWhere(principal),
+    };
+    const buckets = priorityBuckets(query.status, query.pcrStatus);
+    const rows: Array<{
+      bucket: number;
+      row: Prisma.HenkatenGetPayload<{
+        include: { approvalRoutes: { include: { decision: true } }; pcrAssessment: true };
+      }>;
+    }> = [];
+    for (let bucket = 0; bucket < buckets.length && rows.length <= query.limit; bucket++) {
+      if (cursor && bucket < cursor.bucket) continue;
+      const found = await this.prisma.henkaten.findMany({
+        where: {
+          AND: [
+            baseWhere,
+            buckets[bucket]!,
+            ...(cursor && bucket === cursor.bucket ? [priorityKeyset(cursor)] : []),
+          ],
+        },
+        include: {
+          approvalRoutes: { include: { decision: true }, orderBy: { route: 'asc' } },
+          pcrAssessment: true,
+        },
+        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+        take: query.limit + 1 - rows.length,
+      });
+      rows.push(...found.map((row) => ({ bucket, row })));
+    }
     const hasNextPage = rows.length > query.limit;
-    const items = hasNextPage ? rows.slice(0, query.limit) : rows;
+    const items = rows.slice(0, query.limit);
     return {
-      items: items.map(presentHenkatenSummary),
+      items: items.map(({ row }) => presentHenkatenSummary(row)),
       pageInfo: {
         hasNextPage,
-        nextCursor: hasNextPage && items.at(-1) ? encodeCursor(items.at(-1)!.id) : null,
+        nextCursor:
+          hasNextPage && items.at(-1)
+            ? encodePriorityCursor({
+                bucket: items.at(-1)!.bucket,
+                occurredAt: items.at(-1)!.row.occurredAt.toISOString(),
+                id: items.at(-1)!.row.id,
+              })
+            : null,
       },
     };
   }
@@ -487,6 +585,56 @@ export class HenkatenService {
     });
     if (!row) throw missing('Henkaten');
     return presentHenkatenDetail(row);
+  }
+
+  async restoreLineShiftAssignment(
+    tx: Prisma.TransactionClient,
+    supplierId: string,
+    henkatenId: string,
+    actorUserId: string,
+  ) {
+    const target = await tx.henkaten.findFirst({
+      where: { id: henkatenId, supplierId, lineShiftId: { not: null }, category: 'MAN' },
+      include: {
+        manDetail: {
+          include: {
+            lineShiftJobAssignment: { include: { mp: true } },
+            targetWorkingAssignment: true,
+          },
+        },
+      },
+    });
+    const detail = target?.manDetail;
+    const assignment = detail?.lineShiftJobAssignment;
+    if (!target || !detail || !assignment) return;
+    const fallback = await tx.henkaten.findFirst({
+      where: {
+        id: { not: target.id },
+        supplierId,
+        lineShiftId: target.lineShiftId,
+        jobId: target.jobId,
+        category: 'MAN',
+        status: { in: ['OPEN', 'APPROVED'] },
+        effectiveStartAt: target.effectiveStartAt,
+        effectiveEndAt: target.effectiveEndAt,
+        manDetail: { lineShiftJobAssignmentId: assignment.id },
+      },
+      include: { manDetail: { include: { replacementMp: true } } },
+      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+    });
+    const effectiveMp = fallback?.manDetail?.replacementMp ?? assignment.mp;
+    await tx.workingAssignment.update({
+      where: { id: detail.targetWorkingAssignmentId },
+      data: {
+        effectiveMpMemberId: effectiveMp?.id ?? null,
+        candidateMpMemberId: effectiveMp?.id ?? null,
+        mpNameSnapshot: effectiveMp?.fullName ?? null,
+        mpRegistrationSnapshot: effectiveMp?.registrationNumber ?? null,
+        state: effectiveMp ? 'ASSIGNED' : 'VACANT',
+        version: { increment: 1 },
+        updatedById: actorUserId,
+      },
+    });
   }
 
   async formOptions(scope: TenantScope, query: HenkatenFormOptionsQuery) {
@@ -523,24 +671,9 @@ export class HenkatenService {
           id: true,
           fullName: true,
           registrationNumber: true,
-          reservations: { where: { releasedAt: null }, select: { id: true }, take: 1 },
           tanokoMappings: {
             where: { supplierId: scope.supplierId },
             select: { jobId: true, level: true },
-          },
-          effectiveWorkingAssignments: {
-            where: { active: true },
-            orderBy: { updatedAt: 'desc' },
-            take: 1,
-            select: {
-              id: true,
-              version: true,
-              shiftRunId: true,
-              lineId: true,
-              jobId: true,
-              line: { select: { name: true } },
-              job: { select: { name: true } },
-            },
           },
         },
         orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
@@ -567,27 +700,14 @@ export class HenkatenService {
         partNumber: part.partNumber,
         partName: part.partName,
       })),
-      replacementMembers: members.map((member) => {
-        const assignment = member.effectiveWorkingAssignments[0];
-        return {
-          id: member.id,
-          fullName: member.fullName,
-          registrationNumber: member.registrationNumber,
-          reserved: member.reservations.length > 0,
-          skillLevels: member.tanokoMappings,
-          currentAssignment: assignment
-            ? {
-                id: assignment.id,
-                version: assignment.version,
-                shiftRunId: assignment.shiftRunId,
-                lineId: assignment.lineId,
-                lineName: assignment.line.name,
-                jobId: assignment.jobId,
-                jobName: assignment.job.name,
-              }
-            : null,
-        };
-      }),
+      replacementMembers: members.map((member) => ({
+        id: member.id,
+        fullName: member.fullName,
+        registrationNumber: member.registrationNumber,
+        reserved: false,
+        skillLevels: member.tanokoMappings,
+        currentAssignment: null,
+      })),
     };
   }
 
@@ -758,15 +878,7 @@ export class HenkatenService {
   }
 
   async globalList(query: TmminHenkatenQuery) {
-    const cursor = decodeGlobalCursor(query.cursor);
-    const cursorWhere = cursor
-      ? {
-          OR: [
-            { updatedAt: { lt: cursor.updatedAt } },
-            { updatedAt: cursor.updatedAt, id: { lt: cursor.id } },
-          ],
-        }
-      : {};
+    const cursor = decodePriorityCursor(query.cursor);
     const commonDate =
       query.from || query.to
         ? {
@@ -776,225 +888,184 @@ export class HenkatenService {
             },
           }
         : {};
-    const [hosted, external] = await Promise.all([
-      query.sourceMode === 'EXTERNAL'
-        ? Promise.resolve([])
-        : this.prisma.henkaten.findMany({
-            where: {
-              ...cursorWhere,
-              ...commonDate,
-              ...(query.supplierId ? { supplierId: query.supplierId } : {}),
-              ...(query.status ? { status: query.status } : {}),
-              ...(query.category ? { category: query.category } : {}),
-              ...(query.line
-                ? { lineNameSnapshot: { contains: query.line, mode: 'insensitive' as const } }
-                : {}),
-              ...(query.part
-                ? {
-                    OR: [
-                      {
-                        partNumberSnapshot: {
-                          contains: query.part,
+    const buckets = priorityBuckets(query.status, query.pcrStatus);
+    const pages = await Promise.all(
+      buckets.map(async (bucketWhere, bucket) => {
+        if (cursor && bucket < cursor.bucket)
+          return {
+            bucket,
+            rows: [] as Array<{
+              kind: 'HOSTED' | 'EXTERNAL';
+              recordId: string;
+              occurredAt: string;
+            }>,
+          };
+        const bucketCursorWhere = cursor && bucket === cursor.bucket ? priorityKeyset(cursor) : {};
+        const [hosted, external] = await Promise.all([
+          query.sourceMode === 'EXTERNAL'
+            ? Promise.resolve([])
+            : this.prisma.henkaten.findMany({
+                where: {
+                  ...commonDate,
+                  AND: [bucketWhere, bucketCursorWhere],
+                  ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+                  ...(query.status ? { status: query.status } : {}),
+                  ...(query.category ? { category: query.category } : {}),
+                  ...(query.pcrStatus ? { pcrAssessment: { status: query.pcrStatus } } : {}),
+                  ...(query.line
+                    ? { lineNameSnapshot: { contains: query.line, mode: 'insensitive' as const } }
+                    : {}),
+                  ...(query.part
+                    ? {
+                        OR: [
+                          {
+                            partNumberSnapshot: {
+                              contains: query.part,
+                              mode: 'insensitive' as const,
+                            },
+                          },
+                          {
+                            partNameSnapshot: {
+                              contains: query.part,
+                              mode: 'insensitive' as const,
+                            },
+                          },
+                        ],
+                      }
+                    : {}),
+                },
+                include: {
+                  supplier: { select: { code: true, name: true } },
+                  approvalRoutes: true,
+                  pcrAssessment: true,
+                },
+                orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+                take: query.limit + 1,
+              }),
+          query.sourceMode === 'HOSTED'
+            ? Promise.resolve([])
+            : this.prisma.externalHenkatenProjection.findMany({
+                where: {
+                  ...commonDate,
+                  AND: [bucketWhere, bucketCursorWhere],
+                  ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+                  ...(query.status ? { status: query.status } : {}),
+                  ...(query.category ? { category: query.category } : {}),
+                  ...(query.pcrStatus ? { pcrAssessment: { status: query.pcrStatus } } : {}),
+                  ...(query.line
+                    ? {
+                        lineSnapshot: {
+                          path: ['name'],
+                          string_contains: query.line,
                           mode: 'insensitive' as const,
                         },
-                      },
-                      {
-                        partNameSnapshot: {
-                          contains: query.part,
-                          mode: 'insensitive' as const,
-                        },
-                      },
-                    ],
-                  }
-                : {}),
-            },
-            include: {
-              supplier: { select: { code: true, name: true } },
-              approvalRoutes: true,
-            },
-            orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-            take: query.limit + 1,
+                      }
+                    : {}),
+                  ...(query.part
+                    ? {
+                        OR: [
+                          {
+                            partSnapshot: {
+                              path: ['number'],
+                              string_contains: query.part,
+                              mode: 'insensitive' as const,
+                            },
+                          },
+                          {
+                            partSnapshot: {
+                              path: ['name'],
+                              string_contains: query.part,
+                              mode: 'insensitive' as const,
+                            },
+                          },
+                        ],
+                      }
+                    : {}),
+                },
+                include: { supplier: { select: { code: true, name: true } }, pcrAssessment: true },
+                orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+                take: query.limit + 1,
+              }),
+        ]);
+        const mapped = [
+          ...hosted.map((row) => ({
+            kind: 'HOSTED' as const,
+            recordId: row.id,
+            supplierId: row.supplierId,
+            supplierCode: row.supplier.code,
+            supplierName: row.supplier.name,
+            sourceMode: row.sourceMode,
+            sourceEpoch: row.sourceEpoch,
+            displayId: row.identifier,
+            status: row.status,
+            category: row.category,
+            lineName: row.lineNameSnapshot,
+            jobName: row.jobNameSnapshot,
+            partNumber: row.partNumberSnapshot,
+            partName: row.partNameSnapshot,
+            occurredAt: row.occurredAt.toISOString(),
+            updatedAt: row.updatedAt.toISOString(),
+            pcr: presentPcrAssessment(row.pcrAssessment),
+            supervisorStatus:
+              row.approvalRoutes.find((route) => route.route === 'SUPERVISOR')?.status ??
+              'NOT_REQUIRED',
+            qcStatus:
+              row.approvalRoutes.find((route) => route.route === 'QC')?.status ?? 'NOT_REQUIRED',
+          })),
+          ...external.map((row) => {
+            const line = objectRecord(row.lineSnapshot);
+            const job = objectRecord(row.jobSnapshot);
+            const part = objectRecord(row.partSnapshot);
+            return {
+              kind: 'EXTERNAL' as const,
+              recordId: row.id,
+              supplierId: row.supplierId,
+              supplierCode: row.supplier.code,
+              supplierName: row.supplier.name,
+              sourceMode: 'EXTERNAL' as const,
+              sourceEpoch: row.sourceEpoch,
+              displayId: row.sourceHenkatenId,
+              sourceVersion: row.sourceVersion,
+              status: row.status,
+              category: row.category,
+              lineName: safeText(line['name']),
+              jobName: safeText(job['name']),
+              partNumber: safeText(part['number']),
+              partName: safeText(part['name']),
+              occurredAt: row.occurredAt.toISOString(),
+              updatedAt: row.updatedAt.toISOString(),
+              pcr: presentPcrAssessment(row.pcrAssessment),
+            };
           }),
-      query.sourceMode === 'HOSTED'
-        ? Promise.resolve([])
-        : this.prisma.externalHenkatenProjection.findMany({
-            where: {
-              ...cursorWhere,
-              ...commonDate,
-              ...(query.supplierId ? { supplierId: query.supplierId } : {}),
-              ...(query.status ? { status: query.status } : {}),
-              ...(query.category ? { category: query.category } : {}),
-            },
-            include: { supplier: { select: { code: true, name: true } } },
-            orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-            take: query.limit + 1,
-          }),
-    ]);
-    const mapped = [
-      ...hosted.map((row) => ({
-        kind: 'HOSTED' as const,
-        recordId: row.id,
-        supplierId: row.supplierId,
-        supplierCode: row.supplier.code,
-        supplierName: row.supplier.name,
-        sourceMode: row.sourceMode,
-        sourceEpoch: row.sourceEpoch,
-        displayId: row.identifier,
-        status: row.status,
-        category: row.category,
-        lineName: row.lineNameSnapshot,
-        jobName: row.jobNameSnapshot,
-        partNumber: row.partNumberSnapshot,
-        partName: row.partNameSnapshot,
-        occurredAt: row.occurredAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
-        supervisorStatus:
-          row.approvalRoutes.find((route) => route.route === 'SUPERVISOR')?.status ??
-          'NOT_REQUIRED',
-        qcStatus:
-          row.approvalRoutes.find((route) => route.route === 'QC')?.status ?? 'NOT_REQUIRED',
-      })),
-      ...external.map((row) => {
-        const line = objectRecord(row.lineSnapshot);
-        const job = objectRecord(row.jobSnapshot);
-        const part = objectRecord(row.partSnapshot);
-        return {
-          kind: 'EXTERNAL' as const,
-          recordId: row.id,
-          supplierId: row.supplierId,
-          supplierCode: row.supplier.code,
-          supplierName: row.supplier.name,
-          sourceMode: 'EXTERNAL' as const,
-          sourceEpoch: row.sourceEpoch,
-          displayId: row.sourceHenkatenId,
-          sourceVersion: row.sourceVersion,
-          status: row.status,
-          category: row.category,
-          lineName: safeText(line['name']),
-          jobName: safeText(job['name']),
-          partNumber: safeText(part['number']),
-          partName: safeText(part['name']),
-          occurredAt: row.occurredAt.toISOString(),
-          updatedAt: row.updatedAt.toISOString(),
-        };
+        ].sort(
+          (left, right) =>
+            right.occurredAt.localeCompare(left.occurredAt) ||
+            right.recordId.localeCompare(left.recordId),
+        );
+        return { bucket, rows: mapped };
       }),
-    ]
-      .filter((row) => {
-        if (row.kind !== 'EXTERNAL') return true;
-        const lineMatches =
-          !query.line || row.lineName.toLowerCase().includes(query.line.toLowerCase());
-        const partMatches =
-          !query.part ||
-          `${row.partNumber} ${row.partName}`.toLowerCase().includes(query.part.toLowerCase());
-        return lineMatches && partMatches;
-      })
-      .sort(
-        (left, right) =>
-          right.updatedAt.localeCompare(left.updatedAt) ||
-          right.recordId.localeCompare(left.recordId),
-      );
+    );
+    const mapped = pages.flatMap((page) =>
+      page.rows.map((row) => ({ ...row, bucket: page.bucket })),
+    );
     const hasNextPage = mapped.length > query.limit;
-    const items = mapped.slice(0, query.limit);
-    const last = items.at(-1);
+    const pageRows = mapped.slice(0, query.limit);
+    const items = pageRows.map(({ bucket: _bucket, ...row }) => row);
+    const last = pageRows.at(-1);
     return {
       items,
       pageInfo: {
         hasNextPage,
         nextCursor:
           hasNextPage && last
-            ? encodeGlobalCursor({ updatedAt: last.updatedAt, id: last.recordId })
+            ? encodePriorityCursor({
+                bucket: last.bucket,
+                occurredAt: last.occurredAt,
+                id: last.recordId,
+              })
             : null,
       },
     };
-  }
-
-  private async validateMan(
-    tx: Prisma.TransactionClient,
-    supplierId: string,
-    shiftRunId: string,
-    input: Extract<CreateHenkatenRequest, { category: 'MAN' }>,
-  ) {
-    await tx.$queryRaw`SELECT id FROM "WorkingAssignment" WHERE id = ${input.targetWorkingAssignmentId}::uuid FOR UPDATE`;
-    const target = await tx.workingAssignment.findFirst({
-      where: {
-        id: input.targetWorkingAssignmentId,
-        supplierId,
-        shiftRunId,
-        jobId: input.jobId,
-        includedInPlan: true,
-      },
-    });
-    if (!target) throw missing('Target Working Assignment');
-    if (target.version !== input.targetAssignmentVersion) throw versionConflict();
-    const replaced =
-      input.replaced.kind === 'MP'
-        ? await tx.member.findFirst({
-            where: { id: input.replaced.memberId, supplierId, active: true, role: 'MP' },
-          })
-        : null;
-    if (
-      (input.replaced.kind === 'VACANT' && target.effectiveMpMemberId) ||
-      (input.replaced.kind === 'MP' &&
-        (!replaced || target.effectiveMpMemberId !== input.replaced.memberId))
-    ) {
-      throw assignmentConflict();
-    }
-    const replacement = await tx.member.findFirst({
-      where: {
-        id: input.replacementMpMemberId,
-        supplierId,
-        active: true,
-        role: 'MP',
-      },
-    });
-    if (!replacement) throw missing('Active replacement MP');
-    await assertTanokoEligible(tx, supplierId, replacement.id, target.jobId);
-    if (replacement.id === replaced?.id) throw assignmentConflict();
-    const source = await tx.workingAssignment.findFirst({
-      where: {
-        supplierId,
-        effectiveMpMemberId: replacement.id,
-        active: true,
-      },
-    });
-    if (source) {
-      if (
-        !input.sourceWorkingAssignmentId ||
-        input.sourceWorkingAssignmentId !== source.id ||
-        input.sourceAssignmentVersion !== source.version
-      ) {
-        throw versionConflict();
-      }
-    } else if (input.sourceWorkingAssignmentId || input.sourceAssignmentVersion) {
-      throw assignmentConflict();
-    }
-    const reservation = await tx.mPReservation.findFirst({
-      where: {
-        supplierId,
-        releasedAt: null,
-        OR: [{ replacementMpMemberId: replacement.id }, { targetWorkingAssignmentId: target.id }],
-      },
-    });
-    if (reservation) throw reservationConflict();
-    const issue = input.resolutionIssueId
-      ? await tx.assignmentIssue.findFirst({
-          where: {
-            id: input.resolutionIssueId,
-            supplierId,
-            shiftRunId,
-            lineId: target.lineId,
-            jobId: target.jobId,
-            status: 'OPEN',
-          },
-        })
-      : null;
-    const existingIssue = await tx.assignmentIssue.findFirst({
-      where: { supplierId, shiftRunId, jobId: target.jobId, status: 'OPEN' },
-    });
-    if ((input.resolutionIssueId && !issue) || (existingIssue && existingIssue.id !== issue?.id)) {
-      throw assignmentConflict();
-    }
-    return { target, source, replaced, replacement, issue };
   }
 }
 
@@ -1021,6 +1092,79 @@ function roleWhere(principal?: RequestPrincipal): Prisma.HenkatenWhereInput {
         ],
       }
     : { shiftRun: { lineLeaderMemberId: principal.memberId } };
+}
+
+async function ensureAutomaticOccurrence(
+  tx: Prisma.TransactionClient,
+  supplierId: string,
+  sourceEpoch: number,
+  lineShift: Awaited<ReturnType<LineShiftService['resolveOccurrence']>>['row'],
+  businessDate: string,
+  start: Date,
+  end: Date,
+  actorUserId: string,
+) {
+  const existing = await tx.shiftRun.findFirst({
+    where: {
+      supplierId,
+      lineId: lineShift.lineId,
+      shiftTemplateId: lineShift.shiftTemplateId,
+      businessDate: new Date(`${businessDate}T00:00:00.000Z`),
+    },
+    include: { workingAssignments: true },
+  });
+  if (existing) return existing;
+  const created = await tx.shiftRun.create({
+    data: {
+      supplierId,
+      lineId: lineShift.lineId,
+      shiftTemplateId: lineShift.shiftTemplateId,
+      status: 'NOT_STARTED',
+      businessDate: new Date(`${businessDate}T00:00:00.000Z`),
+      scheduledStartAt: start,
+      scheduledEndAt: end,
+      timezoneSnapshot: lineShift.shiftTemplate.timezone,
+      lineCodeSnapshot: lineShift.line.code,
+      lineNameSnapshot: lineShift.line.name,
+      shiftNameSnapshot: lineShift.shiftTemplate.name,
+      shiftStartMinuteSnapshot: lineShift.shiftTemplate.startMinute,
+      shiftEndMinuteSnapshot: lineShift.shiftTemplate.endMinute,
+      defaultAssignmentSetVersion: lineShift.version,
+      sourceEpoch,
+      supervisorMemberId: lineShift.supervisorMemberId,
+      supervisorNameSnapshot: lineShift.supervisor?.fullName ?? null,
+      lineLeaderMemberId: lineShift.lineLeaderMemberId,
+      lineLeaderNameSnapshot: lineShift.lineLeader?.fullName ?? null,
+      latestPreflight: [],
+      latestPreflightAt: new Date(),
+      createdById: actorUserId,
+      updatedById: actorUserId,
+    },
+  });
+  if (lineShift.jobAssignments.length) {
+    await tx.workingAssignment.createMany({
+      data: lineShift.jobAssignments.map((assignment) => ({
+        supplierId,
+        shiftRunId: created.id,
+        lineId: lineShift.lineId,
+        jobId: assignment.jobId,
+        jobNameSnapshot: assignment.job.name,
+        jobDisplayOrderSnapshot: assignment.job.displayOrder,
+        effectiveMpMemberId: assignment.mpMemberId,
+        candidateMpMemberId: assignment.mpMemberId,
+        mpNameSnapshot: assignment.mp?.fullName ?? null,
+        mpRegistrationSnapshot: assignment.mp?.registrationNumber ?? null,
+        state: assignment.mpMemberId ? ('ASSIGNED' as const) : ('VACANT' as const),
+        active: true,
+        includedInPlan: true,
+        updatedById: actorUserId,
+      })),
+    });
+  }
+  return tx.shiftRun.findUniqueOrThrow({
+    where: { id: created.id },
+    include: { workingAssignments: true },
+  });
 }
 
 function presentWarning(row: {
@@ -1114,16 +1258,6 @@ function auditInput(
   };
 }
 
-function isReservationUniqueConflict(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    error.code === 'P2002' &&
-    JSON.stringify(error).includes('MPReservation')
-  );
-}
-
 function forbidden() {
   return new ProblemException({
     status: 403,
@@ -1156,45 +1290,64 @@ function idempotencyConflict() {
     detail: 'The Idempotency-Key was already used with a different request.',
   });
 }
-function reservationConflict() {
-  return new ProblemException({
-    status: 409,
-    code: 'RESERVATION_CONFLICT',
-    title: 'Reservation conflict',
-    detail: 'The replacement MP or target job already has an active reservation.',
-  });
-}
-
-function invalidTransition() {
-  return new ProblemException({
-    status: 409,
-    code: 'INVALID_TRANSITION',
-    title: 'Invalid transition',
-    detail: 'Only Man Henkaten can be submitted for a planned Shift Run.',
-  });
-}
-function assignmentConflict() {
+function shiftSelectionConflict() {
   return new ProblemException({
     status: 409,
     code: 'STATE_CONFLICT',
-    title: 'Assignment conflict',
-    detail: 'The submitted Man assignment no longer matches current Working Assignment.',
+    title: 'Shift selection conflict',
+    detail: 'Henkaten harus menggunakan shift yang sedang berjalan.',
   });
 }
 
-function encodeGlobalCursor(value: { updatedAt: string; id: string }): string {
+type PriorityCursor = { bucket: number; occurredAt: string; id: string };
+
+function priorityBuckets(status?: string, pcrStatus?: PcrStatus): Prisma.HenkatenWhereInput[] {
+  const open = { status: 'OPEN' as const };
+  const closed = { status: { not: 'OPEN' as const } };
+  if (status && status !== 'OPEN') return [closed];
+  if (pcrStatus) return status === 'OPEN' ? [open] : [open, closed];
+  const openPcr = { AND: [open, { pcrAssessment: { is: { status: 'PCR' as const } } }] };
+  const openOther = {
+    AND: [
+      open,
+      {
+        OR: [
+          { pcrAssessment: { is: null } },
+          { pcrAssessment: { isNot: { status: 'PCR' as const } } },
+        ],
+      },
+    ],
+  };
+  return status === 'OPEN' ? [openPcr, openOther] : [openPcr, openOther, closed];
+}
+
+function priorityKeyset(cursor: PriorityCursor) {
+  return {
+    OR: [
+      { occurredAt: { lt: new Date(cursor.occurredAt) } },
+      { occurredAt: new Date(cursor.occurredAt), id: { lt: cursor.id } },
+    ],
+  };
+}
+
+function encodePriorityCursor(value: PriorityCursor): string {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
 }
 
-function decodeGlobalCursor(value?: string): { updatedAt: Date; id: string } | undefined {
+function decodePriorityCursor(value?: string): PriorityCursor | undefined {
   if (!value) return undefined;
   try {
-    const decoded = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as {
-      updatedAt?: unknown;
-      id?: unknown;
-    };
-    if (typeof decoded.updatedAt !== 'string' || typeof decoded.id !== 'string') return undefined;
-    return { updatedAt: new Date(decoded.updatedAt), id: decoded.id };
+    const decoded = JSON.parse(
+      Buffer.from(value, 'base64url').toString('utf8'),
+    ) as Partial<PriorityCursor>;
+    if (
+      !Number.isInteger(decoded.bucket) ||
+      typeof decoded.occurredAt !== 'string' ||
+      Number.isNaN(Date.parse(decoded.occurredAt)) ||
+      typeof decoded.id !== 'string'
+    )
+      return undefined;
+    return decoded as PriorityCursor;
   } catch {
     return undefined;
   }

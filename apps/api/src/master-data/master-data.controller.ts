@@ -21,6 +21,7 @@ import {
   assignmentRemoveRequestSchema,
   createJobRequestSchema,
   createLineRequestSchema,
+  createLineShiftRequestSchema,
   createMemberRequestSchema,
   createPartRequestSchema,
   createShiftTemplateRequestSchema,
@@ -32,13 +33,16 @@ import {
   updateChecklistDraftRequestSchema,
   updateJobRequestSchema,
   updateLineRequestSchema,
+  updateLineShiftAssignmentsRequestSchema,
   updateMemberAccountRequestSchema,
   updateMemberRequestSchema,
   updatePartRequestSchema,
   updateShiftTemplateRequestSchema,
   type CreateMemberRequest,
+  type CreateLineShiftRequest,
   type HenkatenCategory,
   type MasterListQuery,
+  type UpdateLineShiftAssignmentsRequest,
 } from '@tmmin-henkaten/contracts';
 
 import { RequireCapabilities } from '../common/policy.js';
@@ -52,6 +56,7 @@ import { ChecklistService } from './checklist.service.js';
 import { MasterDataAccessService } from './master-data-access.service.js';
 import { MemberService } from './member.service.js';
 import { PhotoService } from './photo.service.js';
+import { LineShiftService } from './line-shift.service.js';
 
 @Controller('/api/v1/supplier/master-data/members')
 export class SupplierMemberController {
@@ -673,7 +678,89 @@ export class SupplierConfigurationController {
     private readonly access: MasterDataAccessService,
     private readonly checklists: ChecklistService,
     private readonly assignments: AssignmentService,
+    private readonly lineShifts: LineShiftService,
   ) {}
+
+  @RequireCapabilities('SUPPLIER_MASTER_DATA_READ')
+  @Get('/lines/:lineId/shifts')
+  lineShiftList(@Param('lineId') lineId: string, @Req() request: ContextRequest) {
+    return this.lineShifts.list(
+      this.access.supplierScope(request),
+      parseWithSchema(opaqueIdSchema, lineId),
+    );
+  }
+
+  @RequireCapabilities('SUPPLIER_SELF_SERVICE')
+  @Get('/line-shifts/operational-context')
+  lineShiftOperationalContext(@Req() request: ContextRequest) {
+    return this.lineShifts.operationalContext(
+      this.access.supplierScope(request),
+      principal(request),
+    );
+  }
+
+  @RequireCapabilities('SUPPLIER_MASTER_DATA_MANAGE')
+  @Post('/lines/:lineId/shifts')
+  async createLineShift(
+    @Param('lineId') lineId: string,
+    @ValidatedBody(createLineShiftRequestSchema) body: CreateLineShiftRequest,
+    @Req() request: ContextRequest,
+  ) {
+    return this.lineShifts.create(
+      await this.access.assertWritable(principal(request)),
+      parseWithSchema(opaqueIdSchema, lineId),
+      body,
+      mutationContext(request),
+    );
+  }
+
+  @RequireCapabilities('SUPPLIER_MASTER_DATA_MANAGE')
+  @Patch('/line-shifts/:id/assignments')
+  async updateLineShiftAssignments(
+    @Param('id') id: string,
+    @ValidatedBody(updateLineShiftAssignmentsRequestSchema)
+    body: UpdateLineShiftAssignmentsRequest,
+    @Req() request: ContextRequest,
+  ) {
+    return this.lineShifts.updateAssignments(
+      await this.access.assertWritable(principal(request)),
+      parseWithSchema(opaqueIdSchema, id),
+      body,
+      mutationContext(request),
+    );
+  }
+
+  @RequireCapabilities('SUPPLIER_MASTER_DATA_MANAGE')
+  @Post('/line-shifts/:id/activate')
+  async activateLineShift(
+    @Param('id') id: string,
+    @ValidatedBody(expectedVersionSchema) body: { expectedVersion: number },
+    @Req() request: ContextRequest,
+  ) {
+    return this.lineShifts.setActive(
+      await this.access.assertWritable(principal(request)),
+      parseWithSchema(opaqueIdSchema, id),
+      body.expectedVersion,
+      true,
+      mutationContext(request),
+    );
+  }
+
+  @RequireCapabilities('SUPPLIER_MASTER_DATA_MANAGE')
+  @Post('/line-shifts/:id/deactivate')
+  async deactivateLineShift(
+    @Param('id') id: string,
+    @ValidatedBody(expectedVersionSchema) body: { expectedVersion: number },
+    @Req() request: ContextRequest,
+  ) {
+    return this.lineShifts.setActive(
+      await this.access.assertWritable(principal(request)),
+      parseWithSchema(opaqueIdSchema, id),
+      body.expectedVersion,
+      false,
+      mutationContext(request),
+    );
+  }
 
   @RequireCapabilities('SUPPLIER_MASTER_DATA_READ')
   @Get('/checklists/:category/draft')

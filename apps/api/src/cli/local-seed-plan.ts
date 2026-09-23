@@ -18,7 +18,6 @@ export type SeedOutcome =
   | 'REJECTED_SUPERVISOR'
   | 'REJECTED_QC'
   | 'CANCELLED_WITHDRAWN'
-  | 'CANCELLED_SHIFT_ENDED'
   | 'OPEN_PENDING'
   | 'OPEN_SUPERVISOR_APPROVED'
   | 'OPEN_QC_APPROVED';
@@ -108,8 +107,7 @@ const profiles: HistoricalProfile[] = [
       APPROVED_QC_FIRST: 25,
       REJECTED_SUPERVISOR: 11,
       REJECTED_QC: 8,
-      CANCELLED_WITHDRAWN: 10,
-      CANCELLED_SHIFT_ENDED: 16,
+      CANCELLED_WITHDRAWN: 26,
     },
     partWeights: [0, 0, 0, 1, 1, 2, 2, 3, 4, 5, 6, 7],
   },
@@ -122,8 +120,7 @@ const profiles: HistoricalProfile[] = [
       APPROVED_QC_FIRST: 32,
       REJECTED_SUPERVISOR: 12,
       REJECTED_QC: 16,
-      CANCELLED_WITHDRAWN: 15,
-      CANCELLED_SHIFT_ENDED: 10,
+      CANCELLED_WITHDRAWN: 25,
     },
     partWeights: [0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 5, 6, 7],
   },
@@ -132,8 +129,6 @@ const profiles: HistoricalProfile[] = [
 function historicalPlan(profile: HistoricalProfile, supplierIndex: number): SeedHenkatenPlan[] {
   const historicalCategories = shuffle(expandCounts(profile.categoryCounts), profile.seed);
   const historicalOutcomes = shuffle(expandCounts(profile.outcomeCounts), profile.seed + 101);
-  avoidPersistentManReservations(historicalCategories, historicalOutcomes);
-  avoidEmergencyShiftManChanges(historicalCategories, profile.shiftLoads[0]!);
   const records: SeedHenkatenPlan[] = [];
   let recordIndex = 0;
   for (let shiftIndex = 0; shiftIndex < profile.shiftLoads.length; shiftIndex += 1) {
@@ -170,49 +165,6 @@ function historicalPlan(profile: HistoricalProfile, supplierIndex: number): Seed
     }
   }
   return records;
-}
-
-function avoidEmergencyShiftManChanges(
-  plannedCategories: SeedCategory[],
-  emergencyShiftLoad: number,
-): void {
-  for (let index = 0; index < emergencyShiftLoad; index += 1) {
-    if (plannedCategories[index] !== 'MAN') continue;
-    const replacementIndex = plannedCategories.findIndex(
-      (category, candidate) => candidate >= emergencyShiftLoad && category !== 'MAN',
-    );
-    if (replacementIndex < 0) {
-      throw new Error('Unable to keep emergency-start assignment evidence conflict-free.');
-    }
-    [plannedCategories[index], plannedCategories[replacementIndex]] = [
-      plannedCategories[replacementIndex]!,
-      plannedCategories[index]!,
-    ];
-  }
-}
-
-function avoidPersistentManReservations(
-  plannedCategories: SeedCategory[],
-  plannedOutcomes: SeedOutcome[],
-): void {
-  for (let index = 0; index < plannedOutcomes.length; index += 1) {
-    if (plannedOutcomes[index] !== 'CANCELLED_SHIFT_ENDED' || plannedCategories[index] !== 'MAN') {
-      continue;
-    }
-    const replacementIndex = plannedCategories.findIndex(
-      (category, candidate) =>
-        candidate > index &&
-        category !== 'MAN' &&
-        plannedOutcomes[candidate] !== 'CANCELLED_SHIFT_ENDED',
-    );
-    if (replacementIndex < 0) {
-      throw new Error('Unable to distribute historical Man reservation scenarios safely.');
-    }
-    [plannedCategories[index], plannedCategories[replacementIndex]] = [
-      plannedCategories[replacementIndex]!,
-      plannedCategories[index]!,
-    ];
-  }
 }
 
 function historicalOffset(group: number, supplierIndex: number): number {

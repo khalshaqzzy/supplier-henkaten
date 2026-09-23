@@ -56,7 +56,7 @@ const items: Item[] = [
   },
   {
     to: '/henkatens',
-    label: 'Penelusuran Henkaten',
+    label: 'Henkaten',
     capability: 'TMMIN_HENKATEN_READ',
     monitor: true,
     icon: Network,
@@ -213,7 +213,7 @@ export function TmminLayout() {
         <div className="tmmin-workspace">
           <span>Enterprise Digital Henkaten</span>
           <strong>Konsol tata kelola</strong>
-          <small>{admin ? 'Administrasi dan monitoring' : 'Monitoring Quality · Hanya baca'}</small>
+          <small>{admin ? 'Administrasi dan monitoring' : 'Quality · Koreksi PCR'}</small>
         </div>
         <nav aria-label="Navigasi utama">
           {Object.entries(groupLabels).map(([group, label]) => {
@@ -253,7 +253,7 @@ export function TmminLayout() {
           </button>
           <div>
             <KeyRound aria-hidden="true" />
-            <span>{admin ? 'Kontrol Admin aktif' : 'Mode hanya baca'}</span>
+            <span>{admin ? 'Kontrol Admin aktif' : 'Koreksi PCR aktif'}</span>
           </div>
         </div>
       </aside>
@@ -315,7 +315,7 @@ export function TmminLayout() {
               <span>{initials(identity.displayName)}</span>
               <span>
                 <strong>{identity.displayName}</strong>
-                <small>{admin ? 'TMMIN Admin' : 'TMMIN Quality · Hanya baca'}</small>
+                <small>{admin ? 'TMMIN Admin' : 'TMMIN Quality · Koreksi PCR'}</small>
               </span>
             </button>
             <IconButton label="Keluar" onClick={() => void logout().then(() => navigate('/login'))}>

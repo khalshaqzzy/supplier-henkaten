@@ -5881,6 +5881,72 @@ in_progress delivery phase. No deployment or production UAT is claimed.
 - Follow-up: deploy forward migration with normal release process, assess actual large-supplier
   matrix load, and conduct user acceptance on the target shop-floor device.
 
+## Line–Shift operating model amendment — 2026-09-22
+
+Phase/Subphase: Hosted Line–Shift scheduling and Henkaten assignment behavior
+Previous status: Shift Run preflight/start/end, reservation, exclusive MP movement, and default
+assignment lifecycle implemented.
+New status: implementation and local verification complete; ADR 0033 accepted. Cross-browser
+Line Setup E2E passes; staging UAT remains pending.
+Completed implementation: recurring Line–Shift configuration; shift-specific Supervisor/LL/MP;
+clock-derived current/next occurrence; Tanoko-only immediate Man replacement; duplicate MP support;
+reject/withdraw restoration; supplier Shift command/UI removal; Admin Line Setup and updated Henkaten
+form; source/readiness/catalog/seed compatibility changes.
+Files changed: Prisma schema/migration, Contracts, API master data/Henkaten/read models/governance,
+API client, Supplier web, PRD, ADR, handoff, and roadmap.
+Migrations: `20260922001300_line_shift_scheduling` (forward-only, history preserving).
+Contracts changed: LineShift, LineShiftJobAssignment, operational occurrence context, Henkaten
+Line–Shift/effective interval fields, and new assignment mutation requests.
+Tests/checks: clean 13-migration deploy and upgrade from the 12-migration staging state; formatting,
+lint, TypeScript, generated API client/OpenAPI parity, 188 repository/script unit tests, 28 API
+integration tests, production build, and diff whitespace check pass. All six isolated Playwright
+journeys pass on Chromium and Edge; onboarding now covers Admin Line Setup and shift assignment.
+The production-like five-image Compose acceptance, deployment quality checks, Gitleaks, Trivy
+filesystem/image scans, and package audit also pass. A separate fresh-database runtime seed now
+creates the planned 240 Henkaten through the built Line–Shift API: 216 terminal historical records
+across 72 compatibility occurrence snapshots plus 24 current records, with 16 Open warnings, 18
+LineShifts, 72 shift assignments, 6 Canvas layouts, dashboard totals/trend verified, and no pending
+outbox events.
+Decisions/ADR: ADR 0033.
+Blockers: none for local implementation.
+Next recommended subphase: run staging UAT of Line Setup and during/outside-shift Henkaten flows;
+add dedicated browser coverage for both clock contexts if staging behavior is accepted.
+
 - Seed extension: varied levels 1–4/unassessed mappings, Admin/GL audit examples, and automatic
   synthetic assessment to at least level 3 before assigning a default MP or submitting a Man
   replacement. Post-seed checks verify all default MP/job pairs remain qualified.
+
+## PCR indication amendment — 2026-09-23
+
+Status: implemented locally and prepared for a PR to `staging`; browser verification and local
+demo reseed completed. ADR 0034 records the durable worker, threshold/review behavior, and manual
+correction boundary.
+
+Scope: Hosted submission queues an assessment atomically; External ingestion queues or refreshes
+only on changed evidence. A leased worker calls local Ling through OpenAI-compatible completions,
+validates one structured tool call, and stores PCR/No-PCR/Review separately from Henkaten status.
+TMMIN Admin/Quality correct a versioned decision with a reason; audit and outbox notifications
+preserve the decision trail. Supplier and TMMIN lists expose PCR priority tabs and stable priority
+pagination. Supplier submit waits on a resumable assessment screen. Design A supplies the detail
+assessment surface, and both portals use a solid orange active sidebar item.
+
+Acceptance checks: isolated 14-migration deploy, formatting, lint, full typecheck, unit suite,
+31 integration tests, isolated 240-Henkaten seed with PCR/No-PCR/Review/manual examples, local
+reseed, browser review of both portals, and production build with configured API origin passed.
+Generated OpenAPI and API client are current; the staged-file drift check passed. The local
+gitignored env and seven GitHub `staging` environment secrets now carry PCR endpoint, model, key,
+and worker configuration; the reusable deploy workflow renders these into runtime env. Compose
+and deployment-script checks pass. A later local 70-case live-worker evaluation classified all
+28 clear PCR and 24 of 25 clear No-PCR cases as expected. Of 17 incomplete cases, seven reached
+Review, eight became PCR, and two became No-PCR, including one unspecified material trial at
+confidence 1.00. The full input/output archive and analysis are in
+`docs/reports/pcr-classifier-70-case-evaluation-2026-09-23/` and
+`docs/reports/pcr-classifier-70-case-local-evaluation-2026-09-23.md`. TMMIN QD adjudication,
+adversarial and missing-evidence regression coverage, and grounding of explanation/control
+references are open before production reliance on automatic No-PCR. Inference outages route to
+Review rather than No-PCR. Public inference
+403/1010 diagnosis is recorded in `docs/reports/inference-server-403-2026-09-23.md`.
+Pre-PR parity also passed fresh and upgrade migrations, all three Chromium journeys, actionlint,
+ShellCheck, Hadolint, a Linux deployment harness, production-like routing/persistence, Gitleaks,
+and Trivy filesystem plus five image scans. Local Edge installation was unavailable without sudo
+on macOS; the Linux CI Edge journey remains the browser gate.
