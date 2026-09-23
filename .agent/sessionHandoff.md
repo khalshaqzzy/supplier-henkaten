@@ -1,3 +1,36 @@
+# Session Handoff — Canvas job-card 4M visibility
+
+Date: 2026-09-23
+Branch: `feat/update-mp-card-on-board`
+Status: implemented and locally verified; PR to `staging` pending. No deployment claim.
+
+The Supplier Canvas `JOB_SLOT` card now centers 26-pixel 4M dots in the white row between the
+assignment badge and the portrait. The photo begins lower, while its bottom edge and the MP identity
+positions remain unchanged on the default card. The dots retain read-model order, category colors,
+and the dark Open outline. Width-based capacity reserves a final `+N` slot when records exceed the
+available row; the default Assignment Board still lists all records. Layout JSON, API contracts,
+the default Board, and saved card geometry are unchanged. PRD section 16.6 and ADR 0031 record the
+visual rule.
+
+Verification: Node 22.23.2/pnpm 11.16.0 host install, formatting, lint, typecheck, OpenAPI/client
+drift check, and production build passed. The focused Canvas suite passed 10 tests. The complete
+unit suite passed in the rebuilt Linux Supplier container using repository-pinned Node 22.23.1 and
+pnpm 11.16.0. The host Windows run failed before `App.test.tsx` executed because Vitest could not
+resolve a virtual PWA file URL; the same suite passed in Linux. Edge visual review of the running
+local NPM Canvas confirmed the Trimming card's three enlarged dots above the portrait, with Open
+outlines visible. Screenshots are in gitignored `.local/board-canvas-after.png` and
+`.local/board-canvas-zoomed.png`. The existing local API/database and other running frontend were
+not reset; only the Supplier frontend container was rebuilt.
+
+Additional checks: `docker compose config --quiet`, migration SQL check against `origin/staging`,
+staging env validation, remote Compose config, and high-severity dependency audit passed (one
+existing high-severity exception). The deployment harness and security-exception check require
+`jq`, which is unavailable in the host Git Bash environment. Database integration and isolated
+browser journeys were not rerun for this Canvas-only rendering change. No PR check monitoring is
+requested. Next: commit, push this branch, open the PR to `staging`, and append its link here.
+
+---
+
 # Session Handoff — PCR indication for Henkaten
 
 ## Local classifier evaluation — 2026-09-23

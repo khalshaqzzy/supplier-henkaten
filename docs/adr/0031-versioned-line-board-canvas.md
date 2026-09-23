@@ -50,6 +50,14 @@ proportional corner handles and job cards remain non-rotatable. Generated and re
 vertical `300 x 440` job card; proportional resize preserves that portrait direction, and a cover
 crop makes the live MP photo the dominant card area.
 
+The live 4M indicators are centered in a dedicated row between the assignment-state badge and the
+portrait. Their radius is 13 logical pixels rather than 8, while the photo starts lower and its
+bottom edge, member name, and registration number retain their default-card positions. Indicator
+order, category color, and the dark outline for Open records remain unchanged. The row derives its
+capacity from card width and replaces excess indicators with a `+N` count; the default Assignment
+Board continues to expose every individual Henkaten. This display-only rule does not change saved
+layout JSON, the board read model, or API contracts.
+
 Machine images are a closed v1 catalog with two generated transparent visual families for the same
 twelve industrial equipment types: polished soft-isometric cutouts and simple generic 2D icons.
 Their 24-entry typed manifest provides distinct stable keys, style-aware labels, source, aspect
@@ -98,6 +106,9 @@ initial path remains unchanged.
 - Schema migration will be required before accepting a future document version.
 - Local Canvas seed failures stop clean start/reseed when layout schema, active-job parity,
   portrait reuse, audit, or outbox invariants drift.
+- Enlarged indicators use some of the portrait's height on default cards, but leave its lower edge
+  and identity text fixed. Very dense indicator sets show a count in Canvas while the default board
+  retains the complete per-record view.
 
 ## Validation
 
@@ -117,6 +128,10 @@ The seeded visual factory additionally validates deterministic node IDs, bounds,
 per active job, explicit machine-family mapping, and four normalized portrait assets. Clean start,
 reseed, and direct browser inspection confirm saved version-1 layouts with responsive containment
 and authoritative vacancy/photo rendering.
+
+Canvas card checks cover empty, typical, and overflow indicator rows at default and reduced card
+widths. Visual review confirms that the row remains above the portrait and Open outlines remain
+distinguishable.
 
 ## Follow-up Work
 
