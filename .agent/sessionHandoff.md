@@ -1,14 +1,18 @@
-# Session Handoff — Browser local end-to-end QA planning
+# Current Session Handoff — Local browser QA execution
 
 - Date: 2026-09-24
-- Branch: `feat/qa-verif` at `7ed8d8a` when analyzed
-- Status: analysis and executable QA plan complete; QA has not been run.
+- Branch: `feat/qa-verif` at baseline `cf53a62`; report and handoff prepared for delivery on this branch.
+- Status: local exploratory QA run documented; no product fixes made. Final report: [`docs/audits/local-browser-qa-2026-09-24.md`](../docs/audits/local-browser-qa-2026-09-24.md).
 
-Objective: inventory current PRD and source functionality, then plan local reseed-based browser verification of Supplier and TMMIN surfaces, without bug fixing. The complete scenario matrix, epoch order, evidence rules, and final Markdown report requirement are in `docs/qa/browser-local-end-to-end-verification-plan.md`. ADR 0035 records the isolation/evidence decision.
+The run covered the PRD/source inventory and 47 planned A/T/S/H/X/N scenario rows across Supplier and TMMIN Admin/Quality surfaces, with Playwright Chromium and local External API calls. Current overall row outcomes: **22 PASS, 15 FAIL, 10 BLOCKED / partial**; 37/47 (78.7%) have a determinate row outcome, but some PASS/FAIL rows still have untested sub-branches. The report lists evidence, twelve findings, all remaining checks, and run limitations. Push/PWA push permission, subscription, delivery, and revoke tests are excluded per user direction.
 
-Key interpretation: the September 22 Line–Shift amendment supersedes old Shift Run lifecycle, reservation, exclusivity, donor cascade, and associated old acceptance checks. The September 23 PCR amendment is in scope. Playwright browser use is the primary UI path, with Chromium coverage and Edge smoke where available; External API needs HTTP verification against the same runtime. Local seed has two Hosted suppliers and no External tenant, so External/governance scenarios need an isolated epoch. Desktop browser emulation cannot establish iOS Home Screen push or the full device matrix.
+The user specifically asked about Admin PCR status correction. TMMIN Admin changed a Closed Henkaten in both No-PCR→PCR and PCR→No-PCR directions. **Simpan keputusan** was disabled until the trimmed reason contained at least 10 characters; valid reasons saved successfully. No product code was changed to address defects.
 
-Files changed: QA plan, ADR 0035, this handoff, and implementation roadmap note. No source, schema, runtime, or test code changed. No local reseed, browser QA, Docker startup, bug fix, commit, or deployment was performed. Checks: read-only source/document inspection and documentation formatting/whitespace checks. No blocker for planning; execution may encounter unavailable PCR inference, VAPID configuration, or device-specific UAT prerequisites. Next action: execute the documented QA epochs, classify findings without fixing them, restore the local seed, and write the comprehensive Markdown audit report.
+External X-02/X-04 verification passed: PII payload rejection/isolation, invalid transition, status-only PCR retention, changed-evidence requeue, Approved/Rejected/Cancelled warning closure, and Admin External Health browser rendering. A final `pnpm local:reseed` restored the baseline counts (2 Hosted suppliers, no External test tenant, 240 Henkaten and expected PCR/warning/Line–Shift counts), health/readiness passed, and TMMIN Admin/NPM Supplier Admin browser smoke passed. `pnpm local:down` stopped the stack. Docker services are not running.
+
+Remaining QA is not yet fully verified: line-scope/source-mode security matrix, negative-password lockout, remaining registry validation and pagination/dashboard reconciliation, complete Explorer detail/filter matrix, an assessment-free `expectedVersion: 0` PCR case and pending-assessment reload, Hosted Preparation/reverse source gates, standalone master-data and Line–Shift branches, schedule/off-hours and Tanoko eligibility boundaries, old External credential rejection after cutover, full outbox/audit/photo-cache diagnostics, and physical-device/assistive-technology coverage. The report describes why each remains and records partial checks inside other rows.
+
+No persistent Playwright specs were added; temporary local runners are removed after the run. The ignored `.local/qa-evidence/` retains sanitized summaries and screenshots. The branch changes are documentation only: the QA execution report and this updated handoff. The full scenario plan remains in `docs/qa/browser-local-end-to-end-verification-plan.md`.
 
 ---
 
