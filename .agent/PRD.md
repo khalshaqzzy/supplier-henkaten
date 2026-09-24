@@ -13,6 +13,18 @@
 
 Dokumen ini adalah kontrak produk dan implementasi v1. Kata **MUST/wajib**, **MUST NOT/dilarang**, **SHOULD/sebaiknya**, dan **MAY/dapat** bersifat normatif. Bila source code, prototype, slide, atau asumsi implementasi berbeda dengan dokumen ini, tim wajib mengeskalasi perbedaan tersebut dan tidak boleh memilih perilaku secara diam-diam.
 
+### Amendment privasi MP dan pilihan Part Other — 24 September 2026
+
+MP tidak memakai nomor registrasi. Nomor registrasi wajib hanya untuk Supervisor, Line Leader,
+dan QC. Nomor MP yang ada di profil dihapus; snapshot pada record historis tidak diubah.
+
+Pada input Hosted Henkaten, Line Leader dapat memilih part master aktif atau **Other** tanpa
+memasukkan identitas part. Other tidak membuat part master. Record, daftar, detail, dashboard,
+dan warning menampilkan label `Other`. Setiap Henkaten Other Open tetap menghasilkan satu warning
+untuk TMMIN; warning tersebut tidak digabung sebagai satu part yang sama. Aturan lama yang
+mensyaratkan part master pada semua Hosted Henkaten hanya berlaku saat part spesifik dipilih.
+Hosted readiness tidak mensyaratkan part master bila supplier menggunakan pilihan Other.
+
 ### Amendment operasional Line–Shift — 22 September 2026
 
 Amendment ini menggantikan seluruh aturan lama tentang Shift Run operasional, shift preflight,
@@ -325,7 +337,7 @@ Semua akun QC memiliki permission yang sama. Perbedaan akun dipakai untuk mencat
 - MP dapat memiliki maksimum satu default job aktif.
 - MP dapat tidak memiliki default job.
 - MP dapat menjadi replacement lintas-line pada Man Henkaten.
-- Nomor registrasi wajib unik di dalam supplier.
+- Nomor registrasi tidak berlaku untuk MP.
 
 ---
 
@@ -371,7 +383,7 @@ Semua permission wajib divalidasi oleh backend. Menyembunyikan control di fronte
 - `Supplier.code` unik global, case-insensitive.
 - `User.username` unik per supplier, case-insensitive.
 - Username TMMIN unik pada TMMIN identity realm.
-- `Member.registrationNumber` unik per supplier.
+- `Member.registrationNumber` wajib dan unik per supplier untuk role selain MP; MP bernilai kosong.
 - `Line.lineCode` unik per supplier.
 - `Job.name` unik per line, case-insensitive.
 - `Part.partNumber` unik per supplier, case-insensitive.
@@ -443,7 +455,7 @@ Field minimum:
 - internal ID;
 - `supplierId`;
 - nama lengkap;
-- nomor registrasi;
+- nomor registrasi untuk Supervisor, Line Leader, dan QC;
 - role: `SUPERVISOR`, `LINE_LEADER`, `MP`, atau `QC`;
 - status aktif/nonaktif;
 - foto opsional;
@@ -491,7 +503,9 @@ Field minimum:
 - status aktif;
 - created/updated metadata.
 
-Part number dan part name wajib diisi. Pada input Henkaten, user dapat mencari menggunakan salah satunya dan UI selalu menampilkan keduanya setelah dipilih.
+Part number dan part name wajib diisi pada master part. Pada input Henkaten, user dapat mencari
+menggunakan salah satunya dan UI menampilkan keduanya setelah part dipilih. Pilihan `Other` tidak
+memerlukan nomor/nama part dan tidak menambahkan master part.
 
 ### 10.5 Shift Template
 
@@ -702,7 +716,7 @@ Field wajib:
 - occurred-at timestamp;
 - line snapshot;
 - job snapshot;
-- part number dan part name snapshot;
+- part number dan part name snapshot, atau label `Other` tanpa identitas part;
 - change point `MAN|MACHINE|MATERIAL|METHOD`;
 - cause;
 - detail change;
@@ -717,7 +731,7 @@ Aturan:
 - Hosted submission wajib membawa `Idempotency-Key` yang unik per supplier + creator; exact retry
   mengembalikan record yang sama dan reuse dengan payload berbeda menghasilkan `409 Conflict`.
 - Job harus aktif pada line tersebut.
-- Part harus aktif pada supplier tersebut.
+- Part spesifik harus aktif pada supplier tersebut; pilihan `Other` tidak merujuk master part.
 - Cause dan detail change wajib, masing-masing maksimum 2.000 karakter.
 - Semua checklist answer wajib Yes.
 - Server menggunakan timestamp authoritative; client timestamp hanya menjadi context bila diperlukan.
@@ -902,7 +916,7 @@ Setiap line section menampilkan:
 - Supervisor;
 - LL;
 - job secara display order;
-- MP name, registration number, dan photo/avatar untuk Hosted;
+- MP name dan photo/avatar untuk Hosted;
 - status assigned, vacant, reserved, atau conflicted;
 - indikator Man, Machine, Material, Method;
 - status warning/approval;
@@ -944,13 +958,13 @@ Process difficulty, skill level, health, attendance, dan schedule tidak boleh mu
   dipilih.
 - Layout Canvas shared per supplier/line dan tidak mengikuti user, pergantian Line Leader, atau
   Shift Run. Layout hanya menyimpan job ID, geometri, style allowlist, lock/z-index, dan curated
-  machine asset key; nama, foto, nomor registrasi, assignment state, serta data Henkaten selalu
+  machine asset key; nama, foto, assignment state, serta data Henkaten selalu
   diambil dari Working Assignment saat ini.
 - Setiap active job wajib memiliki tepat satu `JOB_SLOT`. Job baru direkonsiliasi ke overflow grid,
   job inactive dihapus dari runtime layout, sedangkan perpindahan MP, perubahan foto, vacancy,
   reservation, conflict, dan perubahan 4M tidak boleh mengubah koordinat card.
 - Card memakai format vertikal dan menampilkan foto portrait MP sebagai elemen visual dominan,
-  dengan initials fallback, nama job, nama MP, registration number, state text/icon/border, dan dot
+  dengan initials fallback, nama job, nama MP, state text/icon/border, dan dot
   4M. Dot 4M berukuran lebih besar dan berada pada baris di antara state dan bagian atas foto,
   tanpa menutupi foto. Jika jumlah indikator melebihi lebar card, sisa jumlah ditampilkan sebagai
   `+N`; detail tiap Henkaten tetap tersedia pada Assignment Board default. Legend hanya berisi dot
@@ -1081,7 +1095,8 @@ Filter minimum:
 ### 17.3 Warning Part
 
 - Setiap Henkaten Open membuat warning instance.
-- TMMIN part view mengagregasi warning berdasarkan supplier + part number.
+- TMMIN part view mengagregasi warning part spesifik berdasarkan supplier + part number; setiap
+  warning `Other` tampil sebagai item tersendiri.
 - Part tetap `AFFECTED` selama minimal satu Henkaten untuk supplier/part tersebut Open.
 - Approved, Rejected, atau Cancelled menutup warning instance terkait.
 - Bila warning lain untuk part yang sama masih Open, aggregate part tetap affected.
@@ -1189,7 +1204,7 @@ kegagalan push tidak mengubah lifecycle Henkaten.
 |---|---|
 | Supplier | Tenant, code, source mode, source epoch, timezone/default settings, active status. |
 | User | Credential principal; TMMIN realm atau supplier realm; role dan account state. |
-| Member | Person supplier; role operasional, nomor registrasi, foto opsional. |
+| Member | Person supplier; role operasional, nomor registrasi hanya untuk non-MP, foto opsional. |
 | ShiftTemplate | Definisi shift supplier. |
 | ShiftRun | Eksekusi shift per line/business date; snapshot dan lifecycle. |
 | Line | Master line supplier. |
@@ -1746,7 +1761,7 @@ CI wajib menjalankan:
 
 ### 24.5 Privacy
 
-- Hosted data mencakup nama, nomor registrasi, dan optional photo.
+- Hosted data mencakup nama, nomor registrasi non-MP, dan optional photo.
 - External payload meminimalkan PII.
 - UI dan API menerapkan least privilege.
 - Audit before/after tidak boleh menyimpan password/token.
@@ -2082,7 +2097,8 @@ Scenario minimum:
 
 1. TMMIN Admin membuat Hosted supplier dan Supplier Admin.
 2. Supplier Admin first-login reset.
-3. Admin membuat shift, member, akun, line, job, part, checklist, dan default assignment.
+3. Admin membuat shift, member, akun, line, job, checklist, dan default assignment; part master
+   hanya diperlukan bila part spesifik akan dipilih.
 4. LL login dan Start Shift valid.
 5. LL menginput setiap kategori 4M.
 6. Submission gagal bila satu checklist bukan Yes.

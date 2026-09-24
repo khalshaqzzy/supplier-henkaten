@@ -418,9 +418,13 @@ async function member(
     '/api/v1/supplier/master-data/members',
     {
       fullName: `${role} ${suffix} ${sequence}`,
-      registrationNumber: `REG-${suffix}-${sequence}`,
       role,
-      ...(role === 'MP' ? {} : { username: `${role.toLowerCase()}.${suffix}.${sequence}` }),
+      ...(role === 'MP'
+        ? {}
+        : {
+            registrationNumber: `REG-${suffix}-${sequence}`,
+            username: `${role.toLowerCase()}.${suffix}.${sequence}`,
+          }),
     },
     csrf,
   );

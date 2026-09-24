@@ -267,6 +267,51 @@ describe('Line Shift Henkaten operations', () => {
     expect(response.body.items[0]).toMatchObject({ id: lineShiftId, current: true });
   });
 
+  it('keeps Other part private and creates one warning per Henkaten', async () => {
+    const initialPartCount = await prisma.part.count({ where: { supplierId } });
+    const retryKey = randomUUID();
+    const first = await createManHenkaten(retryKey, true);
+    const retry = await createManHenkaten(retryKey, true);
+    const second = await createManHenkaten(randomUUID(), true);
+    expect(first.status).toBe(201);
+    expect(retry.status).toBe(201);
+    expect(retry.body.id).toBe(first.body.id);
+    expect(second.status).toBe(201);
+    expect(await prisma.part.count({ where: { supplierId } })).toBe(initialPartCount);
+    expect(first.body.partId).toBeNull();
+    expect(first.body.part).toEqual({ number: 'Other', name: '' });
+    const saved = await prisma.henkaten.findMany({
+      where: { id: { in: [first.body.id as string, second.body.id as string] } },
+    });
+    expect(saved).toHaveLength(2);
+    expect(saved.every(({ partId }) => partId === null)).toBe(true);
+    const warningGroups = await app.get(HenkatenService).affectedParts();
+    const other = warningGroups.items.filter(
+      ({ supplierId: id, partNumber }) => id === supplierId && partNumber === 'Other',
+    );
+    expect(other).toHaveLength(2);
+    expect(other[0]!.warningKey).not.toBe(other[1]!.warningKey);
+    for (const group of other) {
+      const detail = await app.get(HenkatenService).affectedPart(supplierId, group.warningKey);
+      expect(detail.openWarningCount).toBe(1);
+    }
+    const clone = await request(app.getHttpServer())
+      .get(`/api/v1/supplier/henkatens/${first.body.id as string}/clone-prefill`)
+      .set('Cookie', leaderCookie);
+    expect(clone.status).toBe(200);
+    expect(clone.body).toMatchObject({ partId: null, partStillValid: true });
+    for (const created of [first, second]) {
+      const withdrawn = await request(app.getHttpServer())
+        .post(`/api/v1/supplier/henkatens/${created.body.id as string}/withdraw`)
+        .set('Origin', supplierOrigin)
+        .set('Cookie', leaderCookie)
+        .set('X-CSRF-Token', leaderCsrf)
+        .set('Idempotency-Key', randomUUID())
+        .send({ expectedVersion: created.body.version, reason: 'Cleanup Other test' });
+      expect(withdrawn.status).toBe(201);
+    }
+  });
+
   it('returns the next occurrence for an LL outside shift time', async () => {
     const before = Date.now();
     const response = await request(app.getHttpServer())
@@ -549,7 +594,7 @@ describe('Line Shift Henkaten operations', () => {
     expect(staleFirstDecision.status).toBe(409);
   });
 
-  async function createManHenkaten(idempotencyKey = randomUUID()) {
+  async function createManHenkaten(idempotencyKey = randomUUID(), otherPart = false) {
     return request(app.getHttpServer())
       .post('/api/v1/supplier/henkatens')
       .set('Origin', supplierOrigin)
@@ -561,7 +606,7 @@ describe('Line Shift Henkaten operations', () => {
         lineShiftId,
         lineShiftJobAssignmentId: job1AssignmentId,
         jobId: job1Id,
-        partId,
+        ...(otherPart ? { otherPart: true } : { partId }),
         replacementMpMemberId: replacementMpId,
         cause: 'Replacement required',
         detail: 'Immediate occurrence assignment',
@@ -607,8 +652,6 @@ describe('Line Shift Henkaten operations', () => {
           supplierId,
           role: 'MP',
           fullName: name,
-          registrationNumber: `REG-${randomUUID()}`,
-          normalizedRegistrationNumber: randomUUID(),
         },
       })
     ).id;

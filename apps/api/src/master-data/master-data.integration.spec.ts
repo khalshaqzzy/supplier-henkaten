@@ -133,12 +133,29 @@ describe('supplier master data', () => {
     const mp = await supplierPost('/api/v1/supplier/master-data/members', {
       role: 'MP',
       fullName: 'Example MP',
-      registrationNumber: `REG-M-${randomUUID()}`,
     });
     expect(mp.status).toBe(201);
     expect(mp.body).not.toHaveProperty('credential');
     expect(mp.body.member).not.toHaveProperty('account');
+    expect(mp.body.member.registrationNumber).toBeNull();
     mpId = mp.body.member.id;
+
+    const invalidMp = await supplierPost('/api/v1/supplier/master-data/members', {
+      role: 'MP',
+      fullName: 'MP With Registration',
+      registrationNumber: `REG-M-${randomUUID()}`,
+    });
+    expect(invalidMp.status).toBe(400);
+
+    const readiness = await request(app.getHttpServer())
+      .get('/api/v1/supplier/setup-readiness')
+      .set('Cookie', supplierCookie);
+    expect(readiness.status).toBe(200);
+    expect(readiness.body.areas).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ area: 'PARTS', ready: true, requiredCount: 0 }),
+      ]),
+    );
 
     await expect(
       prisma.member.update({ where: { id: mpId }, data: { role: 'QC' } }),
@@ -434,8 +451,6 @@ describe('supplier master data', () => {
       data: {
         supplierId: otherSupplier.id,
         fullName: 'Other Tenant Member',
-        registrationNumber: `OTHER-${randomUUID()}`,
-        normalizedRegistrationNumber: randomUUID(),
         role: 'MP',
       },
     });

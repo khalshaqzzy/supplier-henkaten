@@ -105,7 +105,7 @@ export function buildMember(
       id: deterministicUuid(sequence),
       supplierId: deterministicUuid(1),
       name: `Example ${role} ${sequence}`,
-      registrationNumber: `TEST-REG-${sequence}`,
+      registrationNumber: role === 'MP' ? null : `TEST-REG-${sequence}`,
       role,
       active: true,
       version: 1,

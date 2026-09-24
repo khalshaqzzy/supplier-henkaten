@@ -1316,7 +1316,7 @@ function JobCardNode({ job, ...props }: { job?: BoardJob } & ComponentProps<type
         y={identityY + 28}
         width={width - 40}
         align="center"
-        text={job?.mp.registrationNumber ?? humanize(state)}
+        text={humanize(state)}
         fontSize={14}
         fill="#667085"
       />

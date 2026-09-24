@@ -29,7 +29,8 @@ export const checklistSubmissionAnswerSchema = z
 const submissionBase = {
   lineShiftId: opaqueIdSchema,
   jobId: opaqueIdSchema,
-  partId: opaqueIdSchema,
+  partId: opaqueIdSchema.optional(),
+  otherPart: z.literal(true).optional(),
   checklistVersionId: opaqueIdSchema,
   checklistAnswers: z.array(checklistSubmissionAnswerSchema).min(1).max(100),
   cause: requiredText,
@@ -37,26 +38,32 @@ const submissionBase = {
   clonedFromHenkatenId: opaqueIdSchema.optional(),
 };
 
-export const createHenkatenRequestSchema = z.discriminatedUnion('category', [
-  z
-    .object({
-      ...submissionBase,
-      category: z.literal('MAN'),
-      lineShiftJobAssignmentId: opaqueIdSchema,
-      replacementMpMemberId: opaqueIdSchema,
-    })
-    .strict(),
-  ...(['MACHINE', 'MATERIAL', 'METHOD'] as const).map((category) =>
+export const createHenkatenRequestSchema = z
+  .discriminatedUnion('category', [
     z
       .object({
         ...submissionBase,
-        category: z.literal(category),
-        affectedObject: requiredText,
-        replacementObject: requiredText,
+        category: z.literal('MAN'),
+        lineShiftJobAssignmentId: opaqueIdSchema,
+        replacementMpMemberId: opaqueIdSchema,
       })
       .strict(),
-  ),
-]);
+    ...(['MACHINE', 'MATERIAL', 'METHOD'] as const).map((category) =>
+      z
+        .object({
+          ...submissionBase,
+          category: z.literal(category),
+          affectedObject: requiredText,
+          replacementObject: requiredText,
+        })
+        .strict(),
+    ),
+  ])
+  .superRefine((value, context) => {
+    if (Boolean(value.partId) === Boolean(value.otherPart)) {
+      context.addIssue({ code: 'custom', path: ['partId'], message: 'Pilih part atau Other.' });
+    }
+  });
 export type CreateHenkatenRequest = z.infer<typeof createHenkatenRequestSchema>;
 
 export const approvalDecisionEvidenceSchema = z
@@ -100,7 +107,7 @@ export const henkatenSummarySchema = z
     lineShiftId: opaqueIdSchema.nullable(),
     lineId: opaqueIdSchema,
     jobId: opaqueIdSchema,
-    partId: opaqueIdSchema,
+    partId: opaqueIdSchema.nullable(),
     status: henkatenStatusSchema,
     sourceMode: sourceModeSchema,
     sourceEpoch: optimisticVersionSchema,
@@ -266,7 +273,7 @@ export const henkatenFormOptionsSchema = z
         .object({
           id: opaqueIdSchema,
           fullName: z.string().min(1).max(150),
-          registrationNumber: z.string().min(1).max(100),
+          registrationNumber: z.string().min(1).max(100).nullable(),
           reserved: z.boolean(),
           skillLevels: z
             .array(
@@ -324,7 +331,7 @@ export const clonePrefillSchema = z
     shiftRunId: opaqueIdSchema,
     lineShiftId: opaqueIdSchema.nullable(),
     jobId: opaqueIdSchema,
-    partId: opaqueIdSchema,
+    partId: opaqueIdSchema.nullable(),
     cause: z.string(),
     detail: z.string(),
     affectedObject: z.string().nullable(),
@@ -363,6 +370,7 @@ export const affectedPartSchema = z
     partNumber: z.string(),
     partName: z.string(),
     openWarningCount: z.number().int().positive(),
+    warningKey: z.string().min(1),
     oldestOpenedAt: utcTimestampSchema,
   })
   .strict();

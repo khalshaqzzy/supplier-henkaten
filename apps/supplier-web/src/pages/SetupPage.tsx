@@ -114,18 +114,30 @@ export function SetupPage() {
                     key={area.area}
                     title={`${index + 1}. ${meta.label}`}
                     description={
-                      area.ready
-                        ? `${area.activeCount} data aktif · lengkap`
-                        : `${area.activeCount}/${area.requiredCount} minimum · ${area.blockerCount} blocker`
+                      area.requiredCount === 0
+                        ? `${area.activeCount} part · opsional`
+                        : area.ready
+                          ? `${area.activeCount} data aktif · lengkap`
+                          : `${area.activeCount}/${area.requiredCount} minimum · ${area.blockerCount} blocker`
                     }
                     className={area.ready ? 'setup-card is-ready' : 'setup-card'}
                   >
                     <div className="setup-card__state">
                       {area.ready ? <Check /> : <CircleDashed />}
-                      <span>{area.ready ? 'Selesai' : 'Perlu tindakan'}</span>
+                      <span>
+                        {area.requiredCount === 0
+                          ? 'Opsional'
+                          : area.ready
+                            ? 'Selesai'
+                            : 'Perlu tindakan'}
+                      </span>
                     </div>
                     <Link to={meta.to}>
-                      {area.ready ? 'Tinjau konfigurasi' : 'Lengkapi sekarang'}
+                      {area.requiredCount === 0
+                        ? 'Kelola part'
+                        : area.ready
+                          ? 'Tinjau konfigurasi'
+                          : 'Lengkapi sekarang'}
                       <ArrowRight aria-hidden="true" />
                     </Link>
                   </Panel>

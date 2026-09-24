@@ -37,7 +37,7 @@ export interface MemberFixture {
   id: string;
   supplierId: string;
   name: string;
-  registrationNumber: string;
+  registrationNumber: string | null;
   role: MemberRole;
   active: boolean;
   version: number;

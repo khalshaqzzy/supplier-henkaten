@@ -113,8 +113,8 @@ describe('Compact backend performance baseline', () => {
         data: Array.from({ length: membersPerSupplier }, (_, index) => ({
           supplierId: supplier.id,
           fullName: `Member ${supplierIndex}-${String(index).padStart(3, '0')}`,
-          registrationNumber: `REG-${supplierIndex}-${index}`,
-          normalizedRegistrationNumber: `reg-${supplierIndex}-${index}`,
+          registrationNumber: index % 10 === 0 ? `REG-${supplierIndex}-${index}` : null,
+          normalizedRegistrationNumber: index % 10 === 0 ? `reg-${supplierIndex}-${index}` : null,
           role: index % 10 === 0 ? ('SUPERVISOR' as const) : ('MP' as const),
         })),
       });

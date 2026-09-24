@@ -3807,7 +3807,7 @@ export interface paths {
                 /** Format: uuid */
                 id: string;
                 fullName: string;
-                registrationNumber: string;
+                registrationNumber: string | null;
                 /** @enum {string} */
                 role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
                 active: boolean;
@@ -3856,7 +3856,6 @@ export interface paths {
           'application/json':
             | {
                 fullName: string;
-                registrationNumber: string;
                 /** @constant */
                 role: 'MP';
               }
@@ -3895,7 +3894,7 @@ export interface paths {
                 /** Format: uuid */
                 id: string;
                 fullName: string;
-                registrationNumber: string;
+                registrationNumber: string | null;
                 /** @enum {string} */
                 role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
                 active: boolean;
@@ -3965,7 +3964,7 @@ export interface paths {
               /** Format: uuid */
               id: string;
               fullName: string;
-              registrationNumber: string;
+              registrationNumber: string | null;
               /** @enum {string} */
               role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
               active: boolean;
@@ -4075,7 +4074,7 @@ export interface paths {
               /** Format: uuid */
               id: string;
               fullName: string;
-              registrationNumber: string;
+              registrationNumber: string | null;
               /** @enum {string} */
               role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
               active: boolean;
@@ -4189,7 +4188,7 @@ export interface paths {
               /** Format: uuid */
               id: string;
               fullName: string;
-              registrationNumber: string;
+              registrationNumber: string | null;
               /** @enum {string} */
               role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
               active: boolean;
@@ -4307,7 +4306,7 @@ export interface paths {
               /** Format: uuid */
               id: string;
               fullName: string;
-              registrationNumber: string;
+              registrationNumber: string | null;
               /** @enum {string} */
               role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
               active: boolean;
@@ -4430,7 +4429,7 @@ export interface paths {
               /** Format: uuid */
               id: string;
               fullName: string;
-              registrationNumber: string;
+              registrationNumber: string | null;
               /** @enum {string} */
               role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
               active: boolean;
@@ -4545,7 +4544,7 @@ export interface paths {
                 /** Format: uuid */
                 id: string;
                 fullName: string;
-                registrationNumber: string;
+                registrationNumber: string | null;
                 /** @enum {string} */
                 role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
                 active: boolean;
@@ -4669,7 +4668,7 @@ export interface paths {
                 /** Format: uuid */
                 id: string;
                 fullName: string;
-                registrationNumber: string;
+                registrationNumber: string | null;
                 /** @enum {string} */
                 role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
                 active: boolean;
@@ -4793,7 +4792,7 @@ export interface paths {
                 /** Format: uuid */
                 id: string;
                 fullName: string;
-                registrationNumber: string;
+                registrationNumber: string | null;
                 /** @enum {string} */
                 role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
                 active: boolean;
@@ -4917,7 +4916,7 @@ export interface paths {
               /** Format: uuid */
               id: string;
               fullName: string;
-              registrationNumber: string;
+              registrationNumber: string | null;
               /** @enum {string} */
               role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
               active: boolean;
@@ -9357,7 +9356,7 @@ export interface paths {
                 /** Format: uuid */
                 id: string;
                 fullName: string;
-                registrationNumber: string;
+                registrationNumber: string | null;
                 /** @enum {string} */
                 role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
                 active: boolean;
@@ -9475,7 +9474,7 @@ export interface paths {
               /** Format: uuid */
               id: string;
               fullName: string;
-              registrationNumber: string;
+              registrationNumber: string | null;
               /** @enum {string} */
               role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
               active: boolean;
@@ -10680,8 +10679,7 @@ export interface paths {
                 lineId: string;
                 /** Format: uuid */
                 jobId: string;
-                /** Format: uuid */
-                partId: string;
+                partId: string | null;
                 /** @enum {string} */
                 status: 'OPEN' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
                 /** @enum {string} */
@@ -10795,7 +10793,9 @@ export interface paths {
                 /** Format: uuid */
                 jobId: string;
                 /** Format: uuid */
-                partId: string;
+                partId?: string;
+                /** @constant */
+                otherPart?: true;
                 /** Format: uuid */
                 checklistVersionId: string;
                 checklistAnswers: {
@@ -10821,7 +10821,9 @@ export interface paths {
                 /** Format: uuid */
                 jobId: string;
                 /** Format: uuid */
-                partId: string;
+                partId?: string;
+                /** @constant */
+                otherPart?: true;
                 /** Format: uuid */
                 checklistVersionId: string;
                 checklistAnswers: {
@@ -10845,7 +10847,9 @@ export interface paths {
                 /** Format: uuid */
                 jobId: string;
                 /** Format: uuid */
-                partId: string;
+                partId?: string;
+                /** @constant */
+                otherPart?: true;
                 /** Format: uuid */
                 checklistVersionId: string;
                 checklistAnswers: {
@@ -10869,7 +10873,9 @@ export interface paths {
                 /** Format: uuid */
                 jobId: string;
                 /** Format: uuid */
-                partId: string;
+                partId?: string;
+                /** @constant */
+                otherPart?: true;
                 /** Format: uuid */
                 checklistVersionId: string;
                 checklistAnswers: {
@@ -10907,8 +10913,7 @@ export interface paths {
               lineId: string;
               /** Format: uuid */
               jobId: string;
-              /** Format: uuid */
-              partId: string;
+              partId: string | null;
               /** @enum {string} */
               status: 'OPEN' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
               /** @enum {string} */
@@ -11178,7 +11183,7 @@ export interface paths {
                 /** Format: uuid */
                 id: string;
                 fullName: string;
-                registrationNumber: string;
+                registrationNumber: string | null;
                 reserved: boolean;
                 skillLevels?: {
                   /** Format: uuid */
@@ -11247,8 +11252,7 @@ export interface paths {
               lineId: string;
               /** Format: uuid */
               jobId: string;
-              /** Format: uuid */
-              partId: string;
+              partId: string | null;
               /** @enum {string} */
               status: 'OPEN' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
               /** @enum {string} */
@@ -11563,8 +11567,7 @@ export interface paths {
               lineId: string;
               /** Format: uuid */
               jobId: string;
-              /** Format: uuid */
-              partId: string;
+              partId: string | null;
               /** @enum {string} */
               status: 'OPEN' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
               /** @enum {string} */
@@ -11829,8 +11832,7 @@ export interface paths {
               lineId: string;
               /** Format: uuid */
               jobId: string;
-              /** Format: uuid */
-              partId: string;
+              partId: string | null;
               /** @enum {string} */
               status: 'OPEN' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
               /** @enum {string} */
@@ -12094,8 +12096,7 @@ export interface paths {
               lineId: string;
               /** Format: uuid */
               jobId: string;
-              /** Format: uuid */
-              partId: string;
+              partId: string | null;
               /** @enum {string} */
               status: 'OPEN' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
               /** @enum {string} */
@@ -12346,8 +12347,7 @@ export interface paths {
               lineShiftId: string | null;
               /** Format: uuid */
               jobId: string;
-              /** Format: uuid */
-              partId: string;
+              partId: string | null;
               cause: string;
               detail: string;
               affectedObject: string | null;
@@ -12491,8 +12491,7 @@ export interface paths {
                 lineId: string;
                 /** Format: uuid */
                 jobId: string;
-                /** Format: uuid */
-                partId: string;
+                partId: string | null;
                 /** @enum {string} */
                 status: 'OPEN' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
                 /** @enum {string} */
@@ -12785,8 +12784,7 @@ export interface paths {
               lineId: string;
               /** Format: uuid */
               jobId: string;
-              /** Format: uuid */
-              partId: string;
+              partId: string | null;
               /** @enum {string} */
               status: 'OPEN' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
               /** @enum {string} */
@@ -13035,6 +13033,7 @@ export interface paths {
                 partNumber: string;
                 partName: string;
                 openWarningCount: number;
+                warningKey: string;
                 /** Format: date-time */
                 oldestOpenedAt: string;
               }[];
@@ -13087,6 +13086,7 @@ export interface paths {
               partNumber: string;
               partName: string;
               openWarningCount: number;
+              warningKey: string;
               /** Format: date-time */
               oldestOpenedAt: string;
               warnings: {
