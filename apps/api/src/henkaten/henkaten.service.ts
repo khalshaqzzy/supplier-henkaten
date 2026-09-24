@@ -717,15 +717,13 @@ export class HenkatenService {
       include: { manDetail: true },
     });
     if (!row) throw missing('Henkaten');
-    const [checklist, shift, job, part] = await Promise.all([
+    const [checklist, operational, job, part] = await Promise.all([
       this.prisma.checklistVersion.findFirst({
         where: { supplierId: scope.supplierId, category: row.category, template: { active: true } },
         include: { items: { orderBy: { displayOrder: 'asc' } } },
         orderBy: { versionNumber: 'desc' },
       }),
-      this.prisma.shiftRun.findFirst({
-        where: { id: row.shiftRunId, supplierId: scope.supplierId, status: 'ACTIVE' },
-      }),
+      this.lineShifts.operationalContext(scope, principal),
       this.prisma.job.findFirst({
         where: { id: row.jobId, supplierId: scope.supplierId, active: true },
       }),
@@ -734,6 +732,12 @@ export class HenkatenService {
       }),
     ]);
     if (!checklist) throw checklistInvalid();
+    const selectable = operational.currentLineShiftIds.length
+      ? operational.items.filter(({ id }) => operational.currentLineShiftIds.includes(id))
+      : operational.items;
+    const shift =
+      selectable.find(({ id }) => id === row.lineShiftId) ??
+      (!row.lineShiftId ? selectable.find(({ lineId }) => lineId === row.lineId) : undefined);
     const working = row.manDetail
       ? await this.prisma.workingAssignment.findFirst({
           where: {
@@ -747,6 +751,7 @@ export class HenkatenService {
       clonedFromHenkatenId: row.id,
       category: row.category,
       shiftRunId: row.shiftRunId,
+      lineShiftId: shift?.id ?? null,
       jobId: row.jobId,
       partId: row.partId,
       cause: row.cause,
@@ -760,7 +765,12 @@ export class HenkatenService {
         displayOrder: item.displayOrder,
       })),
       shiftStillValid: Boolean(shift),
-      jobStillValid: Boolean(job && shift && job.lineId === shift.lineId),
+      jobStillValid: Boolean(
+        job &&
+        shift &&
+        job.lineId === shift.lineId &&
+        shift.assignments.some(({ jobId }) => jobId === job.id),
+      ),
       partStillValid: Boolean(part),
       assignmentStillValid: Boolean(
         !row.manDetail || (working && working.version === row.manDetail.targetAssignmentVersion),
@@ -866,6 +876,24 @@ export class HenkatenService {
       orderBy: [{ openedAt: 'asc' }, { id: 'asc' }],
     });
     if (!rows.length) throw missing('Affected Part');
+    const [hosted, external] = await Promise.all([
+      this.prisma.henkaten.findMany({
+        where: { id: { in: rows.flatMap((row) => (row.henkatenId ? [row.henkatenId] : [])) } },
+        select: { id: true, identifier: true },
+      }),
+      this.prisma.externalHenkatenProjection.findMany({
+        where: {
+          id: {
+            in: rows.flatMap((row) => (row.externalProjectionId ? [row.externalProjectionId] : [])),
+          },
+        },
+        select: { id: true, sourceHenkatenId: true },
+      }),
+    ]);
+    const identifiers = new Map([
+      ...hosted.map((row) => [row.id, row.identifier] as const),
+      ...external.map((row) => [row.id, row.sourceHenkatenId] as const),
+    ]);
     return {
       supplierId,
       supplierName: supplier.name,
@@ -873,7 +901,14 @@ export class HenkatenService {
       partName: rows[0]!.partNameSnapshot,
       openWarningCount: rows.length,
       oldestOpenedAt: rows[0]!.openedAt.toISOString(),
-      warnings: rows.map(presentWarning),
+      warnings: rows.map((row) => ({
+        ...presentWarning(row),
+        displayIdentifier:
+          identifiers.get(row.henkatenId ?? row.externalProjectionId ?? '') ??
+          row.henkatenId ??
+          row.externalProjectionId ??
+          row.id,
+      })),
     };
   }
 

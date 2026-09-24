@@ -443,7 +443,7 @@ export function WarningDetailPage() {
                     <Link
                       to={`/henkatens/${row.sourceMode.toLowerCase()}/${supplierId}/${row.henkatenId}`}
                     >
-                      {row.henkatenId}
+                      {row.displayIdentifier}
                     </Link>
                   </td>
                   <td>{row.status}</td>

@@ -106,7 +106,7 @@ Setiap baris harus dinilai `PASS`, `FAIL`, `BLOCKED`, atau `NOT_APPLICABLE` deng
 | S-05 | Checklist tiap 4M: edit draft, publish, version history, activate/deactivate; submit lalu ubah checklist | Record lama mempertahankan snapshot; LL wajib semua Yes dan versi aktif |
 | S-06 | Tanoko: search/filter/sort, sticky axes, inspector, level 1–4/unassessed, history dan audit; Admin/GL edit, LL/QC read | Mapping tersimpan/versioned; level <3 dan unassessed tidak eligible untuk Man/default MP; >=3 eligible |
 | S-07 | Line Setup: tambah shift, copy assignment, ubah Supervisor/LL/MP per job, activate/deactivate, konflik overlap/time/version, duplikasi MP | Hanya Admin bisa edit; overlap aktif ditolak; MP sama dapat dipilih pada beberapa job; next occurrence memakai default baru |
-| S-08 | Default assignment legacy read/redirect dan Admin reroute Supervisor pada Henkaten Open | Redirect ke Line Setup; reroute audit/notification dan owner approval sesuai hasil API |
+| S-08 | Default assignment legacy read/redirect dan Admin reroute Supervisor pada Henkaten Open | Redirect ke Line Setup; reroute tercatat di audit, owner baru dapat mengambil keputusan, dan owner lama tidak ditawari aksi maupun dapat mengambil keputusan. Notifikasi reroute tidak diperlukan (ADR 0036). |
 
 ### 5.4 Hosted LL, Supervisor, QC dan board (H)
 

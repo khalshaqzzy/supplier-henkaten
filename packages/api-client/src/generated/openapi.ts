@@ -196,6 +196,8 @@ export interface paths {
                   | 'QC';
                 /** Format: uuid */
                 supplierId?: string;
+                /** Format: uuid */
+                memberId?: string;
                 /** @enum {string} */
                 purpose: 'NORMAL' | 'HOSTED_PREPARATION';
                 mustChangePassword: boolean;
@@ -351,6 +353,8 @@ export interface paths {
                   | 'QC';
                 /** Format: uuid */
                 supplierId?: string;
+                /** Format: uuid */
+                memberId?: string;
                 /** @enum {string} */
                 purpose: 'NORMAL' | 'HOSTED_PREPARATION';
                 mustChangePassword: boolean;
@@ -497,6 +501,8 @@ export interface paths {
                   | 'QC';
                 /** Format: uuid */
                 supplierId?: string;
+                /** Format: uuid */
+                memberId?: string;
                 /** @enum {string} */
                 purpose: 'NORMAL' | 'HOSTED_PREPARATION';
                 mustChangePassword: boolean;
@@ -645,6 +651,8 @@ export interface paths {
                   | 'QC';
                 /** Format: uuid */
                 supplierId?: string;
+                /** Format: uuid */
+                memberId?: string;
                 /** @enum {string} */
                 purpose: 'NORMAL' | 'HOSTED_PREPARATION';
                 mustChangePassword: boolean;
@@ -12335,6 +12343,7 @@ export interface paths {
               category: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
               /** Format: uuid */
               shiftRunId: string;
+              lineShiftId: string | null;
               /** Format: uuid */
               jobId: string;
               /** Format: uuid */
@@ -13094,6 +13103,7 @@ export interface paths {
                 /** Format: date-time */
                 openedAt: string;
                 closedAt: string | null;
+                displayIdentifier: string;
               }[];
             };
           };

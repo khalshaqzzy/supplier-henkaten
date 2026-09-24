@@ -322,6 +322,7 @@ export const clonePrefillSchema = z
     clonedFromHenkatenId: opaqueIdSchema,
     category: henkatenCategorySchema,
     shiftRunId: opaqueIdSchema,
+    lineShiftId: opaqueIdSchema.nullable(),
     jobId: opaqueIdSchema,
     partId: opaqueIdSchema,
     cause: z.string(),
@@ -371,5 +372,7 @@ export const affectedPartPageSchema = z
   .strict();
 
 export const affectedPartDetailSchema = affectedPartSchema
-  .extend({ warnings: z.array(warningInstanceSchema) })
+  .extend({
+    warnings: z.array(warningInstanceSchema.extend({ displayIdentifier: z.string().min(1) })),
+  })
   .strict();

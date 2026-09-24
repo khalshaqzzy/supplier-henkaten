@@ -392,10 +392,14 @@ export function HenkatenDetailPage() {
   const item = record.data;
   const role = session!.principal.role;
   const route = role === 'QC' ? item.routes.qc : item.routes.supervisor;
-  const canDecide =
-    hasCapability('SUPPLIER_HENKATEN_DECIDE') &&
-    item.status === 'OPEN' &&
-    route.status === 'PENDING';
+  const canDecide = canDecideHenkaten({
+    hasCapability: hasCapability('SUPPLIER_HENKATEN_DECIDE'),
+    status: item.status,
+    routeStatus: route.status,
+    role,
+    responsibleMemberId: route.currentResponsibleMemberId,
+    ...(session!.principal.memberId ? { memberId: session!.principal.memberId } : {}),
+  });
   const canWithdraw = role === 'LINE_LEADER' && item.status === 'OPEN';
   const canReroute =
     hasCapability('SUPPLIER_APPROVAL_REROUTE') &&
@@ -673,6 +677,23 @@ export function HenkatenDetailPage() {
         </aside>
       </div>
     </div>
+  );
+}
+
+export function canDecideHenkaten(input: {
+  hasCapability: boolean;
+  status: string;
+  routeStatus: string;
+  role: string;
+  responsibleMemberId: string | null;
+  memberId?: string;
+}): boolean {
+  return (
+    input.hasCapability &&
+    input.status === 'OPEN' &&
+    input.routeStatus === 'PENDING' &&
+    (input.role === 'QC' ||
+      (input.role === 'SUPERVISOR' && input.responsibleMemberId === input.memberId))
   );
 }
 

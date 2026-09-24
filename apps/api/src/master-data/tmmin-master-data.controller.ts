@@ -91,6 +91,7 @@ export class TmminMasterDataController {
     }
     const asset = await this.photos.asset(scope, parseWithSchema(opaqueIdSchema, id), variant);
     response.setHeader('Content-Type', 'image/webp');
+    response.setHeader('Cross-Origin-Resource-Policy', 'same-site');
     response.setHeader('Cache-Control', 'private, max-age=300');
     response.setHeader('ETag', `"${asset.checksum}"`);
     response.setHeader('X-Content-Type-Options', 'nosniff');

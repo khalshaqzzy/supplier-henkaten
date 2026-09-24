@@ -51,6 +51,7 @@ export class AuthControllerFacade {
       realm: user.realm,
       role: user.role,
       ...(user.supplierId ? { supplierId: user.supplierId } : {}),
+      ...(user.memberId ? { memberId: user.memberId } : {}),
       purpose:
         user.supplierId && realm === 'SUPPLIER'
           ? await this.sessions.purpose(session.id)
@@ -76,6 +77,7 @@ export class AuthControllerFacade {
       realm: principal.realm,
       role: principal.role,
       ...(principal.supplierId ? { supplierId: principal.supplierId } : {}),
+      ...(principal.memberId ? { memberId: principal.memberId } : {}),
       purpose: principal.purpose,
       mustChangePassword: principal.mustChangePassword,
     } as const;

@@ -245,6 +245,17 @@ export class SourceGovernanceService {
       for (const contributor of this.contributors.values()) {
         await contributor.revokeOldSource?.(transaction, supplier, input.targetMode);
       }
+      if (input.targetMode === 'EXTERNAL') {
+        await transaction.user.updateMany({
+          where: { supplierId, role: 'SUPPLIER_ADMIN', status: 'ACTIVE' },
+          data: {
+            status: 'INACTIVE',
+            authorizationEpoch: { increment: 1 },
+            version: { increment: 1 },
+            updatedById: context.actorUserId,
+          },
+        });
+      }
       await transaction.userSession.updateMany({
         where: { supplierId, revokedAt: null },
         data: {

@@ -12,6 +12,7 @@ import { correlationMiddleware } from '../common/request-context.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 import { PcrService } from '../pcr/pcr.service.js';
 import { NotificationService } from '../read-models/notification.service.js';
+import { HenkatenService } from './henkaten.service.js';
 
 const supplierOrigin = 'http://localhost:5173';
 const password = 'Line-Shift-Integration-Password-123';
@@ -334,6 +335,36 @@ describe('Line Shift Henkaten operations', () => {
       where: { shiftRunId: created.body.shiftRunId, jobId: job1Id },
     });
     expect(restored.effectiveMpMemberId).toBe(defaultMpId);
+  });
+
+  it('keeps a valid Line Shift Job in clone prefill and labels its warning with the Henkaten identifier', async () => {
+    const created = await createManHenkaten();
+    expect(created.status).toBe(201);
+    const part = await prisma.part.findUniqueOrThrow({ where: { id: partId } });
+    const warning = await app.get(HenkatenService).affectedPart(supplierId, part.partNumber);
+    expect(warning.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          henkatenId: created.body.id,
+          displayIdentifier: created.body.identifier,
+        }),
+      ]),
+    );
+
+    await prisma.shiftRun.update({
+      where: { id: created.body.shiftRunId as string },
+      data: { status: 'NOT_STARTED' },
+    });
+    const prefill = await request(app.getHttpServer())
+      .get(`/api/v1/supplier/henkatens/${created.body.id}/clone-prefill`)
+      .set('Cookie', leaderCookie);
+    expect(prefill.status).toBe(200);
+    expect(prefill.body).toMatchObject({
+      lineShiftId,
+      shiftStillValid: true,
+      jobId: job1Id,
+      jobStillValid: true,
+    });
   });
 
   it('lets TMMIN Quality correct PCR with a reason and rejects stale or Supplier corrections', async () => {

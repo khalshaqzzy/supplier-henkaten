@@ -354,6 +354,8 @@ The complete functionality inventory is in [`browser-local-end-to-end-verificati
 
 ## Findings and residual risk
 
+**Disposisi setelah run — 2026-09-24:** Product owner memutuskan bahwa reroute Supervisor tidak perlu notifikasi in-app. Dengan demikian F-10 adalah perbedaan ekspektasi pada rencana QA, bukan defect aplikasi yang harus diperbaiki. Oracle S-08 telah dikoreksi di rencana skenario dan keputusan dicatat pada ADR 0036. Observasi, angka status, dan evidence run di bawah tetap dipertahankan sebagai rekaman historis; F-11 tetap defect yang terbuka. Rencana penutupan semua temuan ada di `docs/qa/qa-verif-finding-remediation-plan-2026-09-24.md`.
+
 | Finding | Class / severity | Observed impact | Evidence |
 | --- | --- | --- | --- |
 | F-01 | APP_DEFECT / Medium | Authenticated member thumbnails are blocked on the Default Board by the cross-origin response policy; initials render despite available photos. E4 Canvas did render the same seeded photos. | `.local/qa-evidence/e0-browser/npm-admin-board-investigation.png`, `.local/qa-evidence/e0-browser/npm-admin-board-images.json`, `.local/qa-evidence/e4-browser-flow/e4-canvas-viewer.png` |
@@ -401,3 +403,7 @@ Other partial rows have a recorded outcome rather than a wholly blocked state: T
 The 47 planned A/T/S/H/X/N scenario rows now reconcile to **22 PASS, 15 FAIL, and 10 BLOCKED / partial**. A PASS or FAIL gives a determinate overall row outcome; some rows still have the untested sub-branches listed above. **37 of 47 rows (78.7%)** therefore have a determinate outcome, not full sub-step coverage. The application QA plan is not fully verified. The TMMIN Admin PCR correction was exercised in both No-PCR→PCR and PCR→No-PCR directions on a Closed record; the save button remained disabled until the trimmed reason contained at least 10 characters.
 
 This Markdown report is the comprehensive report for the QA performed in this run, including findings, evidence, and remaining work. **After every item under “Remaining QA not executed” is verified, update or publish a complete final QA report in Markdown under `docs/audits/` with the final evidence and counts.** No product bug fixes were made.
+
+## Fix implementation addendum — 2026-09-24
+
+Branch `fix/qa-verif-1` implements targeted fixes for F-01–F-09 and F-11–F-12. F-10 was closed as a corrected product expectation under ADR 0036. ADR 0037 records the cross-boundary implementation decisions. Regression tests cover the changed services and UI state; the existing isolated Chromium and Edge journeys pass. These checks do **not** rerun each original browser observation or execute any item under “Remaining QA not executed”. The 22 PASS / 15 FAIL / 10 BLOCKED counts above remain the original run's results, and no scenario is reclassified by this addendum. The detailed remediation plan and test record are in [`qa-verif-finding-remediation-plan-2026-09-24.md`](../qa/qa-verif-finding-remediation-plan-2026-09-24.md) and the current session handoff.

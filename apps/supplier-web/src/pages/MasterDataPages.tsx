@@ -386,7 +386,12 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
         : supplierApi.createShiftTemplate(body);
     },
     onSuccess: async (resource) => {
-      await queryClient.invalidateQueries({ queryKey: scopedKey(scope, `master-${kind}`) });
+      if (editing) {
+        queryClient.setQueryData(scopedKey(scope, `master-${kind}-detail`, resourceId), resource);
+      }
+      await queryClient.invalidateQueries({
+        queryKey: scopedKey(scope, `master-${kind}`).slice(0, -1),
+      });
       if (!editing && (kind !== 'members' || ('role' in resource && resource.role === 'MP')))
         void navigate(`/master-data/${kind}/${resource.id}`, { replace: true });
     },

@@ -12,6 +12,21 @@ export class RateLimiterService {
 
   constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
 
+  checkAccount(rawKey: string, now: Date): { allowed: boolean; retryAfterSeconds: number } {
+    const bucket = this.buckets.get(`login-account:${this.digest(rawKey)}`);
+    if (!bucket || bucket.resetAt <= now.getTime() || bucket.count < 5) {
+      return { allowed: true, retryAfterSeconds: 0 };
+    }
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil((bucket.resetAt - now.getTime()) / 1_000)),
+    };
+  }
+
+  clearAccount(rawKey: string): void {
+    this.buckets.delete(`login-account:${this.digest(rawKey)}`);
+  }
+
   consume(
     category: 'login-account' | 'login-ip' | 'global-ip',
     rawKey: string,

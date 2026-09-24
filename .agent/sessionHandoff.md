@@ -1,4 +1,23 @@
-# Current Session Handoff — Local browser QA execution
+# Current Session Handoff — Scoped QA finding remediation
+
+- Date: 2026-09-24
+- Branch: `fix/qa-verif-1`
+- Status: F-01–F-09 and F-11–F-12 implemented with automated regressions; F-10 is a product-expectation correction. PR to `staging` is the delivery target. No staging deployment or complete QA claim.
+- Current roadmap position remains Phase 15 / 15.9 `in_progress`.
+
+The full cause and acceptance map is [`docs/qa/qa-verif-finding-remediation-plan-2026-09-24.md`](../docs/qa/qa-verif-finding-remediation-plan-2026-09-24.md). ADR 0036 records the user decision that Supervisor reroute needs no in-app notification; ADR 0037 records implementation boundaries. The original local QA run's 22 PASS / 15 FAIL / 10 BLOCKED outcomes remain unchanged. No “Remaining QA not executed” branch was continued. The fixes have automated regressions, but the original browser observation for every finding was not individually rerun; do not reclassify the historical rows from the tests alone.
+
+Implementation: cutover deactivates the prior Supplier Admin; reverse Preparation defensively revokes any surviving active Admin and rejects reused usernames with a field error. Reset/replace uses Supplier.version. Photo responses use same-site CORP. Clone checks current Line–Shift/Job validity. Account throttling counts failures only, keeps the existing IP limits and five-failure database lockout, and allows six consecutive successful logins. Supplier notification and master-data mutations refresh their actual cache keys; Line Setup retains the newly copied shift; warning detail shows a human-readable Hosted/External identifier; former Supervisor approval controls require current responsibility; the Supplier registry exposes API cursor navigation. OpenAPI and the generated client were regenerated. No migration was added.
+
+Checks completed on a disposable clean-artifact worktree after `pnpm install --frozen-lockfile`: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm openapi:check`, and `VITE_API_ORIGIN=https://api.example.invalid pnpm build` passed. The first clean-worktree lint run caught five new test-mock style errors; they were fixed and the complete sequence passed. The main checkout's `pnpm lint` includes pre-existing ignored `.local/*.mjs` scripts, so the clean-worktree result is the CI-equivalent result. Full API integration passed 32 tests on the disposable Docker test database. `pnpm test:e2e` passed five isolated journeys across Chromium and Edge, and its own Compose projects were removed. Node 22.23.2 and pnpm 11.16.0 were used on the host; production Docker builds used the pinned Node 22.23.1 image.
+
+Staging parity: `docker compose config --quiet`, `pnpm migrations:destructive-check 7ed8d8a5ef515707950c4e8f48ef71b1d2727151`, `pnpm deployment:validate`, `pnpm test:deployment`, `pnpm security:exceptions:check`, `pnpm security:audit`, pinned Actionlint/ShellCheck/Hadolint, `bash -n`, Ubuntu 22.04 bootstrap input validation, Gitleaks v8.24.3 directory scan, and Trivy 0.70.0 filesystem scan passed. The deployment script harness passed in a Linux Docker container with actual `flock` contention. The previous-staging-to-current migration was applied to a temporary database, checked current, and dropped; no migration SQL changed. All five production images built; the isolated staging-like Compose stack passed migration/bootstrap, health, routing, headers, non-root, idempotent bootstrap, and restart persistence checks. Trivy image scans passed for all five images. The first scan of the frontend images encountered cached `apk upgrade` layers containing vulnerable `libexpat` 2.8.4-r0; a `--no-cache` frontend rebuild pulled fixed 2.8.5-r0 and both rescans passed. No Dockerfile change was required.
+
+The local fullstack Compose services on ports 3000, 5173, 5174, and 55432 predated this task and were not stopped or reseeded; `/health` still returned 200 after the checks. The isolated staging-like Compose stack was removed. The disposable parity worktree will be removed after delivery. User explicitly requested pushing this branch and opening a PR to `staging` **without monitoring checks**, overriding the post-push monitoring step in `.agent/rules.md` for this task.
+
+---
+
+# Previous Session Handoff — Local browser QA execution
 
 - Date: 2026-09-24
 - Branch: `feat/qa-verif` at baseline `cf53a62`; report and handoff prepared for delivery on this branch.

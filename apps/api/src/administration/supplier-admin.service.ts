@@ -389,6 +389,56 @@ export class SupplierAdminService {
           detail: 'Cancel or complete the active preparation before starting another.',
         });
       }
+      const usernameTaken = await transaction.user.findFirst({
+        where: {
+          supplierId,
+          normalizedUsername: normalizeLookup(input.supplierAdmin.username),
+        },
+        select: { id: true },
+      });
+      if (usernameTaken) {
+        throw new ProblemException({
+          status: 409,
+          code: 'STATE_CONFLICT',
+          title: 'Supplier Admin username already exists',
+          detail: 'Choose a different Supplier Admin username.',
+          fieldErrors: [
+            {
+              path: 'supplierAdmin.username',
+              code: 'duplicate',
+              message: 'Choose a different Supplier Admin username.',
+            },
+          ],
+        });
+      }
+      const previousAdmins = await transaction.user.findMany({
+        where: { supplierId, role: 'SUPPLIER_ADMIN', status: 'ACTIVE' },
+        select: { id: true },
+      });
+      await transaction.user.updateMany({
+        where: { supplierId, role: 'SUPPLIER_ADMIN', status: 'ACTIVE' },
+        data: {
+          status: 'INACTIVE',
+          authorizationEpoch: { increment: 1 },
+          version: { increment: 1 },
+          updatedById: context.actorUserId,
+        },
+      });
+      if (previousAdmins.length) {
+        const userIds = previousAdmins.map(({ id }) => id);
+        await transaction.userSession.updateMany({
+          where: { userId: { in: userIds }, revokedAt: null },
+          data: {
+            revokedAt: new Date(),
+            revocationReason: 'SOURCE_MODE_CHANGED',
+            version: { increment: 1 },
+          },
+        });
+        await transaction.pushSubscription.updateMany({
+          where: { userId: { in: userIds }, status: 'ACTIVE' },
+          data: { status: 'REVOKED', revokedAt: new Date(), version: { increment: 1 } },
+        });
+      }
       const admin = await this.createSupplierAdmin(
         transaction,
         supplier,
