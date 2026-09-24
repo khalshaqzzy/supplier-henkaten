@@ -347,7 +347,7 @@ export function WarningsPage() {
       <PageHeader
         eyebrow="Registry warning aktif"
         title="Peringatan Aktif"
-        description="Affected part tetap terbuka sampai seluruh sumber Henkaten mencapai status terminal."
+        description=""
         actions={<UpdatedAt fetching={result.isFetching} retry={() => void result.refetch()} />}
       />
       {result.isLoading ? (
@@ -357,10 +357,7 @@ export function WarningsPage() {
       ) : result.data.items.length === 0 ? (
         <QueryState empty="Tidak ada active warning pada scope ini." />
       ) : (
-        <Panel
-          title={`${result.data.items.length} affected part groups`}
-          description="Warning tidak dapat ditutup manual."
-        >
+        <Panel title={`${result.data.items.length} peringatan`} description="">
           <div className="tmmin-table-scroll">
             <table className="tmmin-table">
               <thead>
@@ -374,17 +371,17 @@ export function WarningsPage() {
               </thead>
               <tbody>
                 {result.data.items.map((row) => (
-                  <tr key={`${row.supplierId}-${row.partNumber}`}>
+                  <tr key={`${row.supplierId}-${row.warningKey}`}>
                     <td>{row.supplierName}</td>
                     <td>
                       <strong>{row.partNumber}</strong>
-                      <small>{row.partName}</small>
+                      {row.partName && <small>{row.partName}</small>}
                     </td>
                     <td>{dateTime(row.oldestOpenedAt)}</td>
                     <td className="tmmin-number">{row.openWarningCount}</td>
                     <td>
                       <Link
-                        to={`/warnings/${row.supplierId}/${encodeURIComponent(row.partNumber)}`}
+                        to={`/warnings/${row.supplierId}/${encodeURIComponent(row.warningKey)}`}
                       >
                         Lihat detail
                       </Link>
@@ -414,13 +411,14 @@ export function WarningDetailPage() {
     <>
       <PageHeader
         eyebrow={result.data.supplierName}
-        title={`${result.data.partNumber} · ${result.data.partName}`}
-        description={`${result.data.openWarningCount} open source records contribute to this affected-part warning.`}
+        title={
+          result.data.partName
+            ? `${result.data.partNumber} · ${result.data.partName}`
+            : result.data.partNumber
+        }
+        description={`${result.data.openWarningCount} Henkaten Open`}
       />
-      <Panel
-        title="Record sumber"
-        description="Lifecycle tetap authoritative pada Henkaten Hosted atau External."
-      >
+      <Panel title="Record sumber" description="">
         <div className="tmmin-table-scroll">
           <table className="tmmin-table">
             <thead>

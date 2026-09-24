@@ -116,7 +116,6 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
   if (!lines.length)
     add('LINES_JOBS', 'ACTIVE_LINE_MISSING', 'Minimal satu line aktif diperlukan.');
   if (!jobs.length) add('LINES_JOBS', 'ACTIVE_JOB_MISSING', 'Minimal satu job aktif diperlukan.');
-  if (!partCount) add('PARTS', 'ACTIVE_PART_MISSING', 'Minimal satu part aktif diperlukan.');
 
   const categories = new Set(checklistCategories.map(({ category }) => category));
   for (const category of ['MAN', 'MACHINE', 'MATERIAL', 'METHOD'] as const) {
@@ -191,7 +190,7 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
       requiredCount: 1,
     },
     LINES_JOBS: { activeCount: lines.length + jobs.length, requiredCount: 2 },
-    PARTS: { activeCount: partCount, requiredCount: 1 },
+    PARTS: { activeCount: partCount, requiredCount: 0 },
     CHECKLISTS: { activeCount: categories.size, requiredCount: 4 },
     DEFAULT_ASSIGNMENTS: {
       activeCount: assignmentActiveCount,

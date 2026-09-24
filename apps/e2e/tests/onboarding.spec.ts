@@ -80,12 +80,14 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
   for (const [index, role] of ['Supervisor', 'Line Leader', 'QC', 'MP'].entries()) {
     await supplier.goto(`${runtime.supplierOrigin}/master-data/members/new`);
     await supplier.getByLabel('Nama lengkap').fill(`${role} Onboarding`);
-    await supplier.getByLabel('Nomor registrasi').fill(`REG-ONBOARD-${index + 1}`);
     await supplier
       .getByLabel('Role')
       .selectOption(role === 'Line Leader' ? 'LINE_LEADER' : role.toUpperCase());
     if (role !== 'MP') {
+      await supplier.getByLabel('Nomor registrasi').fill(`REG-ONBOARD-${index + 1}`);
       await supplier.getByLabel('Username').fill(`${role.toLowerCase().replace(' ', '.')}.onboard`);
+    } else {
+      await expect(supplier.getByLabel('Nomor registrasi')).toHaveCount(0);
     }
     await supplier.getByRole('button', { name: 'Buat data' }).click();
     if (role !== 'MP') {
@@ -124,7 +126,7 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
     .locator('.defaults-table__row')
     .filter({ hasText: 'Install Component' })
     .locator('select')
-    .selectOption({ label: 'MP Onboarding · REG-ONBOARD-4' });
+    .selectOption({ label: 'MP Onboarding' });
   await supplier.getByRole('button', { name: 'Simpan assignment' }).click();
   await expect(supplier.getByLabel('Supervisor')).toHaveValue(/.+/);
   await expect(supplier.getByLabel('Line Leader')).toHaveValue(/.+/);

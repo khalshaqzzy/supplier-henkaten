@@ -183,7 +183,7 @@ export function AssignmentBoardPage() {
                     <h3>{job.jobName}</h3>
                     <p>
                       {job.mp.name ?? 'Vacant'}
-                      <small>{job.mp.registrationNumber}</small>
+                      <small>{job.state}</small>
                     </p>
                     <div>
                       {job.indicators.map((indicator) => (

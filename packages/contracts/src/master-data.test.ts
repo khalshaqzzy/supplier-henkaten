@@ -10,6 +10,9 @@ import {
 describe('master-data contracts', () => {
   it('requires credentials for operational account roles and forbids them for MP', () => {
     expect(
+      createMemberRequestSchema.safeParse({ role: 'MP', fullName: 'Example MP' }).success,
+    ).toBe(true);
+    expect(
       createMemberRequestSchema.safeParse({
         role: 'SUPERVISOR',
         fullName: 'Example Supervisor',
