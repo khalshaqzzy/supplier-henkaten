@@ -5950,3 +5950,14 @@ Pre-PR parity also passed fresh and upgrade migrations, all three Chromium journ
 ShellCheck, Hadolint, a Linux deployment harness, production-like routing/persistence, Gitleaks,
 and Trivy filesystem plus five image scans. Local Edge installation was unavailable without sudo
 on macOS; the Linux CI Edge journey remains the browser gate.
+
+## Browser local end-to-end QA plan — 2026-09-24
+
+Status: planned; no QA execution or product changes are claimed. Phase 15.9 remains the sole
+`in_progress` delivery phase. The complete local reseed/browser verification inventory and matrix
+are in `docs/qa/browser-local-end-to-end-verification-plan.md`; ADR 0035 records isolated epochs and
+evidence boundaries. Execution must cover Supplier and TMMIN roles, Hosted Line–Shift/Henkaten/PCR,
+External ingestion and source governance, authorization and responsive states, then restore the
+two-Hosted-supplier seed and publish a complete Markdown audit report. Findings are recorded without
+bug fixing in the QA run. Playwright Chromium/Edge desktop results do not claim iOS Home Screen push
+or the full mobile device matrix.

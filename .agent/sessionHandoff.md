@@ -1,3 +1,17 @@
+# Session Handoff — Browser local end-to-end QA planning
+
+- Date: 2026-09-24
+- Branch: `feat/qa-verif` at `7ed8d8a` when analyzed
+- Status: analysis and executable QA plan complete; QA has not been run.
+
+Objective: inventory current PRD and source functionality, then plan local reseed-based browser verification of Supplier and TMMIN surfaces, without bug fixing. The complete scenario matrix, epoch order, evidence rules, and final Markdown report requirement are in `docs/qa/browser-local-end-to-end-verification-plan.md`. ADR 0035 records the isolation/evidence decision.
+
+Key interpretation: the September 22 Line–Shift amendment supersedes old Shift Run lifecycle, reservation, exclusivity, donor cascade, and associated old acceptance checks. The September 23 PCR amendment is in scope. Playwright browser use is the primary UI path, with Chromium coverage and Edge smoke where available; External API needs HTTP verification against the same runtime. Local seed has two Hosted suppliers and no External tenant, so External/governance scenarios need an isolated epoch. Desktop browser emulation cannot establish iOS Home Screen push or the full device matrix.
+
+Files changed: QA plan, ADR 0035, this handoff, and implementation roadmap note. No source, schema, runtime, or test code changed. No local reseed, browser QA, Docker startup, bug fix, commit, or deployment was performed. Checks: read-only source/document inspection and documentation formatting/whitespace checks. No blocker for planning; execution may encounter unavailable PCR inference, VAPID configuration, or device-specific UAT prerequisites. Next action: execute the documented QA epochs, classify findings without fixing them, restore the local seed, and write the comprehensive Markdown audit report.
+
+---
+
 # Session Handoff — Canvas job-card 4M visibility
 
 Date: 2026-09-23
