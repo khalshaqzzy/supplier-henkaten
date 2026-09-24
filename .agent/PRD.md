@@ -1919,11 +1919,11 @@ Volume:
 
 ### 28.3 Production Domains
 
-Production domain names adalah external dependency dan tetap placeholder sampai diberikan TMMIN:
+Production domains:
 
-- `PRODUCTION_SUPPLIER_DOMAIN`
-- `PRODUCTION_TMMIN_DOMAIN`
-- `PRODUCTION_API_DOMAIN`
+- Supplier: `https://henkaten.qualitydivision.com`
+- TMMIN Admin/Quality: `https://admin-henkaten.qualitydivision.com`
+- API: `https://henkaten-api.qualitydivision.com`
 
 Production deployment tidak boleh diaktifkan sebelum ketiga DNS record, TLS reachability, dan runtime env tervalidasi.
 
@@ -2330,7 +2330,8 @@ Production launch membutuhkan:
 - representative supplier master data untuk UAT;
 - designated TMMIN Admin dan Quality users.
 
-Production domain, credential value, IP, dan secret tidak boleh ditulis di repository.
+Production credential value, IP, dan secret tidak boleh ditulis di repository. Domain production
+yang sudah ditetapkan dicatat pada workflow dan runbook agar routing dapat diverifikasi.
 
 ---
 

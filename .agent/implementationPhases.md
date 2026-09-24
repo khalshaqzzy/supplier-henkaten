@@ -7,10 +7,10 @@ This file tracks sequence, current state, dependencies, and remaining acceptance
 ## Current position
 
 - Phases **0–14: done** for their original implementation and local acceptance scope. Later defects and amendments are tracked below; “done” does not imply production acceptance.
-- Phase **15: in_progress**. The only in-progress subphase is **15.9 Automatic Staging Deployment**. A successful hosted staging deployment has not been evidenced here.
+- Phase **15: in_progress**. **15.9 Automatic Staging Deployment** is done: staging push run `35977992005` completed successfully and independent three-domain smoke returned release SHA `dfc2aa2428b1db5fce407ec2033a1da87b0632bd`. Staging rehearsal and device gates remain.
 - Phase **16: planned**. Production deployment and UAT are not complete.
 - Current repository branch is not a phase status. Confirm the branch, code, CI, and remote state before acting; historical branch names and run IDs in older handoffs are evidence, not current truth.
-- Next dependency: finish 15.9 with an exact-SHA staging deployment and remote smoke evidence; then perform 15.11 staging rehearsal. Address QA findings before claiming UAT or release readiness.
+- Next dependency: perform 15.11 staging rehearsal and address QA findings before claiming UAT or release readiness.
 
 Status vocabulary: `planned`, `in_progress`, `blocked`, `done`, `deferred`. Use at most one `in_progress` phase and one subphase within it. “Implemented locally; acceptance pending” and “implementation ready; activation deferred” describe evidence, not additional progress states. Mark a subphase `done` only when its listed acceptance gate is met. Preserve blockers and deferred work explicitly.
 
@@ -65,8 +65,8 @@ Depends on Phase 14. Exit: automated exact-SHA staging deploy, CI/security gates
 | 15.6 Release-by-SHA | done | Exact archive, lock, secure env, migration, retention and traceable release pointer. |
 | 15.7 Smoke/readiness | done | All three surfaces, semantic API readiness and release SHA gate deployment. |
 | 15.8 Compatible rollback | done | Failed validation returns to previous code when schema permits; volumes retained. |
-| **15.9 Automatic staging deployment** | **in_progress** | A successful `staging` push deploys the exact SHA to isolated staging domains and passes remote health/smoke. Verify current DNS, TLS, VM capacity, secrets, workflow and run result; earlier DNS and disk repairs alone do not satisfy this gate. |
-| 15.10 Automatic production workflow | deferred (implementation ready) | Shared exact-SHA workflow exists. Do not add an active `main` or manual production caller until Phase 16 readiness/authorization; then validate trigger, secrets and remote preflight. |
+| 15.9 Automatic staging deployment | done | Staging push run `35977992005` passed all release jobs and deployment; independent public three-domain smoke confirmed exact SHA `dfc2aa2428b1db5fce407ec2033a1da87b0632bd`. Recheck this evidence for each later candidate. |
+| 15.10 Automatic production workflow | planned (caller implemented locally; activation pending) | `main` push caller and production bootstrap support are prepared. Merge only after production VM SSH identity, 80/443 reachability, runtime secrets, staging rehearsal, and Phase 16 release gates are satisfied; then verify the exact-SHA remote deployment. |
 | 15.11 Staging rehearsal | planned | After 15.9: fresh and upgrade deploy, controlled failed readiness, compatible rollback, DB/photo persistence, release race and core staging browser/API smoke; retain diagnostics. |
 | 15.12 Responsive Supplier | planned (implemented locally) | Staging matrix: 360–767 mobile, 768–1279 tablet, desktop ≥1280; roles and major workflows; no overflow/clipped action; 44 px targets, keyboard/focus, non-color status, Axe, desktop regression. |
 | 15.13 Supplier PWA | planned (implemented locally) | HTTPS staging install/update/offline/reconnect and rollback recovery; only shell assets cached; API/session/photo/domain data and mutations network-only. |
@@ -102,7 +102,7 @@ Phase 16 is `done` only when all applicable PRD acceptance gates, UAT and risk s
 
 ## Dependencies, scope, and next execution
 
-Critical path: **15.9 remote staging deploy → 15.11 rehearsal → 15.12–15.15 staging/device acceptance + QA disposition → 16.1–16.3 quality gates → 16.4–16.6 UAT → 16.7–16.8 production prerequisites/sign-off → 16.9 release → 16.10 handoff**. Product defects and PCR classification evidence may be worked in parallel, but must close before their affected acceptance gate.
+Critical path: **15.11 rehearsal → 15.12–15.15 staging/device acceptance + QA disposition → 16.1–16.3 quality gates → 16.4–16.6 UAT → 16.7–16.8 production prerequisites/sign-off → 16.9 release → 16.10 handoff**. Product defects and PCR classification evidence may be worked in parallel, but must close before their affected acceptance gate.
 
 External prerequisites: staging/production DNS and TLS, VMs/SSH, GitHub and runtime secrets, target push services/devices, designated UAT users, representative External supplier, governance approval, and written risk acceptance. Their presence must be verified at the gate; a historical handoff does not prove current availability.
 

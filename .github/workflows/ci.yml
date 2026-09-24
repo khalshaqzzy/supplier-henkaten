@@ -1,10 +1,10 @@
-name: Staging CI
+name: Release CI
 
 on:
   push:
-    branches: [staging]
+    branches: [staging, main]
   pull_request:
-    branches: [staging]
+    branches: [staging, main]
 
 permissions:
   contents: read
@@ -227,6 +227,9 @@ jobs:
           docker run --rm -v "$PWD:/repo:ro" ubuntu:22.04@sha256:0e0a0fc6d18feda9db1590da249ac93e8d5abfea8f4c3c0c849ce512b5ef8982 \
             bash /repo/deploy/scripts/bootstrap-vm.sh --check staging henkaten-deploy \
             "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGZha2VidXR2YWxpZGJhc2U2NGtleWJ5dGVzZm9ydGVzdA ci" 22
+          docker run --rm -v "$PWD:/repo:ro" ubuntu:22.04@sha256:0e0a0fc6d18feda9db1590da249ac93e8d5abfea8f4c3c0c849ce512b5ef8982 \
+            bash /repo/deploy/scripts/bootstrap-vm.sh --check production henkaten-deploy \
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGZha2VidXR2YWxpZGJhc2U2NGtleWJ5dGVzZm9ydGVzdA ci" 22
 
   containers:
     name: Production containers and routing
@@ -436,7 +439,7 @@ jobs:
 
   deploy-staging:
     name: Deploy staging
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     needs: release-gate
     uses: ./.github/workflows/deploy-reusable.yml
     with:
@@ -449,4 +452,21 @@ jobs:
       supplier_domain: supplier-henkaten.qd-tmmin.site
       tmmin_domain: henkaten.qd-tmmin.site
       api_domain: supplier-henkaten-api.qd-tmmin.site
+    secrets: inherit
+
+  deploy-production:
+    name: Deploy production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: release-gate
+    uses: ./.github/workflows/deploy-reusable.yml
+    with:
+      app_env: production
+      expected_branch: main
+      release_sha: ${{ github.sha }}
+      deploy_run_number: ${{ github.run_number }}
+      environment_url: https://henkaten.qualitydivision.com
+      remote_base_dir: /opt/supplier-henkaten/production
+      supplier_domain: henkaten.qualitydivision.com
+      tmmin_domain: admin-henkaten.qualitydivision.com
+      api_domain: henkaten-api.qualitydivision.com
     secrets: inherit

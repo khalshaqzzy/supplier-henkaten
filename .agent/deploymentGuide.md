@@ -1,7 +1,8 @@
-# Deployment Guide — Staging
+# Deployment Guide — Staging and Production
 
-Dokumen ini adalah runbook operator untuk Phase 15. Scope aktif hanya staging. Push ke `main`,
-`workflow_dispatch`, dan deployment production sengaja tidak dikonfigurasi.
+Dokumen ini adalah runbook operator untuk staging dan production. Push ke `staging` atau `main`
+menjalankan release gate lalu memanggil reusable deployment workflow untuk environment masing-masing.
+Production hanya dapat berhasil setelah VPS, GitHub environment, dan tiga domain siap.
 
 ## 1. Topologi dan Batas Risiko
 
@@ -109,8 +110,24 @@ docker compose version
 test -w /opt/supplier-henkaten/staging
 ```
 
-Jangan menjalankan bootstrap production; script saat ini sengaja menolak environment selain
-`staging`.
+Untuk VM production yang terpisah, jalankan script yang sama dengan argumen `production`. Script
+membuat `/opt/supplier-henkaten/production`; jangan memakai shared path staging pada VM production.
+
+## Production preparation
+
+Production memakai Supplier `henkaten.qualitydivision.com`, Admin/Quality
+`admin-henkaten.qualitydivision.com`, dan API `henkaten-api.qualitydivision.com`. Ketiga DNS A
+record harus mengarah ke VM production. GitHub Environment bernama `production` menyimpan secret
+yang sama namanya dengan staging. `VM_HOST` dan `VM_SSH_KNOWN_HOSTS` harus menunjuk ke VM
+production; key CI boleh sama seperti staging. Pin known host hanya setelah fingerprint dibandingkan
+dengan console/provider VM. `VM_USER` dan variable `VM_SSH_PORT` mengikuti endpoint production.
+
+Push ke `main` menjalankan seluruh CI/security release gate dan otomatis deploy jika semuanya
+lulus. PR ke `main` hanya menjalankan gate. Pastikan port TCP 80/443 dan UDP 443 terbuka pada UFW
+dan firewall provider sebelum merge agar Caddy memperoleh TLS. Setelah merge, cocokkan SHA pada
+`/release.json` kedua frontend dan `/ready` API, lalu jalankan `deploy/scripts/smoke-check.sh`
+untuk tiga URL production. Lihat [production deployment plan](productionDeploymentPlan.md) untuk
+kapasitas, status kesiapan, dan urutan verifikasi.
 
 ## 5. GitHub Environment
 
@@ -362,5 +379,6 @@ Phase 15.9 dan 15.11 baru dapat ditandai `done` setelah evidence berikut tersimp
 6. database dan foto bertahan setelah restart dan rollback;
 7. GitHub environment deployment dan seluruh security/quality job hijau.
 
-Reusable workflow sudah production-capable, tetapi activation production tetap deferred: tidak ada
-trigger `main`, manual dispatch, production environment wiring, atau klaim deployment production.
+Caller `main` dan GitHub Environment `production` sudah disiapkan. Deployment production baru boleh
+diklaim berhasil setelah semua prerequisite pada rencana production terpenuhi dan workflow push
+`main` menunjukkan deploy serta smoke tiga domain hijau untuk SHA yang sama.
