@@ -13,6 +13,22 @@
 
 Dokumen ini adalah kontrak produk dan implementasi v1. Kata **MUST/wajib**, **MUST NOT/dilarang**, **SHOULD/sebaiknya**, dan **MAY/dapat** bersifat normatif. Bila source code, prototype, slide, atau asumsi implementasi berbeda dengan dokumen ini, tim wajib mengeskalasi perbedaan tersebut dan tidak boleh memilih perilaku secara diam-diam.
 
+### Amendment operasional Line–Shift — 22 September 2026
+
+Amendment ini menggantikan seluruh aturan lama tentang Shift Run operasional, shift preflight,
+Start/End/Emergency Start, MP reservation, exclusivity MP, donor vacancy, dan Assignment Issue yang
+berasal dari perpindahan MP. Shift adalah konfigurasi berulang per line. Supplier Admin mengatur
+Supervisor, Line Leader, dan MP default secara terpisah untuk setiap pasangan Line–Shift.
+
+Henkaten memakai occurrence berdasarkan waktu: saat berada dalam jadwal, Line–Shift dipilih otomatis;
+di luar jadwal LL memilih shift dan efek dimulai pada start berikutnya. Man replacement langsung
+mengubah assignment occurrence tersebut, hanya diblokir bila MP tidak aktif atau Tanoko job kurang
+dari level 3. MP yang sama boleh berada di banyak assignment pada waktu yang sama. Reject/Withdraw
+mengembalikan assignment efektif sebelumnya/default, dan occurrence shift berikutnya selalu kembali
+ke default. API Supplier hanya menerima konteks `lineShiftId`; `shiftRunId` tidak dapat dipakai untuk
+membuat Henkaten baru. Detail keputusan ada pada ADR 0033; klausul lama yang bertentangan tidak
+berlaku.
+
 ---
 
 ## 1. Ringkasan Eksekutif
@@ -26,7 +42,7 @@ TMMIN menyediakan dua pilihan kepada setiap supplier:
 
 Satu supplier hanya boleh memiliki satu source mode aktif. Data antar-supplier wajib terisolasi. TMMIN dapat memonitor seluruh supplier, tetapi tidak menjalankan approval supplier.
 
-Scope produk dibatasi pada **Henkaten management**. Fitur health monitoring, attendance, skill matrix, skill recommendation, schedule, moral, task planning, process difficulty, machine telemetry, dan modul operasional non-Henkaten lainnya tidak termasuk v1.
+Scope produk dibatasi pada **Henkaten management**. Fitur health monitoring, attendance, skill recommendation, schedule, moral, task planning, process difficulty, machine telemetry, dan modul operasional non-Henkaten lainnya tidak termasuk v1.
 
 ---
 
@@ -77,7 +93,7 @@ Menyediakan satu sistem Henkaten yang aman, traceable, dan konsisten bagi seluru
 
 - Mendigitalkan input dan approval Henkaten 4M.
 - Memvisualisasikan current assignment dan change point pada Assignment Board.
-- Menjamin satu MP tidak memiliki assignment/reservation yang bertentangan.
+- Mendukung assignment MP fleksibel; kelayakan replacement Man ditentukan oleh Tanoko job.
 - Memberikan warning kepada TMMIN Quality selama Henkaten masih Open.
 - Menyimpan decision history dan audit trail permanen.
 - Memberikan isolasi data yang kuat untuk 20-42 supplier.
@@ -90,7 +106,7 @@ Menyediakan satu sistem Henkaten yang aman, traceable, dan konsisten bagi seluru
 Produk ini bukan:
 
 - HRIS, attendance system, atau employee scheduling system;
-- skill management atau automatic replacement recommendation engine;
+- automatic replacement recommendation engine atau skill management di luar Tanoko job mapping;
 - production planning atau machine monitoring system;
 - quality inspection execution system di luar checklist Henkaten;
 - platform komunikasi email/chat;
@@ -115,14 +131,12 @@ Produk ini bukan:
 | TMMIN Quality | User monitoring lintas supplier; read-only terhadap domain Henkaten. |
 | Line | Unit line produksi milik supplier. |
 | Job | Posisi/proses kerja di dalam satu line. |
-| Default Assignment | Penempatan rutin Supervisor, LL, dan MP yang menjadi baseline shift. |
-| Working Assignment | Penempatan aktual untuk satu Shift Run. |
-| Assignment Issue | Masalah assignment, misalnya vacancy akibat MP ditarik line lain. |
+| Line–Shift Assignment | Supervisor, LL, dan MP default untuk satu pasangan line dan shift. |
+| Effective Assignment | Penempatan aktual pada occurrence shift setelah override Man diterapkan. |
 | Shift Template | Definisi nama, urutan, waktu mulai/selesai, dan timezone shift. |
-| Shift Run | Eksekusi satu Shift Template untuk line dan business date tertentu. |
+| Shift Occurrence | Interval waktu berulang yang dihitung dari Line–Shift dan timezone. |
 | Open | Henkaten menunggu keputusan final dan memunculkan warning TMMIN. |
 | Closed | Kondisi turunan untuk outcome Approved, Rejected, atau Cancelled. |
-| Reservation | Lock sementara atas MP pengganti selama Man Henkaten Open. |
 | Hosted | Source mode dengan seluruh workflow supplier dijalankan di platform TMMIN. |
 | External | Source mode dengan aplikasi supplier sebagai source of truth dan TMMIN hanya menerima data monitoring. |
 | Hosted Preparation | Akses konfigurasi terkontrol saat tenant masih `EXTERNAL`; bukan source mode ketiga dan tidak mengizinkan workflow operasional Hosted. |
@@ -164,7 +178,7 @@ Aturan:
 
 Cutover mode wajib:
 
-1. memblokir perubahan mode bila ada active shift atau Henkaten Open;
+1. memblokir perubahan mode bila ada Henkaten Open;
 2. mencatat alasan, actor, waktu, source mode lama, dan source mode baru;
 3. mencabut session/credential source lama;
 4. menaikkan `sourceEpoch`;
@@ -503,7 +517,7 @@ Shift yang melewati tengah malam wajib didukung. Business date mengikuti tanggal
 - Minimum satu active checklist item per kategori diperlukan sebelum kategori dapat dipakai.
 - Henkaten menyimpan snapshot label, urutan, version, dan jawaban.
 - Semua jawaban wajib `YES` saat submit; `NO` atau unanswered menolak submission.
-- Admin-defined checklist boleh berisi pertanyaan terkait tindakan operasional, tetapi tidak mengaktifkan skill-management feature.
+- Admin-defined checklist boleh berisi pertanyaan terkait tindakan operasional, dan terpisah dari penilaian Tanoko pada section 16.7.
 
 ### 10.7 CRUD dan Deactivation
 
@@ -723,6 +737,7 @@ Validasi:
 
 - replaced dan replacement tidak boleh orang yang sama;
 - replacement aktif dan role MP;
+- replacement memiliki Tanoko level 3 atau 4 pada exact job tujuan; validasi dilakukan saat submit dan atomic movement, termasuk bila level berubah selama approval;
 - replacement berada pada supplier yang sama;
 - replacement tidak memiliki active reservation lain;
 - target job belum menjadi target Man Henkaten Open lain;
@@ -936,8 +951,10 @@ Process difficulty, skill level, health, attendance, dan schedule tidak boleh mu
   reservation, conflict, dan perubahan 4M tidak boleh mengubah koordinat card.
 - Card memakai format vertikal dan menampilkan foto portrait MP sebagai elemen visual dominan,
   dengan initials fallback, nama job, nama MP, registration number, state text/icon/border, dan dot
-  4M. Legend hanya berisi dot Man, Machine, Material, dan Method; status assignment tidak memiliki
-  legend terpisah.
+  4M. Dot 4M berukuran lebih besar dan berada pada baris di antara state dan bagian atas foto,
+  tanpa menutupi foto. Jika jumlah indikator melebihi lebar card, sisa jumlah ditampilkan sebagai
+  `+N`; detail tiap Henkaten tetap tersedia pada Assignment Board default. Legend hanya berisi dot
+  Man, Machine, Material, dan Method; status assignment tidak memiliki legend terpisah.
 - Editor desktop dan tablet landscape menyediakan palette, Layers/Properties DOM, pan/zoom,
   fit/fullscreen, grid/snapping, 50-step undo/redo, numeric transforms, keyboard movement,
   lock/reorder, reset, dan explicit save. Pan wajib dapat dipilih melalui Hand mode dan diaktifkan
@@ -962,6 +979,42 @@ Process difficulty, skill level, health, attendance, dan schedule tidak boleh mu
 - Save memakai optimistic layout version dan menghasilkan audit redacted plus outbox invalidation
   tanpa PII. Konflik mempertahankan local draft sampai pengguna memilih mempertahankan draft atau
   memuat versi authoritative terbaru.
+
+---
+
+### 16.7 Tanoko (implemented, September 2026)
+
+Tanoko merupakan perluasan scope Hosted, terpisah dari Assignment Board. Skill adalah job pada
+line tertentu; nama job yang sama pada line lain tidak berarti kualifikasi yang sama.
+
+- Menu Tanoko menggunakan navbar supplier yang ada. Tab Matriks/Riwayat ditempatkan di kiri.
+- Seluruh MP terdaftar menjadi kolom; seluruh job dari seluruh line supplier menjadi baris.
+  MP/job nonaktif tetap terlihat tetapi tidak dapat diedit; tidak ada akses lintas supplier.
+- Supplier Admin dan seluruh Supervisor/GL dapat memperbarui mapping lintas-line kapan saja,
+  tanpa bergantung pada shift atau penugasan GL. LL dan QC hanya membaca.
+- Kategori job High/Medium/Low diatur pada Setup Line & Job dan bersifat visual. Job lama tidak
+  diberi kategori asumsi; ditampilkan sebagai Belum diatur sampai Admin mengaturnya.
+- Nilai mapping: belum dinilai (null), 1 Training, 2 Dengan pengawasan, 3 Mandiri,
+  4 Dapat melatih. Tidak ada kategori MP, license, expiry, periode tahunan, atau kriteria tambahan.
+- Pengganti Man wajib memiliki level >=3 pada job tujuan. Kelayakan skill tidak menghapus
+  validasi MP aktif, reservasi, versi assignment, dan tenant. Penurunan level tetap dapat
+  disimpan kapan saja; final approval tidak memindahkan MP yang sudah tidak memenuhi syarat.
+- Matriks compact dengan header nama MP sticky, kolom Line/Job/Kategori sticky, sudut sticky,
+  dan footer jumlah job dikuasai. Nama horizontal memakai ellipsis dan tooltip hover/fokus;
+  nomor registrasi tidak ditampilkan. Scroll dimiliki matriks, bukan lebar dokumen.
+- Render kolom dibatasi 24 MP per halaman kolom untuk menjaga DOM; seluruh MP tetap dapat
+  dicari dan diakses. Rekap per job menghitung seluruh MP aktif, bukan hanya halaman kolom.
+  Rekap per MP menghitung job aktif pada hasil filter saat ini.
+- Klik sel membuka inspector kanan. Penyimpanan eksplisit, catatan opsional maksimal 500
+  karakter, optimistic version conflict, serta perlindungan draft saat pindah sel/tab/link.
+- Riwayat immutable menyimpan nilai sebelum/sesudah, MP, job, line, nama/role actor, waktu,
+  dan catatan. Filter pencarian/line serta keyset pagination tersedia. Waktu mengikuti timezone
+  supplier. Update menyimpan mapping, history, dan audit dalam satu transaksi serializable.
+- Matriks membaca ulang setiap 30 detik dan saat window kembali fokus; draft editor tidak
+  ditimpa polling. Tidak ada klaim SSE Tanoko.
+- Production migration tidak mengarang nilai penguasaan. Data lama belum dinilai sampai GL/Admin
+  mengisi; Man replacement akan ditolak bila belum memenuhi syarat. Local demo seed saja
+  membuat penilaian sintetis melalui API.
 
 ---
 
@@ -1866,11 +1919,11 @@ Volume:
 
 ### 28.3 Production Domains
 
-Production domain names adalah external dependency dan tetap placeholder sampai diberikan TMMIN:
+Production domains:
 
-- `PRODUCTION_SUPPLIER_DOMAIN`
-- `PRODUCTION_TMMIN_DOMAIN`
-- `PRODUCTION_API_DOMAIN`
+- Supplier: `https://henkaten.qualitydivision.com`
+- TMMIN Admin/Quality: `https://admin-henkaten.qualitydivision.com`
+- API: `https://henkaten-api.qualitydivision.com`
 
 Production deployment tidak boleh diaktifkan sebelum ketiga DNS record, TLS reachability, dan runtime env tervalidasi.
 
@@ -2212,7 +2265,7 @@ Metrik adoption, cycle time approval, reject rate, dan aging dipantau melalui da
 - health monitoring;
 - attendance/leave management;
 - shift employee scheduling di luar Shift Run Henkaten;
-- skill matrix, skill level, license, dan replacement recommendation;
+- job license, kriteria fundamental/TJI/TPS, kategori permanent/temporary/fresh, dan automatic replacement recommendation;
 - moral monitoring;
 - task planning/result record;
 - process difficulty/hard-medium-easy;
@@ -2225,7 +2278,7 @@ Metrik adoption, cycle time approval, reject rate, dan aging dipantau melalui da
 - bulk CSV/Excel import/export;
 - document/photo attachment pada Henkaten selain member photo;
 - native mobile app;
-- AI/ML/vector search;
+- AI/ML di luar penilaian indikasi PCR Henkaten; vector search;
 - supplier external assignment board di TMMIN;
 - hosted approval bagi supplier External;
 - MFA;
@@ -2277,7 +2330,8 @@ Production launch membutuhkan:
 - representative supplier master data untuk UAT;
 - designated TMMIN Admin dan Quality users.
 
-Production domain, credential value, IP, dan secret tidak boleh ditulis di repository.
+Production credential value, IP, dan secret tidak boleh ditulis di repository. Domain production
+yang sudah ditetapkan dicatat pada workflow dan runbook agar routing dapat diverifikasi.
 
 ---
 
@@ -2331,3 +2385,37 @@ Ringkasan keputusan yang tidak boleh ditafsirkan ulang saat implementasi:
 - correction memakai Withdraw + Clone;
 - foto member opsional dengan initials fallback;
 - process difficulty dan seluruh fitur non-Henkaten tidak masuk scope.
+
+## Amendment — PCR indication for Henkaten (2026-09-23)
+
+Hosted Henkaten submission durably queues an independent PCR assessment. External ingestion queues
+the same assessment when cause, event detail, or before/after evidence changes; status-only updates
+retain the decision. Existing records are not backfilled. Assessment status (`Pending`, `PCR`,
+`No-PCR`, `Perlu tinjauan`) is independent of Henkaten Open/Closed and approval routes. PCR is an
+advisory priority for submitting a Process Change Request through the established channel; it
+neither submits nor approves a PCR and never changes Henkaten approval automatically.
+
+The local Ling inference uses OpenAI-compatible Chat Completions with one forced structured tool
+call and `max_tokens: 8192`. The English prompt covers the supplied 45-item control matrix and PCR
+guidance, explicitly handles Indonesian input as untrusted data, and distinguishes controlled
+method/material/tool/location/permanent-inspection/Safety/Regulations/Emissions changes from routine
+personnel, unchanged material lots, equivalent repair and temporary inspection. A configurable
+confidence threshold defaults to 0.75. Unavailable inference, invalid tool output, and low
+confidence result in `Perlu tinjauan`, never an automatic No-PCR. The full English assessment is
+targeted at 100–150 words and is exposed only for a current PCR decision. Confidence, raw AI
+output, prompt version and model remain server-side for audit.
+
+TMMIN Admin and Quality can correct PCR/No-PCR through a versioned mutation with a mandatory
+reason. Their decision is authoritative for display; the original AI result remains recorded.
+Supplier Line Leader, Supervisor, QC, and Admin see PCR indicators according to their existing
+Henkaten scope. TMMIN Admin/Quality see PCR and review tabs, correction controls, and dedicated
+notification tabs. All lists sort Open PCR ahead of other Open Henkaten, then Closed by occurrence
+time. The PCR tab includes both Open and Closed records. The Supplier submit screen waits for the
+assessment result and resumes after refresh. PCR detail shows the assessment and instruction to
+submit through the established route and contact TMMIN QD for technical difficulty or a suspected
+classification error. Notifications use the transactional outbox and access-scoped deep links.
+
+Local seed retains two suppliers and 240 Henkaten. It creates deterministic PCR, No-PCR, review,
+and manual-correction examples on Open and Closed records without bulk model inference. Production
+requires explicit PCR inference endpoint and credential configuration; absent or failed inference
+safely routes new assessments to TMMIN review.

@@ -50,9 +50,7 @@ export function RouteErrorPage() {
         <RefreshCw aria-hidden="true" />
         <span className="product-eyebrow">Aplikasi perlu dimuat ulang</span>
         <h1>Halaman mengalami masalah yang tidak terduga.</h1>
-        <p>
-          Input sensitif tidak disimpan. Muat ulang untuk mengambil state authoritative terbaru.
-        </p>
+        <p>Muat ulang halaman dan coba kembali.</p>
         <Button onClick={() => window.location.reload()}>Muat ulang</Button>
       </Card>
     </div>

@@ -10,6 +10,8 @@ Required environment:
   CADDY_EMAIL POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DATABASE
   SESSION_CSRF_SECRET AUTH_THROTTLE_SECRET
   TMMIN_BOOTSTRAP_USERNAME TMMIN_BOOTSTRAP_DISPLAY_NAME TMMIN_BOOTSTRAP_PASSWORD
+  PCR_OPENAI_BASE_URL PCR_OPENAI_API_KEY PCR_OPENAI_MODEL
+  PCR_CONFIDENCE_THRESHOLD PCR_INFERENCE_TIMEOUT_MS PCR_WORKER_ENABLED PCR_WORKER_POLL_MS
 
 The rendered dotenv content is written to stdout. Redirect it to a mode-0600 file
 or pipe it directly to SSH. The script never writes or logs secret values itself.
@@ -87,6 +89,29 @@ require_safe TMMIN_BOOTSTRAP_USERNAME 1
 require_safe TMMIN_BOOTSTRAP_PASSWORD 12
 require_value TMMIN_BOOTSTRAP_DISPLAY_NAME
 require_value CADDY_EMAIL
+for name in PCR_OPENAI_BASE_URL PCR_OPENAI_API_KEY PCR_OPENAI_MODEL PCR_CONFIDENCE_THRESHOLD PCR_INFERENCE_TIMEOUT_MS PCR_WORKER_ENABLED PCR_WORKER_POLL_MS; do
+  require_value "${name}"
+done
+[[ "${PCR_OPENAI_BASE_URL}" =~ ^https://[A-Za-z0-9.-]+(/[A-Za-z0-9._/-]*)?$ ]] || {
+  echo "PCR_OPENAI_BASE_URL must be a safe HTTPS URL." >&2
+  exit 1
+}
+[[ "${PCR_OPENAI_API_KEY}" =~ ^[A-Za-z0-9_+/=-]{16,}$ ]] || {
+  echo "PCR_OPENAI_API_KEY contains unsupported dotenv characters." >&2
+  exit 1
+}
+[[ "${PCR_OPENAI_MODEL}" =~ ^[A-Za-z0-9._/-]+$ ]] || {
+  echo "PCR_OPENAI_MODEL contains unsupported characters." >&2
+  exit 1
+}
+[[ "${PCR_CONFIDENCE_THRESHOLD}" =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]] || {
+  echo "PCR_CONFIDENCE_THRESHOLD must be between 0 and 1." >&2
+  exit 1
+}
+[[ "${PCR_INFERENCE_TIMEOUT_MS}" =~ ^[1-9][0-9]*$ && "${PCR_WORKER_POLL_MS}" =~ ^[1-9][0-9]*$ && "${PCR_WORKER_ENABLED}" =~ ^(true|false)$ ]] || {
+  echo "PCR worker settings are invalid." >&2
+  exit 1
+}
 
 [[ "${CADDY_EMAIL}" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || {
   echo "CADDY_EMAIL must be a valid email address." >&2
@@ -115,6 +140,13 @@ printf 'AUTH_THROTTLE_SECRET=%s\n' "${AUTH_THROTTLE_SECRET}"
 printf 'TMMIN_BOOTSTRAP_USERNAME=%s\n' "${TMMIN_BOOTSTRAP_USERNAME}"
 printf 'TMMIN_BOOTSTRAP_DISPLAY_NAME="%s"\n' "${TMMIN_BOOTSTRAP_DISPLAY_NAME}"
 printf 'TMMIN_BOOTSTRAP_PASSWORD=%s\n' "${TMMIN_BOOTSTRAP_PASSWORD}"
+printf 'PCR_OPENAI_BASE_URL=%s\n' "${PCR_OPENAI_BASE_URL}"
+printf 'PCR_OPENAI_API_KEY=%s\n' "${PCR_OPENAI_API_KEY}"
+printf 'PCR_OPENAI_MODEL=%s\n' "${PCR_OPENAI_MODEL}"
+printf 'PCR_CONFIDENCE_THRESHOLD=%s\n' "${PCR_CONFIDENCE_THRESHOLD}"
+printf 'PCR_INFERENCE_TIMEOUT_MS=%s\n' "${PCR_INFERENCE_TIMEOUT_MS}"
+printf 'PCR_WORKER_ENABLED=%s\n' "${PCR_WORKER_ENABLED}"
+printf 'PCR_WORKER_POLL_MS=%s\n' "${PCR_WORKER_POLL_MS}"
 printf '%s\n' \
   'LOG_LEVEL=info' \
   'DB_POOL_MAX=20' \

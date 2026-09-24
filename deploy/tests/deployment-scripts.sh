@@ -36,10 +36,39 @@ AUTH_THROTTLE_SECRET=22222222222222222222222222222222 \
 TMMIN_BOOTSTRAP_USERNAME=bootstrap_admin \
 TMMIN_BOOTSTRAP_DISPLAY_NAME="TMMIN Bootstrap Admin" \
 TMMIN_BOOTSTRAP_PASSWORD=33333333333333333333333333333333 \
+PCR_OPENAI_BASE_URL=https://inference.example.invalid/v1 \
+PCR_OPENAI_API_KEY=synthetic_gateway_key_for_test_only \
+PCR_OPENAI_MODEL=inclusionAI/Ling-3.0-tiny-fp8 \
+PCR_CONFIDENCE_THRESHOLD=0.75 \
+PCR_INFERENCE_TIMEOUT_MS=90000 \
+PCR_WORKER_ENABLED=true \
+PCR_WORKER_POLL_MS=1000 \
   "${SCRIPTS}/render-runtime-env.sh" staging aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 42 >"${rendered_env}"
 chmod 600 "${rendered_env}"
 "${SCRIPTS}/validate-runtime-env.sh" "${rendered_env}" >/dev/null
 grep -Fxq 'DEPLOY_RUN_NUMBER=42' "${rendered_env}" || fail "rendered run number is missing"
+grep -Fxq 'PCR_OPENAI_API_KEY=synthetic_gateway_key_for_test_only' "${rendered_env}" || fail "PCR gateway key was not rendered"
+
+production_env="${TEST_ROOT}/production.env"
+(
+  set -a
+  # shellcheck disable=SC1090
+  source "${EXAMPLE_ENV}"
+  set +a
+  export PCR_OPENAI_BASE_URL=https://inference.example.invalid/v1
+  export PCR_OPENAI_API_KEY=synthetic_gateway_key_for_test_only
+  export PRODUCTION_SUPPLIER_DOMAIN=henkaten.qualitydivision.com
+  export PRODUCTION_TMMIN_DOMAIN=admin-henkaten.qualitydivision.com
+  export PRODUCTION_API_DOMAIN=henkaten-api.qualitydivision.com
+  "${SCRIPTS}/render-runtime-env.sh" production bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 43 >"${production_env}"
+)
+chmod 600 "${production_env}"
+"${SCRIPTS}/validate-runtime-env.sh" "${production_env}" >/dev/null
+grep -Fxq 'COMPOSE_PROJECT_NAME=supplier-henkaten-production' "${production_env}" || fail "production Compose project drifted"
+grep -Fxq 'SHARED_DIR=/opt/supplier-henkaten/production/shared' "${production_env}" || fail "production shared path drifted"
+grep -Fxq 'SUPPLIER_DOMAIN=henkaten.qualitydivision.com' "${production_env}" || fail "production supplier domain drifted"
+grep -Fxq 'TMMIN_DOMAIN=admin-henkaten.qualitydivision.com' "${production_env}" || fail "production admin domain drifted"
+grep -Fxq 'API_DOMAIN=henkaten-api.qualitydivision.com' "${production_env}" || fail "production API domain drifted"
 
 invalid_env="${TEST_ROOT}/invalid.env"
 # shellcheck disable=SC2016
@@ -76,6 +105,28 @@ if (
   "${SCRIPTS}/check-migrations.sh" "${migration_base}" >/dev/null 2>&1
 ); then
   fail "destructive DROP migration was accepted"
+fi
+printf '%s\n' \
+  '-- migration-policy: allow-drop-index WorkingAssignment_one_active_effective_mp_key' \
+  'DROP INDEX IF EXISTS "WorkingAssignment_one_active_effective_mp_key";' \
+  >"${migration_repo}/apps/api/prisma/migrations/0002_additive/migration.sql"
+git -C "${migration_repo}" add .
+git -C "${migration_repo}" commit --quiet -m allowed-index-removal
+(
+  cd "${migration_repo}"
+  "${SCRIPTS}/check-migrations.sh" "${migration_base}" >/dev/null
+) || fail "explicit exact-name DROP INDEX exception was rejected"
+printf '%s\n' \
+  '-- migration-policy: allow-drop-index Wrong_index' \
+  'DROP INDEX IF EXISTS "WorkingAssignment_one_active_effective_mp_key";' \
+  >"${migration_repo}/apps/api/prisma/migrations/0002_additive/migration.sql"
+git -C "${migration_repo}" add .
+git -C "${migration_repo}" commit --quiet -m mismatched-index-removal
+if (
+  cd "${migration_repo}"
+  "${SCRIPTS}/check-migrations.sh" "${migration_base}" >/dev/null 2>&1
+); then
+  fail "mismatched DROP INDEX exception was accepted"
 fi
 
 fake_bin="${TEST_ROOT}/bin"

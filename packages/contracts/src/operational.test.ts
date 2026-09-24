@@ -35,7 +35,7 @@ describe('operational contracts', () => {
 
   it('discriminates Man references from non-Man freeform replacements', () => {
     const base = {
-      shiftRunId: id(),
+      lineShiftId: id(),
       jobId: id(),
       partId: id(),
       checklistVersionId: id(),
@@ -47,9 +47,7 @@ describe('operational contracts', () => {
       createHenkatenRequestSchema.parse({
         ...base,
         category: 'MAN',
-        targetWorkingAssignmentId: id(),
-        targetAssignmentVersion: 1,
-        replaced: { kind: 'VACANT' },
+        lineShiftJobAssignmentId: id(),
         replacementMpMemberId: id(),
       }).category,
     ).toBe('MAN');
@@ -62,13 +60,25 @@ describe('operational contracts', () => {
         replacementObject: 'New machine',
       }),
     ).toThrow();
+    expect(() =>
+      createHenkatenRequestSchema.parse({
+        ...base,
+        lineShiftId: undefined,
+        shiftRunId: id(),
+        category: 'MAN',
+        targetWorkingAssignmentId: id(),
+        targetAssignmentVersion: 1,
+        replaced: { kind: 'VACANT' },
+        replacementMpMemberId: id(),
+      }),
+    ).toThrow();
   });
 
   it('enforces the 2,000 character submission evidence limit', () => {
     expect(() =>
       createHenkatenRequestSchema.parse({
         category: 'METHOD',
-        shiftRunId: id(),
+        lineShiftId: id(),
         jobId: id(),
         partId: id(),
         checklistVersionId: id(),
@@ -81,22 +91,19 @@ describe('operational contracts', () => {
     ).toThrow();
   });
 
-  it('accepts planned Man issue resolution and rejects invalid decision evidence', () => {
+  it('accepts recurring Line–Shift Man replacement and rejects invalid decision evidence', () => {
     expect(
       createHenkatenRequestSchema.parse({
         category: 'MAN',
-        shiftRunId: id(),
+        lineShiftId: id(),
         jobId: id(),
         partId: id(),
         checklistVersionId: id(),
         checklistAnswers: [{ itemId: id(), answer: 'YES' }],
-        cause: 'Resolve planned vacancy',
-        detail: 'Move an available MP into the explicitly linked planned assignment.',
-        targetWorkingAssignmentId: id(),
-        targetAssignmentVersion: 2,
-        replaced: { kind: 'VACANT' },
+        cause: 'Replace assigned MP',
+        detail: 'Apply the replacement for this scheduled occurrence.',
+        lineShiftJobAssignmentId: id(),
         replacementMpMemberId: id(),
-        resolutionIssueId: id(),
       }).category,
     ).toBe('MAN');
     expect(

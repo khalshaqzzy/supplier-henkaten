@@ -1,5 +1,6 @@
 import {
   Bell,
+  Grid2X2,
   ClipboardCheck,
   Factory,
   Gauge,
@@ -9,7 +10,6 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
-  Settings2,
   ShieldCheck,
   UserRound,
   UsersRound,
@@ -82,10 +82,10 @@ const navigation: NavigationItem[] = [
     group: 'OPERASIONAL',
   },
   {
-    to: '/shifts',
-    label: 'Shift',
-    capability: 'SUPPLIER_SHIFT_READ',
-    icon: Settings2,
+    to: '/tanoko',
+    label: 'Tanoko',
+    capability: 'SUPPLIER_TANOKO_READ',
+    icon: Grid2X2,
     group: 'OPERASIONAL',
   },
   {
@@ -247,7 +247,7 @@ export function ProductLayout() {
         >
           <X />
         </IconButton>
-        <BrandLockup context={preparation ? 'Hosted Preparation' : 'Supplier Portal'} />
+        <BrandLockup context={preparation ? 'Persiapan Supplier' : 'Supplier Portal'} />
         <div className="product-workspace">
           <span>{supplier.code}</span>
           <strong>{supplier.name}</strong>
@@ -298,7 +298,6 @@ export function ProductLayout() {
             <Factory aria-hidden="true" />
             <span>
               <strong>{supplier.sourceMode}</strong>
-              <small>Source epoch {supplier.sourceEpoch}</small>
             </span>
           </div>
         </div>
@@ -349,7 +348,11 @@ export function ProductLayout() {
             </IconButton>
           </div>
         </header>
-        <main id="main-content" className="product-content" tabIndex={-1}>
+        <main
+          id="main-content"
+          className={`product-content${location.pathname === '/tanoko' ? ' product-content--tanoko' : ''}`}
+          tabIndex={-1}
+        >
           {push.loading && pushRequired ? (
             <Spinner label="Memeriksa status push perangkat" />
           ) : showPushGate ? (

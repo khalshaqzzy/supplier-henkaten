@@ -10,70 +10,79 @@ import type { RequestPrincipal } from '../common/request-context.js';
 import { TenantScope } from '../common/scope.js';
 import { AuditWriter } from '../persistence/audit-writer.js';
 import { PrismaService } from '../persistence/prisma.service.js';
+import { LineShiftService } from '../master-data/line-shift.service.js';
 
 @Injectable()
 export class ReadModelService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriter,
+    private readonly lineShifts: LineShiftService,
   ) {}
 
   async board(scope: TenantScope, principal: RequestPrincipal, requestedLineId?: string) {
-    const shifts = await this.prisma.shiftRun.findMany({
-      where: {
-        supplierId: scope.supplierId,
-        status: 'ACTIVE',
-        ...(requestedLineId ? { lineId: requestedLineId } : {}),
-        ...shiftScope(principal),
-      },
-      include: {
-        workingAssignments: {
-          where: { active: true, includedInPlan: true },
-          orderBy: [{ jobDisplayOrderSnapshot: 'asc' }, { id: 'asc' }],
-          include: {
-            effectiveMp: {
-              include: { photos: { where: { state: 'CURRENT' }, take: 1 } },
-            },
-          },
-        },
-        henkatens: {
-          where: { status: { in: ['OPEN', 'APPROVED'] } },
-          include: { approvalRoutes: true },
-          orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
-        },
-        assignmentIssues: {
-          where: { status: 'OPEN' },
-          select: { id: true },
-        },
-      },
-      orderBy: [{ lineCodeSnapshot: 'asc' }, { id: 'asc' }],
-    });
-    const updated = shifts.flatMap((shift) => [
-      shift.updatedAt,
-      ...shift.workingAssignments.map(({ updatedAt }) => updatedAt),
-      ...shift.workingAssignments.flatMap(
-        ({ effectiveMp }) => effectiveMp?.photos.map(({ createdAt }) => createdAt) ?? [],
+    const context = await this.lineShifts.operationalContext(scope, principal);
+    const occurrences = context.items.filter(
+      (item) => item.current && (!requestedLineId || item.lineId === requestedLineId),
+    );
+    const memberIds = [
+      ...new Set(
+        occurrences.flatMap((item) =>
+          item.assignments.flatMap((assignment) =>
+            assignment.mpMemberId ? [assignment.mpMemberId] : [],
+          ),
+        ),
       ),
-      ...shift.henkatens.map(({ updatedAt }) => updatedAt),
+    ];
+    const [photos, henkatens] = await Promise.all([
+      memberIds.length
+        ? this.prisma.member.findMany({
+            where: { supplierId: scope.supplierId, id: { in: memberIds } },
+            select: {
+              id: true,
+              photos: {
+                where: { state: 'CURRENT' },
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+                select: { version: true },
+              },
+            },
+          })
+        : [],
+      occurrences.length
+        ? this.prisma.henkaten.findMany({
+            where: {
+              supplierId: scope.supplierId,
+              status: { in: ['OPEN', 'APPROVED'] },
+              OR: occurrences.map((item) => ({
+                lineShiftId: item.id,
+                effectiveStartAt: new Date(item.effectiveStartAt),
+                effectiveEndAt: new Date(item.effectiveEndAt),
+              })),
+            },
+            include: { approvalRoutes: true },
+            orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
+          })
+        : [],
     ]);
-    const lastUpdatedAt = updated.length
-      ? new Date(Math.max(...updated.map((value) => value.getTime())))
-      : new Date();
+    const photoVersion = new Map(
+      photos.flatMap((member) =>
+        member.photos[0] ? [[member.id, member.photos[0].version] as const] : [],
+      ),
+    );
+    const generatedAt = new Date();
     const version = createHash('sha256')
       .update(
-        shifts
-          .flatMap((shift) => [
-            `${shift.id}:${shift.version}`,
-            ...shift.workingAssignments.map(
-              ({ id, version: itemVersion }) => `${id}:${itemVersion}`,
+        occurrences
+          .flatMap((item) => [
+            `${item.id}:${item.version}`,
+            ...item.assignments.map(
+              (assignment) =>
+                `${assignment.id}:${assignment.version}:${assignment.mpMemberId ?? 'vacant'}`,
             ),
-            ...shift.workingAssignments.flatMap(
-              ({ effectiveMp }) =>
-                effectiveMp?.photos.map(
-                  ({ id, version: photoVersion }) => `${id}:${photoVersion}`,
-                ) ?? [],
-            ),
-            ...shift.henkatens.map(({ id, version: itemVersion }) => `${id}:${itemVersion}`),
+            ...henkatens
+              .filter((henkaten) => henkaten.lineShiftId === item.id)
+              .map((henkaten) => `${henkaten.id}:${henkaten.version}`),
           ])
           .join('|'),
       )
@@ -81,48 +90,37 @@ export class ReadModelService {
       .slice(0, 22);
     return {
       version,
-      lastUpdatedAt: lastUpdatedAt.toISOString(),
-      lines: shifts.map((shift) => ({
-        shiftRunId: shift.id,
-        lineId: shift.lineId,
-        lineCode: shift.lineCodeSnapshot,
-        lineName: shift.lineNameSnapshot,
-        shiftName: shift.shiftNameSnapshot,
-        businessDate: shift.businessDate.toISOString().slice(0, 10),
-        supervisor: {
-          memberId: shift.supervisorMemberId,
-          name: shift.supervisorNameSnapshot,
-        },
-        lineLeader: {
-          memberId: shift.lineLeaderMemberId,
-          name: shift.lineLeaderNameSnapshot,
-        },
-        activeOverride:
-          shift.startedWithOverride && shift.overrideReason && shift.startedAt
-            ? {
-                reason: shift.overrideReason,
-                startedAt: shift.startedAt.toISOString(),
-                unresolvedIssueCount: shift.assignmentIssues.length,
-                failedChecks: overrideChecks(shift.overrideFailedChecks),
-              }
-            : null,
-        jobs: shift.workingAssignments.map((assignment) => ({
+      lastUpdatedAt: generatedAt.toISOString(),
+      lines: occurrences.map((item) => ({
+        shiftRunId: item.id,
+        lineId: item.lineId,
+        lineCode: item.lineCode,
+        lineName: item.lineName,
+        shiftName: item.shiftName,
+        businessDate: item.businessDate,
+        supervisor: { memberId: item.supervisorMemberId, name: item.supervisorName },
+        lineLeader: { memberId: item.lineLeaderMemberId, name: item.lineLeaderName },
+        activeOverride: null,
+        jobs: item.assignments.map((assignment) => ({
           assignmentId: assignment.id,
           jobId: assignment.jobId,
-          jobName: assignment.jobNameSnapshot,
-          displayOrder: assignment.jobDisplayOrderSnapshot,
-          state: assignment.state,
+          jobName: assignment.jobName,
+          displayOrder: assignment.jobDisplayOrder,
+          state: assignment.mpMemberId ? ('ASSIGNED' as const) : ('VACANT' as const),
           mp: {
-            memberId: assignment.effectiveMpMemberId,
-            name: assignment.mpNameSnapshot,
-            registrationNumber: assignment.mpRegistrationSnapshot,
-            photoThumbnailUrl: assignment.effectiveMp?.photos[0]
-              ? `/api/v1/supplier/master-data/members/${assignment.effectiveMp.id}/photo/thumbnail?v=${assignment.effectiveMp.photos[0].version}`
-              : null,
-            initials: initials(assignment.mpNameSnapshot),
+            memberId: assignment.mpMemberId,
+            name: assignment.mpName,
+            registrationNumber: assignment.mpRegistrationNumber,
+            photoThumbnailUrl:
+              assignment.mpMemberId && photoVersion.has(assignment.mpMemberId)
+                ? `/api/v1/supplier/master-data/members/${assignment.mpMemberId}/photo/thumbnail?v=${photoVersion.get(assignment.mpMemberId)}`
+                : null,
+            initials: initials(assignment.mpName),
           },
-          indicators: shift.henkatens
-            .filter(({ jobId }) => jobId === assignment.jobId)
+          indicators: henkatens
+            .filter(
+              (henkaten) => henkaten.lineShiftId === item.id && henkaten.jobId === assignment.jobId,
+            )
             .map((henkaten) => ({
               henkatenId: henkaten.id,
               identifier: henkaten.identifier,
@@ -1041,35 +1039,6 @@ function redact(value: Prisma.JsonValue | null): Record<string, unknown> | null 
       .filter(([key]) => !denied.test(key))
       .map(([key, entry]) => [key, typeof entry === 'string' ? entry.slice(0, 500) : entry]),
   );
-}
-
-function overrideChecks(value: Prisma.JsonValue | null): Array<{
-  code: string;
-  message: string;
-  resourceType?: string;
-  resourceId?: string;
-}> {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) => {
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
-    const code = 'code' in entry && typeof entry.code === 'string' ? entry.code : null;
-    const message = 'message' in entry && typeof entry.message === 'string' ? entry.message : null;
-    if (!code || !message) return [];
-    const resourceType =
-      'resourceType' in entry && typeof entry.resourceType === 'string'
-        ? entry.resourceType
-        : undefined;
-    const resourceId =
-      'resourceId' in entry && typeof entry.resourceId === 'string' ? entry.resourceId : undefined;
-    return [
-      {
-        code,
-        message,
-        ...(resourceType ? { resourceType } : {}),
-        ...(resourceId ? { resourceId } : {}),
-      },
-    ];
-  });
 }
 
 function approvalAgingBuckets(createdAt: Date[]) {

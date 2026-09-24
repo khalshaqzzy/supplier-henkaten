@@ -10,7 +10,7 @@ Scope: staging and production topology, routing, releases, rollback, and accepte
 
 TMMIN will host the platform and requires separate staging and production environments. The product
 contract fixes a single-VM Docker Compose architecture and automatic branch deployments. Production
-domains are not yet available, and v1 has no backup, disaster recovery, or high availability.
+domains are now assigned, and v1 has no backup, disaster recovery, or high availability.
 
 ## Decision
 
@@ -27,10 +27,9 @@ health/readiness checks, and three-domain smoke tests. Five releases are retaine
 current and immediately previous release. Code rollback is allowed only when the database schema
 remains backward compatible.
 
-Only a push to `staging` deploys after all required checks. Pull requests to `staging` run the same
-release gates without deployment. A production-capable reusable workflow exists, but no `main`,
-manual-dispatch, or production deployment trigger is active. No backup, PITR, replica, failover,
-RPO, RTO, or HA claim is made.
+Pushes to `staging` and `main` deploy to their respective environments after the same release
+gate. Pull requests to either branch run the gate without deployment. There is no manual dispatch
+or production approval gate. No backup, PITR, replica, failover, RPO, RTO, or HA claim is made.
 
 ## Rationale
 
@@ -67,9 +66,12 @@ The runtime consists of `postgres`, one-shot `migrate`, one-shot `bootstrap-admi
 `supplier-web`, `tmmin-web`, and `caddy`. Base images and third-party workflow actions are pinned by
 digest/SHA. The API copies the exact Node 22.23.1 binary into a Debian distroless runtime. The two
 static web images use pinned unprivileged Nginx. PostgreSQL 18.4 Alpine builds pgvector 0.8.5 from a
-checksum-verified source archive, and Caddy 2.11.4 is rebuilt with a patched Go toolchain and gRPC
-dependency plus `golang.org/x/text` 0.39.0 into a distroless runtime. The explicit `x/text` floor
-prevents transitive resolution from reintroducing CVE-2026-56852. All five runtime images execute
+checksum-verified source archive, and Caddy 2.11.4 is rebuilt with a patched Go toolchain into a
+distroless runtime. The Caddy builder floors `google.golang.org/grpc` at 1.83.2,
+`golang.org/x/crypto` at 0.55.0, and `golang.org/x/text` at 0.41.0, then asserts the resolved module
+versions after the final `go mod tidy`. The floors prevent transitive resolution from reintroducing
+the advisories rejected by the image scan, and the assertions turn a silently downgraded floor into
+a build failure instead of a late scan finding. All five runtime images execute
 as non-root, have bounded JSON logging and healthchecks where applicable, and retain shared data
 across code releases.
 
@@ -170,9 +172,41 @@ the distroless OpenSSL package. Debian publishes no fixed version and marks the 
 13 fix deferred. Because the issue requires an OpenSSL QUIC server and this API exposes only Node.js
 HTTP over TCP behind Caddy, the exact identifier has a registered exception expiring 2026-09-30.
 
+On 2026-09-16, the release gate rejected the Caddy runtime image with CVE-2026-56854
+(`golang.org/x/crypto` 0.53.0) and CVE-2026-84445 (`google.golang.org/grpc` 1.83.1). The builder had
+requested both fixed modules, but the request for `golang.org/x/text` 0.39.0 was issued afterwards
+and resolved the shared module graph back down, so the image shipped the vulnerable `x/crypto`
+version while the builder command still read as patched. Resolution now applies the three floors
+before a final `go mod tidy` and asserts the selected versions afterwards; the `x/text` floor moved
+to 0.41.0, which the `x/crypto` 0.55.0 requirement implies and which remains above the CVE-2026-56852
+fix. A deliberately reordered dependency set was used to confirm the assertion fails the build
+instead of producing a vulnerable image. Caddy 2.11.4 rebuilds were verified from both cold and warm
+module caches, the rebuilt binary validates the production Caddyfile, and the image reports zero
+High/Critical findings in the Debian and Go binary targets. Cold-cache rebuilds of all five runtime
+images were likewise clean, confirming that earlier local findings came from cached `apk upgrade`
+layers rather than the images themselves.
+
 ## Follow-up
 
 After the operator bootstraps Ubuntu 22.04 and configures GitHub Environment `staging`, capture
 first/upgrade deployment, close-candidate race, and forced-smoke rollback evidence from the real VM.
-Production activation remains deferred until Phase 16 authorization and real production domains,
-VM, environment secrets, and acceptance evidence exist.
+Production first release requires verified VM access, host identity, public HTTPS reachability,
+capacity/UAT/security acceptance evidence, and observed success of the main branch workflow.
+
+## Production caller activation — 2026-09-24
+
+The assigned production hostnames are `henkaten.qualitydivision.com` for Supplier,
+`admin-henkaten.qualitydivision.com` for TMMIN Admin/Quality, and
+`henkaten-api.qualitydivision.com` for the API. The `main` push caller uses the same release gate
+and reusable exact-SHA deployment as staging, with an isolated GitHub Environment and base path.
+The bootstrap script accepts either environment and applies identical Ubuntu, Docker, user,
+permission, and firewall setup to the corresponding base directory. The production Environment
+has no manual reviewer gate, matching the approved automatic release behavior.
+
+The existing single-process API and database pool remain the initial production capacity
+configuration. Four vCPUs and 16 GiB RAM do not by themselves prove throughput; API replicas,
+worker concurrency, PostgreSQL memory, and connection pool changes require representative load
+measurements and a schema/worker/routing review. This avoids multiplying database connections or
+PCR and outbox work without evidence. Production launch still depends on SSH host identity,
+public HTTPS reachability, capacity/UAT/security gates, and explicit acceptance of the unchanged
+data-loss and automatic-release risks. Validation is defined in the production deployment plan.

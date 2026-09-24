@@ -196,11 +196,15 @@ export interface paths {
                   | 'QC';
                 /** Format: uuid */
                 supplierId?: string;
+                /** Format: uuid */
+                memberId?: string;
                 /** @enum {string} */
                 purpose: 'NORMAL' | 'HOSTED_PREPARATION';
                 mustChangePassword: boolean;
               };
               capabilities: (
+                | 'SUPPLIER_TANOKO_READ'
+                | 'SUPPLIER_TANOKO_MANAGE'
                 | 'TMMIN_SUPPLIER_READ'
                 | 'TMMIN_SUPPLIER_MANAGE'
                 | 'TMMIN_QUALITY_MANAGE'
@@ -220,6 +224,7 @@ export interface paths {
                 | 'SUPPLIER_HENKATEN_DECIDE'
                 | 'SUPPLIER_APPROVAL_REROUTE'
                 | 'TMMIN_HENKATEN_READ'
+                | 'TMMIN_PCR_CORRECT'
                 | 'SUPPLIER_NOTIFICATION_READ'
                 | 'SUPPLIER_BOARD_READ'
                 | 'SUPPLIER_BOARD_LAYOUT_MANAGE'
@@ -348,11 +353,15 @@ export interface paths {
                   | 'QC';
                 /** Format: uuid */
                 supplierId?: string;
+                /** Format: uuid */
+                memberId?: string;
                 /** @enum {string} */
                 purpose: 'NORMAL' | 'HOSTED_PREPARATION';
                 mustChangePassword: boolean;
               };
               capabilities: (
+                | 'SUPPLIER_TANOKO_READ'
+                | 'SUPPLIER_TANOKO_MANAGE'
                 | 'TMMIN_SUPPLIER_READ'
                 | 'TMMIN_SUPPLIER_MANAGE'
                 | 'TMMIN_QUALITY_MANAGE'
@@ -372,6 +381,7 @@ export interface paths {
                 | 'SUPPLIER_HENKATEN_DECIDE'
                 | 'SUPPLIER_APPROVAL_REROUTE'
                 | 'TMMIN_HENKATEN_READ'
+                | 'TMMIN_PCR_CORRECT'
                 | 'SUPPLIER_NOTIFICATION_READ'
                 | 'SUPPLIER_BOARD_READ'
                 | 'SUPPLIER_BOARD_LAYOUT_MANAGE'
@@ -491,11 +501,15 @@ export interface paths {
                   | 'QC';
                 /** Format: uuid */
                 supplierId?: string;
+                /** Format: uuid */
+                memberId?: string;
                 /** @enum {string} */
                 purpose: 'NORMAL' | 'HOSTED_PREPARATION';
                 mustChangePassword: boolean;
               };
               capabilities: (
+                | 'SUPPLIER_TANOKO_READ'
+                | 'SUPPLIER_TANOKO_MANAGE'
                 | 'TMMIN_SUPPLIER_READ'
                 | 'TMMIN_SUPPLIER_MANAGE'
                 | 'TMMIN_QUALITY_MANAGE'
@@ -515,6 +529,7 @@ export interface paths {
                 | 'SUPPLIER_HENKATEN_DECIDE'
                 | 'SUPPLIER_APPROVAL_REROUTE'
                 | 'TMMIN_HENKATEN_READ'
+                | 'TMMIN_PCR_CORRECT'
                 | 'SUPPLIER_NOTIFICATION_READ'
                 | 'SUPPLIER_BOARD_READ'
                 | 'SUPPLIER_BOARD_LAYOUT_MANAGE'
@@ -636,11 +651,15 @@ export interface paths {
                   | 'QC';
                 /** Format: uuid */
                 supplierId?: string;
+                /** Format: uuid */
+                memberId?: string;
                 /** @enum {string} */
                 purpose: 'NORMAL' | 'HOSTED_PREPARATION';
                 mustChangePassword: boolean;
               };
               capabilities: (
+                | 'SUPPLIER_TANOKO_READ'
+                | 'SUPPLIER_TANOKO_MANAGE'
                 | 'TMMIN_SUPPLIER_READ'
                 | 'TMMIN_SUPPLIER_MANAGE'
                 | 'TMMIN_QUALITY_MANAGE'
@@ -660,6 +679,7 @@ export interface paths {
                 | 'SUPPLIER_HENKATEN_DECIDE'
                 | 'SUPPLIER_APPROVAL_REROUTE'
                 | 'TMMIN_HENKATEN_READ'
+                | 'TMMIN_PCR_CORRECT'
                 | 'SUPPLIER_NOTIFICATION_READ'
                 | 'SUPPLIER_BOARD_READ'
                 | 'SUPPLIER_BOARD_LAYOUT_MANAGE'
@@ -5667,6 +5687,631 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/supplier/master-data/lines/{lineId}/shifts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          lineId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Line shifts */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              items: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                lineId: string;
+                lineCode: string;
+                lineName: string;
+                /** Format: uuid */
+                shiftTemplateId: string;
+                shiftName: string;
+                startTime: string;
+                endTime: string;
+                timezone: string;
+                crossesMidnight: boolean;
+                supervisorMemberId: string | null;
+                supervisorName: string | null;
+                lineLeaderMemberId: string | null;
+                lineLeaderName: string | null;
+                active: boolean;
+                assignments: {
+                  /** Format: uuid */
+                  id: string;
+                  /** Format: uuid */
+                  jobId: string;
+                  jobName: string;
+                  jobDisplayOrder: number;
+                  mpMemberId: string | null;
+                  mpName: string | null;
+                  mpRegistrationNumber: string | null;
+                  version: number;
+                }[];
+                version: number;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          lineId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** Format: uuid */
+            shiftTemplateId: string;
+            /** Format: uuid */
+            copyFromLineShiftId?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Line shift */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              lineId: string;
+              lineCode: string;
+              lineName: string;
+              /** Format: uuid */
+              shiftTemplateId: string;
+              shiftName: string;
+              startTime: string;
+              endTime: string;
+              timezone: string;
+              crossesMidnight: boolean;
+              supervisorMemberId: string | null;
+              supervisorName: string | null;
+              lineLeaderMemberId: string | null;
+              lineLeaderName: string | null;
+              active: boolean;
+              assignments: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                jobId: string;
+                jobName: string;
+                jobDisplayOrder: number;
+                mpMemberId: string | null;
+                mpName: string | null;
+                mpRegistrationNumber: string | null;
+                version: number;
+              }[];
+              version: number;
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/line-shifts/operational-context': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Line shift context */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: date-time */
+              generatedAt: string;
+              currentLineShiftId: string | null;
+              currentLineShiftIds: string[];
+              items: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                lineId: string;
+                lineCode: string;
+                lineName: string;
+                /** Format: uuid */
+                shiftTemplateId: string;
+                shiftName: string;
+                startTime: string;
+                endTime: string;
+                timezone: string;
+                crossesMidnight: boolean;
+                supervisorMemberId: string | null;
+                supervisorName: string | null;
+                lineLeaderMemberId: string | null;
+                lineLeaderName: string | null;
+                active: boolean;
+                assignments: {
+                  /** Format: uuid */
+                  id: string;
+                  /** Format: uuid */
+                  jobId: string;
+                  jobName: string;
+                  jobDisplayOrder: number;
+                  mpMemberId: string | null;
+                  mpName: string | null;
+                  mpRegistrationNumber: string | null;
+                  version: number;
+                }[];
+                version: number;
+                /** Format: date */
+                businessDate: string;
+                /** Format: date-time */
+                effectiveStartAt: string;
+                /** Format: date-time */
+                effectiveEndAt: string;
+                current: boolean;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/line-shifts/{id}/assignments': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number;
+            supervisorMemberId: string | null;
+            lineLeaderMemberId: string | null;
+            jobs: {
+              /** Format: uuid */
+              jobId: string;
+              mpMemberId: string | null;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Line shift */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              lineId: string;
+              lineCode: string;
+              lineName: string;
+              /** Format: uuid */
+              shiftTemplateId: string;
+              shiftName: string;
+              startTime: string;
+              endTime: string;
+              timezone: string;
+              crossesMidnight: boolean;
+              supervisorMemberId: string | null;
+              supervisorName: string | null;
+              lineLeaderMemberId: string | null;
+              lineLeaderName: string | null;
+              active: boolean;
+              assignments: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                jobId: string;
+                jobName: string;
+                jobDisplayOrder: number;
+                mpMemberId: string | null;
+                mpName: string | null;
+                mpRegistrationNumber: string | null;
+                version: number;
+              }[];
+              version: number;
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/line-shifts/{id}/activate': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Action completed */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              lineId: string;
+              lineCode: string;
+              lineName: string;
+              /** Format: uuid */
+              shiftTemplateId: string;
+              shiftName: string;
+              startTime: string;
+              endTime: string;
+              timezone: string;
+              crossesMidnight: boolean;
+              supervisorMemberId: string | null;
+              supervisorName: string | null;
+              lineLeaderMemberId: string | null;
+              lineLeaderName: string | null;
+              active: boolean;
+              assignments: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                jobId: string;
+                jobName: string;
+                jobDisplayOrder: number;
+                mpMemberId: string | null;
+                mpName: string | null;
+                mpRegistrationNumber: string | null;
+                version: number;
+              }[];
+              version: number;
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/line-shifts/{id}/deactivate': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Action completed */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              lineId: string;
+              lineCode: string;
+              lineName: string;
+              /** Format: uuid */
+              shiftTemplateId: string;
+              shiftName: string;
+              startTime: string;
+              endTime: string;
+              timezone: string;
+              crossesMidnight: boolean;
+              supervisorMemberId: string | null;
+              supervisorName: string | null;
+              lineLeaderMemberId: string | null;
+              lineLeaderName: string | null;
+              active: boolean;
+              assignments: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                jobId: string;
+                jobName: string;
+                jobDisplayOrder: number;
+                mpMemberId: string | null;
+                mpName: string | null;
+                mpRegistrationNumber: string | null;
+                version: number;
+              }[];
+              version: number;
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/supplier/master-data/lines/{lineId}/jobs': {
     parameters: {
       query?: never;
@@ -5698,6 +6343,7 @@ export interface paths {
           content: {
             'application/json': {
               items: {
+                skillCategory?: ('HIGH' | 'MEDIUM' | 'LOW') | null;
                 /** Format: uuid */
                 id: string;
                 /** Format: uuid */
@@ -5734,6 +6380,8 @@ export interface paths {
         content: {
           'application/json': {
             name: string;
+            /** @enum {string} */
+            skillCategory?: 'HIGH' | 'MEDIUM' | 'LOW';
           };
         };
       };
@@ -5745,6 +6393,7 @@ export interface paths {
           };
           content: {
             'application/json': {
+              skillCategory?: ('HIGH' | 'MEDIUM' | 'LOW') | null;
               /** Format: uuid */
               id: string;
               /** Format: uuid */
@@ -5794,6 +6443,7 @@ export interface paths {
           };
           content: {
             'application/json': {
+              skillCategory?: ('HIGH' | 'MEDIUM' | 'LOW') | null;
               /** Format: uuid */
               id: string;
               /** Format: uuid */
@@ -5876,6 +6526,8 @@ export interface paths {
           'application/json': {
             expectedVersion: number;
             name: string;
+            /** @enum {string} */
+            skillCategory?: 'HIGH' | 'MEDIUM' | 'LOW';
           };
         };
       };
@@ -5887,6 +6539,7 @@ export interface paths {
           };
           content: {
             'application/json': {
+              skillCategory?: ('HIGH' | 'MEDIUM' | 'LOW') | null;
               /** Format: uuid */
               id: string;
               /** Format: uuid */
@@ -5985,6 +6638,7 @@ export interface paths {
           };
           content: {
             'application/json': {
+              skillCategory?: ('HIGH' | 'MEDIUM' | 'LOW') | null;
               /** Format: uuid */
               id: string;
               /** Format: uuid */
@@ -6087,6 +6741,7 @@ export interface paths {
           };
           content: {
             'application/json': {
+              skillCategory?: ('HIGH' | 'MEDIUM' | 'LOW') | null;
               /** Format: uuid */
               id: string;
               /** Format: uuid */
@@ -9123,6 +9778,7 @@ export interface paths {
           content: {
             'application/json': {
               items: {
+                skillCategory?: ('HIGH' | 'MEDIUM' | 'LOW') | null;
                 /** Format: uuid */
                 id: string;
                 /** Format: uuid */
@@ -9620,1747 +10276,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/supplier/shifts': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: {
-          cursor?: string;
-          limit?: number;
-          status?: 'NOT_STARTED' | 'ACTIVE' | 'ENDED';
-          lineId?: string;
-          businessDate?: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Shift Runs */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              items: {
-                /** Format: uuid */
-                id: string;
-                /** Format: uuid */
-                lineId: string;
-                /** Format: uuid */
-                shiftTemplateId: string;
-                /** @enum {string} */
-                status: 'NOT_STARTED' | 'ACTIVE' | 'ENDED';
-                /** Format: date */
-                businessDate: string;
-                /** Format: date-time */
-                scheduledStartAt: string;
-                /** Format: date-time */
-                scheduledEndAt: string;
-                timezone: string;
-                line: {
-                  code: string;
-                  name: string;
-                };
-                shift: {
-                  name: string;
-                  startMinute: number;
-                  endMinute: number;
-                };
-                defaultAssignmentSetVersion: number;
-                supervisor: {
-                  /** Format: uuid */
-                  memberId: string;
-                  name: string;
-                } | null;
-                lineLeader: {
-                  /** Format: uuid */
-                  memberId: string;
-                  name: string;
-                } | null;
-                eligible: boolean;
-                checks: {
-                  /** @enum {string} */
-                  code:
-                    | 'ACTIVE_SHIFT_EXISTS'
-                    | 'LINE_INACTIVE'
-                    | 'SHIFT_TEMPLATE_INACTIVE'
-                    | 'SUPERVISOR_MISSING'
-                    | 'LINE_LEADER_MISSING'
-                    | 'LINE_LEADER_CONFLICT'
-                    | 'REQUIRED_JOB_VACANT'
-                    | 'DUPLICATE_MP'
-                    | 'MP_INACTIVE'
-                    | 'MP_ACTIVE_ELSEWHERE'
-                    | 'MP_RESERVED'
-                    | 'ASSIGNMENT_ISSUE_OPEN'
-                    | 'OPEN_HENKATEN_CARRY_OVER'
-                    | 'CHECKLIST_INVALID'
-                    | 'STALE_PLANNED_ASSIGNMENT'
-                    | 'SOURCE_EPOCH_STALE';
-                  blocking: boolean;
-                  message: string;
-                  resourceType?: string;
-                  /** Format: uuid */
-                  resourceId?: string;
-                  version?: number;
-                  /** @enum {string} */
-                  category?: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
-                }[];
-                /** Format: date-time */
-                latestPreflightAt: string;
-                startedAt: string | null;
-                startedWithOverride: boolean;
-                overrideReason: string | null;
-                endedAt: string | null;
-                endSummary: {
-                  cancelledHenkatens: number;
-                  releasedReservations: number;
-                  routesNotRequired: number;
-                  closedWarnings: number;
-                  closedAssignmentIssues: number;
-                  deactivatedWorkingAssignments: number;
-                } | null;
-                version: number;
-              }[];
-              pageInfo: {
-                nextCursor: string | null;
-                hasNextPage: boolean;
-              };
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/supplier/shifts/current': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: {
-          lineId?: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Current Shift Run */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** Format: uuid */
-              id: string;
-              /** Format: uuid */
-              lineId: string;
-              /** Format: uuid */
-              shiftTemplateId: string;
-              /** @enum {string} */
-              status: 'NOT_STARTED' | 'ACTIVE' | 'ENDED';
-              /** Format: date */
-              businessDate: string;
-              /** Format: date-time */
-              scheduledStartAt: string;
-              /** Format: date-time */
-              scheduledEndAt: string;
-              timezone: string;
-              line: {
-                code: string;
-                name: string;
-              };
-              shift: {
-                name: string;
-                startMinute: number;
-                endMinute: number;
-              };
-              defaultAssignmentSetVersion: number;
-              supervisor: {
-                /** Format: uuid */
-                memberId: string;
-                name: string;
-              } | null;
-              lineLeader: {
-                /** Format: uuid */
-                memberId: string;
-                name: string;
-              } | null;
-              eligible: boolean;
-              checks: {
-                /** @enum {string} */
-                code:
-                  | 'ACTIVE_SHIFT_EXISTS'
-                  | 'LINE_INACTIVE'
-                  | 'SHIFT_TEMPLATE_INACTIVE'
-                  | 'SUPERVISOR_MISSING'
-                  | 'LINE_LEADER_MISSING'
-                  | 'LINE_LEADER_CONFLICT'
-                  | 'REQUIRED_JOB_VACANT'
-                  | 'DUPLICATE_MP'
-                  | 'MP_INACTIVE'
-                  | 'MP_ACTIVE_ELSEWHERE'
-                  | 'MP_RESERVED'
-                  | 'ASSIGNMENT_ISSUE_OPEN'
-                  | 'OPEN_HENKATEN_CARRY_OVER'
-                  | 'CHECKLIST_INVALID'
-                  | 'STALE_PLANNED_ASSIGNMENT'
-                  | 'SOURCE_EPOCH_STALE';
-                blocking: boolean;
-                message: string;
-                resourceType?: string;
-                /** Format: uuid */
-                resourceId?: string;
-                version?: number;
-                /** @enum {string} */
-                category?: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
-              }[];
-              /** Format: date-time */
-              latestPreflightAt: string;
-              startedAt: string | null;
-              startedWithOverride: boolean;
-              overrideReason: string | null;
-              endedAt: string | null;
-              endSummary: {
-                cancelledHenkatens: number;
-                releasedReservations: number;
-                routesNotRequired: number;
-                closedWarnings: number;
-                closedAssignmentIssues: number;
-                deactivatedWorkingAssignments: number;
-              } | null;
-              version: number;
-              workingAssignments: {
-                /** Format: uuid */
-                id: string;
-                /** Format: uuid */
-                shiftRunId: string;
-                /** Format: uuid */
-                lineId: string;
-                /** Format: uuid */
-                jobId: string;
-                jobName: string;
-                jobDisplayOrder: number;
-                effectiveMpMemberId: string | null;
-                candidateMpMemberId: string | null;
-                mpName: string | null;
-                mpRegistrationNumber: string | null;
-                /** @enum {string} */
-                state: 'ASSIGNED' | 'VACANT' | 'CONFLICTED' | 'RESERVED';
-                active: boolean;
-                version: number;
-              }[];
-            } | null;
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/supplier/shifts/preflight': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            /** Format: uuid */
-            lineId: string;
-            /** Format: uuid */
-            shiftTemplateId: string;
-            /** Format: date */
-            businessDate: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Durable Shift Run plan and preflight */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** Format: uuid */
-              id: string;
-              /** Format: uuid */
-              lineId: string;
-              /** Format: uuid */
-              shiftTemplateId: string;
-              /** @enum {string} */
-              status: 'NOT_STARTED' | 'ACTIVE' | 'ENDED';
-              /** Format: date */
-              businessDate: string;
-              /** Format: date-time */
-              scheduledStartAt: string;
-              /** Format: date-time */
-              scheduledEndAt: string;
-              timezone: string;
-              line: {
-                code: string;
-                name: string;
-              };
-              shift: {
-                name: string;
-                startMinute: number;
-                endMinute: number;
-              };
-              defaultAssignmentSetVersion: number;
-              supervisor: {
-                /** Format: uuid */
-                memberId: string;
-                name: string;
-              } | null;
-              lineLeader: {
-                /** Format: uuid */
-                memberId: string;
-                name: string;
-              } | null;
-              eligible: boolean;
-              checks: {
-                /** @enum {string} */
-                code:
-                  | 'ACTIVE_SHIFT_EXISTS'
-                  | 'LINE_INACTIVE'
-                  | 'SHIFT_TEMPLATE_INACTIVE'
-                  | 'SUPERVISOR_MISSING'
-                  | 'LINE_LEADER_MISSING'
-                  | 'LINE_LEADER_CONFLICT'
-                  | 'REQUIRED_JOB_VACANT'
-                  | 'DUPLICATE_MP'
-                  | 'MP_INACTIVE'
-                  | 'MP_ACTIVE_ELSEWHERE'
-                  | 'MP_RESERVED'
-                  | 'ASSIGNMENT_ISSUE_OPEN'
-                  | 'OPEN_HENKATEN_CARRY_OVER'
-                  | 'CHECKLIST_INVALID'
-                  | 'STALE_PLANNED_ASSIGNMENT'
-                  | 'SOURCE_EPOCH_STALE';
-                blocking: boolean;
-                message: string;
-                resourceType?: string;
-                /** Format: uuid */
-                resourceId?: string;
-                version?: number;
-                /** @enum {string} */
-                category?: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
-              }[];
-              /** Format: date-time */
-              latestPreflightAt: string;
-              startedAt: string | null;
-              startedWithOverride: boolean;
-              overrideReason: string | null;
-              endedAt: string | null;
-              endSummary: {
-                cancelledHenkatens: number;
-                releasedReservations: number;
-                routesNotRequired: number;
-                closedWarnings: number;
-                closedAssignmentIssues: number;
-                deactivatedWorkingAssignments: number;
-              } | null;
-              version: number;
-              workingAssignments: {
-                /** Format: uuid */
-                id: string;
-                /** Format: uuid */
-                shiftRunId: string;
-                /** Format: uuid */
-                lineId: string;
-                /** Format: uuid */
-                jobId: string;
-                jobName: string;
-                jobDisplayOrder: number;
-                effectiveMpMemberId: string | null;
-                candidateMpMemberId: string | null;
-                mpName: string | null;
-                mpRegistrationNumber: string | null;
-                /** @enum {string} */
-                state: 'ASSIGNED' | 'VACANT' | 'CONFLICTED' | 'RESERVED';
-                active: boolean;
-                version: number;
-              }[];
-            };
-          };
-        };
-        /** @description Problem Details */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/problem+json': {
-              /** Format: uri */
-              type: string;
-              title: string;
-              status: number;
-              detail: string;
-              /** @enum {string} */
-              code:
-                | 'VALIDATION_FAILED'
-                | 'AUTHENTICATION_FAILED'
-                | 'SESSION_EXPIRED'
-                | 'FORBIDDEN'
-                | 'RESOURCE_NOT_FOUND'
-                | 'VERSION_CONFLICT'
-                | 'STATE_CONFLICT'
-                | 'IDEMPOTENCY_CONFLICT'
-                | 'RESERVATION_CONFLICT'
-                | 'INVALID_TRANSITION'
-                | 'SOURCE_VERSION_OUT_OF_ORDER'
-                | 'SOURCE_MODE_MISMATCH'
-                | 'PAYLOAD_TOO_LARGE'
-                | 'RATE_LIMITED'
-                | 'NOT_READY'
-                | 'INTERNAL_ERROR'
-                | 'CAPACITY_EXCEEDED'
-                | 'RESOURCE_IN_USE'
-                | 'IMMUTABLE_FIELD'
-                | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED'
-                | 'PUSH_SUBSCRIPTION_REQUIRED';
-              correlationId: string;
-              fieldErrors?: {
-                path: string;
-                code: string;
-                message: string;
-              }[];
-            };
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/supplier/shifts/assignment-issues': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Assignment Issues */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              items: {
-                /** Format: uuid */
-                id: string;
-                shiftRunId: string | null;
-                /** Format: uuid */
-                lineId: string;
-                /** Format: uuid */
-                jobId: string;
-                /** @enum {string} */
-                type: 'VACANCY' | 'CONFLICT';
-                /** @enum {string} */
-                status: 'OPEN' | 'RESOLVED' | 'CLOSED_SHIFT_ENDED';
-                originKind: string;
-                originReferenceId: string | null;
-                originHenkatenId: string | null;
-                originMovementId: string | null;
-                resolutionKind: string | null;
-                resolutionReferenceId: string | null;
-                resolutionHenkatenId: string | null;
-                /** Format: date-time */
-                openedAt: string;
-                resolvedAt: string | null;
-                version: number;
-              }[];
-              pageInfo: {
-                nextCursor: string | null;
-                hasNextPage: boolean;
-              };
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/supplier/shifts/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Shift Run */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** Format: uuid */
-              id: string;
-              /** Format: uuid */
-              lineId: string;
-              /** Format: uuid */
-              shiftTemplateId: string;
-              /** @enum {string} */
-              status: 'NOT_STARTED' | 'ACTIVE' | 'ENDED';
-              /** Format: date */
-              businessDate: string;
-              /** Format: date-time */
-              scheduledStartAt: string;
-              /** Format: date-time */
-              scheduledEndAt: string;
-              timezone: string;
-              line: {
-                code: string;
-                name: string;
-              };
-              shift: {
-                name: string;
-                startMinute: number;
-                endMinute: number;
-              };
-              defaultAssignmentSetVersion: number;
-              supervisor: {
-                /** Format: uuid */
-                memberId: string;
-                name: string;
-              } | null;
-              lineLeader: {
-                /** Format: uuid */
-                memberId: string;
-                name: string;
-              } | null;
-              eligible: boolean;
-              checks: {
-                /** @enum {string} */
-                code:
-                  | 'ACTIVE_SHIFT_EXISTS'
-                  | 'LINE_INACTIVE'
-                  | 'SHIFT_TEMPLATE_INACTIVE'
-                  | 'SUPERVISOR_MISSING'
-                  | 'LINE_LEADER_MISSING'
-                  | 'LINE_LEADER_CONFLICT'
-                  | 'REQUIRED_JOB_VACANT'
-                  | 'DUPLICATE_MP'
-                  | 'MP_INACTIVE'
-                  | 'MP_ACTIVE_ELSEWHERE'
-                  | 'MP_RESERVED'
-                  | 'ASSIGNMENT_ISSUE_OPEN'
-                  | 'OPEN_HENKATEN_CARRY_OVER'
-                  | 'CHECKLIST_INVALID'
-                  | 'STALE_PLANNED_ASSIGNMENT'
-                  | 'SOURCE_EPOCH_STALE';
-                blocking: boolean;
-                message: string;
-                resourceType?: string;
-                /** Format: uuid */
-                resourceId?: string;
-                version?: number;
-                /** @enum {string} */
-                category?: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
-              }[];
-              /** Format: date-time */
-              latestPreflightAt: string;
-              startedAt: string | null;
-              startedWithOverride: boolean;
-              overrideReason: string | null;
-              endedAt: string | null;
-              endSummary: {
-                cancelledHenkatens: number;
-                releasedReservations: number;
-                routesNotRequired: number;
-                closedWarnings: number;
-                closedAssignmentIssues: number;
-                deactivatedWorkingAssignments: number;
-              } | null;
-              version: number;
-              workingAssignments: {
-                /** Format: uuid */
-                id: string;
-                /** Format: uuid */
-                shiftRunId: string;
-                /** Format: uuid */
-                lineId: string;
-                /** Format: uuid */
-                jobId: string;
-                jobName: string;
-                jobDisplayOrder: number;
-                effectiveMpMemberId: string | null;
-                candidateMpMemberId: string | null;
-                mpName: string | null;
-                mpRegistrationNumber: string | null;
-                /** @enum {string} */
-                state: 'ASSIGNED' | 'VACANT' | 'CONFLICTED' | 'RESERVED';
-                active: boolean;
-                version: number;
-              }[];
-            };
-          };
-        };
-        /** @description Problem Details */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/problem+json': {
-              /** Format: uri */
-              type: string;
-              title: string;
-              status: number;
-              detail: string;
-              /** @enum {string} */
-              code:
-                | 'VALIDATION_FAILED'
-                | 'AUTHENTICATION_FAILED'
-                | 'SESSION_EXPIRED'
-                | 'FORBIDDEN'
-                | 'RESOURCE_NOT_FOUND'
-                | 'VERSION_CONFLICT'
-                | 'STATE_CONFLICT'
-                | 'IDEMPOTENCY_CONFLICT'
-                | 'RESERVATION_CONFLICT'
-                | 'INVALID_TRANSITION'
-                | 'SOURCE_VERSION_OUT_OF_ORDER'
-                | 'SOURCE_MODE_MISMATCH'
-                | 'PAYLOAD_TOO_LARGE'
-                | 'RATE_LIMITED'
-                | 'NOT_READY'
-                | 'INTERNAL_ERROR'
-                | 'CAPACITY_EXCEEDED'
-                | 'RESOURCE_IN_USE'
-                | 'IMMUTABLE_FIELD'
-                | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED'
-                | 'PUSH_SUBSCRIPTION_REQUIRED';
-              correlationId: string;
-              fieldErrors?: {
-                path: string;
-                code: string;
-                message: string;
-              }[];
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/supplier/shifts/{id}/preflight': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Shift Run preflight */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** Format: uuid */
-              id: string;
-              /** Format: uuid */
-              lineId: string;
-              /** Format: uuid */
-              shiftTemplateId: string;
-              /** @enum {string} */
-              status: 'NOT_STARTED' | 'ACTIVE' | 'ENDED';
-              /** Format: date */
-              businessDate: string;
-              /** Format: date-time */
-              scheduledStartAt: string;
-              /** Format: date-time */
-              scheduledEndAt: string;
-              timezone: string;
-              line: {
-                code: string;
-                name: string;
-              };
-              shift: {
-                name: string;
-                startMinute: number;
-                endMinute: number;
-              };
-              defaultAssignmentSetVersion: number;
-              supervisor: {
-                /** Format: uuid */
-                memberId: string;
-                name: string;
-              } | null;
-              lineLeader: {
-                /** Format: uuid */
-                memberId: string;
-                name: string;
-              } | null;
-              eligible: boolean;
-              checks: {
-                /** @enum {string} */
-                code:
-                  | 'ACTIVE_SHIFT_EXISTS'
-                  | 'LINE_INACTIVE'
-                  | 'SHIFT_TEMPLATE_INACTIVE'
-                  | 'SUPERVISOR_MISSING'
-                  | 'LINE_LEADER_MISSING'
-                  | 'LINE_LEADER_CONFLICT'
-                  | 'REQUIRED_JOB_VACANT'
-                  | 'DUPLICATE_MP'
-                  | 'MP_INACTIVE'
-                  | 'MP_ACTIVE_ELSEWHERE'
-                  | 'MP_RESERVED'
-                  | 'ASSIGNMENT_ISSUE_OPEN'
-                  | 'OPEN_HENKATEN_CARRY_OVER'
-                  | 'CHECKLIST_INVALID'
-                  | 'STALE_PLANNED_ASSIGNMENT'
-                  | 'SOURCE_EPOCH_STALE';
-                blocking: boolean;
-                message: string;
-                resourceType?: string;
-                /** Format: uuid */
-                resourceId?: string;
-                version?: number;
-                /** @enum {string} */
-                category?: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
-              }[];
-              /** Format: date-time */
-              latestPreflightAt: string;
-              startedAt: string | null;
-              startedWithOverride: boolean;
-              overrideReason: string | null;
-              endedAt: string | null;
-              endSummary: {
-                cancelledHenkatens: number;
-                releasedReservations: number;
-                routesNotRequired: number;
-                closedWarnings: number;
-                closedAssignmentIssues: number;
-                deactivatedWorkingAssignments: number;
-              } | null;
-              version: number;
-              workingAssignments: {
-                /** Format: uuid */
-                id: string;
-                /** Format: uuid */
-                shiftRunId: string;
-                /** Format: uuid */
-                lineId: string;
-                /** Format: uuid */
-                jobId: string;
-                jobName: string;
-                jobDisplayOrder: number;
-                effectiveMpMemberId: string | null;
-                candidateMpMemberId: string | null;
-                mpName: string | null;
-                mpRegistrationNumber: string | null;
-                /** @enum {string} */
-                state: 'ASSIGNED' | 'VACANT' | 'CONFLICTED' | 'RESERVED';
-                active: boolean;
-                version: number;
-              }[];
-            };
-          };
-        };
-        /** @description Problem Details */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/problem+json': {
-              /** Format: uri */
-              type: string;
-              title: string;
-              status: number;
-              detail: string;
-              /** @enum {string} */
-              code:
-                | 'VALIDATION_FAILED'
-                | 'AUTHENTICATION_FAILED'
-                | 'SESSION_EXPIRED'
-                | 'FORBIDDEN'
-                | 'RESOURCE_NOT_FOUND'
-                | 'VERSION_CONFLICT'
-                | 'STATE_CONFLICT'
-                | 'IDEMPOTENCY_CONFLICT'
-                | 'RESERVATION_CONFLICT'
-                | 'INVALID_TRANSITION'
-                | 'SOURCE_VERSION_OUT_OF_ORDER'
-                | 'SOURCE_MODE_MISMATCH'
-                | 'PAYLOAD_TOO_LARGE'
-                | 'RATE_LIMITED'
-                | 'NOT_READY'
-                | 'INTERNAL_ERROR'
-                | 'CAPACITY_EXCEEDED'
-                | 'RESOURCE_IN_USE'
-                | 'IMMUTABLE_FIELD'
-                | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED'
-                | 'PUSH_SUBSCRIPTION_REQUIRED';
-              correlationId: string;
-              fieldErrors?: {
-                path: string;
-                code: string;
-                message: string;
-              }[];
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/supplier/shifts/{id}/working-assignments': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Working Assignments */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              items: {
-                /** Format: uuid */
-                id: string;
-                /** Format: uuid */
-                shiftRunId: string;
-                /** Format: uuid */
-                lineId: string;
-                /** Format: uuid */
-                jobId: string;
-                jobName: string;
-                jobDisplayOrder: number;
-                effectiveMpMemberId: string | null;
-                candidateMpMemberId: string | null;
-                mpName: string | null;
-                mpRegistrationNumber: string | null;
-                /** @enum {string} */
-                state: 'ASSIGNED' | 'VACANT' | 'CONFLICTED' | 'RESERVED';
-                active: boolean;
-                version: number;
-              }[];
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/supplier/shifts/{id}/assignment-issues': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Assignment Issues */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              items: {
-                /** Format: uuid */
-                id: string;
-                shiftRunId: string | null;
-                /** Format: uuid */
-                lineId: string;
-                /** Format: uuid */
-                jobId: string;
-                /** @enum {string} */
-                type: 'VACANCY' | 'CONFLICT';
-                /** @enum {string} */
-                status: 'OPEN' | 'RESOLVED' | 'CLOSED_SHIFT_ENDED';
-                originKind: string;
-                originReferenceId: string | null;
-                originHenkatenId: string | null;
-                originMovementId: string | null;
-                resolutionKind: string | null;
-                resolutionReferenceId: string | null;
-                resolutionHenkatenId: string | null;
-                /** Format: date-time */
-                openedAt: string;
-                resolvedAt: string | null;
-                version: number;
-              }[];
-              pageInfo: {
-                nextCursor: string | null;
-                hasNextPage: boolean;
-              };
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/supplier/shifts/{id}/resolution-context': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Pre-start resolution context */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              shift: {
-                /** Format: uuid */
-                id: string;
-                /** Format: uuid */
-                lineId: string;
-                /** Format: uuid */
-                shiftTemplateId: string;
-                /** @enum {string} */
-                status: 'NOT_STARTED' | 'ACTIVE' | 'ENDED';
-                /** Format: date */
-                businessDate: string;
-                /** Format: date-time */
-                scheduledStartAt: string;
-                /** Format: date-time */
-                scheduledEndAt: string;
-                timezone: string;
-                line: {
-                  code: string;
-                  name: string;
-                };
-                shift: {
-                  name: string;
-                  startMinute: number;
-                  endMinute: number;
-                };
-                defaultAssignmentSetVersion: number;
-                supervisor: {
-                  /** Format: uuid */
-                  memberId: string;
-                  name: string;
-                } | null;
-                lineLeader: {
-                  /** Format: uuid */
-                  memberId: string;
-                  name: string;
-                } | null;
-                eligible: boolean;
-                checks: {
-                  /** @enum {string} */
-                  code:
-                    | 'ACTIVE_SHIFT_EXISTS'
-                    | 'LINE_INACTIVE'
-                    | 'SHIFT_TEMPLATE_INACTIVE'
-                    | 'SUPERVISOR_MISSING'
-                    | 'LINE_LEADER_MISSING'
-                    | 'LINE_LEADER_CONFLICT'
-                    | 'REQUIRED_JOB_VACANT'
-                    | 'DUPLICATE_MP'
-                    | 'MP_INACTIVE'
-                    | 'MP_ACTIVE_ELSEWHERE'
-                    | 'MP_RESERVED'
-                    | 'ASSIGNMENT_ISSUE_OPEN'
-                    | 'OPEN_HENKATEN_CARRY_OVER'
-                    | 'CHECKLIST_INVALID'
-                    | 'STALE_PLANNED_ASSIGNMENT'
-                    | 'SOURCE_EPOCH_STALE';
-                  blocking: boolean;
-                  message: string;
-                  resourceType?: string;
-                  /** Format: uuid */
-                  resourceId?: string;
-                  version?: number;
-                  /** @enum {string} */
-                  category?: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
-                }[];
-                /** Format: date-time */
-                latestPreflightAt: string;
-                startedAt: string | null;
-                startedWithOverride: boolean;
-                overrideReason: string | null;
-                endedAt: string | null;
-                endSummary: {
-                  cancelledHenkatens: number;
-                  releasedReservations: number;
-                  routesNotRequired: number;
-                  closedWarnings: number;
-                  closedAssignmentIssues: number;
-                  deactivatedWorkingAssignments: number;
-                } | null;
-                version: number;
-                workingAssignments: {
-                  /** Format: uuid */
-                  id: string;
-                  /** Format: uuid */
-                  shiftRunId: string;
-                  /** Format: uuid */
-                  lineId: string;
-                  /** Format: uuid */
-                  jobId: string;
-                  jobName: string;
-                  jobDisplayOrder: number;
-                  effectiveMpMemberId: string | null;
-                  candidateMpMemberId: string | null;
-                  mpName: string | null;
-                  mpRegistrationNumber: string | null;
-                  /** @enum {string} */
-                  state: 'ASSIGNED' | 'VACANT' | 'CONFLICTED' | 'RESERVED';
-                  active: boolean;
-                  version: number;
-                }[];
-              };
-              issues: {
-                /** Format: uuid */
-                id: string;
-                shiftRunId: string | null;
-                /** Format: uuid */
-                lineId: string;
-                /** Format: uuid */
-                jobId: string;
-                /** @enum {string} */
-                type: 'VACANCY' | 'CONFLICT';
-                /** @enum {string} */
-                status: 'OPEN' | 'RESOLVED' | 'CLOSED_SHIFT_ENDED';
-                originKind: string;
-                originReferenceId: string | null;
-                originHenkatenId: string | null;
-                originMovementId: string | null;
-                resolutionKind: string | null;
-                resolutionReferenceId: string | null;
-                resolutionHenkatenId: string | null;
-                /** Format: date-time */
-                openedAt: string;
-                resolvedAt: string | null;
-                version: number;
-              }[];
-              /** @constant */
-              proposedManResolutionSupported: true;
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/supplier/shifts/{id}/start': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            expectedVersion: number;
-          };
-        };
-      };
-      responses: {
-        /** @description Started Shift Run */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** Format: uuid */
-              id: string;
-              /** Format: uuid */
-              lineId: string;
-              /** Format: uuid */
-              shiftTemplateId: string;
-              /** @enum {string} */
-              status: 'NOT_STARTED' | 'ACTIVE' | 'ENDED';
-              /** Format: date */
-              businessDate: string;
-              /** Format: date-time */
-              scheduledStartAt: string;
-              /** Format: date-time */
-              scheduledEndAt: string;
-              timezone: string;
-              line: {
-                code: string;
-                name: string;
-              };
-              shift: {
-                name: string;
-                startMinute: number;
-                endMinute: number;
-              };
-              defaultAssignmentSetVersion: number;
-              supervisor: {
-                /** Format: uuid */
-                memberId: string;
-                name: string;
-              } | null;
-              lineLeader: {
-                /** Format: uuid */
-                memberId: string;
-                name: string;
-              } | null;
-              eligible: boolean;
-              checks: {
-                /** @enum {string} */
-                code:
-                  | 'ACTIVE_SHIFT_EXISTS'
-                  | 'LINE_INACTIVE'
-                  | 'SHIFT_TEMPLATE_INACTIVE'
-                  | 'SUPERVISOR_MISSING'
-                  | 'LINE_LEADER_MISSING'
-                  | 'LINE_LEADER_CONFLICT'
-                  | 'REQUIRED_JOB_VACANT'
-                  | 'DUPLICATE_MP'
-                  | 'MP_INACTIVE'
-                  | 'MP_ACTIVE_ELSEWHERE'
-                  | 'MP_RESERVED'
-                  | 'ASSIGNMENT_ISSUE_OPEN'
-                  | 'OPEN_HENKATEN_CARRY_OVER'
-                  | 'CHECKLIST_INVALID'
-                  | 'STALE_PLANNED_ASSIGNMENT'
-                  | 'SOURCE_EPOCH_STALE';
-                blocking: boolean;
-                message: string;
-                resourceType?: string;
-                /** Format: uuid */
-                resourceId?: string;
-                version?: number;
-                /** @enum {string} */
-                category?: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
-              }[];
-              /** Format: date-time */
-              latestPreflightAt: string;
-              startedAt: string | null;
-              startedWithOverride: boolean;
-              overrideReason: string | null;
-              endedAt: string | null;
-              endSummary: {
-                cancelledHenkatens: number;
-                releasedReservations: number;
-                routesNotRequired: number;
-                closedWarnings: number;
-                closedAssignmentIssues: number;
-                deactivatedWorkingAssignments: number;
-              } | null;
-              version: number;
-              workingAssignments: {
-                /** Format: uuid */
-                id: string;
-                /** Format: uuid */
-                shiftRunId: string;
-                /** Format: uuid */
-                lineId: string;
-                /** Format: uuid */
-                jobId: string;
-                jobName: string;
-                jobDisplayOrder: number;
-                effectiveMpMemberId: string | null;
-                candidateMpMemberId: string | null;
-                mpName: string | null;
-                mpRegistrationNumber: string | null;
-                /** @enum {string} */
-                state: 'ASSIGNED' | 'VACANT' | 'CONFLICTED' | 'RESERVED';
-                active: boolean;
-                version: number;
-              }[];
-            };
-          };
-        };
-        /** @description Problem Details */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/problem+json': {
-              /** Format: uri */
-              type: string;
-              title: string;
-              status: number;
-              detail: string;
-              /** @enum {string} */
-              code:
-                | 'VALIDATION_FAILED'
-                | 'AUTHENTICATION_FAILED'
-                | 'SESSION_EXPIRED'
-                | 'FORBIDDEN'
-                | 'RESOURCE_NOT_FOUND'
-                | 'VERSION_CONFLICT'
-                | 'STATE_CONFLICT'
-                | 'IDEMPOTENCY_CONFLICT'
-                | 'RESERVATION_CONFLICT'
-                | 'INVALID_TRANSITION'
-                | 'SOURCE_VERSION_OUT_OF_ORDER'
-                | 'SOURCE_MODE_MISMATCH'
-                | 'PAYLOAD_TOO_LARGE'
-                | 'RATE_LIMITED'
-                | 'NOT_READY'
-                | 'INTERNAL_ERROR'
-                | 'CAPACITY_EXCEEDED'
-                | 'RESOURCE_IN_USE'
-                | 'IMMUTABLE_FIELD'
-                | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED'
-                | 'PUSH_SUBSCRIPTION_REQUIRED';
-              correlationId: string;
-              fieldErrors?: {
-                path: string;
-                code: string;
-                message: string;
-              }[];
-            };
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/supplier/shifts/{id}/emergency-start': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            expectedVersion: number;
-            reason: string;
-            /** Format: uuid */
-            substituteLineLeaderMemberId?: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Emergency-started Shift Run */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** Format: uuid */
-              id: string;
-              /** Format: uuid */
-              lineId: string;
-              /** Format: uuid */
-              shiftTemplateId: string;
-              /** @enum {string} */
-              status: 'NOT_STARTED' | 'ACTIVE' | 'ENDED';
-              /** Format: date */
-              businessDate: string;
-              /** Format: date-time */
-              scheduledStartAt: string;
-              /** Format: date-time */
-              scheduledEndAt: string;
-              timezone: string;
-              line: {
-                code: string;
-                name: string;
-              };
-              shift: {
-                name: string;
-                startMinute: number;
-                endMinute: number;
-              };
-              defaultAssignmentSetVersion: number;
-              supervisor: {
-                /** Format: uuid */
-                memberId: string;
-                name: string;
-              } | null;
-              lineLeader: {
-                /** Format: uuid */
-                memberId: string;
-                name: string;
-              } | null;
-              eligible: boolean;
-              checks: {
-                /** @enum {string} */
-                code:
-                  | 'ACTIVE_SHIFT_EXISTS'
-                  | 'LINE_INACTIVE'
-                  | 'SHIFT_TEMPLATE_INACTIVE'
-                  | 'SUPERVISOR_MISSING'
-                  | 'LINE_LEADER_MISSING'
-                  | 'LINE_LEADER_CONFLICT'
-                  | 'REQUIRED_JOB_VACANT'
-                  | 'DUPLICATE_MP'
-                  | 'MP_INACTIVE'
-                  | 'MP_ACTIVE_ELSEWHERE'
-                  | 'MP_RESERVED'
-                  | 'ASSIGNMENT_ISSUE_OPEN'
-                  | 'OPEN_HENKATEN_CARRY_OVER'
-                  | 'CHECKLIST_INVALID'
-                  | 'STALE_PLANNED_ASSIGNMENT'
-                  | 'SOURCE_EPOCH_STALE';
-                blocking: boolean;
-                message: string;
-                resourceType?: string;
-                /** Format: uuid */
-                resourceId?: string;
-                version?: number;
-                /** @enum {string} */
-                category?: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
-              }[];
-              /** Format: date-time */
-              latestPreflightAt: string;
-              startedAt: string | null;
-              startedWithOverride: boolean;
-              overrideReason: string | null;
-              endedAt: string | null;
-              endSummary: {
-                cancelledHenkatens: number;
-                releasedReservations: number;
-                routesNotRequired: number;
-                closedWarnings: number;
-                closedAssignmentIssues: number;
-                deactivatedWorkingAssignments: number;
-              } | null;
-              version: number;
-              workingAssignments: {
-                /** Format: uuid */
-                id: string;
-                /** Format: uuid */
-                shiftRunId: string;
-                /** Format: uuid */
-                lineId: string;
-                /** Format: uuid */
-                jobId: string;
-                jobName: string;
-                jobDisplayOrder: number;
-                effectiveMpMemberId: string | null;
-                candidateMpMemberId: string | null;
-                mpName: string | null;
-                mpRegistrationNumber: string | null;
-                /** @enum {string} */
-                state: 'ASSIGNED' | 'VACANT' | 'CONFLICTED' | 'RESERVED';
-                active: boolean;
-                version: number;
-              }[];
-            };
-          };
-        };
-        /** @description Problem Details */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/problem+json': {
-              /** Format: uri */
-              type: string;
-              title: string;
-              status: number;
-              detail: string;
-              /** @enum {string} */
-              code:
-                | 'VALIDATION_FAILED'
-                | 'AUTHENTICATION_FAILED'
-                | 'SESSION_EXPIRED'
-                | 'FORBIDDEN'
-                | 'RESOURCE_NOT_FOUND'
-                | 'VERSION_CONFLICT'
-                | 'STATE_CONFLICT'
-                | 'IDEMPOTENCY_CONFLICT'
-                | 'RESERVATION_CONFLICT'
-                | 'INVALID_TRANSITION'
-                | 'SOURCE_VERSION_OUT_OF_ORDER'
-                | 'SOURCE_MODE_MISMATCH'
-                | 'PAYLOAD_TOO_LARGE'
-                | 'RATE_LIMITED'
-                | 'NOT_READY'
-                | 'INTERNAL_ERROR'
-                | 'CAPACITY_EXCEEDED'
-                | 'RESOURCE_IN_USE'
-                | 'IMMUTABLE_FIELD'
-                | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED'
-                | 'PUSH_SUBSCRIPTION_REQUIRED';
-              correlationId: string;
-              fieldErrors?: {
-                path: string;
-                code: string;
-                message: string;
-              }[];
-            };
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/supplier/shifts/{id}/end': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header: {
-          'Idempotency-Key': string;
-        };
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': {
-            expectedVersion: number;
-          };
-        };
-      };
-      responses: {
-        /** @description Ended Shift Run */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** Format: uuid */
-              id: string;
-              /** Format: uuid */
-              lineId: string;
-              /** Format: uuid */
-              shiftTemplateId: string;
-              /** @enum {string} */
-              status: 'NOT_STARTED' | 'ACTIVE' | 'ENDED';
-              /** Format: date */
-              businessDate: string;
-              /** Format: date-time */
-              scheduledStartAt: string;
-              /** Format: date-time */
-              scheduledEndAt: string;
-              timezone: string;
-              line: {
-                code: string;
-                name: string;
-              };
-              shift: {
-                name: string;
-                startMinute: number;
-                endMinute: number;
-              };
-              defaultAssignmentSetVersion: number;
-              supervisor: {
-                /** Format: uuid */
-                memberId: string;
-                name: string;
-              } | null;
-              lineLeader: {
-                /** Format: uuid */
-                memberId: string;
-                name: string;
-              } | null;
-              eligible: boolean;
-              checks: {
-                /** @enum {string} */
-                code:
-                  | 'ACTIVE_SHIFT_EXISTS'
-                  | 'LINE_INACTIVE'
-                  | 'SHIFT_TEMPLATE_INACTIVE'
-                  | 'SUPERVISOR_MISSING'
-                  | 'LINE_LEADER_MISSING'
-                  | 'LINE_LEADER_CONFLICT'
-                  | 'REQUIRED_JOB_VACANT'
-                  | 'DUPLICATE_MP'
-                  | 'MP_INACTIVE'
-                  | 'MP_ACTIVE_ELSEWHERE'
-                  | 'MP_RESERVED'
-                  | 'ASSIGNMENT_ISSUE_OPEN'
-                  | 'OPEN_HENKATEN_CARRY_OVER'
-                  | 'CHECKLIST_INVALID'
-                  | 'STALE_PLANNED_ASSIGNMENT'
-                  | 'SOURCE_EPOCH_STALE';
-                blocking: boolean;
-                message: string;
-                resourceType?: string;
-                /** Format: uuid */
-                resourceId?: string;
-                version?: number;
-                /** @enum {string} */
-                category?: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
-              }[];
-              /** Format: date-time */
-              latestPreflightAt: string;
-              startedAt: string | null;
-              startedWithOverride: boolean;
-              overrideReason: string | null;
-              endedAt: string | null;
-              endSummary: {
-                cancelledHenkatens: number;
-                releasedReservations: number;
-                routesNotRequired: number;
-                closedWarnings: number;
-                closedAssignmentIssues: number;
-                deactivatedWorkingAssignments: number;
-              } | null;
-              version: number;
-              workingAssignments: {
-                /** Format: uuid */
-                id: string;
-                /** Format: uuid */
-                shiftRunId: string;
-                /** Format: uuid */
-                lineId: string;
-                /** Format: uuid */
-                jobId: string;
-                jobName: string;
-                jobDisplayOrder: number;
-                effectiveMpMemberId: string | null;
-                candidateMpMemberId: string | null;
-                mpName: string | null;
-                mpRegistrationNumber: string | null;
-                /** @enum {string} */
-                state: 'ASSIGNED' | 'VACANT' | 'CONFLICTED' | 'RESERVED';
-                active: boolean;
-                version: number;
-              }[];
-            };
-          };
-        };
-        /** @description Problem Details */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/problem+json': {
-              /** Format: uri */
-              type: string;
-              title: string;
-              status: number;
-              detail: string;
-              /** @enum {string} */
-              code:
-                | 'VALIDATION_FAILED'
-                | 'AUTHENTICATION_FAILED'
-                | 'SESSION_EXPIRED'
-                | 'FORBIDDEN'
-                | 'RESOURCE_NOT_FOUND'
-                | 'VERSION_CONFLICT'
-                | 'STATE_CONFLICT'
-                | 'IDEMPOTENCY_CONFLICT'
-                | 'RESERVATION_CONFLICT'
-                | 'INVALID_TRANSITION'
-                | 'SOURCE_VERSION_OUT_OF_ORDER'
-                | 'SOURCE_MODE_MISMATCH'
-                | 'PAYLOAD_TOO_LARGE'
-                | 'RATE_LIMITED'
-                | 'NOT_READY'
-                | 'INTERNAL_ERROR'
-                | 'CAPACITY_EXCEEDED'
-                | 'RESOURCE_IN_USE'
-                | 'IMMUTABLE_FIELD'
-                | 'INVALID_IMAGE'
-                | 'CHECKLIST_NOT_PUBLISHED'
-                | 'PUSH_SUBSCRIPTION_REQUIRED';
-              correlationId: string;
-              fieldErrors?: {
-                path: string;
-                code: string;
-                message: string;
-              }[];
-            };
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/tmmin/suppliers/{supplierId}/shifts': {
     parameters: {
       query?: never;
@@ -11739,6 +10654,7 @@ export interface paths {
           to?: string;
           approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NOT_REQUIRED';
           approvalRoute?: 'SUPERVISOR' | 'QC';
+          pcrStatus?: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
         };
         header?: never;
         path?: never;
@@ -11759,6 +10675,7 @@ export interface paths {
                 identifier: string;
                 /** Format: uuid */
                 shiftRunId: string;
+                lineShiftId: string | null;
                 /** Format: uuid */
                 lineId: string;
                 /** Format: uuid */
@@ -11776,6 +10693,8 @@ export interface paths {
                 businessDate: string;
                 /** Format: date-time */
                 occurredAt: string;
+                effectiveStartAt: string | null;
+                effectiveEndAt: string | null;
                 line: {
                   code: string;
                   name: string;
@@ -11838,6 +10757,15 @@ export interface paths {
                   };
                 };
                 version: number;
+                pcr: {
+                  /** @enum {string} */
+                  status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                  decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                  assessment: string | null;
+                  version: number;
+                  /** Format: date-time */
+                  updatedAt: string;
+                } | null;
               }[];
               pageInfo: {
                 nextCursor: string | null;
@@ -11863,7 +10791,7 @@ export interface paths {
           'application/json':
             | {
                 /** Format: uuid */
-                shiftRunId: string;
+                lineShiftId: string;
                 /** Format: uuid */
                 jobId: string;
                 /** Format: uuid */
@@ -11883,30 +10811,13 @@ export interface paths {
                 /** @constant */
                 category: 'MAN';
                 /** Format: uuid */
-                targetWorkingAssignmentId: string;
-                targetAssignmentVersion: number;
-                replaced:
-                  | {
-                      /** @constant */
-                      kind: 'VACANT';
-                    }
-                  | {
-                      /** @constant */
-                      kind: 'MP';
-                      /** Format: uuid */
-                      memberId: string;
-                    };
+                lineShiftJobAssignmentId: string;
                 /** Format: uuid */
                 replacementMpMemberId: string;
-                /** Format: uuid */
-                sourceWorkingAssignmentId?: string;
-                sourceAssignmentVersion?: number;
-                /** Format: uuid */
-                resolutionIssueId?: string;
               }
             | {
                 /** Format: uuid */
-                shiftRunId: string;
+                lineShiftId: string;
                 /** Format: uuid */
                 jobId: string;
                 /** Format: uuid */
@@ -11930,7 +10841,7 @@ export interface paths {
               }
             | {
                 /** Format: uuid */
-                shiftRunId: string;
+                lineShiftId: string;
                 /** Format: uuid */
                 jobId: string;
                 /** Format: uuid */
@@ -11954,7 +10865,7 @@ export interface paths {
               }
             | {
                 /** Format: uuid */
-                shiftRunId: string;
+                lineShiftId: string;
                 /** Format: uuid */
                 jobId: string;
                 /** Format: uuid */
@@ -11991,6 +10902,7 @@ export interface paths {
               identifier: string;
               /** Format: uuid */
               shiftRunId: string;
+              lineShiftId: string | null;
               /** Format: uuid */
               lineId: string;
               /** Format: uuid */
@@ -12008,6 +10920,8 @@ export interface paths {
               businessDate: string;
               /** Format: date-time */
               occurredAt: string;
+              effectiveStartAt: string | null;
+              effectiveEndAt: string | null;
               line: {
                 code: string;
                 name: string;
@@ -12070,6 +10984,15 @@ export interface paths {
                 };
               };
               version: number;
+              pcr: {
+                /** @enum {string} */
+                status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                assessment: string | null;
+                version: number;
+                /** Format: date-time */
+                updatedAt: string;
+              } | null;
               timezone: string;
               shiftName: string;
               creatorName: string;
@@ -12098,6 +11021,7 @@ export interface paths {
               man: {
                 /** Format: uuid */
                 targetWorkingAssignmentId: string;
+                lineShiftJobAssignmentId: string | null;
                 sourceWorkingAssignmentId: string | null;
                 replacedMpMemberId: string | null;
                 replacedWasVacant: boolean;
@@ -12256,6 +11180,11 @@ export interface paths {
                 fullName: string;
                 registrationNumber: string;
                 reserved: boolean;
+                skillLevels?: {
+                  /** Format: uuid */
+                  jobId: string;
+                  level: number | null;
+                }[];
                 currentAssignment: {
                   /** Format: uuid */
                   id: string;
@@ -12313,6 +11242,7 @@ export interface paths {
               identifier: string;
               /** Format: uuid */
               shiftRunId: string;
+              lineShiftId: string | null;
               /** Format: uuid */
               lineId: string;
               /** Format: uuid */
@@ -12330,6 +11260,8 @@ export interface paths {
               businessDate: string;
               /** Format: date-time */
               occurredAt: string;
+              effectiveStartAt: string | null;
+              effectiveEndAt: string | null;
               line: {
                 code: string;
                 name: string;
@@ -12392,6 +11324,15 @@ export interface paths {
                 };
               };
               version: number;
+              pcr: {
+                /** @enum {string} */
+                status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                assessment: string | null;
+                version: number;
+                /** Format: date-time */
+                updatedAt: string;
+              } | null;
               timezone: string;
               shiftName: string;
               creatorName: string;
@@ -12420,6 +11361,7 @@ export interface paths {
               man: {
                 /** Format: uuid */
                 targetWorkingAssignmentId: string;
+                lineShiftJobAssignmentId: string | null;
                 sourceWorkingAssignmentId: string | null;
                 replacedMpMemberId: string | null;
                 replacedWasVacant: boolean;
@@ -12616,6 +11558,7 @@ export interface paths {
               identifier: string;
               /** Format: uuid */
               shiftRunId: string;
+              lineShiftId: string | null;
               /** Format: uuid */
               lineId: string;
               /** Format: uuid */
@@ -12633,6 +11576,8 @@ export interface paths {
               businessDate: string;
               /** Format: date-time */
               occurredAt: string;
+              effectiveStartAt: string | null;
+              effectiveEndAt: string | null;
               line: {
                 code: string;
                 name: string;
@@ -12695,6 +11640,15 @@ export interface paths {
                 };
               };
               version: number;
+              pcr: {
+                /** @enum {string} */
+                status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                assessment: string | null;
+                version: number;
+                /** Format: date-time */
+                updatedAt: string;
+              } | null;
               timezone: string;
               shiftName: string;
               creatorName: string;
@@ -12723,6 +11677,7 @@ export interface paths {
               man: {
                 /** Format: uuid */
                 targetWorkingAssignmentId: string;
+                lineShiftJobAssignmentId: string | null;
                 sourceWorkingAssignmentId: string | null;
                 replacedMpMemberId: string | null;
                 replacedWasVacant: boolean;
@@ -12869,6 +11824,7 @@ export interface paths {
               identifier: string;
               /** Format: uuid */
               shiftRunId: string;
+              lineShiftId: string | null;
               /** Format: uuid */
               lineId: string;
               /** Format: uuid */
@@ -12886,6 +11842,8 @@ export interface paths {
               businessDate: string;
               /** Format: date-time */
               occurredAt: string;
+              effectiveStartAt: string | null;
+              effectiveEndAt: string | null;
               line: {
                 code: string;
                 name: string;
@@ -12948,6 +11906,15 @@ export interface paths {
                 };
               };
               version: number;
+              pcr: {
+                /** @enum {string} */
+                status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                assessment: string | null;
+                version: number;
+                /** Format: date-time */
+                updatedAt: string;
+              } | null;
               timezone: string;
               shiftName: string;
               creatorName: string;
@@ -12976,6 +11943,7 @@ export interface paths {
               man: {
                 /** Format: uuid */
                 targetWorkingAssignmentId: string;
+                lineShiftJobAssignmentId: string | null;
                 sourceWorkingAssignmentId: string | null;
                 replacedMpMemberId: string | null;
                 replacedWasVacant: boolean;
@@ -13121,6 +12089,7 @@ export interface paths {
               identifier: string;
               /** Format: uuid */
               shiftRunId: string;
+              lineShiftId: string | null;
               /** Format: uuid */
               lineId: string;
               /** Format: uuid */
@@ -13138,6 +12107,8 @@ export interface paths {
               businessDate: string;
               /** Format: date-time */
               occurredAt: string;
+              effectiveStartAt: string | null;
+              effectiveEndAt: string | null;
               line: {
                 code: string;
                 name: string;
@@ -13200,6 +12171,15 @@ export interface paths {
                 };
               };
               version: number;
+              pcr: {
+                /** @enum {string} */
+                status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                assessment: string | null;
+                version: number;
+                /** Format: date-time */
+                updatedAt: string;
+              } | null;
               timezone: string;
               shiftName: string;
               creatorName: string;
@@ -13228,6 +12208,7 @@ export interface paths {
               man: {
                 /** Format: uuid */
                 targetWorkingAssignmentId: string;
+                lineShiftJobAssignmentId: string | null;
                 sourceWorkingAssignmentId: string | null;
                 replacedMpMemberId: string | null;
                 replacedWasVacant: boolean;
@@ -13362,6 +12343,7 @@ export interface paths {
               category: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
               /** Format: uuid */
               shiftRunId: string;
+              lineShiftId: string | null;
               /** Format: uuid */
               jobId: string;
               /** Format: uuid */
@@ -13481,6 +12463,7 @@ export interface paths {
           to?: string;
           approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NOT_REQUIRED';
           approvalRoute?: 'SUPERVISOR' | 'QC';
+          pcrStatus?: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
         };
         header?: never;
         path: {
@@ -13503,6 +12486,7 @@ export interface paths {
                 identifier: string;
                 /** Format: uuid */
                 shiftRunId: string;
+                lineShiftId: string | null;
                 /** Format: uuid */
                 lineId: string;
                 /** Format: uuid */
@@ -13520,6 +12504,8 @@ export interface paths {
                 businessDate: string;
                 /** Format: date-time */
                 occurredAt: string;
+                effectiveStartAt: string | null;
+                effectiveEndAt: string | null;
                 line: {
                   code: string;
                   name: string;
@@ -13582,6 +12568,15 @@ export interface paths {
                   };
                 };
                 version: number;
+                pcr: {
+                  /** @enum {string} */
+                  status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                  decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                  assessment: string | null;
+                  version: number;
+                  /** Format: date-time */
+                  updatedAt: string;
+                } | null;
               }[];
               pageInfo: {
                 nextCursor: string | null;
@@ -13785,6 +12780,7 @@ export interface paths {
               identifier: string;
               /** Format: uuid */
               shiftRunId: string;
+              lineShiftId: string | null;
               /** Format: uuid */
               lineId: string;
               /** Format: uuid */
@@ -13802,6 +12798,8 @@ export interface paths {
               businessDate: string;
               /** Format: date-time */
               occurredAt: string;
+              effectiveStartAt: string | null;
+              effectiveEndAt: string | null;
               line: {
                 code: string;
                 name: string;
@@ -13864,6 +12862,15 @@ export interface paths {
                 };
               };
               version: number;
+              pcr: {
+                /** @enum {string} */
+                status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                assessment: string | null;
+                version: number;
+                /** Format: date-time */
+                updatedAt: string;
+              } | null;
               timezone: string;
               shiftName: string;
               creatorName: string;
@@ -13892,6 +12899,7 @@ export interface paths {
               man: {
                 /** Format: uuid */
                 targetWorkingAssignmentId: string;
+                lineShiftJobAssignmentId: string | null;
                 sourceWorkingAssignmentId: string | null;
                 replacedMpMemberId: string | null;
                 replacedWasVacant: boolean;
@@ -14095,6 +13103,7 @@ export interface paths {
                 /** Format: date-time */
                 openedAt: string;
                 closedAt: string | null;
+                displayIdentifier: string;
               }[];
             };
           };
@@ -14167,6 +13176,7 @@ export interface paths {
           cursor?: string;
           limit?: number;
           unreadOnly?: 'true' | 'false';
+          pcrTab?: 'PCR' | 'REVIEW';
         };
         header?: never;
         path?: never;
@@ -14197,7 +13207,10 @@ export interface paths {
                   | 'SHIFT_OVERRIDE'
                   | 'EXTERNAL_WARNING'
                   | 'EXTERNAL_INGESTION_ERROR'
-                  | 'SECURITY';
+                  | 'SECURITY'
+                  | 'PCR_FLAGGED'
+                  | 'PCR_REVIEW_REQUIRED'
+                  | 'PCR_CORRECTED';
                 title: string;
                 body: string;
                 resourceType: string;
@@ -14315,7 +13328,10 @@ export interface paths {
                 | 'SHIFT_OVERRIDE'
                 | 'EXTERNAL_WARNING'
                 | 'EXTERNAL_INGESTION_ERROR'
-                | 'SECURITY';
+                | 'SECURITY'
+                | 'PCR_FLAGGED'
+                | 'PCR_REVIEW_REQUIRED'
+                | 'PCR_CORRECTED';
               title: string;
               body: string;
               resourceType: string;
@@ -14375,6 +13391,227 @@ export interface paths {
         };
       };
     };
+    trace?: never;
+  };
+  '/api/v1/supplier/tanoko': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Supplier Tanoko matrix */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              canEdit: boolean;
+              members: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                active: boolean;
+              }[];
+              jobs: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /** Format: uuid */
+                lineId: string;
+                lineName: string;
+                lineCode: string;
+                category: ('HIGH' | 'MEDIUM' | 'LOW') | null;
+                active: boolean;
+              }[];
+              mappings: {
+                /** Format: uuid */
+                memberId: string;
+                /** Format: uuid */
+                jobId: string;
+                level: number | null;
+                version: number;
+                /** Format: date-time */
+                updatedAt: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/tanoko/history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          cursor?: string;
+          search?: string;
+          lineId?: string;
+          limit?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Tanoko changes */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              items: {
+                /** Format: uuid */
+                id: string;
+                memberName: string;
+                jobName: string;
+                lineName: string;
+                previousLevel: number | null;
+                level: number | null;
+                actorName: string;
+                actorRole: string;
+                note: string;
+                /** Format: date-time */
+                createdAt: string;
+              }[];
+              nextCursor: string | null;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/tanoko/members/{memberId}/jobs/{jobId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          memberId: string;
+          jobId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number | null;
+            level: number | null;
+            /** @default  */
+            note?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Saved mapping */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: uuid */
+              memberId: string;
+              /** Format: uuid */
+              jobId: string;
+              level: number | null;
+              version: number;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   '/api/v1/supplier/assignment-board': {
@@ -15951,6 +15188,7 @@ export interface paths {
           category?: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
           line?: string;
           part?: string;
+          pcrStatus?: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
         };
         header?: never;
         path?: never;
@@ -15988,6 +15226,15 @@ export interface paths {
                     occurredAt: string;
                     /** Format: date-time */
                     updatedAt: string;
+                    pcr: {
+                      /** @enum {string} */
+                      status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                      decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                      assessment: string | null;
+                      version: number;
+                      /** Format: date-time */
+                      updatedAt: string;
+                    } | null;
                     /** @constant */
                     kind: 'HOSTED';
                     displayId: string;
@@ -16018,6 +15265,15 @@ export interface paths {
                     occurredAt: string;
                     /** Format: date-time */
                     updatedAt: string;
+                    pcr: {
+                      /** @enum {string} */
+                      status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                      decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                      assessment: string | null;
+                      version: number;
+                      /** Format: date-time */
+                      updatedAt: string;
+                    } | null;
                     /** @constant */
                     kind: 'EXTERNAL';
                     displayId: string;
@@ -16041,6 +15297,107 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/tmmin/henkatens/{kind}/{supplierId}/{recordId}/pcr-decision': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          kind: 'HOSTED' | 'EXTERNAL';
+          supplierId: string;
+          recordId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @enum {string} */
+            status: 'PCR' | 'NO_PCR';
+            reason: string;
+            expectedVersion: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Corrected PCR decision */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {string} */
+              status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+              decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+              assessment: string | null;
+              version: number;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/tmmin/notifications': {
     parameters: {
       query?: never;
@@ -16054,6 +15411,7 @@ export interface paths {
           cursor?: string;
           limit?: number;
           unreadOnly?: 'true' | 'false';
+          pcrTab?: 'PCR' | 'REVIEW';
         };
         header?: never;
         path?: never;
@@ -16084,7 +15442,10 @@ export interface paths {
                   | 'SHIFT_OVERRIDE'
                   | 'EXTERNAL_WARNING'
                   | 'EXTERNAL_INGESTION_ERROR'
-                  | 'SECURITY';
+                  | 'SECURITY'
+                  | 'PCR_FLAGGED'
+                  | 'PCR_REVIEW_REQUIRED'
+                  | 'PCR_CORRECTED';
                 title: string;
                 body: string;
                 resourceType: string;
@@ -16202,7 +15563,10 @@ export interface paths {
                 | 'SHIFT_OVERRIDE'
                 | 'EXTERNAL_WARNING'
                 | 'EXTERNAL_INGESTION_ERROR'
-                | 'SECURITY';
+                | 'SECURITY'
+                | 'PCR_FLAGGED'
+                | 'PCR_REVIEW_REQUIRED'
+                | 'PCR_CORRECTED';
               title: string;
               body: string;
               resourceType: string;
@@ -16772,6 +16136,15 @@ export interface paths {
                 occurredAt: string;
                 /** Format: date-time */
                 updatedAt: string;
+                pcr: {
+                  /** @enum {string} */
+                  status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                  decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                  assessment: string | null;
+                  version: number;
+                  /** Format: date-time */
+                  updatedAt: string;
+                } | null;
               }[];
               pageInfo: {
                 nextCursor: string | null;
@@ -16852,6 +16225,15 @@ export interface paths {
               occurredAt: string;
               /** Format: date-time */
               updatedAt: string;
+              pcr: {
+                /** @enum {string} */
+                status: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+                decisionSource: ('AI' | 'TMMIN' | 'SEED') | null;
+                assessment: string | null;
+                version: number;
+                /** Format: date-time */
+                updatedAt: string;
+              } | null;
               change: {
                 [key: string]: unknown;
               };

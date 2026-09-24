@@ -97,6 +97,7 @@ jobs:
       - name: Validate required environment secrets
         if: steps.freshness.outputs.deploy == 'true'
         env:
+          APP_ENV: ${{ inputs.app_env }}
           VM_HOST: ${{ secrets.VM_HOST }}
           VM_USER: ${{ secrets.VM_USER }}
           VM_SSH_PRIVATE_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
@@ -109,10 +110,17 @@ jobs:
           AUTH_THROTTLE_SECRET: ${{ secrets.AUTH_THROTTLE_SECRET }}
           TMMIN_BOOTSTRAP_USERNAME: ${{ secrets.TMMIN_BOOTSTRAP_USERNAME }}
           TMMIN_BOOTSTRAP_PASSWORD: ${{ secrets.TMMIN_BOOTSTRAP_PASSWORD }}
+          PCR_OPENAI_BASE_URL: ${{ secrets.PCR_OPENAI_BASE_URL }}
+          PCR_OPENAI_API_KEY: ${{ secrets.PCR_OPENAI_API_KEY }}
+          PCR_OPENAI_MODEL: ${{ secrets.PCR_OPENAI_MODEL }}
+          PCR_CONFIDENCE_THRESHOLD: ${{ secrets.PCR_CONFIDENCE_THRESHOLD }}
+          PCR_INFERENCE_TIMEOUT_MS: ${{ secrets.PCR_INFERENCE_TIMEOUT_MS }}
+          PCR_WORKER_ENABLED: ${{ secrets.PCR_WORKER_ENABLED }}
+          PCR_WORKER_POLL_MS: ${{ secrets.PCR_WORKER_POLL_MS }}
         run: |
-          for name in VM_HOST VM_USER VM_SSH_PRIVATE_KEY VM_SSH_KNOWN_HOSTS CADDY_EMAIL POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DATABASE SESSION_CSRF_SECRET AUTH_THROTTLE_SECRET TMMIN_BOOTSTRAP_USERNAME TMMIN_BOOTSTRAP_PASSWORD; do
+          for name in VM_HOST VM_USER VM_SSH_PRIVATE_KEY VM_SSH_KNOWN_HOSTS CADDY_EMAIL POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DATABASE SESSION_CSRF_SECRET AUTH_THROTTLE_SECRET TMMIN_BOOTSTRAP_USERNAME TMMIN_BOOTSTRAP_PASSWORD PCR_OPENAI_BASE_URL PCR_OPENAI_API_KEY PCR_OPENAI_MODEL PCR_CONFIDENCE_THRESHOLD PCR_INFERENCE_TIMEOUT_MS PCR_WORKER_ENABLED PCR_WORKER_POLL_MS; do
             [[ -n "${!name// }" ]] || {
-              echo "Missing required staging environment secret: $name" >&2
+              echo "Missing required $APP_ENV environment secret: $name" >&2
               exit 1
             }
           done
@@ -136,6 +144,13 @@ jobs:
           AUTH_THROTTLE_SECRET: ${{ secrets.AUTH_THROTTLE_SECRET }}
           TMMIN_BOOTSTRAP_USERNAME: ${{ secrets.TMMIN_BOOTSTRAP_USERNAME }}
           TMMIN_BOOTSTRAP_PASSWORD: ${{ secrets.TMMIN_BOOTSTRAP_PASSWORD }}
+          PCR_OPENAI_BASE_URL: ${{ secrets.PCR_OPENAI_BASE_URL }}
+          PCR_OPENAI_API_KEY: ${{ secrets.PCR_OPENAI_API_KEY }}
+          PCR_OPENAI_MODEL: ${{ secrets.PCR_OPENAI_MODEL }}
+          PCR_CONFIDENCE_THRESHOLD: ${{ secrets.PCR_CONFIDENCE_THRESHOLD }}
+          PCR_INFERENCE_TIMEOUT_MS: ${{ secrets.PCR_INFERENCE_TIMEOUT_MS }}
+          PCR_WORKER_ENABLED: ${{ secrets.PCR_WORKER_ENABLED }}
+          PCR_WORKER_POLL_MS: ${{ secrets.PCR_WORKER_POLL_MS }}
           TMMIN_BOOTSTRAP_DISPLAY_NAME: ${{ vars.TMMIN_BOOTSTRAP_DISPLAY_NAME || 'TMMIN Bootstrap Admin' }}
           PRODUCTION_SUPPLIER_DOMAIN: ${{ inputs.supplier_domain }}
           PRODUCTION_TMMIN_DOMAIN: ${{ inputs.tmmin_domain }}
@@ -222,4 +237,4 @@ jobs:
 
       - name: Record skipped stale deployment
         if: steps.freshness.outputs.deploy != 'true' || steps.pre_ssh_freshness.outputs.deploy != 'true'
-        run: echo "A newer staging SHA superseded this successful candidate." >> "$GITHUB_STEP_SUMMARY"
+        run: echo "A newer ${{ inputs.app_env }} SHA superseded this successful candidate." >> "$GITHUB_STEP_SUMMARY"

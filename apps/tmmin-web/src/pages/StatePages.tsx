@@ -18,7 +18,7 @@ export function ForbiddenPage() {
         <Ban aria-hidden="true" />
         <span className="tmmin-eyebrow">403 · Akses ditolak</span>
         <h1>Halaman ini tidak tersedia untuk role Anda.</h1>
-        <p>Monitoring Quality bersifat hanya baca dan kontrol administrasi tidak ditampilkan.</p>
+        <p>Role Anda tidak memiliki izin untuk halaman atau tindakan ini.</p>
         <Link className="hds-button hds-button--primary hds-button--md" to="/">
           Kembali ke overview
         </Link>

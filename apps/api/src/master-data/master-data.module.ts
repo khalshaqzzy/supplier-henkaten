@@ -1,3 +1,5 @@
+import { TanokoController } from './tanoko.controller.js';
+import { TanokoService } from './tanoko.service.js';
 import { Module } from '@nestjs/common';
 
 import { AuthModule } from '../auth/auth.module.js';
@@ -12,24 +14,34 @@ import {
 import { MasterDataAccessService } from './master-data-access.service.js';
 import { MemberService } from './member.service.js';
 import { PhotoService } from './photo.service.js';
+import { LineShiftService } from './line-shift.service.js';
 import { TmminMasterDataController } from './tmmin-master-data.controller.js';
 
 @Module({
   imports: [AuthModule],
   controllers: [
+    TanokoController,
     SupplierMemberController,
     SupplierCatalogController,
     SupplierConfigurationController,
     TmminMasterDataController,
   ],
   providers: [
+    TanokoService,
     MasterDataAccessService,
     MemberService,
     CatalogService,
     ChecklistService,
     AssignmentService,
     PhotoService,
+    LineShiftService,
   ],
-  exports: [MasterDataAccessService, ChecklistService, AssignmentService, PhotoService],
+  exports: [
+    MasterDataAccessService,
+    ChecklistService,
+    AssignmentService,
+    PhotoService,
+    LineShiftService,
+  ],
 })
 export class MasterDataModule {}

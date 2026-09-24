@@ -6,6 +6,10 @@ ARG RUNTIME_IMAGE=gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9
 FROM ${GO_IMAGE} AS build
 WORKDIR /build
 
+# The pinned module versions are asserted after the final `go mod tidy`, which both completes
+# go.sum for the upgraded graph and would revert any pin that a later dependency resolution
+# drags back down. Without the assertions a silently downgraded pin only surfaces in the image
+# vulnerability scan.
 RUN --mount=type=cache,id=supplier-henkaten-go-mod,target=/go/pkg/mod \
   --mount=type=cache,id=supplier-henkaten-go-build,target=/root/.cache/go-build \
   printf '%s\n' \
@@ -19,9 +23,13 @@ RUN --mount=type=cache,id=supplier-henkaten-go-mod,target=/go/pkg/mod \
     '}' > main.go \
   && go mod init supplier-henkaten/caddy \
   && go get github.com/caddyserver/caddy/v2@v2.11.4 \
-  && go get google.golang.org/grpc@v1.82.1 \
-  && go get golang.org/x/text@v0.39.0 \
+  && go get google.golang.org/grpc@v1.83.2 \
+  && go get golang.org/x/text@v0.41.0 \
+  && go get golang.org/x/crypto@v0.55.0 \
   && go mod tidy \
+  && test "$(go list -m -f '{{.Version}}' google.golang.org/grpc)" = v1.83.2 \
+  && test "$(go list -m -f '{{.Version}}' golang.org/x/crypto)" = v0.55.0 \
+  && test "$(go list -m -f '{{.Version}}' golang.org/x/text)" = v0.41.0 \
   && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/caddy .
 
 FROM ${RUNTIME_IMAGE} AS runtime

@@ -1,9 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, KeyRound, Plus, RefreshCw, UserRoundPlus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, KeyRound, Plus, RefreshCw, UserRoundPlus } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 
 import {
@@ -34,10 +34,16 @@ import { QueryState } from './StatePages';
 export function SuppliersPage() {
   const { session } = useTmminSession();
   const navigate = useNavigate();
+  const location = useLocation();
   const [params, setParams] = useSearchParams();
   const admin = session!.principal.role === 'TMMIN_ADMIN';
+  const cursor = params.get('cursor');
+  const cursorTrail =
+    (location.state as { supplierCursorTrail?: Array<string | null> } | null)
+      ?.supplierCursorTrail ?? [];
   const query = {
     limit: 25,
+    ...(cursor ? { cursor } : {}),
     status: (params.get('status') ?? 'ALL') as 'ALL' | 'ACTIVE' | 'INACTIVE',
     sort: (params.get('sort') ?? 'NAME_ASC') as 'NAME_ASC' | 'UPDATED_DESC',
     ...(params.get('search') ? { search: params.get('search')! } : {}),
@@ -142,6 +148,53 @@ export function SuppliersPage() {
               </tbody>
             </table>
           </div>
+          {(cursor || result.data.pageInfo.hasNextPage) && (
+            <nav className="cursor-pager" aria-label="Pagination supplier">
+              <span>{result.data.items.length} supplier pada halaman ini</span>
+              <div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  leadingIcon={<ArrowLeft />}
+                  disabled={cursorTrail.length === 0}
+                  onClick={() => {
+                    const previous = cursorTrail.at(-1);
+                    const next = new URLSearchParams(params);
+                    if (previous) next.set('cursor', previous);
+                    else next.delete('cursor');
+                    void navigate(
+                      { search: next.toString() },
+                      {
+                        state: { supplierCursorTrail: cursorTrail.slice(0, -1) },
+                      },
+                    );
+                  }}
+                >
+                  Sebelumnya
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  leadingIcon={<ArrowRight />}
+                  disabled={!result.data.pageInfo.nextCursor}
+                  onClick={() => {
+                    const nextCursor = result.data.pageInfo.nextCursor;
+                    if (!nextCursor) return;
+                    const next = new URLSearchParams(params);
+                    next.set('cursor', nextCursor);
+                    void navigate(
+                      { search: next.toString() },
+                      {
+                        state: { supplierCursorTrail: [...cursorTrail, cursor] },
+                      },
+                    );
+                  }}
+                >
+                  Berikutnya
+                </Button>
+              </div>
+            </nav>
+          )}
         </Panel>
       )}
     </>
@@ -403,6 +456,7 @@ export function SupplierDetailPage() {
           <SupplierAdminPanel
             admin={admin}
             supplierId={supplierId}
+            supplierVersion={supplier.version}
             current={result.data.currentSupplierAdmin}
             onCredential={setCredential}
             onChanged={() => void result.refetch()}
@@ -452,12 +506,14 @@ const supplierAdminSchema = z.object({
 function SupplierAdminPanel({
   admin,
   supplierId,
+  supplierVersion,
   current,
   onCredential,
   onChanged,
 }: {
   admin: boolean;
   supplierId: string;
+  supplierVersion: number;
   current: {
     username: string;
     displayName: string;
@@ -474,7 +530,7 @@ function SupplierAdminPanel({
     if (!current) return;
     const response = await tmminApi.replaceSupplierAdmin(supplierId, {
       ...values,
-      expectedVersion: current.version,
+      expectedVersion: supplierVersion,
     });
     onCredential(response.credential);
     form.reset();
@@ -508,7 +564,7 @@ function SupplierAdminPanel({
               confirmLabel="Reset kata sandi"
               onConfirm={() =>
                 void (async () => {
-                  const response = await tmminApi.resetSupplierAdmin(supplierId, current.version);
+                  const response = await tmminApi.resetSupplierAdmin(supplierId, supplierVersion);
                   onCredential(response.credential);
                   onChanged();
                 })()

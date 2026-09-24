@@ -6,6 +6,7 @@ import {
   boundedTransform,
   constrainCanvasCamera,
   fitCanvasCamera,
+  layoutJobCardIndicators,
   resizeCanvasCamera,
   resolveBoardMpVisual,
   zoomCanvasCamera,
@@ -19,6 +20,31 @@ const document: BoardLayoutDocument = {
 };
 
 describe('Assignment Board canvas editor primitives', () => {
+  it('centers enlarged 4M indicators above the photo and leaves empty cards clear', () => {
+    expect(layoutJobCardIndicators(300, 0)).toMatchObject({
+      visibleXs: [],
+      overflowCount: 0,
+    });
+    expect(layoutJobCardIndicators(300, 3)).toMatchObject({
+      visibleXs: [116, 150, 184],
+      overflowCount: 0,
+    });
+  });
+
+  it('keeps 4M indicators within resized cards and counts the hidden remainder', () => {
+    const normal = layoutJobCardIndicators(300, 9);
+    expect(normal.visibleXs).toHaveLength(6);
+    expect(normal.overflowCount).toBe(3);
+    expect(normal.visibleXs[0]! - 13).toBeGreaterThanOrEqual(20);
+    expect(normal.overflowX + 13).toBeLessThanOrEqual(280);
+
+    const narrower = layoutJobCardIndicators(220, 9);
+    expect(narrower.visibleXs).toHaveLength(4);
+    expect(narrower.overflowCount).toBe(5);
+    expect(narrower.visibleXs[0]! - 13).toBeGreaterThanOrEqual(20);
+    expect(narrower.overflowX + 13).toBeLessThanOrEqual(200);
+  });
+
   it('ships the complete curated machine catalog with stable unique keys', () => {
     expect(machineAssets).toHaveLength(24);
     expect(new Set(machineAssets.map(({ key }) => key)).size).toBe(24);

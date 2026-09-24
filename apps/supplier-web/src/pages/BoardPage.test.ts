@@ -10,7 +10,7 @@ import { BoardHenkatenIndicator, BoardRiskAction, boardOperationalRisks } from '
 afterEach(cleanup);
 
 describe('Assignment Board operational evidence', () => {
-  it('surfaces an Open Man Henkaten as an active reservation without changing assignment state', () => {
+  it('does not model an Open Man Henkaten as a reservation', () => {
     const lines = [
       {
         shiftRunId: '00000000-0000-4000-8000-000000000003',
@@ -32,21 +32,13 @@ describe('Assignment Board operational evidence', () => {
       },
     ] as unknown as Parameters<typeof boardOperationalRisks>[0];
 
-    expect(boardOperationalRisks(lines)).toEqual([
-      {
-        key: 'reservation:00000000-0000-4000-8000-000000000002',
-        kind: 'RESERVATION',
-        jobName: 'Function Test',
-        label: 'Reservation aktif · HEN-GKI-20260727-0004',
-        henkatenId: '00000000-0000-4000-8000-000000000002',
-        resolutionShiftRunId: null,
-      },
-    ]);
+    expect(boardOperationalRisks(lines)).toEqual([]);
   });
 
-  it('routes a vacant assignment directly to its Shift resolution wizard', () => {
+  it('routes a vacant assignment to Line Setup', () => {
     const lines = [
       {
+        lineId: '00000000-0000-4000-8000-000000000009',
         shiftRunId: '00000000-0000-4000-8000-000000000010',
         jobs: [
           {
@@ -66,12 +58,12 @@ describe('Assignment Board operational evidence', () => {
         jobName: 'Press Forming',
         label: 'Assignment issue · Vacant',
         henkatenId: null,
-        resolutionShiftRunId: '00000000-0000-4000-8000-000000000010',
+        lineId: '00000000-0000-4000-8000-000000000009',
       },
     ]);
   });
 
-  it('does not create a duplicate dead-end row for a reserved assignment', () => {
+  it('does not surface legacy reserved assignment state as a blocking risk', () => {
     const lines = [
       {
         shiftRunId: '00000000-0000-4000-8000-000000000010',
@@ -93,16 +85,13 @@ describe('Assignment Board operational evidence', () => {
       },
     ] as unknown as Parameters<typeof boardOperationalRisks>[0];
 
-    expect(boardOperationalRisks(lines)).toHaveLength(1);
-    expect(boardOperationalRisks(lines)[0]).toMatchObject({
-      kind: 'RESERVATION',
-      henkatenId: '00000000-0000-4000-8000-000000000012',
-    });
+    expect(boardOperationalRisks(lines)).toEqual([]);
   });
 
-  it('renders polished accessible actions for issues and reservations', () => {
+  it('renders an accessible Line Setup action for assignment issues', () => {
     const [issue] = boardOperationalRisks([
       {
+        lineId: '00000000-0000-4000-8000-000000000009',
         shiftRunId: '00000000-0000-4000-8000-000000000010',
         jobs: [
           {
@@ -115,43 +104,13 @@ describe('Assignment Board operational evidence', () => {
       },
     ] as unknown as Parameters<typeof boardOperationalRisks>[0]);
 
-    const { rerender } = render(
-      createElement(MemoryRouter, {}, createElement(BoardRiskAction, { risk: issue! })),
+    render(createElement(MemoryRouter, {}, createElement(BoardRiskAction, { risk: issue! })));
+    const lineSetup = screen.getByRole('link', { name: 'Line Setup' });
+    expect(lineSetup.getAttribute('href')).toBe(
+      '/master-data/line-setup?lineId=00000000-0000-4000-8000-000000000009',
     );
-    const resolution = screen.getByRole('link', { name: 'Buka resolusi' });
-    expect(resolution.getAttribute('href')).toBe(
-      '/shifts/00000000-0000-4000-8000-000000000010/resolve',
-    );
-    expect(resolution.classList.contains('hds-button--primary')).toBe(true);
-    expect(resolution.classList.contains('board-risk-action')).toBe(true);
-
-    const [reservation] = boardOperationalRisks([
-      {
-        shiftRunId: '00000000-0000-4000-8000-000000000010',
-        jobs: [
-          {
-            assignmentId: '00000000-0000-4000-8000-000000000011',
-            jobName: 'Press Forming',
-            state: 'ASSIGNED',
-            indicators: [
-              {
-                henkatenId: '00000000-0000-4000-8000-000000000012',
-                identifier: 'HEN-GKI-20260727-0005',
-                category: 'MAN',
-                status: 'OPEN',
-              },
-            ],
-          },
-        ],
-      },
-    ] as unknown as Parameters<typeof boardOperationalRisks>[0]);
-    rerender(
-      createElement(MemoryRouter, {}, createElement(BoardRiskAction, { risk: reservation! })),
-    );
-    const henkaten = screen.getByRole('link', { name: 'Buka Henkaten' });
-    expect(henkaten.getAttribute('href')).toBe('/henkatens/00000000-0000-4000-8000-000000000012');
-    expect(henkaten.classList.contains('hds-button--secondary')).toBe(true);
-    expect(henkaten.classList.contains('board-risk-action')).toBe(true);
+    expect(lineSetup.classList.contains('hds-button--primary')).toBe(true);
+    expect(lineSetup.classList.contains('board-risk-action')).toBe(true);
   });
 
   it('renders an accessible Henkaten link with the shared category dot', () => {

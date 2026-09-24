@@ -50,7 +50,7 @@ export class AuthService {
       ? normalizeLookup(input.supplierCode)
       : undefined;
     const accountKey = `${input.realm}:${normalizedSupplierCode ?? ''}:${normalizedUsername}`;
-    const accountLimit = this.limiter.consume('login-account', accountKey, now);
+    const accountLimit = this.limiter.checkAccount(accountKey, now);
     const user = await this.findLoginUser(input.realm, normalizedUsername, normalizedSupplierCode);
 
     const blocked =
@@ -63,6 +63,7 @@ export class AuthService {
       : await this.passwords.verify(user.passwordHash, input.password);
 
     if (!user || blocked || !passwordValid) {
+      if (accountLimit.allowed) this.limiter.consume('login-account', accountKey, now);
       if (user && user.status === 'ACTIVE' && !blocked) await this.recordFailure(user, now);
       await this.auditLogin(input, user, 'FAILURE', 'AUTHENTICATION_FAILED');
       throw authenticationFailed();
@@ -82,6 +83,7 @@ export class AuthService {
       where: { id: user.id },
       data: { failedLoginCount: 0, failedLoginWindowStartedAt: null, lockedUntil: null },
     });
+    this.limiter.clearAccount(accountKey);
     const purpose =
       supplier?.sourceMode === 'EXTERNAL' ? 'HOSTED_PREPARATION' : ('NORMAL' as const);
     const session = await this.sessions.create(user, supplier?.sourceEpoch ?? null, purpose, {

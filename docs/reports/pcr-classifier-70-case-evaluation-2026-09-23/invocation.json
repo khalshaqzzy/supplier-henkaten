@@ -1,0 +1,67 @@
+{
+  "source": "apps/api/src/pcr/pcr.service.ts and pcr-prompt.ts at evaluation time",
+  "model": "inclusionAI/Ling-3.0-tiny-fp8",
+  "promptVersion": "sqam-45-2026-09-v1",
+  "systemPromptFile": "system-prompt.txt",
+  "systemPromptSha256": "14319972afa50266db08c97cf6ed6da8de68d0a3470374b9468e71bc86b04486",
+  "tool": {
+    "type": "function",
+    "function": {
+      "name": "assess_henkaten_pcr",
+      "description": "Return a structured advisory Process Change Request screening result for one Henkaten.",
+      "parameters": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "needsPcr",
+          "confidence",
+          "matchedControlItems",
+          "assessment"
+        ],
+        "properties": {
+          "needsPcr": {
+            "type": "boolean"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "matchedControlItems": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 45
+            },
+            "maxItems": 12
+          },
+          "assessment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "tool_choice": {
+    "type": "function",
+    "function": {
+      "name": "assess_henkaten_pcr"
+    }
+  },
+  "max_tokens": 8192,
+  "temperature": 1,
+  "top_p": 0.95,
+  "top_k": 20,
+  "chat_template_kwargs": {
+    "enable_thinking": true
+  },
+  "configuredConfidenceThreshold": 0.75
+}

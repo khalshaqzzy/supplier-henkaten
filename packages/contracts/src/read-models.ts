@@ -29,6 +29,9 @@ export const notificationKindSchema = z.enum([
   'EXTERNAL_WARNING',
   'EXTERNAL_INGESTION_ERROR',
   'SECURITY',
+  'PCR_FLAGGED',
+  'PCR_REVIEW_REQUIRED',
+  'PCR_CORRECTED',
 ]);
 
 export const notificationSchema = z
@@ -55,6 +58,7 @@ export const notificationListQuerySchema = z
       .enum(['true', 'false'])
       .transform((value) => value === 'true')
       .optional(),
+    pcrTab: z.enum(['PCR', 'REVIEW']).optional(),
   })
   .strict();
 export type NotificationListQuery = z.infer<typeof notificationListQuerySchema>;

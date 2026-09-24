@@ -6,6 +6,7 @@ import {
   createLocalSeedPlan,
   assertLocalSeedEnvironment,
   localSeedSummary,
+  localSeedTanokoLevel,
 } from './local-seed-plan.js';
 
 describe('local seed plan', () => {
@@ -99,10 +100,9 @@ describe('local seed plan', () => {
       expect(new Set(resolutionMinutes).size).toBeGreaterThan(30);
       expect(
         supplier.historical.some(
-          ({ category, outcome }) => category === 'MAN' && outcome === 'CANCELLED_SHIFT_ENDED',
+          ({ outcome }) => outcome.startsWith('CANCELLED_') && outcome !== 'CANCELLED_WITHDRAWN',
         ),
       ).toBe(false);
-      expect(shifts[0]!.some(({ category }) => category === 'MAN')).toBe(false);
     }
   });
 
@@ -119,12 +119,22 @@ describe('local seed plan', () => {
         'REJECTED_SUPERVISOR',
         'REJECTED_QC',
         'CANCELLED_WITHDRAWN',
-        'CANCELLED_SHIFT_ENDED',
         'OPEN_PENDING',
         'OPEN_SUPERVISOR_APPROVED',
         'OPEN_QC_APPROVED',
       ]),
     );
+  });
+
+  it('provides every Tanoko level, unassessed cells and qualified coverage for each job', () => {
+    for (let jobIndex = 0; jobIndex < 12; jobIndex += 1) {
+      const levels = Array.from({ length: 15 }, (_, memberIndex) =>
+        localSeedTanokoLevel(memberIndex, jobIndex),
+      );
+      expect(new Set(levels)).toEqual(new Set([null, 1, 2, 3, 4]));
+      expect(levels.filter((level) => (level ?? 0) >= 3).length).toBeGreaterThanOrEqual(6);
+    }
+    expect(localSeedTanokoLevel(13, 11)).toBeNull();
   });
 
   it('rejects non-local, production, test-database, missing-confirmation, CI, and push-enabled execution', () => {

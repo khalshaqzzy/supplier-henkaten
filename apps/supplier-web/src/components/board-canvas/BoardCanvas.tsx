@@ -72,6 +72,26 @@ const categoryColors: Record<HenkatenCategory, string> = {
   METHOD: '#2f8f4e',
 };
 
+const JOB_CARD_INDICATOR_RADIUS = 13;
+const JOB_CARD_INDICATOR_GAP = 8;
+const JOB_CARD_INDICATOR_Y = 104;
+
+export function layoutJobCardIndicators(width: number, count: number) {
+  const diameter = JOB_CARD_INDICATOR_RADIUS * 2;
+  const spacing = diameter + JOB_CARD_INDICATOR_GAP;
+  const capacity = Math.max(1, Math.floor((width - 40 + JOB_CARD_INDICATOR_GAP) / spacing));
+  const visibleCount = count > capacity ? capacity - 1 : count;
+  const overflowCount = count - visibleCount;
+  const slotCount = visibleCount + (overflowCount > 0 ? 1 : 0);
+  const firstX = width / 2 - ((slotCount - 1) * spacing) / 2;
+
+  return {
+    visibleXs: Array.from({ length: visibleCount }, (_, index) => firstX + index * spacing),
+    overflowCount,
+    overflowX: firstX + visibleCount * spacing,
+  };
+}
+
 export default function BoardCanvas({
   line,
   onDirtyChange,
@@ -1158,10 +1178,12 @@ function JobCardNode({ job, ...props }: { job?: BoardJob } & ComponentProps<type
   const state = job?.state ?? 'VACANT';
   const accent = state === 'ASSIGNED' ? '#2f8f4e' : state === 'RESERVED' ? '#d97706' : '#d92d20';
   const photoWidth = Math.max(150, width - 88);
-  const photoHeight = Math.max(176, height - 212);
+  const photoHeight = Math.max(140, height - 246);
   const photoX = (width - photoWidth) / 2;
-  const photoY = 92;
+  const photoY = 126;
   const identityY = photoY + photoHeight + 14;
+  const indicators = job?.indicators ?? [];
+  const indicatorLayout = layoutJobCardIndicators(width, indicators.length);
   return (
     <Group {...props}>
       <Rect
@@ -1210,6 +1232,41 @@ function JobCardNode({ job, ...props }: { job?: BoardJob } & ComponentProps<type
         fontStyle="bold"
         fill={accent}
       />
+      {indicators.slice(0, indicatorLayout.visibleXs.length).map((indicator, index) => (
+        <Circle
+          key={indicator.henkatenId}
+          x={indicatorLayout.visibleXs[index]!}
+          y={JOB_CARD_INDICATOR_Y}
+          radius={JOB_CARD_INDICATOR_RADIUS}
+          fill={categoryColors[indicator.category]}
+          stroke={indicator.status === 'OPEN' ? '#172033' : '#ffffff'}
+          strokeWidth={indicator.status === 'OPEN' ? 2 : 1}
+        />
+      ))}
+      {indicatorLayout.overflowCount > 0 && (
+        <>
+          <Rect
+            x={indicatorLayout.overflowX - JOB_CARD_INDICATOR_RADIUS}
+            y={JOB_CARD_INDICATOR_Y - JOB_CARD_INDICATOR_RADIUS}
+            width={JOB_CARD_INDICATOR_RADIUS * 2}
+            height={JOB_CARD_INDICATOR_RADIUS * 2}
+            fill="#ffffff"
+            stroke="#667085"
+            strokeWidth={1.5}
+            cornerRadius={JOB_CARD_INDICATOR_RADIUS}
+          />
+          <Text
+            x={indicatorLayout.overflowX - JOB_CARD_INDICATOR_RADIUS}
+            y={JOB_CARD_INDICATOR_Y - 7}
+            width={JOB_CARD_INDICATOR_RADIUS * 2}
+            align="center"
+            text={`+${indicatorLayout.overflowCount}`}
+            fontSize={12}
+            fontStyle="bold"
+            fill="#344054"
+          />
+        </>
+      )}
       <Rect
         x={photoX}
         y={photoY}
@@ -1263,17 +1320,6 @@ function JobCardNode({ job, ...props }: { job?: BoardJob } & ComponentProps<type
         fontSize={14}
         fill="#667085"
       />
-      {(job?.indicators ?? []).map((indicator, index) => (
-        <Circle
-          key={indicator.henkatenId}
-          x={width / 2 + ((job?.indicators.length ?? 1) - 1) * 12 - index * 24}
-          y={height - 18}
-          radius={8}
-          fill={categoryColors[indicator.category]}
-          stroke={indicator.status === 'OPEN' ? '#172033' : '#ffffff'}
-          strokeWidth={indicator.status === 'OPEN' ? 2 : 1}
-        />
-      ))}
     </Group>
   );
 }

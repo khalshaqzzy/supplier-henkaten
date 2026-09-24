@@ -8,7 +8,6 @@ import { z } from 'zod';
 import { ApiProblemError } from '@tmmin-henkaten/api-client';
 import { passwordChangeRequestSchema, supplierLoginRequestSchema } from '@tmmin-henkaten/contracts';
 import {
-  Alert,
   BrandLockup,
   Button,
   Card,
@@ -222,11 +221,7 @@ export function AccountPage() {
   const principal = session!.principal;
   return (
     <div className="product-page">
-      <PageHeader
-        eyebrow="Identitas dan keamanan"
-        title="Akun"
-        description="Lihat konteks session aktif dan kelola password Anda."
-      />
+      <PageHeader eyebrow="Identitas dan keamanan" title="Akun" description="" />
       <Card className="account-card">
         <KeyValueGrid
           columns={2}
@@ -250,9 +245,6 @@ export function AccountPage() {
             },
           ]}
         />
-        <Alert tone="info" title="Session aman">
-          Credential, CSRF token, dan password tidak disimpan ke persistent browser storage.
-        </Alert>
         <div className="form-actions">
           <Button onClick={() => void navigate('/change-password')}>Ganti password</Button>
           <Button

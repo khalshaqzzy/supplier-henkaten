@@ -329,14 +329,12 @@ export function ManTransitionEvidence({
   replacedWasVacant,
   replacedMpName,
   replacementMpName,
-  reservationActive,
   movement,
   formatDate,
 }: {
   replacedWasVacant: boolean;
   replacedMpName: string | null;
   replacementMpName: string;
-  reservationActive: boolean;
   movement: { movedMpName: string; replacedMpName: string | null; movedAt: string } | null;
   formatDate: (value: string) => string;
 }) {
@@ -347,8 +345,7 @@ export function ManTransitionEvidence({
           <Workflow aria-hidden="true" />
         </span>
         <div>
-          <h2>Reservation &amp; perpindahan</h2>
-          <p>{movement ? 'Movement sudah diterapkan' : 'Perubahan assignment yang diajukan'}</p>
+          <h2>Perubahan assignment</h2>
         </div>
       </header>
       <div className="object-transition__flow">
@@ -364,20 +361,13 @@ export function ManTransitionEvidence({
           <ArrowRight />
         </span>
         <div className="object-transition__node is-after">
-          <span>{movement ? 'Dipindahkan' : 'Replacement'}</span>
-          <small>{movement ? formatDate(movement.movedAt) : 'MP yang direservasi'}</small>
+          <span>MP pengganti</span>
+          <small>{movement ? formatDate(movement.movedAt) : ''}</small>
           <strong>
             <UserRound aria-hidden="true" />
             {movement?.movedMpName ?? replacementMpName}
           </strong>
         </div>
-      </div>
-      <div className={`object-transition__state${reservationActive ? ' is-active' : ''}`}>
-        {movement
-          ? `Perpindahan selesai${movement.replacedMpName ? `; ${movement.replacedMpName} digantikan.` : '.'}`
-          : reservationActive
-            ? 'Reservation aktif. Assignment efektif belum berubah sampai approval final.'
-            : 'Reservation sudah dilepas atau record telah menjadi terminal.'}
       </div>
     </section>
   );
@@ -412,7 +402,7 @@ export function ApprovalTimeline({
       label: 'Hasil akhir',
       state: status === 'OPEN' ? 'PENDING' : status,
       person: status === 'OPEN' ? 'Belum terminal' : humanize(status),
-      detail: status === 'OPEN' ? 'Menunggu keputusan final' : 'Lifecycle terminal',
+      detail: status === 'OPEN' ? 'Menunggu keputusan final' : 'Selesai',
       decidedAt: null,
     },
   ];

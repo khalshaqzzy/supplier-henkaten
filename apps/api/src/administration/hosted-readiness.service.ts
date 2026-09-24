@@ -35,9 +35,7 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
     partCount,
     shiftCount,
     checklistCategories,
-    supervisorAssignments,
-    leaderAssignments,
-    mpAssignments,
+    lineShifts,
   ] = await Promise.all([
     client.user.count({ where: { supplierId, role: 'SUPPLIER_ADMIN', status: 'ACTIVE' } }),
     client.member.count({ where: { supplierId, active: true } }),
@@ -52,7 +50,7 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
     client.line.findMany({ where: { supplierId, active: true }, select: { id: true } }),
     client.job.findMany({
       where: { supplierId, active: true, line: { active: true } },
-      select: { id: true },
+      select: { id: true, lineId: true },
     }),
     client.part.count({ where: { supplierId, active: true } }),
     client.shiftTemplate.count({ where: { supplierId, active: true } }),
@@ -61,31 +59,27 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
       distinct: ['category'],
       select: { category: true },
     }),
-    client.defaultLineSupervisor.findMany({
+    client.lineShift.findMany({
       where: {
         supplierId,
+        active: true,
         line: { active: true },
+        shiftTemplate: { active: true },
         supervisor: {
           active: true,
           users: { some: { status: 'ACTIVE', role: 'SUPERVISOR' } },
         },
       },
-      select: { lineId: true },
-    }),
-    client.defaultLineLeader.findMany({
-      where: {
-        supplierId,
-        line: { active: true },
-        lineLeader: {
-          active: true,
-          users: { some: { status: 'ACTIVE', role: 'LINE_LEADER' } },
+      select: {
+        id: true,
+        lineId: true,
+        supervisorMemberId: true,
+        lineLeaderMemberId: true,
+        jobAssignments: {
+          where: { job: { active: true } },
+          select: { jobId: true, mpMemberId: true },
         },
       },
-      select: { lineId: true },
-    }),
-    client.defaultJobMp.findMany({
-      where: { supplierId, job: { active: true }, mp: { active: true } },
-      select: { jobId: true },
     }),
   ]);
 
@@ -135,36 +129,61 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
     }
   }
 
-  const supervised = new Set(supervisorAssignments.map(({ lineId }) => lineId));
-  const led = new Set(leaderAssignments.map(({ lineId }) => lineId));
+  const configuredLines = new Set(lineShifts.map(({ lineId }) => lineId));
   for (const { id } of lines) {
-    if (!supervised.has(id)) {
+    if (!configuredLines.has(id)) {
       add(
         'DEFAULT_ASSIGNMENTS',
-        'LINE_SUPERVISOR_MISSING',
-        'Setiap line aktif memerlukan Supervisor.',
-        id,
-      );
-    }
-    if (!led.has(id)) {
-      add(
-        'DEFAULT_ASSIGNMENTS',
-        'LINE_LEADER_MISSING',
-        'Setiap line aktif memerlukan Line Leader.',
+        'LINE_SHIFT_MISSING',
+        'Setiap line aktif memerlukan minimal satu shift.',
         id,
       );
     }
   }
-  const staffed = new Set(mpAssignments.map(({ jobId }) => jobId));
-  for (const { id } of jobs) {
-    if (!staffed.has(id)) {
-      add('DEFAULT_ASSIGNMENTS', 'JOB_MP_MISSING', 'Setiap job aktif memerlukan MP default.', id);
+  for (const lineShift of lineShifts) {
+    if (!lineShift.supervisorMemberId) {
+      add(
+        'DEFAULT_ASSIGNMENTS',
+        'LINE_SHIFT_SUPERVISOR_MISSING',
+        'Setiap line dan shift memerlukan Supervisor.',
+        lineShift.id,
+      );
+    }
+    if (!lineShift.lineLeaderMemberId) {
+      add(
+        'DEFAULT_ASSIGNMENTS',
+        'LINE_SHIFT_LEADER_MISSING',
+        'Setiap line dan shift memerlukan Line Leader.',
+        lineShift.id,
+      );
+    }
+    const staffed = new Set(
+      lineShift.jobAssignments.filter(({ mpMemberId }) => mpMemberId).map(({ jobId }) => jobId),
+    );
+    for (const { id: jobId } of jobs.filter((job) => job.lineId === lineShift.lineId)) {
+      if (!staffed.has(jobId)) {
+        add(
+          'DEFAULT_ASSIGNMENTS',
+          'LINE_SHIFT_MP_MISSING',
+          'Setiap job pada line dan shift memerlukan MP.',
+          lineShift.id,
+        );
+      }
     }
   }
 
-  const assignmentRequiredCount = lines.length * 2 + jobs.length;
-  const assignmentActiveCount =
-    supervisorAssignments.length + leaderAssignments.length + mpAssignments.length;
+  const assignmentRequiredCount = lineShifts.reduce(
+    (total, item) => total + 2 + jobs.filter((job) => job.lineId === item.lineId).length,
+    0,
+  );
+  const assignmentActiveCount = lineShifts.reduce(
+    (total, item) =>
+      total +
+      Number(Boolean(item.supervisorMemberId)) +
+      Number(Boolean(item.lineLeaderMemberId)) +
+      item.jobAssignments.filter(({ mpMemberId }) => mpMemberId).length,
+    0,
+  );
   const counts: Record<SupplierSetupArea, { activeCount: number; requiredCount: number }> = {
     SHIFT_TEMPLATES: { activeCount: shiftCount, requiredCount: 1 },
     MEMBERS_ACCOUNTS: {

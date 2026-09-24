@@ -98,40 +98,16 @@ export class SourceGovernanceService {
       name: 'hosted-operational-state',
       async check(transaction, supplier, targetMode) {
         if (targetMode !== 'EXTERNAL') return [];
-        const [activeShift, openHenkaten, activeReservation] = await Promise.all([
-          transaction.shiftRun.findFirst({
-            where: { supplierId: supplier.id, status: 'ACTIVE' },
-            select: { id: true },
-          }),
-          transaction.henkaten.findFirst({
-            where: { supplierId: supplier.id, status: 'OPEN' },
-            select: { id: true },
-          }),
-          transaction.mPReservation.findFirst({
-            where: { supplierId: supplier.id, releasedAt: null },
-            select: { id: true },
-          }),
-        ]);
+        const openHenkaten = await transaction.henkaten.findFirst({
+          where: { supplierId: supplier.id, status: 'OPEN' },
+          select: { id: true },
+        });
         const blockers: CutoverBlocker[] = [];
-        if (activeShift) {
-          blockers.push({
-            contributor: 'hosted-operational-state',
-            code: 'ACTIVE_SHIFT_EXISTS',
-            detail: 'Hosted source cutover is blocked by an active Shift Run.',
-          });
-        }
         if (openHenkaten) {
           blockers.push({
             contributor: 'hosted-operational-state',
             code: 'OPEN_HENKATEN_EXISTS',
             detail: 'Hosted source cutover is blocked by an Open Henkaten.',
-          });
-        }
-        if (activeReservation) {
-          blockers.push({
-            contributor: 'hosted-operational-state',
-            code: 'ACTIVE_MP_RESERVATION_EXISTS',
-            detail: 'Hosted source cutover is blocked by an active MP reservation.',
           });
         }
         return blockers;
@@ -268,6 +244,17 @@ export class SourceGovernanceService {
       }
       for (const contributor of this.contributors.values()) {
         await contributor.revokeOldSource?.(transaction, supplier, input.targetMode);
+      }
+      if (input.targetMode === 'EXTERNAL') {
+        await transaction.user.updateMany({
+          where: { supplierId, role: 'SUPPLIER_ADMIN', status: 'ACTIVE' },
+          data: {
+            status: 'INACTIVE',
+            authorizationEpoch: { increment: 1 },
+            version: { increment: 1 },
+            updatedById: context.actorUserId,
+          },
+        });
       }
       await transaction.userSession.updateMany({
         where: { supplierId, revokedAt: null },

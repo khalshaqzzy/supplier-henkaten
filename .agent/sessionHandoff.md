@@ -1,3 +1,403 @@
+# Current Session Handoff — Production deployment preparation
+
+- Date: 2026-09-24
+- Branch: `feat/production-deployment`
+- Status: production caller, bootstrap support, domain documentation, and production Environment preparation are in progress. No production release has run.
+
+The `main` push and PR paths now use the existing release gate. Staging run `35977992005` passed
+every gate and remote deployment; independent public smoke passed on all three staging domains
+for SHA `dfc2aa2428b1db5fce407ec2033a1da87b0632bd`, closing 15.9. Only a successful `main` push
+calls the reusable production deployment for Supplier `henkaten.qualitydivision.com`, Admin
+`admin-henkaten.qualitydivision.com`, and API `henkaten-api.qualitydivision.com`. Bootstrap accepts
+`production` and creates isolated paths. Production runtime rendering and bootstrap input checks
+were added to the existing deployment validation. ADR 0008 and
+[`productionDeploymentPlan.md`](productionDeploymentPlan.md) record decisions, capacity measurement
+and launch sequence; PRD, roadmap, and deployment guide now use the confirmed domains.
+
+GitHub Environment `production` exists without reviewers and only branch `main` may deploy to it.
+Main branch protection now requires an up-to-date `Release candidate gate` check while preserving
+its existing one-review requirement. Its secret-name inventory now matches staging: 15 non-host
+values were copied from the current staging
+release's runtime env through trusted SSH without logging values; the preserved CI SSH private key
+was set directly; `VM_HOST` and `VM_USER` use the production endpoint. `VM_SSH_PORT=22` and a
+production-specific bootstrap display name are configured. The production bootstrap username was
+then changed to the operator-requested value; no production release or running container exists yet,
+so the first bootstrap will consume that value. GitHub does not expose secret values
+for reading back. The production ED25519 host key is pinned from a fresh keyscan after its
+fingerprint matched prior network observations and the host public-key file over SSH. This is
+trust on first use; the provider-console fingerprint has not been independently checked.
+The current staging VM was resolved through live DNS rather than the
+stale IP in older handoff entries.
+
+All three production DNS A records currently resolve to the production VM. Bootstrap verification
+now confirms CI key login, Ubuntu 22.04, four vCPUs, 16 GiB RAM, Docker 29.8.1, Compose 5.5.1,
+about 191 GiB free disk, writable production paths, required data ownership, and correct DNS from
+the VM. Only SSH currently listens, so public HTTP/HTTPS cannot be judged until Caddy starts.
+The production host fingerprint has not yet been compared with the provider console, although
+the observed key is pinned in `VM_SSH_KNOWN_HOSTS`. UFW status needs sudo authentication. Therefore the next merge
+to `main` cannot yet be claimed deployable. Remaining staging
+rehearsal, QA/UAT, PCR, capacity and critical-risk sign-offs remain release prerequisites in the
+roadmap.
+
+Checks so far: `pnpm format:check`, `pnpm deployment:validate`, `pnpm test:deployment` on macOS
+and Linux (including real `flock` contention), `pnpm migrations:destructive-check origin/main`,
+`git diff --check`, pinned Actionlint, pinned ShellCheck, and pinned Ubuntu 22.04 production
+bootstrap input check passed. The actual staging secret values rendered a valid production runtime
+env and passed production Compose configuration without printing the values; the temporary env file
+was removed. Docker was initially stopped and started for these checks; resumed local Compose
+containers were shut down and OrbStack was quit afterwards. Full
+clean-artifact CI parity, production VM preflight, and first deployment remain outstanding.
+
+Delivery preparation: a disposable clean-artifact worktree at the current staging HEAD plus this
+patch passed frozen install under pinned Node 22.23.1/pnpm 11.16.0, format, lint, typecheck, unit,
+OpenAPI/client drift, and production application build. A disposable PostgreSQL 18/pgvector
+database passed fresh migration and 32 integration tests; it was stopped. The unchanged app code
+also passed the six isolated Chromium/Edge E2E journeys on the host. Migration SQL is unchanged
+from `origin/staging`. Actionlint, ShellCheck, Hadolint, Ubuntu production bootstrap validation,
+environment/Compose validation, Linux `flock` deployment harness, exact security-exception check,
+dependency audit, Gitleaks source scan, Trivy filesystem scan, and HIGH/CRITICAL scans of all five
+rebuilt images passed. A separate five-service Compose acceptance passed migration, bootstrap and
+idempotency, health/routing/release identity, non-root and private database checks, and database/photo
+persistence across restart; all test containers were stopped. The first Gitleaks scan traversed a
+generated pnpm package cache, which was moved outside the worktree before the clean source scan;
+no source exception was added. The host's pnpm attempted to replace Linux node_modules in the
+worktree, so shell validation ran directly and the dependency audit ran in the pinned Node image.
+No application migration or contract changed in this patch.
+
+Next: deliver the branch as a PR to `staging`; observe its release gate. Production deployment
+still requires a later merge to `main`, production external smoke, and the remaining UAT/capacity
+and risk sign-offs. Confirm public 80/443 reachability when Caddy starts; independent provider-console
+host fingerprint verification remains available to strengthen the current trust-on-first-use pin.
+
+---
+
+# Previous Session Handoff — Scoped QA finding remediation
+
+- Date: 2026-09-24
+- Branch: `fix/qa-verif-1`
+- Status: F-01–F-09 and F-11–F-12 implemented with automated regressions; F-10 is a product-expectation correction. PR [#20](https://github.com/khalshaqzzy/supplier-henkaten/pull/20) targets `staging`. No staging deployment or complete QA claim.
+- Current roadmap position remains Phase 15 / 15.9 `in_progress`.
+
+The full cause and acceptance map is [`docs/qa/qa-verif-finding-remediation-plan-2026-09-24.md`](../docs/qa/qa-verif-finding-remediation-plan-2026-09-24.md). ADR 0036 records the user decision that Supervisor reroute needs no in-app notification; ADR 0037 records implementation boundaries. The original local QA run's 22 PASS / 15 FAIL / 10 BLOCKED outcomes remain unchanged. No “Remaining QA not executed” branch was continued. The fixes have automated regressions, but the original browser observation for every finding was not individually rerun; do not reclassify the historical rows from the tests alone.
+
+Implementation: cutover deactivates the prior Supplier Admin; reverse Preparation defensively revokes any surviving active Admin and rejects reused usernames with a field error. Reset/replace uses Supplier.version. Photo responses use same-site CORP. Clone checks current Line–Shift/Job validity. Account throttling counts failures only, keeps the existing IP limits and five-failure database lockout, and allows six consecutive successful logins. Supplier notification and master-data mutations refresh their actual cache keys; Line Setup retains the newly copied shift; warning detail shows a human-readable Hosted/External identifier; former Supervisor approval controls require current responsibility; the Supplier registry exposes API cursor navigation. OpenAPI and the generated client were regenerated. No migration was added.
+
+Checks completed on a disposable clean-artifact worktree after `pnpm install --frozen-lockfile`: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm openapi:check`, and `VITE_API_ORIGIN=https://api.example.invalid pnpm build` passed. The first clean-worktree lint run caught five new test-mock style errors; they were fixed and the complete sequence passed. The main checkout's `pnpm lint` includes pre-existing ignored `.local/*.mjs` scripts, so the clean-worktree result is the CI-equivalent result. Full API integration passed 32 tests on the disposable Docker test database. `pnpm test:e2e` passed five isolated journeys across Chromium and Edge, and its own Compose projects were removed. Node 22.23.2 and pnpm 11.16.0 were used on the host; production Docker builds used the pinned Node 22.23.1 image.
+
+Staging parity: `docker compose config --quiet`, `pnpm migrations:destructive-check 7ed8d8a5ef515707950c4e8f48ef71b1d2727151`, `pnpm deployment:validate`, `pnpm test:deployment`, `pnpm security:exceptions:check`, `pnpm security:audit`, pinned Actionlint/ShellCheck/Hadolint, `bash -n`, Ubuntu 22.04 bootstrap input validation, Gitleaks v8.24.3 directory scan, and Trivy 0.70.0 filesystem scan passed. The deployment script harness passed in a Linux Docker container with actual `flock` contention. The previous-staging-to-current migration was applied to a temporary database, checked current, and dropped; no migration SQL changed. All five production images built; the isolated staging-like Compose stack passed migration/bootstrap, health, routing, headers, non-root, idempotent bootstrap, and restart persistence checks. Trivy image scans passed for all five images. The first scan of the frontend images encountered cached `apk upgrade` layers containing vulnerable `libexpat` 2.8.4-r0; a `--no-cache` frontend rebuild pulled fixed 2.8.5-r0 and both rescans passed. No Dockerfile change was required.
+
+The local fullstack Compose services on ports 3000, 5173, 5174, and 55432 predated this task and were not stopped or reseeded; `/health` still returned 200 after the checks. The isolated staging-like Compose stack and disposable parity worktree were removed. User explicitly requested pushing this branch and opening a PR to `staging` **without monitoring checks**, overriding the post-push monitoring step in `.agent/rules.md` for this task. The PR was opened without a staging deployment claim.
+
+---
+
+# Previous Session Handoff — Local browser QA execution
+
+- Date: 2026-09-24
+- Branch: `feat/qa-verif` at baseline `cf53a62`; report and handoff prepared for delivery on this branch.
+- Status: local exploratory QA run documented; no product fixes made. Final report: [`docs/audits/local-browser-qa-2026-09-24.md`](../docs/audits/local-browser-qa-2026-09-24.md).
+
+The run covered the PRD/source inventory and 47 planned A/T/S/H/X/N scenario rows across Supplier and TMMIN Admin/Quality surfaces, with Playwright Chromium and local External API calls. Current overall row outcomes: **22 PASS, 15 FAIL, 10 BLOCKED / partial**; 37/47 (78.7%) have a determinate row outcome, but some PASS/FAIL rows still have untested sub-branches. The report lists evidence, twelve findings, all remaining checks, and run limitations. Push/PWA push permission, subscription, delivery, and revoke tests are excluded per user direction.
+
+The user specifically asked about Admin PCR status correction. TMMIN Admin changed a Closed Henkaten in both No-PCR→PCR and PCR→No-PCR directions. **Simpan keputusan** was disabled until the trimmed reason contained at least 10 characters; valid reasons saved successfully. No product code was changed to address defects.
+
+External X-02/X-04 verification passed: PII payload rejection/isolation, invalid transition, status-only PCR retention, changed-evidence requeue, Approved/Rejected/Cancelled warning closure, and Admin External Health browser rendering. A final `pnpm local:reseed` restored the baseline counts (2 Hosted suppliers, no External test tenant, 240 Henkaten and expected PCR/warning/Line–Shift counts), health/readiness passed, and TMMIN Admin/NPM Supplier Admin browser smoke passed. `pnpm local:down` stopped the stack. Docker services are not running.
+
+Remaining QA is not yet fully verified: line-scope/source-mode security matrix, negative-password lockout, remaining registry validation and pagination/dashboard reconciliation, complete Explorer detail/filter matrix, an assessment-free `expectedVersion: 0` PCR case and pending-assessment reload, Hosted Preparation/reverse source gates, standalone master-data and Line–Shift branches, schedule/off-hours and Tanoko eligibility boundaries, old External credential rejection after cutover, full outbox/audit/photo-cache diagnostics, and physical-device/assistive-technology coverage. The report describes why each remains and records partial checks inside other rows.
+
+No persistent Playwright specs were added; temporary local runners are removed after the run. The ignored `.local/qa-evidence/` retains sanitized summaries and screenshots. The branch changes are documentation only: the QA execution report and this updated handoff. The full scenario plan remains in `docs/qa/browser-local-end-to-end-verification-plan.md`.
+
+---
+
+# Session Handoff — Canvas job-card 4M visibility
+
+Date: 2026-09-23
+Branch: `feat/update-mp-card-on-board`
+Status: implemented and locally verified; PR #19 to `staging` is open. No deployment claim.
+PR: https://github.com/khalshaqzzy/supplier-henkaten/pull/19
+
+The Supplier Canvas `JOB_SLOT` card now centers 26-pixel 4M dots in the white row between the
+assignment badge and the portrait. The photo begins lower, while its bottom edge and the MP identity
+positions remain unchanged on the default card. The dots retain read-model order, category colors,
+and the dark Open outline. Width-based capacity reserves a final `+N` slot when records exceed the
+available row; the default Assignment Board still lists all records. Layout JSON, API contracts,
+the default Board, and saved card geometry are unchanged. PRD section 16.6 and ADR 0031 record the
+visual rule.
+
+Verification: Node 22.23.2/pnpm 11.16.0 host install, formatting, lint, typecheck, OpenAPI/client
+drift check, and production build passed. The focused Canvas suite passed 10 tests. The complete
+unit suite passed in the rebuilt Linux Supplier container using repository-pinned Node 22.23.1 and
+pnpm 11.16.0. The host Windows run failed before `App.test.tsx` executed because Vitest could not
+resolve a virtual PWA file URL; the same suite passed in Linux. Edge visual review of the running
+local NPM Canvas confirmed the Trimming card's three enlarged dots above the portrait, with Open
+outlines visible. Screenshots are in gitignored `.local/board-canvas-after.png` and
+`.local/board-canvas-zoomed.png`. The existing local API/database and other running frontend were
+not reset; only the Supplier frontend container was rebuilt.
+
+Additional checks: `docker compose config --quiet`, migration SQL check against `origin/staging`,
+staging env validation, remote Compose config, and high-severity dependency audit passed (one
+existing high-severity exception). The deployment harness and security-exception check require
+`jq`, which is unavailable in the host Git Bash environment. Database integration and isolated
+browser journeys were not rerun for this Canvas-only rendering change. No PR check monitoring is
+requested. The implementation commit passed Gitleaks v8.24.3 commit scanning. Next: review PR #19;
+do not claim staging deployment until a separate release action has completed.
+
+---
+
+# Session Handoff — PCR indication for Henkaten
+
+## Local classifier evaluation — 2026-09-23
+
+### Documentation commit checks
+
+The 70-case report and evidence archive were checked in a detached clean-artifact worktree using
+Node 22.23.1 and pnpm 11.16.0. `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`,
+`pnpm typecheck`, `pnpm test:unit`, `pnpm openapi:check`, and
+`VITE_API_ORIGIN=https://api.example.invalid pnpm build` passed. A separate Compose project and
+disposable PostgreSQL test database passed `docker compose config --quiet`, `pnpm db:up`,
+`pnpm db:wait`, `pnpm db:verify`, `pnpm db:test:reset`, `pnpm db:test:migrate`, and 31 API integration
+tests; that project was stopped with `pnpm db:down`. A second isolated project passed fresh and
+`origin/staging`-to-current migration deployment and was also stopped. All three Chromium journeys
+passed with `pnpm test:e2e:chromium`; local Edge installation remains unavailable on macOS.
+
+`pnpm migrations:destructive-check <origin/staging SHA>`, `pnpm deployment:validate`,
+`pnpm test:deployment`, `pnpm security:exceptions:check`, `pnpm security:audit`, and `bash -n` passed.
+The macOS deployment harness reported that Linux `flock` contention needs its CI gate. Pinned
+Actionlint, ShellCheck, Hadolint, Ubuntu bootstrap validation, Gitleaks v8.24.3 directory scan,
+and Trivy v0.70.0 filesystem vulnerability/secret/misconfiguration scan passed with no findings.
+The 70 archived messages, input hashes, decisions, and unique record IDs were rechecked. The
+already-running demo PostgreSQL restarted during Docker-heavy checks and its API lost the database
+connection; only the demo API container was restarted, then `/health` returned 200 and both
+containers were healthy. Production container routing and image scans were not rerun locally for
+this documentation-only patch; the open PR's staging CI will rerun them after push.
+
+Seventy distinct synthetic Hosted Henkaten were submitted through the running local API in two
+batches, using a seeded NPM Line Leader and valid current Line–Shift/checklist data. The live Ling
+worker completed all 70. Of 53 clear cases, all 28 PCR and 24 of 25 No-PCR were classified as
+expected. One unchanged-lot case with adversarial text became PCR at confidence 1.00. Of 17
+deliberately incomplete cases, seven reached Review, eight became PCR, and two became No-PCR;
+one unspecified alternative material trial was No-PCR at confidence 1.00. Six Review results had
+low-confidence validated output, while one had no validated model output. Several PCR narratives
+asserted missing facts or wrong control references; 14 of 37 were outside the approximate
+100–150-word target. The complete exact model messages and persisted output for each case are in
+`docs/reports/pcr-classifier-70-case-evaluation-2026-09-23/`, with analysis in
+`docs/reports/pcr-classifier-70-case-local-evaluation-2026-09-23.md`. No classifier code or
+configuration was changed. Seventy Open NPM Henkaten remain in the local demo for inspection;
+the pre-existing Compose stack remains running. Next: TMMIN QD adjudication, targeted adversarial
+and missing-evidence regression coverage, and grounded explanation checks before production
+reliance on automatic No-PCR. Verification: 70/70 HTTP 201 submissions, 70/70 terminal
+assessments, database evidence inspection, archive completeness checks, report formatting and
+`git diff --check`.
+
+Date: 2026-09-23
+Branch: `feat/ai-pcr`
+Status: implemented and validated locally; prepared for PR to `staging`. No staging deployment or
+UAT claim.
+
+Hosted submissions now persist `PcrAssessment` in the creation transaction. External ingestion
+refreshes assessment only when evidence changes. A separate leased worker uses the local Ling
+OpenAI-compatible Chat Completions endpoint, a forced validated tool call and 8192 output tokens.
+Low confidence, invalid output and failures move to Review. TMMIN Admin/Quality can correct with a
+mandatory reason and optimistic version; a late worker cannot overwrite the correction. AI raw
+output and confidence remain server-side; full English assessment appears only for current PCR.
+Supplier and TMMIN have PCR tabs, priority pagination, indicators, and scoped notifications;
+TMMIN also has review tabs and correction UI. Design A is applied to detail, submit waits on a
+refresh-safe assessment screen, and active sidebar items are solid orange. The local seed includes
+PCR/No-PCR/Review/manual examples while preserving 2 suppliers and 240 Henkaten.
+
+Validation: formatting, lint, typecheck, unit suite, production build, 31 API integration tests on
+a freshly migrated disposable database, and OpenAPI check passed. An isolated 240-record seed and
+`pnpm local:reseed` completed; the main local database has 2 suppliers and 240 Henkaten (PCR 6,
+No-PCR 230, Review 4). Browser review covered both portals, PCR/review tabs, detail assessment,
+orange active navigation, and the TMMIN page title shortened to `Henkaten`. ADR 0034 and PRD
+amendment define the decision boundary.
+
+The valid gateway key was read without changing `dx-2`. The gitignored local `.env` now has the
+public inference endpoint, model, key, threshold, timeout, and worker settings (file mode 0600).
+All seven names were set as GitHub `staging` environment secrets through `gh`; the reusable deploy
+workflow now validates and renders them into runtime env. Compose configuration and actual-key
+runtime rendering were checked without printing values. The deployment script harness passes
+locally. No key appears in tracked or nonignored new files. The local Compose stack was stopped
+after verification without deleting the seeded database volume.
+The separate inference report at `docs/reports/inference-server-403-2026-09-23.md` records the
+user-provided successful Ling tool-call tests through `curl` and OpenAI JavaScript SDK and the
+Python `urllib` Cloudflare 1010 result. The later 70-case local evaluation above exercised PCR
+worker inference end to end. Before activating on staging, evaluate Indonesian cases with TMMIN
+QD. Generated OpenAPI/client content is current, and the staged-file drift check passed.
+
+Pre-PR local parity used Node 22.23.1, pnpm 11.16.0, frozen install, and cleaned build artifacts.
+Format, lint, typecheck,
+unit tests, OpenAPI drift, and production application build passed. A disposable Docker database
+passed all 31 integration tests, fresh migration, and the upgrade from `origin/staging` migrations.
+All three Chromium journeys passed after updating the Henkaten title selector. The local macOS
+Edge installer requires sudo and could not install Edge; CI's Linux Edge journey remains the
+browser gate. Actionlint, ShellCheck, Hadolint, deployment validation, and the deployment harness
+passed, including the harness inside Linux with real `flock`. Five production images built and
+passed routing, non-root, and restart persistence checks. Gitleaks v8.24.3 found no leaks; Trivy
+v0.70.0 reported no HIGH/CRITICAL findings for the filesystem and all five production images.
+The high-severity dependency audit exited successfully with the repository's existing exception.
+Local ignored credentials were temporarily moved outside the scan path and restored. The PCR
+worker was not sent a live inference request in this parity run.
+
+The feature branch already contained four earlier commits absent from `origin/staging`: line
+schedules, migration-policy repair, local seed repair, and UI typography rules. A PR from this
+branch to `staging` includes those predecessors along with the PCR implementation. No existing
+commit was rewritten.
+
+---
+
+# Previous Session Handoff — Compact Tanoko Matrix and Proficiency Enforcement
+
+Date: 2026-09-16
+Branch: `feat/tanoko`
+Status: implemented and delivered on `feat/tanoko` as PR #16 against `staging`. The last remaining
+release-gate failure, the Caddy runtime image scan, is fixed and locally verified pending the next
+CI run. Phase 15.9 remains `in_progress`.
+
+## Objective and decisions
+
+- Implement the approved PDF-derived design A with the existing supplier navbar, left-aligned
+  Matriks/Riwayat tabs, name-only clipped MP headers and right-side cell editor from design C.
+- Keep the UI compact: 16px desktop content inset, 36px matrix rows, viewport-owned matrix scroll,
+  sticky MP names and Line/Job/Kategori columns, sticky summary, no dashboard metric cards.
+- Supplier Admin and every GL (SUPERVISOR) can edit any active MP/job within their supplier.
+  LL and QC have read access only. Authorization is enforced by API capabilities and service checks.
+- High/Medium/Low categorizes jobs visually; mastery levels 1–4 are independent. Missing mastery
+  is unassessed. No MP employment categories, license, annual restrictions or extra criteria.
+- Require level >=3 at Man submission and final atomic movement. A downgrade while approval is
+  pending blocks movement; existing reservation and assignment checks remain in force.
+
+## Seed follow-up verification
+
+- `pnpm --filter @tmmin-henkaten/api exec vitest run src/cli/local-seed-plan.spec.ts`: 6 passed.
+- API typecheck, targeted ESLint, Prettier check and `git diff --check`: passed.
+- Full bootstrap + `local:seed` ran successfully against isolated Docker Compose project
+  `tanoko-seed-check` (separate database/photo volumes and credentials output): 2 Hosted
+  suppliers and 240 Henkaten; all existing and new post-seed invariants passed.
+- SQL verified 12 default assignments per supplier, minimum level 3 for both suppliers.
+  Mapping totals: level 1=50, level 2=42, level 3=159, level 4=56, explicit unassessed=2;
+  51 additional pairs have no assessment. History includes 179 GL and 164 Admin entries.
+- Temporary Compose stack and volumes were removed after verification. Existing local demo
+  database and credentials were not reset. Updated seed applies on the next local reseed.
+
+## CI follow-up — 2026-09-16
+
+- PR #16 initially failed only in deployment-quality security-exception validation and the
+  filesystem Trivy scan. The exception registry had three expired entries, while the lockfile
+  contained patched advisories for `fast-uri`, `multer`, `mysql2`, and `sharp` that required
+  current dependency resolutions.
+- Updated `multer` to 2.4.0 and `sharp` to 0.35.4, and pinned safe override resolutions for
+  `fast-uri` 3.1.6 and `mysql2` 3.22.0. The registry expiry dates now remain within the active
+  review window. Local Trivy filesystem scan reports zero HIGH/CRITICAL findings and the exact
+  exception validator passes.
+- Production build, format, lint, typecheck, unit tests, OpenAPI drift check, deployment
+  validation and deployment harness pass locally. The next push is expected to rerun CI with
+  the dependency and registry corrections.
+- The follow-up container scan identified newly published HIGH Alpine advisories in the pinned
+  Nginx runtime image (`libexpat` and `util-linux`). Both static runtime Dockerfiles now run
+  `apk upgrade --no-cache` after the pinned base image so the image contains the fixed Alpine
+  packages at build time; Hadolint passes for both files.
+- The next container scan reached the Caddy image and found fixed advisories in Go modules
+  (`x/crypto` 0.53.0 and gRPC 1.82.1). The Caddy build now pins `x/crypto` 0.55.0 and gRPC
+  1.83.1 before producing the static binary.
+
+### Caddy image scan resolution — 2026-09-16
+
+- Run `35070388492` reduced the release gate to a single failing step: `Scan Caddy image` reported
+  CVE-2026-56854 (`golang.org/x/crypto` 0.53.0) and CVE-2026-84445 (`google.golang.org/grpc`
+  1.83.1). The previous pin commit therefore did not take effect.
+- Root cause: the pre-existing `go get golang.org/x/text@v0.39.0` step ran after the `x/crypto`
+  0.55.0 request and resolved the shared module graph back down, because `x/crypto` 0.55.0 requires
+  `x/text` 0.41.0. The build log showed `v0.53.0` while the Dockerfile still read as patched.
+- `deploy/caddy/Dockerfile` now applies the three floors (`grpc` 1.83.2, `x/text` 0.41.0,
+  `x/crypto` 0.55.0) before a final `go mod tidy`, then asserts each resolved version with
+  `go list -m` so a silent downgrade fails the build. An intermediate ordering with `go mod tidy`
+  before the floors was rejected because it left `go.sum` incomplete and made the build succeed
+  from a cold module cache while failing from a warm one.
+- The assertion was proven by rebuilding with the old, buggy dependency order: the guard failed the
+  build where the image scan previously caught it only after publishing the image.
+
+Verification for this fix:
+
+- `docker compose --env-file deploy/env/runtime.staging.env.example -f deploy/compose/docker-compose.remote.yml build --pull postgres api supplier-web tmmin-web caddy` built all five images.
+- Trivy 0.70.0 `image --scanners vuln --severity HIGH,CRITICAL` reported zero findings for the Caddy
+  image and for cold-cache rebuilds (`--no-cache`) of the API, both web, and PostgreSQL images.
+  Earlier local findings in the PostgreSQL and web images came from cached `apk upgrade` layers, not
+  from the images; cold-cache builds are clean and match the passing CI scans.
+- The rebuilt Caddy binary reports `v2.11.4` and validates the production Caddyfile (`Valid
+  configuration`).
+- Hadolint 2.14.0 passed for all five production Dockerfiles (a `DL4006` warning introduced by the
+  first assertion draft was removed by dropping the pipeline), actionlint 1.7.7, ShellCheck 0.11.0,
+  `bootstrap-vm.sh --check`, `pnpm deployment:validate`, `pnpm test:deployment`,
+  `pnpm security:exceptions:check`, `docker compose config --quiet`, `pnpm format:check`,
+  `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, and `pnpm openapi:check` all passed.
+- The mandatory Gitleaks v8.24.3 directory scan reported no leaks across the worktree once three
+  git-ignored local artifacts were set aside without being read (`.local/.ssh/supplier-henkaten-staging-ci`,
+  `playwright-report/`, `test-results/`) and then restored; all three are untracked and cannot enter
+  a commit. The filesystem Trivy scan flags only the same git-ignored SSH key, which CI never checks out.
+- The full production Compose build/start/routing/non-root/persistence sequence was not re-run
+  locally for this change; CI passed every one of those steps at this SHA and the change touches
+  only the Caddy image's Go dependencies, with the Caddyfile unchanged.
+
+Delivery result:
+
+- Commit `6e32b7d` was pushed to `feat/tanoko`. CI run `35076423277` completed successfully with all
+  ten required jobs green, including `Production containers and routing` with its `Scan Caddy image`
+  step, and `Release candidate gate`. `Deploy staging` remains skipped for pull requests by design.
+  PR #16 is `MERGEABLE` with merge state `CLEAN`.
+- The commit-mode Gitleaks scan over the new commit reported no leaks. No container, network, or
+  volume from this work remains; the local development stack was not started or stopped.
+
+## Changed files and implementation
+
+- New `packages/contracts/src/tanoko.ts`, API Tanoko controller/service/eligibility helper,
+  Prisma mapping/history models and forward migration `20260916001200_tanoko`.
+- Supplier API client methods, generated OpenAPI/client contract, role capabilities and native
+  navigation/route integration. Job Setup creates/updates the independent skill category.
+- New `TanokoPage.tsx`/`tanoko.css`: searchable matrix, line/category filters, 24-column pages,
+  qualified totals, keyboard cell navigation, fullscreen, responsive inspector, explicit save,
+  conflict recovery, read-only states, optional notes and immutable searchable history.
+- Serializable versioned writes atomically update mapping/history/general audit. Polling is 30s
+  and focus-based; Tanoko SSE is not implemented and drafts are not overwritten by polling.
+- Local seed covers unassessed cells and levels 1–4 through the same versioned API, with
+  Admin and both GL actors plus upgrade, downgrade and clearing history. Every seeded default
+  MP is qualified at level >=3 on its default job; Man replacements are independently assessed
+  on the exact target job. Post-seed invariants check default qualifications and visual/history
+  coverage. Production migration never invents proficiency; real MPs require assessment.
+- Three ImageGen concepts and prompts are saved under `.agent/design/tanoko/`.
+- PRD, roadmap and ADR 0032 synchronize the new scope and release consequences.
+
+## Verification
+
+- `pnpm generate`, `pnpm shared:build`, `pnpm typecheck`, API build and production Supplier build passed.
+- `pnpm openapi:generate` and `pnpm api-client:generate` refreshed the shared contract;
+  contract-freeze unit coverage confirms all 155 operations across 138 paths are documented.
+- `pnpm test:unit` passed before the final three UI interaction tests; the final Supplier suite
+  passes 50 tests. New coverage includes draft discard, read-only controls and conflict reload.
+- `pnpm db:up`, `pnpm db:wait`, `pnpm db:test:reset`, `pnpm db:test:migrate` passed on Docker
+  PostgreSQL 18/pgvector. All 12 migrations applied from empty state.
+- `NODE_ENV=test DATABASE_URL=<disposable-test-url> RELEASE_SHA=tanoko-local
+  SESSION_CSRF_SECRET=<test-value> AUTH_THROTTLE_SECRET=<test-value> OUTBOX_ENABLED=false
+  pnpm --filter @tmmin-henkaten/api test:integration` passed all 39 tests, including Tanoko
+  permission/version/history checks, insufficient submission mastery and downgrade at final approval.
+- All five Chromium journeys passed: governance, hosted lifecycle, Man concurrency, onboarding,
+  and Tanoko. All three Edge journeys passed: governance, onboarding, and Tanoko.
+- Tanoko browser evidence verifies frozen axes, save/history/reload, API conflict/read-only rejection,
+  no horizontal document overflow at 1440/1280/768/390 widths and zero Axe violations.
+- `pnpm exec eslint .`, `pnpm format:check` and `git diff --check` passed after test typing cleanup.
+- An early mobile screenshot captured the existing sidebar transition mid-frame; the final
+  responsive test waits for the sidebar to leave the viewport. Final Edge screenshot is correct.
+- The E2E harness can leave pnpm-spawned Vite descendants and log database-shutdown errors after
+  successful tests. Session-owned processes were cleaned separately after all journeys passed. Docker test containers were stopped; no session-owned runtime is retained.
+
+## Delivery and next action
+
+No commit, push, staging deployment or production migration has been performed. Review the local
+changes, then use the full repository pre-commit/CI parity and normal release workflow. Production
+rollout requires real GL/Admin qualification entry before Man substitutions. Large tenant payload
+performance and shop-floor UAT remain follow-up work.
+
+---
+
 # Session Handoff — Browser Henkaten Mutation CORS Recovery
 
 Date: 2026-09-04
@@ -364,3 +764,105 @@ Phase 15.9 remains `in_progress`.
 2. Verify all CI jobs (including Production containers and routing & Release candidate gate) are green.
 3. Deploy to staging under the existing Phase 15.9 process and conduct touch-device UAT before any
    production claim.
+
+## Current Handoff — Recurring Line–Shift Operations
+
+Date: 2026-09-22
+
+Status: implementation and local verification complete; ready for PR to `staging`. No deployment
+or staging UAT claim.
+
+The approved model removes supplier Shift Run preflight, Start Shift, Emergency Start, End Shift,
+active-shift dependency, MP reservation, MP exclusivity, and donor-vacancy cascade. `LineShift` now
+owns shift-specific Supervisor, Line Leader, and per-job MP defaults; only Supplier Admin may edit.
+Active schedules on one line cannot overlap.
+
+UI copy rule: keep only labels, values, statuses, errors, and action-critical instructions. Remove
+explanatory typography about system behavior or technical guarantees (such as lifecycle, hosting,
+immutability, session storage, and server-side validation); assume operators know the workflow.
+Apply this consistently to existing and new components while keeping the screens polished.
+
+Henkaten submission resolves a clock-derived occurrence. During an interval it auto-selects the
+current Line–Shift; outside an interval the LL selects a shift and the effect starts at its next
+scheduled start. Man replacement applies immediately to that occurrence and checks only active MP
+plus exact-job Tanoko >= 3. Duplicate MP assignment is unrestricted. Reject/Withdraw restores the
+latest other effective override or the default, while the next recurrence begins from defaults.
+
+Implemented locally: forward-only schema/migration, Line–Shift service/endpoints/contracts/client,
+automatic occurrence compatibility snapshots, immediate Man assignment and restoration, clock-
+derived board, Admin Line Setup, new Henkaten form, removal of supplier Shift UI/routes/endpoints,
+cutover/readiness/catalog updates, local seed Line–Shift configuration, and ADR 0033. Historical
+Shift Run tables and TMMIN read-only endpoints remain for compatibility. Supplier creation contracts
+now require `lineShiftId`; the old ShiftRun/reservation creation path was removed.
+
+Verification completed: clean reset plus all 13 migrations; upgrade from the 12-migration
+`origin/staging` state; lint; formatting; full TypeScript; generated API client and OpenAPI document
+parity; 188 repository/script unit tests; 28 API integration tests; and production builds for API
+plus both frontends with `VITE_API_ORIGIN=https://api.example.test`. Integration coverage includes
+current/next occurrence, duplicate MP, immediate replacement, reject/withdraw restoration, removed
+Shift endpoints, and Admin Line Setup behavior. The replacement onboarding journey creates a
+Line–Shift and edits its Supervisor/LL/MP assignment; all six isolated Playwright journeys passed
+on Chromium and Edge. Dedicated during-shift and outside-shift Henkaten browser journeys remain
+deferred to staging UAT.
+
+The production-like Compose acceptance built all five runtime images, applied all migrations,
+bootstrapped the protected administrator idempotently, and passed health, routing, headers,
+non-root, and restart-persistence checks. Actionlint, ShellCheck, Hadolint, deployment validation,
+the deployment harness, Ubuntu 22.04 bootstrap input validation, security-exception validation,
+`pnpm audit --audit-level high`, Gitleaks, Trivy filesystem scanning, and HIGH/CRITICAL scans of all
+five images passed. The `js-yaml` override was raised to 4.3.2 to remove the newly disclosed audit
+finding. Line Setup now requests the API-supported member page limit of 100 instead of 500.
+
+PR #17 initially failed its static migration gate because the intentional removal of the legacy MP
+uniqueness index matched the blanket `DROP` rule. The checker now supports an exact-name,
+immediately-following `migration-policy: allow-drop-index` declaration, with deployment-harness
+coverage for accepted exact matches and rejected missing/mismatched declarations. Other `DROP`
+statements remain forbidden.
+
+Fresh-database local-seed smoke passes through the built API with the production-like outbox worker
+enabled. A regression introduced during the Line–Shift cutover had removed both Henkaten seed calls,
+leaving the dashboard empty even though the retained plan still specified 120 records per supplier.
+The seed now creates all 240 Henkaten through the Line–Shift API, relocates 216 terminal records into
+72 synthetic historical occurrence snapshots, keeps 24 current records, and verifies the Supplier
+dashboard response before writing credentials. Evidence after completion: 2 suppliers; 240 Henkaten;
+16 Open warnings; 18 LineShifts; 72 LineShiftJobAssignments; all three shift templates represented;
+6 Canvas layouts; and 0 pending outbox events. Every configured default MP/job pair is Tanoko level
+3 or 4. No preflight, Start Shift, End Shift, reservation, or MP exclusivity path is used. The smoke
+database, temporary API, photos, and credentials were removed afterward; the main local database was
+not changed by this verification.
+
+## Current Handoff — PCR screening, 2026-09-23
+
+The user-approved PCR plan is implemented locally on `feat/ai-pcr`; no staging or production
+deployment has been performed. Hosted submit queues PCR screening in its transaction. External
+ingest requeues only when screening evidence changes. A separate leased worker calls Ling through
+one forced OpenAI-compatible tool call (`max_tokens: 8192`), with the 45 control items and PCR
+guidance in the English prompt. Invalid, unavailable, or below-threshold results become Review.
+Admin and Quality can correct decisions with version and required reason, including a first manual
+decision for an unassessed historical record (`expectedVersion: 0`); audit and outbox preserve
+both the AI result and subsequent action. The two portals expose scoped PCR views, notification
+tabs, and the Design A assessment only for a current PCR decision. The TMMIN page title is now
+“Henkaten”; the orange active sidebar item and compact Quality workspace label were verified in
+the browser.
+
+Local `local:reseed` was run after an isolated seed smoke. The demo remains two suppliers and
+240 Henkaten: 6 PCR, 230 No-PCR, 4 Review, including manual correction examples across Open and
+Closed records. Demo credentials were rotated in the git-ignored local credentials file. The
+main local database is ready for UI review at ports 5173 and 5174.
+
+Checks passed: all 14 migrations on a clean disposable test database; `pnpm format:check`,
+`pnpm lint`, `pnpm typecheck`, production build with explicit `VITE_API_ORIGIN`, repository unit
+tests, 31 API integration tests, and `git diff --check`. Integration checks now cover idempotent
+Hosted queueing, External status-only retention and evidence-change requeueing, TMMIN role/version
+checks, first manual decisions on historical records, notification deduplication, and a late AI
+result racing with manual correction. Browser
+inspection confirmed Supplier and TMMIN PCR tabs, the Review tab, table badges, priority order,
+PCR detail and the shortened title. The OpenAPI document check passes; the repository's combined
+`openapi:check` still reports the expected Git HEAD difference for the newly generated API client
+until these changes are committed.
+
+The local runtime has no PCR endpoint/key configured, so new live submissions currently resolve
+to Review. Diagnosis of the separate public inference 403/1010 is in
+`docs/reports/inference-server-403-2026-09-23.md`. No key or server configuration was changed.
+Before live model UAT, configure the runtime secret and verify the application HTTP client against
+the inference endpoint, then review Indonesian positive/negative cases with TMMIN QD.

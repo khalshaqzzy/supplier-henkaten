@@ -40,8 +40,12 @@ export function NotificationsPage() {
     mutationFn: ({ id, version, read }: { id: string; version: number; read: boolean }) =>
       supplierApi.setNotificationRead(id, { read, expectedVersion: version }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'notifications') });
-      await queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'notification-count') });
+      await queryClient.invalidateQueries({
+        queryKey: scopedKey(scope, 'notifications').slice(0, -1),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: scopedKey(scope, 'notification-count').slice(0, -1),
+      });
     },
   });
 
@@ -50,7 +54,7 @@ export function NotificationsPage() {
       <PageHeader
         eyebrow="Perhatian dan tindak lanjut"
         title="Notifikasi"
-        description="Event operasional sesuai izin Anda, dengan deep link yang diverifikasi kembali."
+        description=""
         actions={
           <Button
             variant="secondary"
@@ -86,14 +90,14 @@ export function NotificationsPage() {
       {query.isError && (
         <ErrorState
           title="Notifikasi tidak dapat dimuat"
-          description="Coba kembali tanpa kehilangan read state yang sudah tersimpan."
+          description=""
           action={<Button onClick={() => void query.refetch()}>Coba lagi</Button>}
         />
       )}
       {query.data && query.data.items.length === 0 && (
         <EmptyState
           title={unreadOnly ? 'Tidak ada notifikasi baru' : 'Belum ada notifikasi'}
-          description="Event yang memerlukan perhatian akan muncul di sini."
+          description=""
           action={
             unreadOnly ? (
               <Button variant="secondary" onClick={() => setParams({}, { replace: true })}>
@@ -178,11 +182,7 @@ export function AuditPage() {
 
   return (
     <div className="product-page">
-      <PageHeader
-        eyebrow="Immutable evidence"
-        title="Audit"
-        description="Riwayat domain dan keamanan sesuai tenant atau line scope Anda."
-      />
+      <PageHeader eyebrow="Sistem" title="Audit" description="" />
       <FilterBar>
         <label>
           <span>Tindakan</span>
@@ -205,7 +205,7 @@ export function AuditPage() {
       {query.isError && (
         <ErrorState
           title="Audit tidak dapat dimuat"
-          description="Scope tidak diperluas di browser. Coba permintaan yang sama kembali."
+          description=""
           action={<Button onClick={() => void query.refetch()}>Coba lagi</Button>}
         />
       )}
@@ -228,10 +228,7 @@ export function AuditPage() {
       )}
       {query.data && query.data.items.length > 0 && (
         <>
-          <Panel
-            title="Timeline audit"
-            description={`${query.data.items.length} event pada halaman ini.`}
-          >
+          <Panel title="Timeline audit" description="">
             <ol className="audit-timeline">
               {query.data.items.map((item) => (
                 <li key={item.id}>

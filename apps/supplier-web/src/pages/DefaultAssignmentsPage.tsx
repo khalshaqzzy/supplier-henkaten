@@ -1,8 +1,9 @@
-import { AlertTriangle, ArrowRightLeft, CheckCircle2, UserPlus, Users } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
+import { ApiProblemError } from '@tmmin-henkaten/api-client';
+import type { LineShift } from '@tmmin-henkaten/contracts';
 import {
   Alert,
   Button,
@@ -10,168 +11,107 @@ import {
   ErrorState,
   NativeSelect,
   Panel,
-  Sheet,
   Skeleton,
 } from '@tmmin-henkaten/ui';
-
-import { ApiProblemError } from '@tmmin-henkaten/api-client';
 
 import { supplierApi } from '../app/api';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { PageHeader } from '../components/layout';
 
-type AssignmentKind = 'supervisor' | 'leader' | 'mp';
-
 export function DefaultAssignmentsPage() {
   const { session } = useSession();
   const [params, setParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const [editor, setEditor] = useState<{
-    kind: AssignmentKind;
-    resourceId: string;
-    currentMemberId: string | undefined;
-    assignmentId: string | undefined;
-    version: number | undefined;
-  } | null>(null);
-  const [selectedMember, setSelectedMember] = useState('');
+  const [selectedShiftId, setSelectedShiftId] = useState('');
+  const [newShiftTemplateId, setNewShiftTemplateId] = useState('');
+  const [copyFromId, setCopyFromId] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
-  const returnFocusRef = useRef<HTMLElement | null>(null);
-  const closeEditor = () => {
-    setEditor(null);
-    setSelectedMember('');
-    queueMicrotask(() => returnFocusRef.current?.focus());
-  };
   const scope = {
     userId: session!.principal.userId,
     supplierId: session!.supplier!.id,
     purpose: session!.principal.purpose,
   };
   const lines = useQuery({
-    queryKey: scopedKey(scope, 'master-lines-defaults'),
+    queryKey: scopedKey(scope, 'line-setup-lines'),
     queryFn: () => supplierApi.lines({ limit: 100, active: 'ACTIVE' }),
   });
   const members = useQuery({
-    queryKey: scopedKey(scope, 'master-members-defaults'),
+    queryKey: scopedKey(scope, 'line-setup-members'),
     queryFn: () => supplierApi.members({ limit: 100, active: 'ACTIVE' }),
   });
-  const assignments = useQuery({
-    queryKey: scopedKey(scope, 'default-assignments'),
-    queryFn: () => supplierApi.defaultAssignments(),
+  const templates = useQuery({
+    queryKey: scopedKey(scope, 'line-setup-shifts'),
+    queryFn: () => supplierApi.shiftTemplates({ limit: 100, active: 'ACTIVE' }),
   });
   const lineId = params.get('lineId') || lines.data?.items[0]?.id || '';
-  const jobs = useQuery({
-    queryKey: scopedKey(scope, 'line-jobs-defaults', lineId),
-    queryFn: () => supplierApi.jobs(lineId, { limit: 100, active: 'ACTIVE' }),
+  const lineShifts = useQuery({
+    queryKey: scopedKey(scope, 'line-shifts', lineId),
+    queryFn: () => supplierApi.lineShifts(lineId),
     enabled: Boolean(lineId),
   });
-  const activeShift = useQuery({
-    queryKey: scopedKey(scope, 'current-shift-defaults', lineId),
-    queryFn: () => supplierApi.currentShift({ lineId }),
-    enabled: Boolean(lineId),
-  });
-  const memberMap = useMemo(
-    () => new Map(members.data?.items.map((member) => [member.id, member]) ?? []),
-    [members.data],
-  );
-  const mutation = useMutation({
-    mutationFn: async () => {
-      if (!editor || !selectedMember) throw new Error('SelectionRequired');
-      const collection =
-        editor.kind === 'supervisor'
-          ? assignments.data!.supervisors
-          : editor.kind === 'leader'
-            ? assignments.data!.lineLeaders
-            : assignments.data!.mps;
-      const occupied = collection.find(
-        (assignment) =>
-          assignment.memberId === selectedMember && assignment.resourceId !== editor.resourceId,
-      );
-      if (occupied && editor.kind !== 'supervisor') {
-        const confirmed = window.confirm(
-          'Member sudah assigned pada resource lain. Lakukan atomic move ke target baru?',
-        );
-        if (!confirmed) throw new Error('MoveCancelled');
-        return supplierApi.moveDefault(editor.kind, editor.resourceId, {
-          memberId: selectedMember,
-          fromResourceId: occupied.resourceId,
-          expectedSourceVersion: occupied.version,
-          ...(editor.version === undefined ? {} : { expectedTargetVersion: editor.version }),
-        });
-      }
-      return supplierApi.assignDefault(editor.kind, editor.resourceId, {
-        memberId: selectedMember,
-        ...(editor.version === undefined ? {} : { expectedAssignmentVersion: editor.version }),
-      });
-    },
-    onSuccess: async () => {
-      closeEditor();
-      await queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'default-assignments') });
-    },
-    onError: (error) => {
-      if (error instanceof Error && error.message === 'MoveCancelled') return;
-      setProblem(
-        error instanceof ApiProblemError
-          ? error.problem.detail
-          : 'Assignment berubah atau member tidak lagi tersedia. Muat ulang dan pilih kembali.',
-      );
-    },
-  });
-  const remove = useMutation({
-    mutationFn: () => {
-      if (!editor?.assignmentId || editor.version === undefined)
-        throw new Error('AssignmentMissing');
-      const kind =
-        editor.kind === 'supervisor'
-          ? 'supervisors'
-          : editor.kind === 'leader'
-            ? 'line-leaders'
-            : 'mps';
-      return supplierApi.removeAssignment(kind, editor.resourceId, {
-        expectedAssignmentVersion: editor.version,
-      });
-    },
-    onSuccess: async () => {
-      closeEditor();
-      await queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'default-assignments') });
-    },
-    onError: (error) =>
-      setProblem(
-        error instanceof ApiProblemError
-          ? error.problem.detail
-          : 'Assignment sudah berubah. Muat ulang sebelum menghapus.',
-      ),
-  });
+  const selected =
+    lineShifts.data?.items.find(({ id }) => id === selectedShiftId) ?? lineShifts.data?.items[0];
 
-  const lineAssignment = (kind: 'supervisors' | 'lineLeaders') =>
-    assignments.data?.[kind].find((assignment) => assignment.resourceId === lineId);
-  const loading = lines.isLoading || members.isLoading || assignments.isLoading;
-  const editorCollection =
-    editor && assignments.data
-      ? editor.kind === 'supervisor'
-        ? assignments.data.supervisors
-        : editor.kind === 'leader'
-          ? assignments.data.lineLeaders
-          : assignments.data.mps
-      : [];
-  const occupiedAssignment = editorCollection.find(
-    (assignment) =>
-      assignment.memberId === selectedMember && assignment.resourceId !== editor?.resourceId,
-  );
+  useEffect(() => {
+    if (selected && selected.id !== selectedShiftId) setSelectedShiftId(selected.id);
+  }, [selected, selectedShiftId]);
+
+  const availableTemplates = useMemo(() => {
+    const configured = new Set(
+      lineShifts.data?.items.map(({ shiftTemplateId }) => shiftTemplateId),
+    );
+    return templates.data?.items.filter(({ id }) => !configured.has(id)) ?? [];
+  }, [lineShifts.data, templates.data]);
+  const invalidate = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'line-shifts', lineId) }),
+      queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'setup-readiness') }),
+    ]);
+  };
+  const addShift = useMutation({
+    mutationFn: () =>
+      supplierApi.createLineShift(lineId, {
+        shiftTemplateId: newShiftTemplateId,
+        ...(copyFromId ? { copyFromLineShiftId: copyFromId } : {}),
+      }),
+    onSuccess: async (created) => {
+      setProblem(null);
+      setNewShiftTemplateId('');
+      setCopyFromId('');
+      queryClient.setQueryData<{ items: LineShift[] }>(
+        scopedKey(scope, 'line-shifts', lineId),
+        (previous) =>
+          previous
+            ? { items: [...previous.items.filter(({ id }) => id !== created.id), created] }
+            : { items: [created] },
+      );
+      setSelectedShiftId(created.id);
+      await invalidate();
+    },
+    onError: (error) => setProblem(problemDetail(error, 'Shift tidak dapat ditambahkan.')),
+  });
+  const action = useMutation({
+    mutationFn: ({ item, active }: { item: LineShift; active: boolean }) =>
+      supplierApi.lineShiftAction(item.id, active ? 'activate' : 'deactivate', item.version),
+    onSuccess: invalidate,
+    onError: (error) => setProblem(problemDetail(error, 'Status shift tidak dapat diubah.')),
+  });
+  const loading =
+    lines.isLoading || members.isLoading || templates.isLoading || lineShifts.isLoading;
 
   return (
     <div className="product-page">
-      <PageHeader
-        eyebrow="Master Data"
-        title="Default Assignment"
-        description="Tetapkan Supervisor, Line Leader, dan MP untuk future Shift Run."
-      />
+      <PageHeader eyebrow="Master Data" title="Line Setup" description="" />
       <div className="defaults-toolbar">
         <label>
           <span>Line</span>
           <NativeSelect
             value={lineId}
-            onChange={(event) => setParams({ lineId: event.target.value }, { replace: true })}
+            onChange={(event) => {
+              setSelectedShiftId('');
+              setParams({ lineId: event.target.value }, { replace: true });
+            }}
           >
             {lines.data?.items.map((line) => (
               <option key={line.id} value={line.id}>
@@ -180,296 +120,221 @@ export function DefaultAssignmentsPage() {
             ))}
           </NativeSelect>
         </label>
-        <div className="defaults-legend">
-          <span>
-            <i className="is-assigned" />
-            Assigned
-          </span>
-          <span>
-            <i className="is-empty" />
-            Belum assigned
-          </span>
-        </div>
       </div>
-      {activeShift.data?.status === 'ACTIVE' && (
-        <Alert tone="info" title="Shift aktif sedang berjalan">
-          Perubahan default hanya berlaku untuk shift berikutnya dan tidak mengubah Working
-          Assignment saat ini.
-        </Alert>
-      )}
-      {problem && !editor && (
-        <Alert tone="danger" title="Assignment gagal">
+      {problem && (
+        <Alert tone="danger" title="Perubahan gagal">
           {problem}
         </Alert>
       )}
       {loading && (
         <div className="list-skeleton">
-          {Array.from({ length: 8 }, (_, index) => (
-            <Skeleton key={index} />
-          ))}
+          <Skeleton />
+          <Skeleton />
+          <Skeleton />
         </div>
       )}
-      {(lines.isError || members.isError || assignments.isError) && (
+      {(lines.isError || members.isError || templates.isError || lineShifts.isError) && (
         <ErrorState
-          title="Default Assignment tidak dapat dimuat"
-          description="Hierarchy dan version harus diambil bersama dari server."
-          action={<Button onClick={() => void assignments.refetch()}>Coba lagi</Button>}
+          title="Line Setup tidak dapat dimuat"
+          description=""
+          action={<Button onClick={() => void lineShifts.refetch()}>Coba lagi</Button>}
         />
       )}
-      {!loading && !lineId && (
-        <EmptyState
-          title="Belum ada line aktif"
-          description="Buat line dan job sebelum menetapkan default assignment."
-        />
-      )}
-      {assignments.data && lineId && (
+      {!loading && !lineId && <EmptyState title="Belum ada line aktif" description="" />}
+      {lineId && lineShifts.data && (
         <>
-          <section className="defaults-summary">
-            <AssignmentSummary
-              label="Supervisor default"
-              assignment={lineAssignment('supervisors')}
-              memberMap={memberMap}
-              onEdit={(assignment, trigger) => {
-                returnFocusRef.current = trigger;
-                setProblem(null);
-                setEditor({
-                  kind: 'supervisor',
-                  resourceId: lineId,
-                  currentMemberId: assignment?.memberId,
-                  assignmentId: assignment?.id,
-                  version: assignment?.version,
-                });
-                setSelectedMember(assignment?.memberId ?? '');
-              }}
-            />
-            <AssignmentSummary
-              label="Line Leader default"
-              assignment={lineAssignment('lineLeaders')}
-              memberMap={memberMap}
-              onEdit={(assignment, trigger) => {
-                returnFocusRef.current = trigger;
-                setProblem(null);
-                setEditor({
-                  kind: 'leader',
-                  resourceId: lineId,
-                  currentMemberId: assignment?.memberId,
-                  assignmentId: assignment?.id,
-                  version: assignment?.version,
-                });
-                setSelectedMember(assignment?.memberId ?? '');
-              }}
-            />
-            <div className="defaults-summary__metric">
-              <Users aria-hidden="true" />
-              <span>
-                <strong>{jobs.data?.items.length ?? 0}</strong>
-                <small>Job aktif</small>
-              </span>
+          <Panel title="Shift line">
+            <div className="defaults-toolbar">
+              <label>
+                <span>Shift baru</span>
+                <NativeSelect
+                  value={newShiftTemplateId}
+                  onChange={(event) => setNewShiftTemplateId(event.target.value)}
+                >
+                  <option value="">Pilih shift</option>
+                  {availableTemplates.map((shift) => (
+                    <option key={shift.id} value={shift.id}>
+                      {shift.name} · {shift.startTime}–{shift.endTime}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </label>
+              <label>
+                <span>Salin assignment</span>
+                <NativeSelect
+                  value={copyFromId}
+                  onChange={(event) => setCopyFromId(event.target.value)}
+                >
+                  <option value="">Tanpa salinan</option>
+                  {lineShifts.data.items.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.shiftName}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </label>
+              <Button
+                disabled={!newShiftTemplateId}
+                loading={addShift.isPending}
+                onClick={() => addShift.mutate()}
+              >
+                Tambah shift
+              </Button>
             </div>
-          </section>
-          <Panel
-            title="MP per job"
-            description="Satu MP hanya boleh menjadi default pada satu job."
-          >
-            <div className="defaults-table">
-              <div className="defaults-table__head">
-                <span>Urutan</span>
-                <span>Job</span>
-                <span>MP default</span>
-                <span>Status</span>
-                <span />
+            {lineShifts.data.items.length > 0 && (
+              <div className="defaults-toolbar" role="tablist" aria-label="Shift line">
+                {lineShifts.data.items.map((item) => (
+                  <Button
+                    key={item.id}
+                    size="sm"
+                    variant={selected?.id === item.id ? 'primary' : 'secondary'}
+                    onClick={() => setSelectedShiftId(item.id)}
+                  >
+                    {item.shiftName} · {item.startTime}–{item.endTime}
+                    {item.active ? '' : ' · Nonaktif'}
+                  </Button>
+                ))}
               </div>
-              {jobs.data?.items.map((job) => {
-                const assignment = assignments.data.mps.find((item) => item.resourceId === job.id);
-                const member = assignment ? memberMap.get(assignment.memberId) : undefined;
-                return (
-                  <div key={job.id} className="defaults-table__row">
-                    <span className="order-pill">{String(job.displayOrder).padStart(2, '0')}</span>
-                    <strong>{job.name}</strong>
-                    <Person member={member} />
-                    <span className={assignment ? 'status-ok' : 'status-missing'}>
-                      {assignment ? <CheckCircle2 /> : <AlertTriangle />}
-                      {assignment ? 'Assigned' : 'Kosong'}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant={assignment ? 'secondary' : 'primary'}
-                      onClick={(event) => {
-                        returnFocusRef.current = event.currentTarget;
-                        setProblem(null);
-                        setEditor({
-                          kind: 'mp',
-                          resourceId: job.id,
-                          currentMemberId: assignment?.memberId,
-                          assignmentId: assignment?.id,
-                          version: assignment?.version,
-                        });
-                        setSelectedMember(assignment?.memberId ?? '');
-                      }}
-                    >
-                      {assignment ? 'Ganti' : 'Assign'}
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
+            )}
           </Panel>
+          {selected ? (
+            <AssignmentEditor
+              key={`${selected.id}:${selected.version}`}
+              item={selected}
+              members={members.data?.items ?? []}
+              onSaved={invalidate}
+              onProblem={setProblem}
+              onToggle={() => action.mutate({ item: selected, active: !selected.active })}
+              toggling={action.isPending}
+            />
+          ) : (
+            <EmptyState title="Belum ada shift pada line ini" description="" />
+          )}
         </>
       )}
-      {editor && (
-        <Sheet
-          trigger={<button type="button" hidden />}
-          open
-          onOpenChange={(open) => {
-            if (!open) closeEditor();
-          }}
-          title={editor.currentMemberId ? 'Ubah Default Assignment' : 'Assign Member'}
-          description="Konflik uniqueness diselesaikan sebagai atomic move dengan version check."
-          footer={
-            <div className="assignment-sheet-actions">
-              {editor.assignmentId && (
-                <Button
-                  variant="danger"
-                  loading={remove.isPending}
-                  onClick={() => {
-                    if (window.confirm('Hapus default assignment ini?')) remove.mutate();
-                  }}
-                >
-                  Hapus assignment
-                </Button>
-              )}
-              <Button variant="ghost" onClick={closeEditor}>
-                Batal
-              </Button>
-              <Button
-                leadingIcon={<ArrowRightLeft />}
-                loading={mutation.isPending}
-                disabled={!selectedMember}
-                onClick={() => mutation.mutate()}
-              >
-                Konfirmasi perubahan
-              </Button>
-            </div>
-          }
-        >
-          <div className="assignment-change-preview">
-            <section>
-              <span>Dari kondisi saat ini</span>
-              <strong>
-                {editor.currentMemberId
-                  ? (memberMap.get(editor.currentMemberId)?.fullName ?? 'Member tidak tersedia')
-                  : 'Belum assigned'}
-              </strong>
-              <small>
-                {editor.currentMemberId
-                  ? memberMap.get(editor.currentMemberId)?.registrationNumber
-                  : 'Tidak ada default pada target'}
-              </small>
-            </section>
-            <ArrowRightLeft aria-hidden="true" />
-            <section>
-              <span>Ke kondisi baru</span>
-              <strong>
-                {selectedMember
-                  ? (memberMap.get(selectedMember)?.fullName ?? 'Pilih member')
-                  : 'Pilih member'}
-              </strong>
-              <small>
-                {occupiedAssignment
-                  ? 'Member akan dipindahkan secara atomik'
-                  : 'Assignment target akan diperbarui'}
-              </small>
-            </section>
-          </div>
-          <FieldSelect
-            kind={editor.kind}
-            value={selectedMember}
-            members={members.data?.items ?? []}
-            onChange={setSelectedMember}
-          />
-          <Alert tone="warning" title="Efektif untuk future shift">
-            Working Assignment aktif tidak berubah. Audit event akan direkam.
-          </Alert>
-          {problem && (
-            <Alert tone="danger" title="Assignment perlu dimuat ulang">
-              {problem}
-            </Alert>
-          )}
-        </Sheet>
-      )}
     </div>
   );
 }
 
-type Assignment = Awaited<ReturnType<typeof supplierApi.defaultAssignments>>['mps'][number];
 type Member = Awaited<ReturnType<typeof supplierApi.members>>['items'][number];
 
-function AssignmentSummary({
-  label,
-  assignment,
-  memberMap,
-  onEdit,
+function AssignmentEditor({
+  item,
+  members,
+  onSaved,
+  onProblem,
+  onToggle,
+  toggling,
 }: {
-  label: string;
-  assignment: Assignment | undefined;
-  memberMap: Map<string, Member>;
-  onEdit: (assignment: Assignment | undefined, trigger: HTMLElement) => void;
+  item: LineShift;
+  members: Member[];
+  onSaved: () => Promise<void>;
+  onProblem: (value: string | null) => void;
+  onToggle: () => void;
+  toggling: boolean;
 }) {
-  const member = assignment ? memberMap.get(assignment.memberId) : undefined;
+  const [supervisorId, setSupervisorId] = useState(item.supervisorMemberId ?? '');
+  const [leaderId, setLeaderId] = useState(item.lineLeaderMemberId ?? '');
+  const [mps, setMps] = useState<Record<string, string>>(
+    Object.fromEntries(item.assignments.map(({ jobId, mpMemberId }) => [jobId, mpMemberId ?? ''])),
+  );
+  const save = useMutation({
+    mutationFn: () =>
+      supplierApi.updateLineShiftAssignments(item.id, {
+        expectedVersion: item.version,
+        supervisorMemberId: supervisorId || null,
+        lineLeaderMemberId: leaderId || null,
+        jobs: item.assignments.map(({ jobId }) => ({ jobId, mpMemberId: mps[jobId] || null })),
+      }),
+    onSuccess: async () => {
+      onProblem(null);
+      await onSaved();
+    },
+    onError: (error) => onProblem(problemDetail(error, 'Assignment tidak dapat disimpan.')),
+  });
+  const role = (name: Member['role']) => members.filter((member) => member.role === name);
   return (
-    <div className="defaults-summary__person">
-      <span>{label}</span>
-      <Person member={member} />
-      <Button
-        size="sm"
-        variant="ghost"
-        leadingIcon={<UserPlus />}
-        onClick={(event) => onEdit(assignment, event.currentTarget)}
-      >
-        {assignment ? 'Ganti' : 'Assign'}
-      </Button>
-    </div>
+    <Panel title={`${item.shiftName} · ${item.startTime}–${item.endTime}`}>
+      <div className="defaults-summary">
+        <MemberSelect
+          label="Supervisor"
+          value={supervisorId}
+          members={role('SUPERVISOR')}
+          onChange={setSupervisorId}
+        />
+        <MemberSelect
+          label="Line Leader"
+          value={leaderId}
+          members={role('LINE_LEADER')}
+          onChange={setLeaderId}
+        />
+      </div>
+      <div className="defaults-table">
+        <div className="defaults-table__head">
+          <span>Urutan</span>
+          <span>Job</span>
+          <span>MP</span>
+        </div>
+        {item.assignments.map((assignment) => (
+          <div className="defaults-table__row" key={assignment.id}>
+            <span className="order-pill">
+              {String(assignment.jobDisplayOrder).padStart(2, '0')}
+            </span>
+            <strong>{assignment.jobName}</strong>
+            <NativeSelect
+              value={mps[assignment.jobId] ?? ''}
+              onChange={(event) =>
+                setMps((current) => ({ ...current, [assignment.jobId]: event.target.value }))
+              }
+            >
+              <option value="">Pilih MP</option>
+              {role('MP').map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.fullName} · {member.registrationNumber}
+                </option>
+              ))}
+            </NativeSelect>
+          </div>
+        ))}
+      </div>
+      <div className="assignment-sheet-actions">
+        <Button variant="secondary" loading={toggling} onClick={onToggle}>
+          {item.active ? 'Nonaktifkan shift' : 'Aktifkan shift'}
+        </Button>
+        <Button loading={save.isPending} onClick={() => save.mutate()}>
+          Simpan assignment
+        </Button>
+      </div>
+    </Panel>
   );
 }
 
-function Person({ member }: { member: Member | undefined }) {
-  if (!member) return <span className="person-empty">Belum assigned</span>;
-  return (
-    <span className="person-summary">
-      <i>{member.initials}</i>
-      <span>
-        <strong>{member.fullName}</strong>
-        <small>{member.registrationNumber}</small>
-      </span>
-    </span>
-  );
-}
-
-function FieldSelect({
-  kind,
+function MemberSelect({
+  label,
   value,
   members,
   onChange,
 }: {
-  kind: AssignmentKind;
+  label: string;
   value: string;
   members: Member[];
   onChange: (value: string) => void;
 }) {
-  const role = kind === 'supervisor' ? 'SUPERVISOR' : kind === 'leader' ? 'LINE_LEADER' : 'MP';
   return (
     <label className="sheet-field">
-      <span>Member tersedia</span>
+      <span>{label}</span>
       <NativeSelect value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">Pilih member</option>
-        {members
-          .filter((member) => member.role === role)
-          .map((member) => (
-            <option key={member.id} value={member.id}>
-              {member.fullName} · {member.registrationNumber}
-            </option>
-          ))}
+        <option value="">Pilih {label}</option>
+        {members.map((member) => (
+          <option key={member.id} value={member.id}>
+            {member.fullName} · {member.registrationNumber}
+          </option>
+        ))}
       </NativeSelect>
     </label>
   );
+}
+
+function problemDetail(error: unknown, fallback: string) {
+  return error instanceof ApiProblemError ? error.problem.detail : fallback;
 }

@@ -25,6 +25,9 @@ const NOTIFICATION_EVENTS = [
   'MP_RESERVED',
   'EXTERNAL_PROJECTION_UPDATED',
   'EXTERNAL_INGEST_REJECTED',
+  'PCR_ASSESSED',
+  'PCR_REVIEW_REQUIRED',
+  'PCR_DECISION_CORRECTED',
 ] as const;
 
 @Injectable()
@@ -48,6 +51,8 @@ export class NotificationService implements OnModuleInit {
       where: {
         recipientUserId: principal.userId,
         ...(query.unreadOnly ? { readAt: null } : {}),
+        ...(query.pcrTab === 'PCR' ? { kind: { in: ['PCR_FLAGGED', 'PCR_CORRECTED'] } } : {}),
+        ...(query.pcrTab === 'REVIEW' ? { kind: 'PCR_REVIEW_REQUIRED' } : {}),
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: query.limit + 1,
@@ -110,6 +115,17 @@ export class NotificationService implements OnModuleInit {
     if (!recipients.length) return;
     await this.prisma.$transaction(async (tx) => {
       for (const recipientUserId of recipients) {
+        const recipient = await tx.user.findUnique({
+          where: { id: recipientUserId },
+          select: { realm: true },
+        });
+        const recipientTemplate =
+          recipient?.realm === 'TMMIN' && event.eventType.startsWith('PCR_')
+            ? {
+                ...template,
+                deepLink: `/henkatens/${event.aggregateType === 'Henkaten' ? 'hosted' : 'external'}/${event.supplierId}/${event.aggregateId}`,
+              }
+            : template;
         const notification = await tx.notification.upsert({
           where: {
             sourceEventId_recipientUserId: {
@@ -121,7 +137,7 @@ export class NotificationService implements OnModuleInit {
             supplierId: event.supplierId!,
             recipientUserId,
             sourceEventId: event.id,
-            ...template,
+            ...recipientTemplate,
           },
           update: {},
         });
@@ -144,6 +160,42 @@ export class NotificationService implements OnModuleInit {
 
   private async recipients(event: ClaimedOutboxEvent): Promise<string[]> {
     const supplierId = event.supplierId!;
+    if (event.eventType.startsWith('PCR_')) {
+      const payload = asRecord(event.payload);
+      const reviewOnly = payload.pcrStatus === 'REVIEW';
+      const tmmin = await this.prisma.user.findMany({
+        where: {
+          realm: 'TMMIN',
+          role: { in: ['TMMIN_ADMIN', 'TMMIN_QUALITY'] },
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+      if (reviewOnly || event.aggregateType !== 'Henkaten') return tmmin.map(({ id }) => id);
+      const henkaten = await this.prisma.henkaten.findUnique({
+        where: { id: event.aggregateId },
+        select: {
+          createdById: true,
+          approvalRoutes: { select: { route: true, currentResponsibleMemberId: true } },
+        },
+      });
+      const supervisorId = henkaten?.approvalRoutes.find(
+        ({ route }) => route === 'SUPERVISOR',
+      )?.currentResponsibleMemberId;
+      const supplierUsers = await this.prisma.user.findMany({
+        where: {
+          supplierId,
+          status: 'ACTIVE',
+          OR: [
+            { role: { in: ['SUPPLIER_ADMIN', 'QC'] } },
+            ...(henkaten ? [{ id: henkaten.createdById }] : []),
+            ...(supervisorId ? [{ memberId: supervisorId }] : []),
+          ],
+        },
+        select: { id: true },
+      });
+      return [...new Set([...tmmin, ...supplierUsers].map(({ id }) => id))];
+    }
     if (event.eventType === 'EXTERNAL_PROJECTION_UPDATED') {
       const users = await this.prisma.user.findMany({
         where: {
@@ -230,6 +282,36 @@ export class NotificationService implements OnModuleInit {
       deepLink: path,
     });
     switch (event.eventType) {
+      case 'PCR_ASSESSED':
+      case 'PCR_REVIEW_REQUIRED':
+      case 'PCR_DECISION_CORRECTED': {
+        const payload = asRecord(event.payload);
+        const state = payload.pcrStatus;
+        const review = state === 'REVIEW';
+        const removed = state === 'NO_PCR';
+        return {
+          kind: review
+            ? 'PCR_REVIEW_REQUIRED'
+            : event.eventType === 'PCR_DECISION_CORRECTED'
+              ? 'PCR_CORRECTED'
+              : 'PCR_FLAGGED',
+          title: review
+            ? 'Penilaian PCR perlu ditinjau'
+            : removed
+              ? 'Status PCR Henkaten dikoreksi'
+              : 'Henkaten terindikasi memerlukan PCR',
+          body: review
+            ? 'Tinjau Henkaten dan tetapkan keputusan PCR atau No-PCR.'
+            : removed
+              ? 'TMMIN telah mengubah penilaian menjadi No-PCR. Lihat detail terbaru.'
+              : 'Ajukan PCR melalui jalur yang berlaku. Jika ada kendala teknis, hubungi TMMIN QD.',
+          ...link(
+            event.aggregateType === 'Henkaten'
+              ? `/henkatens/${event.aggregateId}`
+              : `/henkatens/external/${event.supplierId}/${event.aggregateId}`,
+          ),
+        };
+      }
       case 'HENKATEN_OPENED':
         return {
           kind: 'APPROVAL_PENDING',

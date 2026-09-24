@@ -18,6 +18,7 @@ import {
   utcTimestampSchema,
 } from './common.js';
 import { businessDateSchema, workingAssignmentSchema } from './shifts.js';
+import { pcrAssessmentSchema, pcrStatusSchema } from './pcr.js';
 
 const requiredText = z.string().trim().min(1).max(2_000);
 
@@ -26,7 +27,7 @@ export const checklistSubmissionAnswerSchema = z
   .strict();
 
 const submissionBase = {
-  shiftRunId: opaqueIdSchema,
+  lineShiftId: opaqueIdSchema,
   jobId: opaqueIdSchema,
   partId: opaqueIdSchema,
   checklistVersionId: opaqueIdSchema,
@@ -41,16 +42,8 @@ export const createHenkatenRequestSchema = z.discriminatedUnion('category', [
     .object({
       ...submissionBase,
       category: z.literal('MAN'),
-      targetWorkingAssignmentId: opaqueIdSchema,
-      targetAssignmentVersion: optimisticVersionSchema,
-      replaced: z.discriminatedUnion('kind', [
-        z.object({ kind: z.literal('VACANT') }).strict(),
-        z.object({ kind: z.literal('MP'), memberId: opaqueIdSchema }).strict(),
-      ]),
+      lineShiftJobAssignmentId: opaqueIdSchema,
       replacementMpMemberId: opaqueIdSchema,
-      sourceWorkingAssignmentId: opaqueIdSchema.optional(),
-      sourceAssignmentVersion: optimisticVersionSchema.optional(),
-      resolutionIssueId: opaqueIdSchema.optional(),
     })
     .strict(),
   ...(['MACHINE', 'MATERIAL', 'METHOD'] as const).map((category) =>
@@ -104,6 +97,7 @@ export const henkatenSummarySchema = z
     id: opaqueIdSchema,
     identifier: z.string().min(1).max(150),
     shiftRunId: opaqueIdSchema,
+    lineShiftId: opaqueIdSchema.nullable(),
     lineId: opaqueIdSchema,
     jobId: opaqueIdSchema,
     partId: opaqueIdSchema,
@@ -113,11 +107,14 @@ export const henkatenSummarySchema = z
     category: henkatenCategorySchema,
     businessDate: businessDateSchema,
     occurredAt: utcTimestampSchema,
+    effectiveStartAt: utcTimestampSchema.nullable(),
+    effectiveEndAt: utcTimestampSchema.nullable(),
     line: z.object({ code: z.string(), name: z.string() }).strict(),
     jobName: z.string(),
     part: z.object({ number: z.string(), name: z.string() }).strict(),
     routes: approvalRouteSummarySchema,
     version: optimisticVersionSchema,
+    pcr: pcrAssessmentSchema.nullable(),
   })
   .strict();
 
@@ -167,6 +164,7 @@ export const henkatenDetailSchema = henkatenSummarySchema
     man: z
       .object({
         targetWorkingAssignmentId: opaqueIdSchema,
+        lineShiftJobAssignmentId: opaqueIdSchema.nullable(),
         sourceWorkingAssignmentId: opaqueIdSchema.nullable(),
         replacedMpMemberId: opaqueIdSchema.nullable(),
         replacedWasVacant: z.boolean(),
@@ -216,6 +214,7 @@ export const henkatenListQuerySchema = z
     to: utcTimestampSchema.optional(),
     approvalStatus: approvalRouteStatusSchema.optional(),
     approvalRoute: approvalRouteSchema.optional(),
+    pcrStatus: pcrStatusSchema.optional(),
   })
   .strict();
 export type HenkatenListQuery = z.infer<typeof henkatenListQuerySchema>;
@@ -269,6 +268,13 @@ export const henkatenFormOptionsSchema = z
           fullName: z.string().min(1).max(150),
           registrationNumber: z.string().min(1).max(100),
           reserved: z.boolean(),
+          skillLevels: z
+            .array(
+              z
+                .object({ jobId: opaqueIdSchema, level: z.number().int().min(1).max(4).nullable() })
+                .strict(),
+            )
+            .optional(),
           currentAssignment: z
             .object({
               id: opaqueIdSchema,
@@ -316,6 +322,7 @@ export const clonePrefillSchema = z
     clonedFromHenkatenId: opaqueIdSchema,
     category: henkatenCategorySchema,
     shiftRunId: opaqueIdSchema,
+    lineShiftId: opaqueIdSchema.nullable(),
     jobId: opaqueIdSchema,
     partId: opaqueIdSchema,
     cause: z.string(),
@@ -365,5 +372,7 @@ export const affectedPartPageSchema = z
   .strict();
 
 export const affectedPartDetailSchema = affectedPartSchema
-  .extend({ warnings: z.array(warningInstanceSchema) })
+  .extend({
+    warnings: z.array(warningInstanceSchema.extend({ displayIdentifier: z.string().min(1) })),
+  })
   .strict();

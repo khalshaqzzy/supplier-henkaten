@@ -166,36 +166,46 @@ export class BoardLayoutService {
     principal: RequestPrincipal,
     lineId: string,
   ): Promise<{ jobs: BoardJob[]; canEdit: boolean }> {
-    const shift = await client.shiftRun.findFirst({
+    const unrestricted =
+      principal.realm === 'TMMIN' || ['SUPPLIER_ADMIN', 'QC'].includes(principal.role);
+    const lineShiftScope =
+      principal.role === 'SUPERVISOR'
+        ? { supervisorMemberId: principal.memberId ?? impossibleId }
+        : principal.role === 'LINE_LEADER'
+          ? { lineLeaderMemberId: principal.memberId ?? impossibleId }
+          : { id: impossibleId };
+    const line = await client.line.findFirst({
       where: {
+        id: lineId,
         supplierId: scope.supplierId,
-        lineId,
-        status: 'ACTIVE',
-        ...(principal.realm === 'TMMIN' || ['SUPPLIER_ADMIN', 'QC'].includes(principal.role)
-          ? {}
-          : principal.role === 'SUPERVISOR'
-            ? { supervisorMemberId: principal.memberId ?? impossibleId }
-            : { lineLeaderMemberId: principal.memberId ?? impossibleId }),
+        active: true,
+        ...(unrestricted ? {} : { lineShifts: { some: { active: true, ...lineShiftScope } } }),
       },
       select: {
-        lineLeaderMemberId: true,
-        workingAssignments: {
-          where: { active: true, includedInPlan: true },
-          orderBy: [{ jobDisplayOrderSnapshot: 'asc' }, { id: 'asc' }],
-          select: { jobId: true, jobDisplayOrderSnapshot: true },
+        jobs: {
+          where: { active: true },
+          orderBy: [{ displayOrder: 'asc' }, { id: 'asc' }],
+          select: { id: true, displayOrder: true },
+        },
+        lineShifts: {
+          where: {
+            active: true,
+            lineLeaderMemberId: principal.memberId ?? impossibleId,
+          },
+          select: { id: true },
         },
       },
     });
-    if (!shift) throw notFound();
+    if (!line) throw notFound();
     const canEdit =
       principal.realm === 'SUPPLIER' &&
       principal.purpose === 'NORMAL' &&
       (principal.role === 'SUPPLIER_ADMIN' ||
-        (principal.role === 'LINE_LEADER' && shift.lineLeaderMemberId === principal.memberId));
+        (principal.role === 'LINE_LEADER' && line.lineShifts.length > 0));
     return {
-      jobs: shift.workingAssignments.map((job) => ({
-        jobId: job.jobId,
-        displayOrder: job.jobDisplayOrderSnapshot,
+      jobs: line.jobs.map((job) => ({
+        jobId: job.id,
+        displayOrder: job.displayOrder,
       })),
       canEdit,
     };
@@ -284,7 +294,7 @@ function notFound(): ProblemException {
     status: 404,
     code: 'RESOURCE_NOT_FOUND',
     title: 'Active line not found',
-    detail: 'Canvas layout is available only for an active Shift Run in the current scope.',
+    detail: 'Canvas layout is available only for an active line in the current scope.',
   });
 }
 
@@ -293,6 +303,6 @@ function forbiddenEdit(): ProblemException {
     status: 403,
     code: 'FORBIDDEN',
     title: 'Board layout is read-only',
-    detail: 'Only the active Line Leader or Supplier Admin may edit this line layout.',
+    detail: 'Only an assigned Line Leader or Supplier Admin may edit this line layout.',
   });
 }

@@ -1,3 +1,4 @@
+import { skillCategorySchema } from './tanoko.js';
 import { z } from 'zod';
 
 import { henkatenCategorySchema, memberRoleSchema, userStatusSchema } from './enums.js';
@@ -137,12 +138,19 @@ export const linePageSchema = z
   .object({ items: z.array(lineSchema), pageInfo: pageInfoSchema })
   .strict();
 
-export const createJobRequestSchema = z.object({ name: nameSchema }).strict();
+export const createJobRequestSchema = z
+  .object({ name: nameSchema, skillCategory: skillCategorySchema.optional() })
+  .strict();
 export const updateJobRequestSchema = z
-  .object({ expectedVersion: optimisticVersionSchema, name: nameSchema })
+  .object({
+    expectedVersion: optimisticVersionSchema,
+    name: nameSchema,
+    skillCategory: skillCategorySchema.optional(),
+  })
   .strict();
 export const jobSchema = z
   .object({
+    skillCategory: skillCategorySchema.nullable().optional(),
     id: opaqueIdSchema,
     lineId: opaqueIdSchema,
     name: nameSchema,
@@ -308,5 +316,85 @@ export const defaultAssignmentsSchema = z
     supervisors: z.array(assignmentEntrySchema),
     lineLeaders: z.array(assignmentEntrySchema),
     mps: z.array(assignmentEntrySchema),
+  })
+  .strict();
+
+export const createLineShiftRequestSchema = z
+  .object({
+    shiftTemplateId: opaqueIdSchema,
+    copyFromLineShiftId: opaqueIdSchema.optional(),
+  })
+  .strict();
+export type CreateLineShiftRequest = z.infer<typeof createLineShiftRequestSchema>;
+
+export const lineShiftAssignmentInputSchema = z
+  .object({ jobId: opaqueIdSchema, mpMemberId: opaqueIdSchema.nullable() })
+  .strict();
+
+export const updateLineShiftAssignmentsRequestSchema = z
+  .object({
+    expectedVersion: optimisticVersionSchema,
+    supervisorMemberId: opaqueIdSchema.nullable(),
+    lineLeaderMemberId: opaqueIdSchema.nullable(),
+    jobs: z.array(lineShiftAssignmentInputSchema).max(500),
+  })
+  .strict();
+export type UpdateLineShiftAssignmentsRequest = z.infer<
+  typeof updateLineShiftAssignmentsRequestSchema
+>;
+
+export const lineShiftJobAssignmentSchema = z
+  .object({
+    id: opaqueIdSchema,
+    jobId: opaqueIdSchema,
+    jobName: nameSchema,
+    jobDisplayOrder: displayOrderSchema,
+    mpMemberId: opaqueIdSchema.nullable(),
+    mpName: nameSchema.nullable(),
+    mpRegistrationNumber: registrationNumberSchema.nullable(),
+    version: optimisticVersionSchema,
+  })
+  .strict();
+
+export const lineShiftSchema = z
+  .object({
+    id: opaqueIdSchema,
+    lineId: opaqueIdSchema,
+    lineCode: z.string().min(1).max(100),
+    lineName: nameSchema,
+    shiftTemplateId: opaqueIdSchema,
+    shiftName: nameSchema,
+    startTime: timeSchema,
+    endTime: timeSchema,
+    timezone: z.string().min(1).max(100),
+    crossesMidnight: z.boolean(),
+    supervisorMemberId: opaqueIdSchema.nullable(),
+    supervisorName: nameSchema.nullable(),
+    lineLeaderMemberId: opaqueIdSchema.nullable(),
+    lineLeaderName: nameSchema.nullable(),
+    active: z.boolean(),
+    assignments: z.array(lineShiftJobAssignmentSchema),
+    version: optimisticVersionSchema,
+  })
+  .strict();
+export type LineShift = z.infer<typeof lineShiftSchema>;
+
+export const lineShiftListSchema = z.object({ items: z.array(lineShiftSchema) }).strict();
+
+export const lineShiftOccurrenceSchema = lineShiftSchema
+  .extend({
+    businessDate: z.string().date(),
+    effectiveStartAt: utcTimestampSchema,
+    effectiveEndAt: utcTimestampSchema,
+    current: z.boolean(),
+  })
+  .strict();
+
+export const lineShiftOperationalContextSchema = z
+  .object({
+    generatedAt: utcTimestampSchema,
+    currentLineShiftId: opaqueIdSchema.nullable(),
+    currentLineShiftIds: z.array(opaqueIdSchema),
+    items: z.array(lineShiftOccurrenceSchema),
   })
   .strict();

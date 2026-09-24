@@ -25,6 +25,7 @@ import {
   Skeleton,
   StatCard,
   StatusBadge,
+  Textarea,
   Timeline,
 } from '@tmmin-henkaten/ui';
 
@@ -442,7 +443,7 @@ export function WarningDetailPage() {
                     <Link
                       to={`/henkatens/${row.sourceMode.toLowerCase()}/${supplierId}/${row.henkatenId}`}
                     >
-                      {row.henkatenId}
+                      {row.displayIdentifier}
                     </Link>
                   </td>
                   <td>{row.status}</td>
@@ -469,6 +470,7 @@ export function HenkatenExplorerPage() {
     'category',
     'line',
     'part',
+    'pcrStatus',
     'cursor',
   ]);
   const result = useQuery({
@@ -479,11 +481,31 @@ export function HenkatenExplorerPage() {
     <>
       <PageHeader
         eyebrow="Penelusuran source-aware"
-        title="Penelusuran Henkaten"
+        title="Henkaten"
         description="Identitas Hosted dan snapshot External tetap terpisah dalam satu urutan stabil."
         actions={<UpdatedAt fetching={result.isFetching} retry={() => void result.refetch()} />}
       />
       <div className="tmmin-filter-strip">
+        <div className="tmmin-pcr-tabs" role="tablist" aria-label="Penilaian PCR">
+          {(
+            [
+              ['', 'Semua'],
+              ['PCR', 'PCR'],
+              ['REVIEW', 'Perlu tinjauan'],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={(params.get('pcrStatus') ?? '') === value}
+              className={(params.get('pcrStatus') ?? '') === value ? 'is-active' : ''}
+              onClick={() => updateParam(params, setParams, 'pcrStatus', value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <NativeSelect
           aria-label="Status"
           value={params.get('status') ?? ''}
@@ -559,6 +581,10 @@ export function HenkatenExplorerPage() {
                     </td>
                     <td>
                       <StatusBadge tone={statusTone(row.status)}>{row.status}</StatusBadge>
+                      {row.pcr?.status === 'PCR' && <span className="tmmin-pcr-badge">PCR</span>}
+                      {row.pcr?.status === 'REVIEW' && (
+                        <span className="tmmin-review-badge">Perlu tinjauan</span>
+                      )}
                     </td>
                     <td>{dateTime(row.occurredAt)}</td>
                   </tr>
@@ -574,7 +600,10 @@ export function HenkatenExplorerPage() {
 
 export function HenkatenDetailPage() {
   const { kind = 'hosted', supplierId = '', recordId = '' } = useParams();
-  const { session } = useTmminSession();
+  const { session, hasCapability } = useTmminSession();
+  const queryClient = useQueryClient();
+  const [decision, setDecision] = useState<'PCR' | 'NO_PCR'>('PCR');
+  const [reason, setReason] = useState('');
   const external = kind === 'external';
   const result = useQuery<unknown>({
     queryKey: tmminKey(session!.principal.userId, 'henkaten-detail', {
@@ -587,26 +616,40 @@ export function HenkatenDetailPage() {
         ? await tmminApi.externalProjection(supplierId, recordId)
         : await tmminApi.hostedHenkaten(supplierId, recordId),
   });
+  const correction = useMutation({
+    mutationFn: (input: { status: 'PCR' | 'NO_PCR'; reason: string; expectedVersion: number }) =>
+      tmminApi.correctPcr(external ? 'EXTERNAL' : 'HOSTED', supplierId, recordId, input),
+    onSuccess: () => {
+      setReason('');
+      void queryClient.invalidateQueries({ queryKey: ['TMMIN', session!.principal.userId] });
+    },
+  });
   if (result.isLoading) return <TableSkeleton />;
   if (result.error || !result.data)
     return <QueryState error={result.error} retry={() => void result.refetch()} />;
   const data = result.data as Record<string, unknown>;
+  const pcr = data.pcr as
+    | { status: string; assessment: string | null; version: number; decisionSource: string | null }
+    | null
+    | undefined;
   const line = labelOf(data.line);
   const part = labelOf(data.part, 'number');
+  const evidence =
+    external && data.change && typeof data.change === 'object' && !Array.isArray(data.change)
+      ? (data.change as Record<string, unknown>)
+      : data;
   return (
     <>
       <PageHeader
         eyebrow={`${external ? 'External snapshot' : 'Hosted operational record'} · Epoch ${stringValue(data.sourceEpoch)}`}
         title={stringValue(data.sourceHenkatenId) || stringValue(data.identifier) || recordId}
-        description="Field spesifik sumber ditampilkan tanpa menciptakan identitas lintas sumber."
+        description="Tinjau bukti perubahan, penilaian PCR, dan keputusan tindak lanjut."
       />
       <div className="tmmin-detail-layout">
         <div>
           <Panel
             title="Ringkasan konteks"
-            description={
-              external ? 'Immutable External snapshot boundary' : 'Hosted operational identity'
-            }
+            description={external ? 'Data dari sistem Supplier' : 'Data Henkaten Supplier'}
           >
             <KeyValueGrid
               columns={3}
@@ -630,26 +673,126 @@ export function HenkatenDetailPage() {
               ]}
             />
           </Panel>
-          <Panel
-            title={external ? 'Change & checklist snapshot' : 'Hosted evidence'}
-            description="Evidence hanya baca yang ditangkap oleh sumber authoritative."
-          >
-            <pre className="tmmin-json">
-              {JSON.stringify(
-                external
-                  ? { change: data.change, checklist: data.checklist, decisions: data.decisions }
-                  : { cause: data.cause, detail: data.detail, checklist: data.checklist },
-                null,
-                2,
+          {pcr?.status === 'PCR' && (
+            <section className="tmmin-pcr-assessment" aria-label="PCR assessment">
+              <div className="tmmin-pcr-assessment-head">
+                <span className="tmmin-pcr-badge">PCR</span>
+                <span>{pcr.decisionSource === 'TMMIN' ? 'Keputusan TMMIN' : 'Penilaian awal'}</span>
+              </div>
+              <h2>Indikasi Process Change Request</h2>
+              <p className="tmmin-pcr-instruction">
+                Henkaten ini terindikasi memerlukan PCR. Ajukan PCR melalui jalur yang berlaku. Jika
+                ada kendala teknis atau hasil penilaian tampak keliru, hubungi TMMIN QD.
+              </p>
+              {pcr.assessment && (
+                <div className="tmmin-pcr-reason">
+                  <h3>{pcr.decisionSource === 'TMMIN' ? 'Alasan keputusan' : 'Assessment'}</h3>
+                  <p>{pcr.assessment}</p>
+                </div>
               )}
-            </pre>
+            </section>
+          )}
+          {pcr?.status === 'REVIEW' && (
+            <Alert tone="warning" title="Perlu tinjauan PCR">
+              Penilaian otomatis belum dapat memastikan keputusan. TMMIN Admin atau Quality perlu
+              menetapkan keputusan berdasarkan bukti Henkaten.
+            </Alert>
+          )}
+          {!pcr && hasCapability('TMMIN_PCR_CORRECT') && (
+            <Alert tone="info" title="Belum ada penilaian PCR">
+              Tinjau bukti perubahan dan tetapkan keputusan bila tindak lanjut PCR diperlukan.
+            </Alert>
+          )}
+          <Panel title="Penyebab & detail" description="Bukti perubahan yang dilaporkan Supplier">
+            <div className="tmmin-evidence">
+              <div>
+                <span>PENYEBAB</span>
+                <strong>{stringValue(evidence.cause) || 'Belum tersedia'}</strong>
+              </div>
+              <div>
+                <span>DETAIL KEJADIAN</span>
+                <p>{stringValue(evidence.detail) || 'Belum tersedia'}</p>
+              </div>
+              {Boolean(evidence.affectedObject || evidence.replacementObject) && (
+                <div className="tmmin-evidence-transition">
+                  <div>
+                    <span>SEBELUM</span>
+                    <strong>{stringValue(evidence.affectedObject) || '—'}</strong>
+                  </div>
+                  <div>
+                    <span>SESUDAH</span>
+                    <strong>{stringValue(evidence.replacementObject) || '—'}</strong>
+                  </div>
+                </div>
+              )}
+              {Boolean(data.checklist) && (
+                <details className="tmmin-evidence-checklist">
+                  <summary>Lihat data checklist</summary>
+                  <pre className="tmmin-json">{JSON.stringify(data.checklist, null, 2)}</pre>
+                </details>
+              )}
+            </div>
           </Panel>
+          {hasCapability('TMMIN_PCR_CORRECT') && (
+            <section className="tmmin-pcr-correction">
+              <div>
+                <span className="tmmin-section-kicker">TMMIN REVIEW</span>
+                <h2>Ubah keputusan PCR</h2>
+                <p>Keputusan dan alasan tersimpan dalam riwayat audit.</p>
+              </div>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  correction.mutate({
+                    status: decision,
+                    reason: reason.trim(),
+                    expectedVersion: pcr?.version ?? 0,
+                  });
+                }}
+              >
+                <label>
+                  Keputusan
+                  <NativeSelect
+                    value={decision}
+                    onChange={(event) => setDecision(event.target.value as 'PCR' | 'NO_PCR')}
+                  >
+                    <option value="PCR">PCR</option>
+                    <option value="NO_PCR">No-PCR</option>
+                  </NativeSelect>
+                </label>
+                <label>
+                  Alasan keputusan
+                  <Textarea
+                    rows={4}
+                    value={reason}
+                    minLength={10}
+                    maxLength={2000}
+                    required
+                    onChange={(event) => setReason(event.target.value)}
+                    placeholder="Jelaskan bukti dan pertimbangan keputusan"
+                  />
+                </label>
+                {correction.error && (
+                  <Alert tone="danger" title="Keputusan belum tersimpan">
+                    {String(correction.error)}
+                  </Alert>
+                )}
+                <Button
+                  type="submit"
+                  loading={correction.isPending}
+                  disabled={reason.trim().length < 10}
+                >
+                  Simpan keputusan
+                </Button>
+              </form>
+            </section>
+          )}
         </div>
         <aside>
-          <Alert tone="info" title={external ? 'External lineage' : 'Hosted workflow'}>
+          <Alert tone="info" title={external ? 'Sumber External' : 'Persetujuan Henkaten'}>
             {external
-              ? 'No Hosted-only user, shift, or assignment identity is inferred from this projection.'
-              : 'This record remains traceable to Hosted shift and approval identities.'}
+              ? 'Bukti perubahan berasal dari sistem Supplier. Konfirmasi rincian kepada Supplier bila diperlukan.'
+              : 'Indikasi PCR tidak mengubah rute persetujuan Supervisor dan QC pada Henkaten ini.'}
           </Alert>
           {external && Array.isArray(data.events) && (
             <Timeline
@@ -906,10 +1049,12 @@ export function AuditPage() {
 
 export function NotificationsPage() {
   const { session } = useTmminSession();
+  const [params, setParams] = useSearchParams();
+  const pcrTab = (params.get('pcrTab') || undefined) as 'PCR' | 'REVIEW' | undefined;
   const queryClient = useQueryClient();
   const result = useQuery({
-    queryKey: tmminKey(session!.principal.userId, 'notifications'),
-    queryFn: () => tmminApi.notifications({ limit: 50 }),
+    queryKey: tmminKey(session!.principal.userId, 'notifications', { pcrTab }),
+    queryFn: () => tmminApi.notifications({ limit: 50, pcrTab }),
   });
   const mutation = useMutation({
     mutationFn: ({ id, read, version }: { id: string; read: boolean; version: number }) =>
@@ -922,8 +1067,28 @@ export function NotificationsPage() {
       <PageHeader
         eyebrow="Inbox berbasis role"
         title="Notifikasi"
-        description="Warning External diterima Admin dan Quality; ingesti ditolak hanya untuk Admin."
+        description="Pembaruan PCR dan Henkaten yang perlu ditinjau tersedia di tab khusus."
       />
+      <div className="tmmin-pcr-tabs" role="tablist" aria-label="Jenis notifikasi">
+        {(
+          [
+            ['', 'Semua'],
+            ['PCR', 'PCR'],
+            ['REVIEW', 'Perlu tinjauan'],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={(pcrTab ?? '') === value}
+            className={(pcrTab ?? '') === value ? 'is-active' : ''}
+            onClick={() => updateParam(params, setParams, 'pcrTab', value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       {result.isLoading ? (
         <TableSkeleton />
       ) : result.error || !result.data ? (

@@ -223,6 +223,10 @@ describe('Supplier Web Push persistence and enforcement', () => {
       await deliveries.materialize(notification, transaction);
     });
     expect(await prisma.pushDelivery.count({ where: { notificationId: notification.id } })).toBe(2);
+    await prisma.pushDelivery.updateMany({
+      where: { notificationId: notification.id },
+      data: { nextAttemptAt: new Date(Date.now() - 1_000) },
+    });
 
     await Promise.all([worker.processBatch(), worker.processBatch()]);
     const rows = await prisma.pushDelivery.findMany({ where: { notificationId: notification.id } });
@@ -244,6 +248,7 @@ describe('Supplier Web Push persistence and enforcement', () => {
         subscriptionId: transientSubscription.id,
         payload: { title: 'Security', deepLink: '/notifications' },
         expiresAt: new Date(Date.now() + 3_600_000),
+        nextAttemptAt: new Date(Date.now() - 1_000),
       },
     });
     gateway.nextError = Object.assign(new Error('service unavailable'), { statusCode: 503 });
@@ -259,6 +264,10 @@ describe('Supplier Web Push persistence and enforcement', () => {
     await prisma.$transaction((transaction) =>
       deliveries.materialize(goneNotification, transaction),
     );
+    await prisma.pushDelivery.updateMany({
+      where: { notificationId: goneNotification.id },
+      data: { nextAttemptAt: new Date(Date.now() - 1_000) },
+    });
     gateway.nextError = Object.assign(new Error('endpoint gone'), { statusCode: 410 });
     await worker.processBatch();
     const gone = await prisma.pushSubscription.findFirstOrThrow({

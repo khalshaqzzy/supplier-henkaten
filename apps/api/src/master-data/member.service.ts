@@ -205,25 +205,15 @@ export class MemberService {
       if (member.version !== expectedVersion) throw versionConflict();
       if (!active) {
         const references = await Promise.all([
-          transaction.defaultLineSupervisor.count({ where: { supervisorMemberId: id } }),
-          transaction.defaultLineLeader.count({ where: { lineLeaderMemberId: id } }),
-          transaction.defaultJobMp.count({ where: { mpMemberId: id } }),
-          transaction.shiftRun.count({
-            where: {
-              supplierId: scope.supplierId,
-              status: { in: ['NOT_STARTED', 'ACTIVE'] },
-              OR: [{ supervisorMemberId: id }, { lineLeaderMemberId: id }],
-            },
-          }),
-          transaction.workingAssignment.count({
+          transaction.lineShift.count({
             where: {
               supplierId: scope.supplierId,
               active: true,
-              OR: [{ effectiveMpMemberId: id }, { candidateMpMemberId: id }],
+              OR: [{ supervisorMemberId: id }, { lineLeaderMemberId: id }],
             },
           }),
-          transaction.mPReservation.count({
-            where: { supplierId: scope.supplierId, replacementMpMemberId: id, releasedAt: null },
+          transaction.lineShiftJobAssignment.count({
+            where: { supplierId: scope.supplierId, mpMemberId: id, lineShift: { active: true } },
           }),
           transaction.henkaten.count({
             where: {

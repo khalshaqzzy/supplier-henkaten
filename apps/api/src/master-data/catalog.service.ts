@@ -138,23 +138,15 @@ export class CatalogService {
       if (!current) throw missing('Line');
       if (current.version !== expectedVersion) throw versionConflict();
       if (!active) {
-        const [jobs, supervisor, leader, shifts, openHenkaten] = await Promise.all([
+        const [jobs, lineShifts, openHenkaten] = await Promise.all([
           tx.job.count({ where: { lineId: id, active: true } }),
-          tx.defaultLineSupervisor.count({ where: { lineId: id } }),
-          tx.defaultLineLeader.count({ where: { lineId: id } }),
-          tx.shiftRun.count({
-            where: {
-              supplierId: scope.supplierId,
-              lineId: id,
-              status: { in: ['NOT_STARTED', 'ACTIVE'] },
-            },
-          }),
+          tx.lineShift.count({ where: { supplierId: scope.supplierId, lineId: id, active: true } }),
           tx.henkaten.count({
             where: { supplierId: scope.supplierId, lineId: id, status: 'OPEN' },
           }),
         ]);
-        if (jobs || supervisor || leader || shifts || openHenkaten)
-          throw resourceInUse('Line still has active jobs, assignments, or operational records.');
+        if (jobs || lineShifts || openHenkaten)
+          throw resourceInUse('Line masih memiliki job, shift, atau Henkaten aktif.');
       } else if (
         (await tx.line.count({ where: { supplierId: scope.supplierId, active: true } })) >= 20
       ) {
@@ -199,7 +191,7 @@ export class CatalogService {
   async createJob(
     scope: TenantScope,
     lineId: string,
-    input: { name: string },
+    input: { name: string; skillCategory?: string },
     context: MutationContext,
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
@@ -219,12 +211,28 @@ export class CatalogService {
           supplierId: scope.supplierId,
           lineId,
           name: input.name.trim(),
+          ...(input.skillCategory ? { skillCategory: input.skillCategory } : {}),
           normalizedName: normalizeLookup(input.name),
           displayOrder: displayOrder + 1,
           createdById: context.actorUserId,
           updatedById: context.actorUserId,
         },
       });
+      const lineShifts = await tx.lineShift.findMany({
+        where: { supplierId: scope.supplierId, lineId },
+        select: { id: true },
+      });
+      if (lineShifts.length) {
+        await tx.lineShiftJobAssignment.createMany({
+          data: lineShifts.map(({ id: lineShiftId }) => ({
+            supplierId: scope.supplierId,
+            lineShiftId,
+            jobId: created.id,
+            createdById: context.actorUserId,
+            updatedById: context.actorUserId,
+          })),
+        });
+      }
       await this.audit.write(
         masterAudit(context, scope.supplierId, 'JOB_CREATED', 'Job', created.id, { lineId }),
         tx,
@@ -246,7 +254,7 @@ export class CatalogService {
     scope: TenantScope,
     lineId: string,
     id: string,
-    input: { expectedVersion: number; name: string },
+    input: { expectedVersion: number; name: string; skillCategory?: string },
     context: MutationContext,
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
@@ -259,6 +267,7 @@ export class CatalogService {
         where: { id },
         data: {
           name: input.name.trim(),
+          ...(input.skillCategory ? { skillCategory: input.skillCategory } : {}),
           normalizedName: normalizeLookup(input.name),
           version: { increment: 1 },
           updatedById: context.actorUserId,
@@ -289,24 +298,14 @@ export class CatalogService {
         !active &&
         (
           await Promise.all([
-            tx.defaultJobMp.count({ where: { jobId: id } }),
-            tx.workingAssignment.count({
-              where: { supplierId: scope.supplierId, jobId: id, active: true },
-            }),
+            tx.lineShiftJobAssignment.count({ where: { supplierId: scope.supplierId, jobId: id } }),
             tx.henkaten.count({
               where: { supplierId: scope.supplierId, jobId: id, status: 'OPEN' },
-            }),
-            tx.mPReservation.count({
-              where: {
-                supplierId: scope.supplierId,
-                releasedAt: null,
-                targetWorkingAssignment: { jobId: id },
-              },
             }),
           ])
         ).some(Boolean)
       ) {
-        throw resourceInUse('Job is required by an active assignment or operational record.');
+        throw resourceInUse('Job masih digunakan oleh assignment shift atau Henkaten aktif.');
       }
       if (
         active &&
@@ -583,15 +582,11 @@ export class CatalogService {
       if (current.version !== expectedVersion) throw versionConflict();
       if (
         !active &&
-        (await tx.shiftRun.count({
-          where: {
-            supplierId: scope.supplierId,
-            shiftTemplateId: id,
-            status: { in: ['NOT_STARTED', 'ACTIVE'] },
-          },
+        (await tx.lineShift.count({
+          where: { supplierId: scope.supplierId, shiftTemplateId: id, active: true },
         }))
       ) {
-        throw resourceInUse('Shift Template is required by a planned or active Shift Run.');
+        throw resourceInUse('Shift masih aktif pada Line Setup.');
       }
       const updated = await tx.shiftTemplate.update({
         where: { id },

@@ -54,7 +54,7 @@ export function ApprovalAgingDistribution({
   return (
     <Panel
       title="Approval aging"
-      description="Usia route approval yang masih pending."
+      description=""
       action={
         showApprovalLink ? (
           <Link className="overview-widget-link" to="/approvals">
@@ -93,11 +93,7 @@ export function ApprovalAgingDistribution({
           </div>
         </>
       ) : (
-        <WidgetEmpty
-          icon={<CheckCircle2 />}
-          title="Tidak ada approval tertunda"
-          description="Semua route pada scope saat ini sudah diputuskan."
-        />
+        <WidgetEmpty icon={<CheckCircle2 />} title="Tidak ada approval tertunda" description="" />
       )}
     </Panel>
   );
@@ -144,11 +140,7 @@ export function RankedDistribution({
           ))}
         </ol>
       ) : (
-        <WidgetEmpty
-          icon={<CircleDot />}
-          title={emptyLabel}
-          description="Ubah filter atau rentang tanggal untuk melihat distribusi."
-        />
+        <WidgetEmpty icon={<CircleDot />} title={emptyLabel} description="" />
       )}
     </Panel>
   );
@@ -172,7 +164,7 @@ export function RecentActivityFeed({
   return (
     <Panel
       title="Aktivitas terbaru"
-      description="Perubahan operasional terbaru pada scope Anda."
+      description=""
       action={
         items.length ? (
           <span className="overview-activity-count">{items.length} event terbaru</span>
@@ -192,11 +184,7 @@ export function RecentActivityFeed({
           ))}
         </ol>
       ) : (
-        <WidgetEmpty
-          icon={<FileClock />}
-          title="Belum ada aktivitas"
-          description="Aktivitas akan muncul setelah operasi pertama tercatat."
-        />
+        <WidgetEmpty icon={<FileClock />} title="Belum ada aktivitas" description="" />
       )}
       {items.length > 5 && (
         <div className="overview-activity-footer">
@@ -329,7 +317,7 @@ function activityLabel(action: string) {
     HENKATEN_WITHDRAWN: 'Henkaten ditarik',
     HENKATEN_SUPERVISOR_REROUTED: 'Penanggung jawab Supervisor dialihkan',
     WARNING_OPENED: 'Peringatan dibuka',
-    SHIFT_PREFLIGHT_COMPLETED: 'Pemeriksaan shift selesai',
+    SHIFT_PREFLIGHT_COMPLETED: 'Pembaruan operasional',
     SHIFT_STARTED: 'Shift dimulai',
     SHIFT_START_BLOCKED: 'Shift gagal dimulai',
     ASSIGNMENT_ISSUE_OPENED: 'Assignment issue dibuka',

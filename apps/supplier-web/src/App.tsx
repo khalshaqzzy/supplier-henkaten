@@ -13,7 +13,9 @@ import { AccountPage, ChangePasswordPage, LoginPage } from './pages/AuthPages';
 import { AuditPage, NotificationsPage } from './pages/ActivityPages';
 import { BoardPage } from './pages/BoardPage';
 import { DefaultAssignmentsPage } from './pages/DefaultAssignmentsPage';
-import { HenkatenCreatePage, HenkatenDetailPage, HenkatenListPage } from './pages/HenkatenPages';
+import { HenkatenDetailPage, HenkatenListPage } from './pages/HenkatenPages';
+import { HenkatenCreatePage } from './pages/HenkatenCreatePage';
+import { PcrWaitPage } from './pages/PcrWaitPage';
 import {
   ChecklistDetailPage,
   ChecklistOverviewPage,
@@ -23,13 +25,9 @@ import {
 } from './pages/MasterDataPages';
 import { OverviewPage } from './pages/OverviewPage';
 import { SetupPage } from './pages/SetupPage';
-import {
-  PrepareShiftPage,
-  ShiftDetailPage,
-  ShiftListPage,
-  ShiftResolutionPage,
-} from './pages/ShiftPages';
 import { AppLoading, ForbiddenPage, NotFoundPage, RouteErrorPage } from './pages/StatePages';
+
+const TanokoPage = lazy(() => import('./pages/TanokoPage'));
 
 const DesignSystemShowcase = lazy(() =>
   import('@tmmin-henkaten/ui/showcase').then((module) => ({
@@ -81,6 +79,16 @@ function ProductRoutes() {
       >
         <Route index element={<HomeRoute />} />
         <Route
+          path="tanoko"
+          element={
+            <CapabilityRoute capability="SUPPLIER_TANOKO_READ">
+              <Suspense fallback={<AppLoading />}>
+                <TanokoPage />
+              </Suspense>
+            </CapabilityRoute>
+          }
+        />
+        <Route
           path="setup"
           element={
             <CapabilityRoute capability="SUPPLIER_MASTER_DATA_READ" allowPreparation>
@@ -121,6 +129,14 @@ function ProductRoutes() {
           }
         />
         <Route
+          path="henkatens/:henkatenId/assessment"
+          element={
+            <CapabilityRoute capability="SUPPLIER_HENKATEN_READ">
+              <PcrWaitPage />
+            </CapabilityRoute>
+          }
+        />
+        <Route
           path="henkatens/:henkatenId"
           element={
             <CapabilityRoute capability="SUPPLIER_HENKATEN_READ">
@@ -133,38 +149,6 @@ function ProductRoutes() {
           element={
             <CapabilityRoute capability="SUPPLIER_HENKATEN_DECIDE">
               <HenkatenListPage approvalQueue />
-            </CapabilityRoute>
-          }
-        />
-        <Route
-          path="shifts"
-          element={
-            <CapabilityRoute capability="SUPPLIER_SHIFT_READ">
-              <ShiftListPage />
-            </CapabilityRoute>
-          }
-        />
-        <Route
-          path="shifts/prepare"
-          element={
-            <CapabilityRoute capability="SUPPLIER_SHIFT_OPERATE">
-              <PrepareShiftPage />
-            </CapabilityRoute>
-          }
-        />
-        <Route
-          path="shifts/:shiftRunId/resolve"
-          element={
-            <CapabilityRoute capability="SUPPLIER_SHIFT_READ">
-              <ShiftResolutionPage />
-            </CapabilityRoute>
-          }
-        />
-        <Route
-          path="shifts/:shiftRunId"
-          element={
-            <CapabilityRoute capability="SUPPLIER_SHIFT_READ">
-              <ShiftDetailPage />
             </CapabilityRoute>
           }
         />
@@ -297,12 +281,16 @@ function ProductRoutes() {
           }
         />
         <Route
-          path="master-data/default-assignments"
+          path="master-data/line-setup"
           element={
             <CapabilityRoute capability="SUPPLIER_MASTER_DATA_MANAGE" allowPreparation>
               <DefaultAssignmentsPage />
             </CapabilityRoute>
           }
+        />
+        <Route
+          path="master-data/default-assignments"
+          element={<Navigate to="/master-data/line-setup" replace />}
         />
         <Route
           path="audit"
