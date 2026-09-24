@@ -951,8 +951,10 @@ Process difficulty, skill level, health, attendance, dan schedule tidak boleh mu
   reservation, conflict, dan perubahan 4M tidak boleh mengubah koordinat card.
 - Card memakai format vertikal dan menampilkan foto portrait MP sebagai elemen visual dominan,
   dengan initials fallback, nama job, nama MP, registration number, state text/icon/border, dan dot
-  4M. Legend hanya berisi dot Man, Machine, Material, dan Method; status assignment tidak memiliki
-  legend terpisah.
+  4M. Dot 4M berukuran lebih besar dan berada pada baris di antara state dan bagian atas foto,
+  tanpa menutupi foto. Jika jumlah indikator melebihi lebar card, sisa jumlah ditampilkan sebagai
+  `+N`; detail tiap Henkaten tetap tersedia pada Assignment Board default. Legend hanya berisi dot
+  Man, Machine, Material, dan Method; status assignment tidak memiliki legend terpisah.
 - Editor desktop dan tablet landscape menyediakan palette, Layers/Properties DOM, pan/zoom,
   fit/fullscreen, grid/snapping, 50-step undo/redo, numeric transforms, keyboard movement,
   lock/reorder, reset, dan explicit save. Pan wajib dapat dipilih melalui Hand mode dan diaktifkan
