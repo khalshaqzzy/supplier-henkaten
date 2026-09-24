@@ -2,7 +2,7 @@
 
 - Date: 2026-09-24
 - Branch: `fix/qa-verif-1`
-- Status: F-01–F-09 and F-11–F-12 implemented with automated regressions; F-10 is a product-expectation correction. PR to `staging` is the delivery target. No staging deployment or complete QA claim.
+- Status: F-01–F-09 and F-11–F-12 implemented with automated regressions; F-10 is a product-expectation correction. PR [#20](https://github.com/khalshaqzzy/supplier-henkaten/pull/20) targets `staging`. No staging deployment or complete QA claim.
 - Current roadmap position remains Phase 15 / 15.9 `in_progress`.
 
 The full cause and acceptance map is [`docs/qa/qa-verif-finding-remediation-plan-2026-09-24.md`](../docs/qa/qa-verif-finding-remediation-plan-2026-09-24.md). ADR 0036 records the user decision that Supervisor reroute needs no in-app notification; ADR 0037 records implementation boundaries. The original local QA run's 22 PASS / 15 FAIL / 10 BLOCKED outcomes remain unchanged. No “Remaining QA not executed” branch was continued. The fixes have automated regressions, but the original browser observation for every finding was not individually rerun; do not reclassify the historical rows from the tests alone.
@@ -13,7 +13,7 @@ Checks completed on a disposable clean-artifact worktree after `pnpm install --f
 
 Staging parity: `docker compose config --quiet`, `pnpm migrations:destructive-check 7ed8d8a5ef515707950c4e8f48ef71b1d2727151`, `pnpm deployment:validate`, `pnpm test:deployment`, `pnpm security:exceptions:check`, `pnpm security:audit`, pinned Actionlint/ShellCheck/Hadolint, `bash -n`, Ubuntu 22.04 bootstrap input validation, Gitleaks v8.24.3 directory scan, and Trivy 0.70.0 filesystem scan passed. The deployment script harness passed in a Linux Docker container with actual `flock` contention. The previous-staging-to-current migration was applied to a temporary database, checked current, and dropped; no migration SQL changed. All five production images built; the isolated staging-like Compose stack passed migration/bootstrap, health, routing, headers, non-root, idempotent bootstrap, and restart persistence checks. Trivy image scans passed for all five images. The first scan of the frontend images encountered cached `apk upgrade` layers containing vulnerable `libexpat` 2.8.4-r0; a `--no-cache` frontend rebuild pulled fixed 2.8.5-r0 and both rescans passed. No Dockerfile change was required.
 
-The local fullstack Compose services on ports 3000, 5173, 5174, and 55432 predated this task and were not stopped or reseeded; `/health` still returned 200 after the checks. The isolated staging-like Compose stack was removed. The disposable parity worktree will be removed after delivery. User explicitly requested pushing this branch and opening a PR to `staging` **without monitoring checks**, overriding the post-push monitoring step in `.agent/rules.md` for this task.
+The local fullstack Compose services on ports 3000, 5173, 5174, and 55432 predated this task and were not stopped or reseeded; `/health` still returned 200 after the checks. The isolated staging-like Compose stack and disposable parity worktree were removed. User explicitly requested pushing this branch and opening a PR to `staging` **without monitoring checks**, overriding the post-push monitoring step in `.agent/rules.md` for this task. The PR was opened without a staging deployment claim.
 
 ---
 
