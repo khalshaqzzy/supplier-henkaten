@@ -33,7 +33,7 @@ type SnapshotAssignment = {
   defaultVersion?: number;
   memberId?: string;
   memberName?: string;
-  registrationNumber?: string;
+  registrationNumber?: string | null;
   state: WorkingAssignmentState;
   effectiveMemberId?: string;
   unavailableReason?: 'INACTIVE';

@@ -262,7 +262,7 @@ function MasterRow({
             </i>
             <strong>{item.fullName}</strong>
           </span>,
-          item.registrationNumber,
+          item.registrationNumber ?? '—',
           label(item.role),
           item.account?.status ?? 'Tanpa akun',
           item.active ? 'Aktif' : 'Nonaktif',
@@ -342,12 +342,12 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
           return supplierApi.updateMember(resourceId!, {
             expectedVersion: detail.data!.version,
             fullName: values.fullName,
-            registrationNumber: values.registrationNumber,
+            ...(values.role === 'MP' ? {} : { registrationNumber: values.registrationNumber }),
           });
         }
         const result = await supplierApi.createMember({
           fullName: values.fullName,
-          registrationNumber: values.registrationNumber,
+          ...(values.role === 'MP' ? {} : { registrationNumber: values.registrationNumber }),
           role: values.role,
           ...(values.role === 'MP' ? {} : { username: values.username }),
         });
@@ -538,14 +538,16 @@ function MasterFields({
             required
           />
         </Field>
-        <Field label="Nomor registrasi" htmlFor="registrationNumber" required>
-          <Input
-            id="registrationNumber"
-            value={values.registrationNumber}
-            onChange={(event) => field('registrationNumber', event.target.value)}
-            required
-          />
-        </Field>
+        {values.role !== 'MP' && (
+          <Field label="Nomor registrasi" htmlFor="registrationNumber" required>
+            <Input
+              id="registrationNumber"
+              value={values.registrationNumber}
+              onChange={(event) => field('registrationNumber', event.target.value)}
+              required
+            />
+          </Field>
+        )}
         <Field label="Role" htmlFor="role" required>
           <NativeSelect
             id="role"
@@ -1239,7 +1241,7 @@ function valuesFromResource(kind: ResourceKind, resource: MasterItem) {
   if (kind === 'members' && 'fullName' in resource)
     return {
       fullName: resource.fullName,
-      registrationNumber: resource.registrationNumber,
+      registrationNumber: resource.registrationNumber ?? '',
       role: resource.role,
       username: resource.account?.username ?? '',
     };

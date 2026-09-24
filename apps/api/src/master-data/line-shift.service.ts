@@ -109,7 +109,7 @@ export class LineShiftService {
         });
         const effective = new Map<
           string,
-          { id: string; name: string; registrationNumber: string }
+          { id: string; name: string; registrationNumber: string | null }
         >();
         for (const override of overrides) {
           const detail = override.manDetail;

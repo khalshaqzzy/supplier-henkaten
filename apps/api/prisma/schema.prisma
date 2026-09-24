@@ -580,8 +580,8 @@ model Member {
   id                           String                  @id @default(uuid()) @db.Uuid
   supplierId                   String                  @db.Uuid
   fullName                     String                  @db.VarChar(150)
-  registrationNumber           String                  @db.VarChar(100)
-  normalizedRegistrationNumber String                  @db.VarChar(100)
+  registrationNumber           String?                 @db.VarChar(100)
+  normalizedRegistrationNumber String?                 @db.VarChar(100)
   role                         MemberRole
   active                       Boolean                 @default(true)
   version                      Int                     @default(1)
@@ -1098,7 +1098,7 @@ model Henkaten {
   lineShiftId                  String?                     @db.Uuid
   lineId                       String                      @db.Uuid
   jobId                        String                      @db.Uuid
-  partId                       String                      @db.Uuid
+  partId                       String?                     @db.Uuid
   identifier                   String                      @db.VarChar(150)
   dailySequence                Int
   sourceMode                   SourceMode
@@ -1139,7 +1139,7 @@ model Henkaten {
   lineShift                    LineShift?                  @relation(fields: [lineShiftId, supplierId], references: [id, supplierId], onDelete: Restrict)
   line                         Line                        @relation(fields: [lineId, supplierId], references: [id, supplierId], onDelete: Restrict)
   job                          Job                         @relation(fields: [jobId, supplierId], references: [id, supplierId], onDelete: Restrict)
-  part                         Part                        @relation(fields: [partId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  part                         Part?                       @relation(fields: [partId, supplierId], references: [id, supplierId], onDelete: Restrict)
   creator                      Member?                     @relation("HenkatenCreator", fields: [creatorMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
   clonedFrom                   Henkaten?                   @relation("HenkatenClone", fields: [clonedFromHenkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
   clones                       Henkaten[]                  @relation("HenkatenClone")

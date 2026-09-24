@@ -17,7 +17,7 @@ import { FourMDot } from '@tmmin-henkaten/ui';
 type ReplacementMember = {
   id: string;
   fullName: string;
-  registrationNumber: string;
+  registrationNumber: string | null;
   reserved: boolean;
   currentAssignment: {
     lineName: string;
@@ -102,7 +102,7 @@ export function SelectedPart({
       </span>
       <span>
         <strong>{part.partNumber}</strong>
-        <small>{part.partName}</small>
+        {part.partName && <small>{part.partName}</small>}
       </span>
       <button type="button" aria-label={`Hapus pilihan part ${part.partNumber}`} onClick={onClear}>
         <X aria-hidden="true" />
@@ -147,7 +147,7 @@ export function ManMovementPreview({
       >
         <span>Replacement MP</span>
         <strong>{replacement?.fullName ?? 'Belum dipilih'}</strong>
-        <small>{replacement?.registrationNumber ?? 'Pilih kandidat yang tersedia'}</small>
+        <small>{replacement ? 'MP pengganti' : 'Pilih kandidat yang tersedia'}</small>
         <dl>
           <div>
             <dt>Assignment sumber</dt>

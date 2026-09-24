@@ -290,7 +290,7 @@ function AssignmentEditor({
               <option value="">Pilih MP</option>
               {role('MP').map((member) => (
                 <option key={member.id} value={member.id}>
-                  {member.fullName} · {member.registrationNumber}
+                  {member.fullName}
                 </option>
               ))}
             </NativeSelect>
@@ -327,7 +327,8 @@ function MemberSelect({
         <option value="">Pilih {label}</option>
         {members.map((member) => (
           <option key={member.id} value={member.id}>
-            {member.fullName} · {member.registrationNumber}
+            {member.fullName}
+            {member.role === 'MP' ? '' : ` · ${member.registrationNumber}`}
           </option>
         ))}
       </NativeSelect>

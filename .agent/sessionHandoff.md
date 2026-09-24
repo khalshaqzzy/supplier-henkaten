@@ -1,4 +1,59 @@
-# Current Session Handoff — Production deployment preparation
+# Current Session Handoff — MP registration and undisclosed Other part
+
+- Date: 2026-09-24
+- Branch: `feat/supplier-privacy`
+- Scope: Hosted MP master data and Henkaten part disclosure; Phase 15 staging acceptance remains in progress.
+
+The Supplier Admin form no longer requests a registration number for MP, and the migration removes
+existing MP profile numbers. Other roles still require unique registration numbers. Current MP
+views use names and assignment states without registration text; historical snapshots remain.
+
+The Hosted Henkaten form now offers `Other` without a part number or name. Submission stores a null
+part ID, does not create a master Part, and shows the Other label. Each Other Henkaten creates its
+own TMMIN warning; named parts retain supplier/number aggregation. Clone prefill preserves Other.
+Part masters are optional in Hosted readiness, including for an Other-only supplier.
+The API contract, OpenAPI, generated client, local seed, fixtures, PRD, roadmap, and ADR 0038 were
+updated. External ingestion was not changed.
+
+Verification: `pnpm clean`, frozen install, format, lint, typecheck, all repository unit tests,
+generated OpenAPI document/client parity, and production API/Supplier/TMMIN builds with
+`VITE_API_ORIGIN=https://api.example.invalid` passed. A clean disposable database applied all
+15 migrations; a separate upgrade database applied the 14 `origin/staging` migrations followed
+by the new migration and reported schema current. All 33 API integration tests passed, including
+Other privacy, retry, clone, separate warnings, MP creation, and optional part readiness. All six
+isolated Chromium/Edge browser journeys passed after updating selectors that had expected an MP
+number. Deployment script harness, env validation, ShellCheck, Hadolint, Actionlint, Ubuntu
+bootstrap input validation, security exception check, audit threshold, Gitleaks directory scan,
+Trivy filesystem and all five image scans passed. The production-like five-service stack passed
+migration, bootstrap, routing, headers, non-root, restart, and persistence checks; containers were
+stopped. The migration checker now permits only an exact declared `DROP NOT NULL` expansion and
+its harness accepts exact matches and rejects mismatches. macOS lacks `flock`; Linux CI remains
+the authoritative lock-contention check.
+
+Local ignored `.local` evaluation scripts and `.env`/browser reports were moved temporarily out
+of the repository during lint or secret scanning and restored unchanged. An initial integration
+failure was test-order interference from two new Open Man records; the test now withdraws both.
+The first two browser runs failed on old selectors for the removed MP number; the corrected full
+suite passed. No staging or production deployment claim has been made. Rollback to the prior
+staging code is unsafe after null MP/Other records are written; ADR 0038 records this boundary.
+Exact local command evidence: `pnpm clean`, `pnpm install --frozen-lockfile`,
+`pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`,
+`pnpm --filter @tmmin-henkaten/api run openapi:check`,
+`VITE_API_ORIGIN=https://api.example.invalid pnpm build`, `pnpm db:up`, `pnpm db:wait`,
+`pnpm db:verify`, `pnpm db:test:reset`, `pnpm db:test:migrate`,
+`NODE_ENV=test DATABASE_URL=<disposable-test-url> RELEASE_SHA=ci
+SESSION_CSRF_SECRET=<test-value> AUTH_THROTTLE_SECRET=<test-value> OUTBOX_ENABLED=false pnpm
+test:integration`, `pnpm test:e2e`, `pnpm db:down`, `pnpm deployment:validate`,
+`pnpm test:deployment`, `pnpm security:exceptions:check`, `pnpm security:audit`,
+`git diff --check`, and the workflow-pinned container/scanner checks described above all passed.
+The generated client was regenerated twice with identical checksum; the HEAD-comparing combined
+`pnpm openapi:check` must run after the delivery commit. Next: commit, run commit-state drift and
+migration checks, push, create PR to staging, verify checks, merge after green, and notify the
+linked manual book task.
+
+---
+
+# Previous Session Handoff — Production deployment preparation
 
 - Date: 2026-09-24
 - Branch: `feat/production-deployment`

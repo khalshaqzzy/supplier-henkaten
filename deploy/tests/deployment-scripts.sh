@@ -128,6 +128,28 @@ if (
 ); then
   fail "mismatched DROP INDEX exception was accepted"
 fi
+printf '%s\n' \
+  '-- migration-policy: allow-drop-not-null Member.registrationNumber' \
+  'ALTER TABLE "Member" ALTER COLUMN "registrationNumber" DROP NOT NULL;' \
+  >"${migration_repo}/apps/api/prisma/migrations/0002_additive/migration.sql"
+git -C "${migration_repo}" add .
+git -C "${migration_repo}" commit --quiet -m allowed-nullability-expansion
+(
+  cd "${migration_repo}"
+  "${SCRIPTS}/check-migrations.sh" "${migration_base}" >/dev/null
+) || fail "exact-name DROP NOT NULL exception was rejected"
+printf '%s\n' \
+  '-- migration-policy: allow-drop-not-null Member.wrongColumn' \
+  'ALTER TABLE "Member" ALTER COLUMN "registrationNumber" DROP NOT NULL;' \
+  >"${migration_repo}/apps/api/prisma/migrations/0002_additive/migration.sql"
+git -C "${migration_repo}" add .
+git -C "${migration_repo}" commit --quiet -m mismatched-nullability-expansion
+if (
+  cd "${migration_repo}"
+  "${SCRIPTS}/check-migrations.sh" "${migration_base}" >/dev/null 2>&1
+); then
+  fail "mismatched DROP NOT NULL exception was accepted"
+fi
 
 fake_bin="${TEST_ROOT}/bin"
 mkdir -p "${fake_bin}"

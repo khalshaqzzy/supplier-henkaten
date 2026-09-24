@@ -34,7 +34,7 @@ const memberBaseCreateSchema = z.object({
 });
 
 export const createMemberRequestSchema = z.discriminatedUnion('role', [
-  memberBaseCreateSchema.extend({ role: z.literal('MP') }).strict(),
+  z.object({ fullName: nameSchema, role: z.literal('MP') }).strict(),
   memberBaseCreateSchema
     .extend({ role: z.literal('SUPERVISOR'), username: usernameSchema })
     .strict(),
@@ -82,7 +82,7 @@ export const memberSchema = z
   .object({
     id: opaqueIdSchema,
     fullName: nameSchema,
-    registrationNumber: registrationNumberSchema,
+    registrationNumber: registrationNumberSchema.nullable(),
     role: memberRoleSchema,
     active: z.boolean(),
     initials: z.string().min(1).max(4),

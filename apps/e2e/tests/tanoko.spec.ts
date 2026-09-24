@@ -33,7 +33,6 @@ test('Tanoko freezes both axes, saves cross-line mapping and displays history @e
       '/api/v1/supplier/master-data/members',
       {
         fullName: `Operator ${String(i + 1).padStart(2, '0')} Nama Panjang Untuk Clipping`,
-        registrationNumber: `TANOKO-${i}`,
         role: 'MP',
       },
       fixture.csrf,

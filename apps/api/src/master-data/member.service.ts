@@ -97,8 +97,9 @@ export class MemberService {
         data: {
           supplierId: scope.supplierId,
           fullName: input.fullName.trim(),
-          registrationNumber: input.registrationNumber.trim(),
-          normalizedRegistrationNumber: normalizeLookup(input.registrationNumber),
+          registrationNumber: input.role === 'MP' ? null : input.registrationNumber.trim(),
+          normalizedRegistrationNumber:
+            input.role === 'MP' ? null : normalizeLookup(input.registrationNumber),
           role: input.role,
           createdById: context.actorUserId,
           updatedById: context.actorUserId,
@@ -148,6 +149,14 @@ export class MemberService {
       });
       if (!current) throw missing('Member');
       if (current.version !== input.expectedVersion) throw versionConflict();
+      if (current.role === 'MP' && input.registrationNumber !== undefined) {
+        throw new ProblemException({
+          status: 400,
+          code: 'VALIDATION_FAILED',
+          title: 'Nomor registrasi tidak berlaku',
+          detail: 'MP tidak menggunakan nomor registrasi.',
+        });
+      }
       const updated = await transaction.member.update({
         where: { id },
         data: {

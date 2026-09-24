@@ -8479,9 +8479,16 @@
                             "maxLength": 150
                           },
                           "registrationNumber": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 100
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "role": {
                             "type": "string",
@@ -8658,11 +8665,6 @@
                         "minLength": 1,
                         "maxLength": 150
                       },
-                      "registrationNumber": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 100
-                      },
                       "role": {
                         "type": "string",
                         "const": "MP"
@@ -8670,7 +8672,6 @@
                     },
                     "required": [
                       "fullName",
-                      "registrationNumber",
                       "role"
                     ],
                     "additionalProperties": false
@@ -8796,9 +8797,16 @@
                           "maxLength": 150
                         },
                         "registrationNumber": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 100
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 100
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "role": {
                           "type": "string",
@@ -8987,9 +8995,16 @@
                       "maxLength": 150
                     },
                     "registrationNumber": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 100
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "role": {
                       "type": "string",
@@ -9283,9 +9298,16 @@
                       "maxLength": 150
                     },
                     "registrationNumber": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 100
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "role": {
                       "type": "string",
@@ -9571,9 +9593,16 @@
                       "maxLength": 150
                     },
                     "registrationNumber": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 100
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "role": {
                       "type": "string",
@@ -9859,9 +9888,16 @@
                       "maxLength": 150
                     },
                     "registrationNumber": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 100
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "role": {
                       "type": "string",
@@ -10153,9 +10189,16 @@
                       "maxLength": 150
                     },
                     "registrationNumber": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 100
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "role": {
                       "type": "string",
@@ -10444,9 +10487,16 @@
                           "maxLength": 150
                         },
                         "registrationNumber": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 100
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 100
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "role": {
                           "type": "string",
@@ -10761,9 +10811,16 @@
                           "maxLength": 150
                         },
                         "registrationNumber": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 100
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 100
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "role": {
                           "type": "string",
@@ -11078,9 +11135,16 @@
                           "maxLength": 150
                         },
                         "registrationNumber": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 100
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 100
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "role": {
                           "type": "string",
@@ -11392,9 +11456,16 @@
                       "maxLength": 150
                     },
                     "registrationNumber": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 100
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "role": {
                       "type": "string",
@@ -21865,9 +21936,16 @@
                             "maxLength": 150
                           },
                           "registrationNumber": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 100
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "role": {
                             "type": "string",
@@ -22175,9 +22253,16 @@
                       "maxLength": 150
                     },
                     "registrationNumber": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 100
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "role": {
                       "type": "string",
@@ -25431,9 +25516,16 @@
                             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                           },
                           "partId": {
-                            "type": "string",
-                            "format": "uuid",
-                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "status": {
                             "type": "string",
@@ -26026,6 +26118,10 @@
                         "format": "uuid",
                         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                       },
+                      "otherPart": {
+                        "type": "boolean",
+                        "const": true
+                      },
                       "checklistVersionId": {
                         "type": "string",
                         "format": "uuid",
@@ -26091,7 +26187,6 @@
                     "required": [
                       "lineShiftId",
                       "jobId",
-                      "partId",
                       "checklistVersionId",
                       "checklistAnswers",
                       "cause",
@@ -26119,6 +26214,10 @@
                         "type": "string",
                         "format": "uuid",
                         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "otherPart": {
+                        "type": "boolean",
+                        "const": true
                       },
                       "checklistVersionId": {
                         "type": "string",
@@ -26185,7 +26284,6 @@
                     "required": [
                       "lineShiftId",
                       "jobId",
-                      "partId",
                       "checklistVersionId",
                       "checklistAnswers",
                       "cause",
@@ -26213,6 +26311,10 @@
                         "type": "string",
                         "format": "uuid",
                         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "otherPart": {
+                        "type": "boolean",
+                        "const": true
                       },
                       "checklistVersionId": {
                         "type": "string",
@@ -26279,7 +26381,6 @@
                     "required": [
                       "lineShiftId",
                       "jobId",
-                      "partId",
                       "checklistVersionId",
                       "checklistAnswers",
                       "cause",
@@ -26307,6 +26408,10 @@
                         "type": "string",
                         "format": "uuid",
                         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "otherPart": {
+                        "type": "boolean",
+                        "const": true
                       },
                       "checklistVersionId": {
                         "type": "string",
@@ -26373,7 +26478,6 @@
                     "required": [
                       "lineShiftId",
                       "jobId",
-                      "partId",
                       "checklistVersionId",
                       "checklistAnswers",
                       "cause",
@@ -26436,9 +26540,16 @@
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                     },
                     "partId": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "status": {
                       "type": "string",
@@ -27708,9 +27819,16 @@
                             "maxLength": 150
                           },
                           "registrationNumber": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 100
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "reserved": {
                             "type": "boolean"
@@ -27888,9 +28006,16 @@
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                     },
                     "partId": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "status": {
                       "type": "string",
@@ -29205,9 +29330,16 @@
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                     },
                     "partId": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "status": {
                       "type": "string",
@@ -30423,9 +30555,16 @@
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                     },
                     "partId": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "status": {
                       "type": "string",
@@ -31634,9 +31773,16 @@
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                     },
                     "partId": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "status": {
                       "type": "string",
@@ -32807,9 +32953,16 @@
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                     },
                     "partId": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "cause": {
                       "type": "string"
@@ -33326,9 +33479,16 @@
                             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                           },
                           "partId": {
-                            "type": "string",
-                            "format": "uuid",
-                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "status": {
                             "type": "string",
@@ -34279,9 +34439,16 @@
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                     },
                     "partId": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "status": {
                       "type": "string",
@@ -35427,6 +35594,10 @@
                             "exclusiveMinimum": 0,
                             "maximum": 9007199254740991
                           },
+                          "warningKey": {
+                            "type": "string",
+                            "minLength": 1
+                          },
                           "oldestOpenedAt": {
                             "type": "string",
                             "format": "date-time",
@@ -35439,6 +35610,7 @@
                           "partNumber",
                           "partName",
                           "openWarningCount",
+                          "warningKey",
                           "oldestOpenedAt"
                         ],
                         "additionalProperties": false
@@ -35533,6 +35705,10 @@
                       "exclusiveMinimum": 0,
                       "maximum": 9007199254740991
                     },
+                    "warningKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
                     "oldestOpenedAt": {
                       "type": "string",
                       "format": "date-time",
@@ -35616,6 +35792,7 @@
                     "partNumber",
                     "partName",
                     "openWarningCount",
+                    "warningKey",
                     "oldestOpenedAt",
                     "warnings"
                   ],

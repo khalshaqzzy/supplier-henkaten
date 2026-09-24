@@ -311,7 +311,7 @@ export function BoardPage() {
                             </i>
                             <span>
                               <strong>{job.mp.name ?? 'Vacant'}</strong>
-                              <small>{job.mp.registrationNumber ?? humanize(job.state)}</small>
+                              <small>{humanize(job.state)}</small>
                             </span>
                           </div>
                           <div className="board-job__status">

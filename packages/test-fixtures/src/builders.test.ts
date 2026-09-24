@@ -58,7 +58,7 @@ describe('deterministic fixture builders', () => {
     expect(buildExternalSupplier().sourceMode).toBe('EXTERNAL');
     expect(buildUser('TMMIN_ADMIN')).not.toHaveProperty('supplierId');
     expect(buildUser('SUPERVISOR')).toHaveProperty('supplierId');
-    expect(buildMember('MP').registrationNumber).toMatch(/^TEST-REG-/);
+    expect(buildMember('MP').registrationNumber).toBeNull();
     expect(buildJob()).toHaveProperty('lineId');
     expect(buildPart()).toHaveProperty('partNumber');
     expect(buildShift()).toHaveProperty('status', 'NOT_STARTED');

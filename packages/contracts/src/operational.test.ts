@@ -74,6 +74,25 @@ describe('operational contracts', () => {
     ).toThrow();
   });
 
+  it('requires exactly one part choice and accepts undisclosed Other', () => {
+    const base = {
+      category: 'METHOD' as const,
+      lineShiftId: id(),
+      jobId: id(),
+      checklistVersionId: id(),
+      checklistAnswers: [{ itemId: id(), answer: 'YES' as const }],
+      cause: 'Change',
+      detail: 'Method updated',
+      affectedObject: 'Old method',
+      replacementObject: 'New method',
+    };
+    expect(createHenkatenRequestSchema.safeParse({ ...base, otherPart: true }).success).toBe(true);
+    expect(createHenkatenRequestSchema.safeParse(base).success).toBe(false);
+    expect(
+      createHenkatenRequestSchema.safeParse({ ...base, partId: id(), otherPart: true }).success,
+    ).toBe(false);
+  });
+
   it('enforces the 2,000 character submission evidence limit', () => {
     expect(() =>
       createHenkatenRequestSchema.parse({

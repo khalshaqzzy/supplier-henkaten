@@ -1,6 +1,6 @@
 import { assertTanokoEligible } from '../master-data/tanoko-eligibility.js';
 import { LineShiftService } from '../master-data/line-shift.service.js';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
 
@@ -92,7 +92,7 @@ export class HenkatenService {
         principal,
       );
       const lineShift = occurrence.row;
-      const [supplier, job, part, checklist] = await Promise.all([
+      const [supplier, job, selectedPart, checklist] = await Promise.all([
         tx.supplier.findUnique({ where: { id: scope.supplierId } }),
         tx.job.findFirst({
           where: {
@@ -102,9 +102,11 @@ export class HenkatenService {
             active: true,
           },
         }),
-        tx.part.findFirst({
-          where: { id: input.partId, supplierId: scope.supplierId, active: true },
-        }),
+        input.partId
+          ? tx.part.findFirst({
+              where: { id: input.partId, supplierId: scope.supplierId, active: true },
+            })
+          : Promise.resolve(null),
         tx.checklistVersion.findFirst({
           where: {
             id: input.checklistVersionId,
@@ -125,7 +127,13 @@ export class HenkatenService {
       )
         throw sourceMismatch();
       if (!job) throw missing('Active job');
-      if (!part) throw missing('Active part');
+      if (input.partId && !selectedPart) throw missing('Active part');
+      const henkatenId = randomUUID();
+      const partNumber = selectedPart?.partNumber ?? 'Other';
+      const partName = selectedPart?.partName ?? '';
+      const partWarningKey = selectedPart
+        ? normalizeLookup(selectedPart.partNumber)
+        : `other:${henkatenId}`;
       const answers = new Map(
         input.checklistAnswers.map((answer) => [answer.itemId, answer.answer]),
       );
@@ -156,7 +164,7 @@ export class HenkatenService {
       let man:
         | {
             assignment: (typeof lineShift.jobAssignments)[number];
-            replacement: { id: string; fullName: string; registrationNumber: string };
+            replacement: { id: string; fullName: string; registrationNumber: string | null };
             replaced: { id: string; fullName: string } | null;
           }
         | undefined;
@@ -216,12 +224,13 @@ export class HenkatenService {
       const now = new Date();
       const created = await tx.henkaten.create({
         data: {
+          id: henkatenId,
           supplierId: scope.supplierId,
           shiftRunId: legacyShift.id,
           lineShiftId: lineShift.id,
           lineId: lineShift.lineId,
           jobId: job.id,
-          partId: part.id,
+          partId: selectedPart?.id ?? null,
           identifier,
           dailySequence: sequence,
           sourceMode: supplier.sourceMode,
@@ -233,9 +242,9 @@ export class HenkatenService {
           lineCodeSnapshot: lineShift.line.code,
           lineNameSnapshot: lineShift.line.name,
           jobNameSnapshot: job.name,
-          partNumberSnapshot: part.partNumber,
-          normalizedPartNumberSnapshot: normalizeLookup(part.partNumber),
-          partNameSnapshot: part.partName,
+          partNumberSnapshot: partNumber,
+          normalizedPartNumberSnapshot: partWarningKey,
+          partNameSnapshot: partName,
           creatorMemberId: memberId,
           creatorNameSnapshot: principal.displayName,
           cause: input.cause,
@@ -281,9 +290,9 @@ export class HenkatenService {
           },
           warning: {
             create: {
-              partNumberSnapshot: part.partNumber,
-              normalizedPartNumberSnapshot: normalizeLookup(part.partNumber),
-              partNameSnapshot: part.partName,
+              partNumberSnapshot: partNumber,
+              normalizedPartNumberSnapshot: partWarningKey,
+              partNameSnapshot: partName,
             },
           },
           approvalRoutes: {
@@ -727,9 +736,11 @@ export class HenkatenService {
       this.prisma.job.findFirst({
         where: { id: row.jobId, supplierId: scope.supplierId, active: true },
       }),
-      this.prisma.part.findFirst({
-        where: { id: row.partId, supplierId: scope.supplierId, active: true },
-      }),
+      row.partId
+        ? this.prisma.part.findFirst({
+            where: { id: row.partId, supplierId: scope.supplierId, active: true },
+          })
+        : Promise.resolve(null),
     ]);
     if (!checklist) throw checklistInvalid();
     const selectable = operational.currentLineShiftIds.length
@@ -771,7 +782,7 @@ export class HenkatenService {
         job.lineId === shift.lineId &&
         shift.assignments.some(({ jobId }) => jobId === job.id),
       ),
-      partStillValid: Boolean(part),
+      partStillValid: row.partId === null || Boolean(part),
       assignmentStillValid: Boolean(
         !row.manDetail || (working && working.version === row.manDetail.targetAssignmentVersion),
       ),
@@ -852,6 +863,9 @@ export class HenkatenService {
           supplierName: suppliers.get(group.supplierId) ?? 'Unknown supplier',
           partNumber: sample.partNumberSnapshot,
           partName: sample.partNameSnapshot,
+          warningKey: group.normalizedPartNumberSnapshot.startsWith('other:')
+            ? group.normalizedPartNumberSnapshot
+            : sample.partNumberSnapshot,
           openWarningCount: group._count._all,
           oldestOpenedAt: group._min.openedAt!.toISOString(),
         };
@@ -899,6 +913,9 @@ export class HenkatenService {
       supplierName: supplier.name,
       partNumber: rows[0]!.partNumberSnapshot,
       partName: rows[0]!.partNameSnapshot,
+      warningKey: normalizedPartNumber.startsWith('other:')
+        ? normalizedPartNumber
+        : rows[0]!.partNumberSnapshot,
       openWarningCount: rows.length,
       oldestOpenedAt: rows[0]!.openedAt.toISOString(),
       warnings: rows.map((row) => ({

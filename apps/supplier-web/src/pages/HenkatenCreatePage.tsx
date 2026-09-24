@@ -69,7 +69,7 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
     setCategory(prefill.category);
     setLineShiftId(prefill.lineShiftId ?? '');
     setJobId(prefill.jobStillValid ? prefill.jobId : '');
-    setPartId(prefill.partStillValid ? prefill.partId : '');
+    setPartId(prefill.partStillValid ? (prefill.partId ?? 'OTHER') : '');
     setCause(prefill.cause);
     setDetail(prefill.detail);
     setAffectedObject(prefill.affectedObject ?? '');
@@ -106,7 +106,7 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
       const base = {
         lineShiftId,
         jobId,
-        partId,
+        ...(partId === 'OTHER' ? { otherPart: true as const } : { partId }),
         checklistVersionId: checklist!.id,
         checklistAnswers: checklist!.items.map(({ id }) => ({ itemId: id, answer: answers[id]! })),
         cause,
@@ -234,9 +234,13 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
                     {part.partNumber} · {part.partName}
                   </option>
                 ))}
+                <option value="OTHER">Other</option>
               </NativeSelect>
             </Field>
-            <SelectedPart part={selectedPart} onClear={() => setPartId('')} />
+            <SelectedPart
+              part={partId === 'OTHER' ? { partNumber: 'Other', partName: '' } : selectedPart}
+              onClear={() => setPartId('')}
+            />
           </Panel>
           {category === 'MAN' ? (
             <Panel title="Replacement MP">
@@ -253,7 +257,7 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
                       member.skillLevels?.find(({ jobId: id }) => id === jobId)?.level ?? 0;
                     return (
                       <option key={member.id} value={member.id} disabled={level < 3}>
-                        {member.fullName} · {member.registrationNumber} · Tanoko {level || '—'}
+                        {member.fullName} · Tanoko {level || '—'}
                       </option>
                     );
                   })}
@@ -340,7 +344,7 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
             </div>
             <div>
               <dt>Part</dt>
-              <dd>{selectedPart?.partNumber ?? '—'}</dd>
+              <dd>{partId === 'OTHER' ? 'Other' : (selectedPart?.partNumber ?? '—')}</dd>
             </div>
           </dl>
           <Button type="submit" loading={submit.isPending} disabled={!valid}>

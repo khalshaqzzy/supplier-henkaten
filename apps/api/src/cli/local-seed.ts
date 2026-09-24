@@ -403,7 +403,6 @@ async function provisionSupplier(
       '/api/v1/supplier/master-data/members',
       {
         fullName: `Operator Sintetis ${plan.code} ${index + 1}`,
-        registrationNumber: `SYN-${plan.code}-MP-${String(index + 1).padStart(3, '0')}`,
         role: 'MP',
       },
       admin.csrf,
