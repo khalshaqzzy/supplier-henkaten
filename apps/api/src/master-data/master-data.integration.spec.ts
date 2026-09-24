@@ -384,6 +384,8 @@ describe('supplier master data', () => {
       .set('Cookie', supplierCookie);
     expect(photo.status).toBe(200);
     expect(photo.headers['content-type']).toContain('image/webp');
+    expect(photo.headers['cross-origin-resource-policy']).toBe('same-site');
+    expect(photo.headers['cache-control']).toContain('private');
 
     const staleRemoval = await supplierPost(
       `/api/v1/supplier/master-data/members/${mpId}/photo/remove`,

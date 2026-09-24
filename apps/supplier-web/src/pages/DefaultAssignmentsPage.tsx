@@ -79,6 +79,13 @@ export function DefaultAssignmentsPage() {
       setProblem(null);
       setNewShiftTemplateId('');
       setCopyFromId('');
+      queryClient.setQueryData<{ items: LineShift[] }>(
+        scopedKey(scope, 'line-shifts', lineId),
+        (previous) =>
+          previous
+            ? { items: [...previous.items.filter(({ id }) => id !== created.id), created] }
+            : { items: [created] },
+      );
       setSelectedShiftId(created.id);
       await invalidate();
     },

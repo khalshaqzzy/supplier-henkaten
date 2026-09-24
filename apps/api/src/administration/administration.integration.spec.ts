@@ -78,6 +78,9 @@ describe('Phase 3 administration flows', () => {
     const cookie = login.headers['set-cookie'] ?? '';
     const csrf = login.body.csrfToken as string;
     expect(login.body.principal.mustChangePassword).toBe(false);
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      expect((await tmminLogin(adminUsername, changedPassword)).status).toBe(200);
+    }
 
     const quality = await request(app.getHttpServer())
       .post('/api/v1/tmmin/quality-users')
@@ -142,6 +145,85 @@ describe('Phase 3 administration flows', () => {
           role: 'SUPPLIER_ADMIN',
           status: 'ACTIVE',
         },
+      }),
+    ).resolves.toBe(1);
+
+    const resetAfterVersionDiverged = await request(app.getHttpServer())
+      .post(`/api/v1/tmmin/suppliers/${hosted.body.supplier.id}/supplier-admin/reset-password`)
+      .set('Origin', tmminOrigin)
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', csrf)
+      .send({ expectedVersion: 2 });
+    expect(resetAfterVersionDiverged.status).toBe(200);
+
+    const externalClient = await request(app.getHttpServer())
+      .post(`/api/v1/tmmin/suppliers/${hosted.body.supplier.id}/external-clients`)
+      .set('Origin', tmminOrigin)
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', csrf)
+      .send({ name: 'Cutover test client', ipAllowlist: [] });
+    expect(externalClient.status).toBe(201);
+    const toExternal = await request(app.getHttpServer())
+      .post(`/api/v1/tmmin/suppliers/${hosted.body.supplier.id}/source/cutover`)
+      .set('Origin', tmminOrigin)
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', csrf)
+      .send({
+        expectedVersion: 3,
+        targetMode: 'EXTERNAL',
+        reason: 'Move the supplier to its External source epoch',
+        privacyAcknowledged: true,
+      });
+    expect(toExternal.status).toBe(200);
+    expect(toExternal.body.sourceMode).toBe('EXTERNAL');
+    await expect(
+      prisma.user.count({
+        where: { supplierId: hosted.body.supplier.id, role: 'SUPPLIER_ADMIN', status: 'ACTIVE' },
+      }),
+    ).resolves.toBe(0);
+    const reversePreflight = await request(app.getHttpServer())
+      .post(`/api/v1/tmmin/suppliers/${hosted.body.supplier.id}/source/preflight`)
+      .set('Origin', tmminOrigin)
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', csrf)
+      .send({ targetMode: 'HOSTED' });
+    expect(reversePreflight.status).toBe(200);
+    const duplicatePreparation = await request(app.getHttpServer())
+      .post(`/api/v1/tmmin/suppliers/${hosted.body.supplier.id}/source/preparation`)
+      .set('Origin', tmminOrigin)
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', csrf)
+      .send({
+        expectedVersion: toExternal.body.version,
+        reason: 'Attempt an already used Supplier Admin username',
+        privacyAcknowledged: true,
+        supplierAdmin: {
+          username: hosted.body.supplierAdmin.username,
+          displayName: 'Duplicate Supplier Admin',
+        },
+      });
+    expect(duplicatePreparation.status).toBe(409);
+    expect(duplicatePreparation.body.fieldErrors).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: 'supplierAdmin.username' })]),
+    );
+    const reversePreparation = await request(app.getHttpServer())
+      .post(`/api/v1/tmmin/suppliers/${hosted.body.supplier.id}/source/preparation`)
+      .set('Origin', tmminOrigin)
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', csrf)
+      .send({
+        expectedVersion: toExternal.body.version,
+        reason: 'Prepare the supplier to return to Hosted mode',
+        privacyAcknowledged: true,
+        supplierAdmin: {
+          username: `return-admin-${randomUUID()}`,
+          displayName: 'Returning Supplier Admin',
+        },
+      });
+    expect(reversePreparation.status).toBe(201);
+    await expect(
+      prisma.user.count({
+        where: { supplierId: hosted.body.supplier.id, role: 'SUPPLIER_ADMIN', status: 'ACTIVE' },
       }),
     ).resolves.toBe(1);
 

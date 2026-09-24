@@ -1,3 +1,40 @@
+# Current Session Handoff — Scoped QA finding remediation
+
+- Date: 2026-09-24
+- Branch: `fix/qa-verif-1`
+- Status: F-01–F-09 and F-11–F-12 implemented with automated regressions; F-10 is a product-expectation correction. PR [#20](https://github.com/khalshaqzzy/supplier-henkaten/pull/20) targets `staging`. No staging deployment or complete QA claim.
+- Current roadmap position remains Phase 15 / 15.9 `in_progress`.
+
+The full cause and acceptance map is [`docs/qa/qa-verif-finding-remediation-plan-2026-09-24.md`](../docs/qa/qa-verif-finding-remediation-plan-2026-09-24.md). ADR 0036 records the user decision that Supervisor reroute needs no in-app notification; ADR 0037 records implementation boundaries. The original local QA run's 22 PASS / 15 FAIL / 10 BLOCKED outcomes remain unchanged. No “Remaining QA not executed” branch was continued. The fixes have automated regressions, but the original browser observation for every finding was not individually rerun; do not reclassify the historical rows from the tests alone.
+
+Implementation: cutover deactivates the prior Supplier Admin; reverse Preparation defensively revokes any surviving active Admin and rejects reused usernames with a field error. Reset/replace uses Supplier.version. Photo responses use same-site CORP. Clone checks current Line–Shift/Job validity. Account throttling counts failures only, keeps the existing IP limits and five-failure database lockout, and allows six consecutive successful logins. Supplier notification and master-data mutations refresh their actual cache keys; Line Setup retains the newly copied shift; warning detail shows a human-readable Hosted/External identifier; former Supervisor approval controls require current responsibility; the Supplier registry exposes API cursor navigation. OpenAPI and the generated client were regenerated. No migration was added.
+
+Checks completed on a disposable clean-artifact worktree after `pnpm install --frozen-lockfile`: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm openapi:check`, and `VITE_API_ORIGIN=https://api.example.invalid pnpm build` passed. The first clean-worktree lint run caught five new test-mock style errors; they were fixed and the complete sequence passed. The main checkout's `pnpm lint` includes pre-existing ignored `.local/*.mjs` scripts, so the clean-worktree result is the CI-equivalent result. Full API integration passed 32 tests on the disposable Docker test database. `pnpm test:e2e` passed five isolated journeys across Chromium and Edge, and its own Compose projects were removed. Node 22.23.2 and pnpm 11.16.0 were used on the host; production Docker builds used the pinned Node 22.23.1 image.
+
+Staging parity: `docker compose config --quiet`, `pnpm migrations:destructive-check 7ed8d8a5ef515707950c4e8f48ef71b1d2727151`, `pnpm deployment:validate`, `pnpm test:deployment`, `pnpm security:exceptions:check`, `pnpm security:audit`, pinned Actionlint/ShellCheck/Hadolint, `bash -n`, Ubuntu 22.04 bootstrap input validation, Gitleaks v8.24.3 directory scan, and Trivy 0.70.0 filesystem scan passed. The deployment script harness passed in a Linux Docker container with actual `flock` contention. The previous-staging-to-current migration was applied to a temporary database, checked current, and dropped; no migration SQL changed. All five production images built; the isolated staging-like Compose stack passed migration/bootstrap, health, routing, headers, non-root, idempotent bootstrap, and restart persistence checks. Trivy image scans passed for all five images. The first scan of the frontend images encountered cached `apk upgrade` layers containing vulnerable `libexpat` 2.8.4-r0; a `--no-cache` frontend rebuild pulled fixed 2.8.5-r0 and both rescans passed. No Dockerfile change was required.
+
+The local fullstack Compose services on ports 3000, 5173, 5174, and 55432 predated this task and were not stopped or reseeded; `/health` still returned 200 after the checks. The isolated staging-like Compose stack and disposable parity worktree were removed. User explicitly requested pushing this branch and opening a PR to `staging` **without monitoring checks**, overriding the post-push monitoring step in `.agent/rules.md` for this task. The PR was opened without a staging deployment claim.
+
+---
+
+# Previous Session Handoff — Local browser QA execution
+
+- Date: 2026-09-24
+- Branch: `feat/qa-verif` at baseline `cf53a62`; report and handoff prepared for delivery on this branch.
+- Status: local exploratory QA run documented; no product fixes made. Final report: [`docs/audits/local-browser-qa-2026-09-24.md`](../docs/audits/local-browser-qa-2026-09-24.md).
+
+The run covered the PRD/source inventory and 47 planned A/T/S/H/X/N scenario rows across Supplier and TMMIN Admin/Quality surfaces, with Playwright Chromium and local External API calls. Current overall row outcomes: **22 PASS, 15 FAIL, 10 BLOCKED / partial**; 37/47 (78.7%) have a determinate row outcome, but some PASS/FAIL rows still have untested sub-branches. The report lists evidence, twelve findings, all remaining checks, and run limitations. Push/PWA push permission, subscription, delivery, and revoke tests are excluded per user direction.
+
+The user specifically asked about Admin PCR status correction. TMMIN Admin changed a Closed Henkaten in both No-PCR→PCR and PCR→No-PCR directions. **Simpan keputusan** was disabled until the trimmed reason contained at least 10 characters; valid reasons saved successfully. No product code was changed to address defects.
+
+External X-02/X-04 verification passed: PII payload rejection/isolation, invalid transition, status-only PCR retention, changed-evidence requeue, Approved/Rejected/Cancelled warning closure, and Admin External Health browser rendering. A final `pnpm local:reseed` restored the baseline counts (2 Hosted suppliers, no External test tenant, 240 Henkaten and expected PCR/warning/Line–Shift counts), health/readiness passed, and TMMIN Admin/NPM Supplier Admin browser smoke passed. `pnpm local:down` stopped the stack. Docker services are not running.
+
+Remaining QA is not yet fully verified: line-scope/source-mode security matrix, negative-password lockout, remaining registry validation and pagination/dashboard reconciliation, complete Explorer detail/filter matrix, an assessment-free `expectedVersion: 0` PCR case and pending-assessment reload, Hosted Preparation/reverse source gates, standalone master-data and Line–Shift branches, schedule/off-hours and Tanoko eligibility boundaries, old External credential rejection after cutover, full outbox/audit/photo-cache diagnostics, and physical-device/assistive-technology coverage. The report describes why each remains and records partial checks inside other rows.
+
+No persistent Playwright specs were added; temporary local runners are removed after the run. The ignored `.local/qa-evidence/` retains sanitized summaries and screenshots. The branch changes are documentation only: the QA execution report and this updated handoff. The full scenario plan remains in `docs/qa/browser-local-end-to-end-verification-plan.md`.
+
+---
+
 # Session Handoff — Canvas job-card 4M visibility
 
 Date: 2026-09-23

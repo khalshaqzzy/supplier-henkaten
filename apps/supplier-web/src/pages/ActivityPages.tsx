@@ -40,8 +40,12 @@ export function NotificationsPage() {
     mutationFn: ({ id, version, read }: { id: string; version: number; read: boolean }) =>
       supplierApi.setNotificationRead(id, { read, expectedVersion: version }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'notifications') });
-      await queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'notification-count') });
+      await queryClient.invalidateQueries({
+        queryKey: scopedKey(scope, 'notifications').slice(0, -1),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: scopedKey(scope, 'notification-count').slice(0, -1),
+      });
     },
   });
 

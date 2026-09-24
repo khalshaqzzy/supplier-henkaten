@@ -67,6 +67,7 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
     const prefill = clonePrefill.data;
     if (!prefill) return;
     setCategory(prefill.category);
+    setLineShiftId(prefill.lineShiftId ?? '');
     setJobId(prefill.jobStillValid ? prefill.jobId : '');
     setPartId(prefill.partStillValid ? prefill.partId : '');
     setCause(prefill.cause);

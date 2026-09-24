@@ -37,6 +37,7 @@ export const sessionPrincipalSchema = z
     realm: identityRealmSchema,
     role: userRoleSchema,
     supplierId: opaqueIdSchema.optional(),
+    memberId: opaqueIdSchema.optional(),
     purpose: sessionPurposeSchema,
     mustChangePassword: z.boolean(),
   })

@@ -9,7 +9,7 @@ import type { SessionResponse } from '@tmmin-henkaten/contracts';
 
 import { App } from './App';
 import { supplierApi } from './app/api';
-import { queryClient } from './app/query';
+import { queryClient, scopedKey } from './app/query';
 import { consumeIntendedPath, rememberIntendedPath } from './app/session';
 import { supplierDashboardVisualFixture } from './test/visualFixtures';
 
@@ -385,6 +385,116 @@ describe('Supplier application foundation', () => {
     await user.click(screen.getByRole('button', { name: 'Refresh record' }));
     await waitFor(() => expect(screen.queryByText('Action tidak dapat diproses')).toBeNull());
     await waitFor(() => expect(henkaten).toHaveBeenCalledTimes(2));
+  });
+
+  it('updates the Supplier QC notification row after read and unread without reloading', async () => {
+    vi.spyOn(supplierApi, 'session').mockResolvedValue(
+      session('NORMAL', ['SUPPLIER_SELF_SERVICE', 'SUPPLIER_NOTIFICATION_READ'], false, 'QC'),
+    );
+    const notification = {
+      id: '00000000-0000-4000-8000-000000000040',
+      supplierId: supplierContext.id,
+      kind: 'APPROVAL_PENDING' as const,
+      title: 'QC approval pending',
+      body: 'Review this Henkaten.',
+      resourceType: 'Henkaten',
+      resourceId: '00000000-0000-4000-8000-000000000041',
+      deepLink: '/henkatens/00000000-0000-4000-8000-000000000041',
+      createdAt: '2026-09-24T01:00:00.000Z',
+      readAt: null as string | null,
+      version: 1,
+    };
+    vi.spyOn(supplierApi, 'notifications').mockImplementation(() =>
+      Promise.resolve({
+        items: [{ ...notification }],
+        pageInfo: { hasNextPage: false, nextCursor: null },
+      }),
+    );
+    vi.spyOn(supplierApi, 'notificationCount').mockImplementation(() =>
+      Promise.resolve({
+        count: notification.readAt ? 0 : 1,
+      }),
+    );
+    const setRead = vi.spyOn(supplierApi, 'setNotificationRead').mockImplementation((_id, body) => {
+      notification.readAt = body.read ? '2026-09-24T02:00:00.000Z' : null;
+      notification.version += 1;
+      return Promise.resolve({ ...notification });
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/notifications']}>
+        <App />
+      </MemoryRouter>,
+    );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Tandai dibaca' }));
+    expect(await screen.findByRole('button', { name: 'Tandai belum dibaca' })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Tandai belum dibaca' }));
+    expect(await screen.findByRole('button', { name: 'Tandai dibaca' })).toBeTruthy();
+    expect(setRead).toHaveBeenNthCalledWith(2, notification.id, {
+      read: false,
+      expectedVersion: 2,
+    });
+  });
+
+  it('uses the updated Part version for an immediate lifecycle action', async () => {
+    vi.spyOn(supplierApi, 'session').mockResolvedValue(
+      session('NORMAL', ['SUPPLIER_SELF_SERVICE', 'SUPPLIER_MASTER_DATA_MANAGE']),
+    );
+    const partId = '00000000-0000-4000-8000-000000000042';
+    const part = {
+      id: partId,
+      partNumber: 'NPM-53601-B',
+      partName: 'Original part',
+      active: true,
+      version: 2,
+      createdAt: '2026-09-24T01:00:00.000Z',
+      updatedAt: '2026-09-24T01:00:00.000Z',
+    };
+    vi.spyOn(supplierApi, 'part').mockResolvedValue(part);
+    vi.spyOn(supplierApi, 'updatePart').mockResolvedValue({
+      ...part,
+      partName: 'Updated part',
+      version: 3,
+    });
+    const lifecycle = vi.spyOn(supplierApi, 'partAction').mockResolvedValue({
+      ...part,
+      partName: 'Updated part',
+      active: false,
+      version: 4,
+    });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(
+      <MemoryRouter initialEntries={[`/master-data/parts/${partId}`]}>
+        <App />
+      </MemoryRouter>,
+    );
+    const user = userEvent.setup();
+    await waitFor(() => expect(document.getElementById('partName')).toBeTruthy());
+    const name = document.getElementById('partName') as HTMLInputElement;
+    await user.clear(name);
+    await user.type(name, 'Updated part');
+    await user.click(screen.getByRole('button', { name: 'Simpan perubahan' }));
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData(
+          scopedKey(
+            {
+              userId: '00000000-0000-4000-8000-000000000002',
+              supplierId: supplierContext.id,
+              purpose: 'NORMAL',
+            },
+            'master-parts-detail',
+            partId,
+          ),
+        ),
+      ).toMatchObject({ version: 3, partName: 'Updated part' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Nonaktifkan' }));
+    await waitFor(() =>
+      expect(lifecycle).toHaveBeenCalledWith(partId, 'deactivate', { expectedVersion: 3 }),
+    );
   });
 
   it('forces a temporary-password session into the password-change route', async () => {
