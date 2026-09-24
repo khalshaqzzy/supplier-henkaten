@@ -10,7 +10,7 @@ Scope: staging and production topology, routing, releases, rollback, and accepte
 
 TMMIN will host the platform and requires separate staging and production environments. The product
 contract fixes a single-VM Docker Compose architecture and automatic branch deployments. Production
-domains are not yet available, and v1 has no backup, disaster recovery, or high availability.
+domains are now assigned, and v1 has no backup, disaster recovery, or high availability.
 
 ## Decision
 
@@ -27,10 +27,9 @@ health/readiness checks, and three-domain smoke tests. Five releases are retaine
 current and immediately previous release. Code rollback is allowed only when the database schema
 remains backward compatible.
 
-Only a push to `staging` deploys after all required checks. Pull requests to `staging` run the same
-release gates without deployment. A production-capable reusable workflow exists, but no `main`,
-manual-dispatch, or production deployment trigger is active. No backup, PITR, replica, failover,
-RPO, RTO, or HA claim is made.
+Pushes to `staging` and `main` deploy to their respective environments after the same release
+gate. Pull requests to either branch run the gate without deployment. There is no manual dispatch
+or production approval gate. No backup, PITR, replica, failover, RPO, RTO, or HA claim is made.
 
 ## Rationale
 
@@ -191,5 +190,23 @@ layers rather than the images themselves.
 
 After the operator bootstraps Ubuntu 22.04 and configures GitHub Environment `staging`, capture
 first/upgrade deployment, close-candidate race, and forced-smoke rollback evidence from the real VM.
-Production activation remains deferred until Phase 16 authorization and real production domains,
-VM, environment secrets, and acceptance evidence exist.
+Production first release requires verified VM access, host identity, public HTTPS reachability,
+capacity/UAT/security acceptance evidence, and observed success of the main branch workflow.
+
+## Production caller activation — 2026-09-24
+
+The assigned production hostnames are `henkaten.qualitydivision.com` for Supplier,
+`admin-henkaten.qualitydivision.com` for TMMIN Admin/Quality, and
+`henkaten-api.qualitydivision.com` for the API. The `main` push caller uses the same release gate
+and reusable exact-SHA deployment as staging, with an isolated GitHub Environment and base path.
+The bootstrap script accepts either environment and applies identical Ubuntu, Docker, user,
+permission, and firewall setup to the corresponding base directory. The production Environment
+has no manual reviewer gate, matching the approved automatic release behavior.
+
+The existing single-process API and database pool remain the initial production capacity
+configuration. Four vCPUs and 16 GiB RAM do not by themselves prove throughput; API replicas,
+worker concurrency, PostgreSQL memory, and connection pool changes require representative load
+measurements and a schema/worker/routing review. This avoids multiplying database connections or
+PCR and outbox work without evidence. Production launch still depends on SSH host identity,
+public HTTPS reachability, capacity/UAT/security gates, and explicit acceptance of the unchanged
+data-loss and automatic-release risks. Validation is defined in the production deployment plan.

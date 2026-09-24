@@ -4,12 +4,12 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  sudo bash deploy/scripts/bootstrap-vm.sh staging <deploy-user> "<ssh-public-key>" [ssh-port]
-  bash deploy/scripts/bootstrap-vm.sh --check staging <deploy-user> "<ssh-public-key>" [ssh-port]
+  sudo bash deploy/scripts/bootstrap-vm.sh <staging|production> <deploy-user> "<ssh-public-key>" [ssh-port]
+  bash deploy/scripts/bootstrap-vm.sh --check <staging|production> <deploy-user> "<ssh-public-key>" [ssh-port]
 
 This script supports Ubuntu 22.04 LTS only. It installs Docker Engine and Compose
 from Docker's official apt repository, creates the deploy user and authorized key,
-creates /opt/supplier-henkaten/staging, and enables UFW for SSH/HTTP/HTTPS.
+creates /opt/supplier-henkaten/<environment>, and enables UFW for SSH/HTTP/HTTPS.
 EOF
 }
 
@@ -28,8 +28,8 @@ DEPLOY_USER="$2"
 DEPLOY_SSH_PUBLIC_KEY="$3"
 SSH_PORT="${4:-22}"
 
-[[ "${APP_ENV}" == "staging" ]] || {
-  echo "Only the staging environment is enabled by this bootstrap script." >&2
+[[ "${APP_ENV}" =~ ^(staging|production)$ ]] || {
+  echo "Environment must be staging or production." >&2
   exit 1
 }
 [[ "${DEPLOY_USER}" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || {
@@ -56,9 +56,9 @@ source /etc/os-release
   exit 1
 }
 
-BASE_DIR="/opt/supplier-henkaten/staging"
+BASE_DIR="/opt/supplier-henkaten/${APP_ENV}"
 if "${CHECK_ONLY}"; then
-  printf 'Bootstrap inputs are valid for Ubuntu 22.04 staging at %s.\n' "${BASE_DIR}"
+  printf 'Bootstrap inputs are valid for Ubuntu 22.04 %s at %s.\n' "${APP_ENV}" "${BASE_DIR}"
   exit 0
 fi
 
@@ -142,7 +142,7 @@ ufw --force enable
 
 cat <<EOF
 VM bootstrap complete.
-Environment: staging
+Environment: ${APP_ENV}
 Deploy user: ${DEPLOY_USER}
 Base directory: ${BASE_DIR}
 

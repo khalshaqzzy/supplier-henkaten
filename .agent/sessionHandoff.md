@@ -1,4 +1,77 @@
-# Current Session Handoff — Scoped QA finding remediation
+# Current Session Handoff — Production deployment preparation
+
+- Date: 2026-09-24
+- Branch: `feat/production-deployment`
+- Status: production caller, bootstrap support, domain documentation, and production Environment preparation are in progress. No production release has run.
+
+The `main` push and PR paths now use the existing release gate. Staging run `35977992005` passed
+every gate and remote deployment; independent public smoke passed on all three staging domains
+for SHA `dfc2aa2428b1db5fce407ec2033a1da87b0632bd`, closing 15.9. Only a successful `main` push
+calls the reusable production deployment for Supplier `henkaten.qualitydivision.com`, Admin
+`admin-henkaten.qualitydivision.com`, and API `henkaten-api.qualitydivision.com`. Bootstrap accepts
+`production` and creates isolated paths. Production runtime rendering and bootstrap input checks
+were added to the existing deployment validation. ADR 0008 and
+[`productionDeploymentPlan.md`](productionDeploymentPlan.md) record decisions, capacity measurement
+and launch sequence; PRD, roadmap, and deployment guide now use the confirmed domains.
+
+GitHub Environment `production` exists without reviewers and only branch `main` may deploy to it.
+Main branch protection now requires an up-to-date `Release candidate gate` check while preserving
+its existing one-review requirement. Its secret-name inventory now matches staging: 15 non-host
+values were copied from the current staging
+release's runtime env through trusted SSH without logging values; the preserved CI SSH private key
+was set directly; `VM_HOST` and `VM_USER` use the production endpoint. `VM_SSH_PORT=22` and a
+production-specific bootstrap display name are configured. The production bootstrap username was
+then changed to the operator-requested value; no production release or running container exists yet,
+so the first bootstrap will consume that value. GitHub does not expose secret values
+for reading back. The production ED25519 host key is pinned from a fresh keyscan after its
+fingerprint matched prior network observations and the host public-key file over SSH. This is
+trust on first use; the provider-console fingerprint has not been independently checked.
+The current staging VM was resolved through live DNS rather than the
+stale IP in older handoff entries.
+
+All three production DNS A records currently resolve to the production VM. Bootstrap verification
+now confirms CI key login, Ubuntu 22.04, four vCPUs, 16 GiB RAM, Docker 29.8.1, Compose 5.5.1,
+about 191 GiB free disk, writable production paths, required data ownership, and correct DNS from
+the VM. Only SSH currently listens, so public HTTP/HTTPS cannot be judged until Caddy starts.
+The production host fingerprint has not yet been compared with the provider console, although
+the observed key is pinned in `VM_SSH_KNOWN_HOSTS`. UFW status needs sudo authentication. Therefore the next merge
+to `main` cannot yet be claimed deployable. Remaining staging
+rehearsal, QA/UAT, PCR, capacity and critical-risk sign-offs remain release prerequisites in the
+roadmap.
+
+Checks so far: `pnpm format:check`, `pnpm deployment:validate`, `pnpm test:deployment` on macOS
+and Linux (including real `flock` contention), `pnpm migrations:destructive-check origin/main`,
+`git diff --check`, pinned Actionlint, pinned ShellCheck, and pinned Ubuntu 22.04 production
+bootstrap input check passed. The actual staging secret values rendered a valid production runtime
+env and passed production Compose configuration without printing the values; the temporary env file
+was removed. Docker was initially stopped and started for these checks; resumed local Compose
+containers were shut down and OrbStack was quit afterwards. Full
+clean-artifact CI parity, production VM preflight, and first deployment remain outstanding.
+
+Delivery preparation: a disposable clean-artifact worktree at the current staging HEAD plus this
+patch passed frozen install under pinned Node 22.23.1/pnpm 11.16.0, format, lint, typecheck, unit,
+OpenAPI/client drift, and production application build. A disposable PostgreSQL 18/pgvector
+database passed fresh migration and 32 integration tests; it was stopped. The unchanged app code
+also passed the six isolated Chromium/Edge E2E journeys on the host. Migration SQL is unchanged
+from `origin/staging`. Actionlint, ShellCheck, Hadolint, Ubuntu production bootstrap validation,
+environment/Compose validation, Linux `flock` deployment harness, exact security-exception check,
+dependency audit, Gitleaks source scan, Trivy filesystem scan, and HIGH/CRITICAL scans of all five
+rebuilt images passed. A separate five-service Compose acceptance passed migration, bootstrap and
+idempotency, health/routing/release identity, non-root and private database checks, and database/photo
+persistence across restart; all test containers were stopped. The first Gitleaks scan traversed a
+generated pnpm package cache, which was moved outside the worktree before the clean source scan;
+no source exception was added. The host's pnpm attempted to replace Linux node_modules in the
+worktree, so shell validation ran directly and the dependency audit ran in the pinned Node image.
+No application migration or contract changed in this patch.
+
+Next: deliver the branch as a PR to `staging`; observe its release gate. Production deployment
+still requires a later merge to `main`, production external smoke, and the remaining UAT/capacity
+and risk sign-offs. Confirm public 80/443 reachability when Caddy starts; independent provider-console
+host fingerprint verification remains available to strengthen the current trust-on-first-use pin.
+
+---
+
+# Previous Session Handoff — Scoped QA finding remediation
 
 - Date: 2026-09-24
 - Branch: `fix/qa-verif-1`

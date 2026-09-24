@@ -49,6 +49,27 @@ chmod 600 "${rendered_env}"
 grep -Fxq 'DEPLOY_RUN_NUMBER=42' "${rendered_env}" || fail "rendered run number is missing"
 grep -Fxq 'PCR_OPENAI_API_KEY=synthetic_gateway_key_for_test_only' "${rendered_env}" || fail "PCR gateway key was not rendered"
 
+production_env="${TEST_ROOT}/production.env"
+(
+  set -a
+  # shellcheck disable=SC1090
+  source "${EXAMPLE_ENV}"
+  set +a
+  export PCR_OPENAI_BASE_URL=https://inference.example.invalid/v1
+  export PCR_OPENAI_API_KEY=synthetic_gateway_key_for_test_only
+  export PRODUCTION_SUPPLIER_DOMAIN=henkaten.qualitydivision.com
+  export PRODUCTION_TMMIN_DOMAIN=admin-henkaten.qualitydivision.com
+  export PRODUCTION_API_DOMAIN=henkaten-api.qualitydivision.com
+  "${SCRIPTS}/render-runtime-env.sh" production bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 43 >"${production_env}"
+)
+chmod 600 "${production_env}"
+"${SCRIPTS}/validate-runtime-env.sh" "${production_env}" >/dev/null
+grep -Fxq 'COMPOSE_PROJECT_NAME=supplier-henkaten-production' "${production_env}" || fail "production Compose project drifted"
+grep -Fxq 'SHARED_DIR=/opt/supplier-henkaten/production/shared' "${production_env}" || fail "production shared path drifted"
+grep -Fxq 'SUPPLIER_DOMAIN=henkaten.qualitydivision.com' "${production_env}" || fail "production supplier domain drifted"
+grep -Fxq 'TMMIN_DOMAIN=admin-henkaten.qualitydivision.com' "${production_env}" || fail "production admin domain drifted"
+grep -Fxq 'API_DOMAIN=henkaten-api.qualitydivision.com' "${production_env}" || fail "production API domain drifted"
+
 invalid_env="${TEST_ROOT}/invalid.env"
 # shellcheck disable=SC2016
 sed 's/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=unsafe$password/' "${rendered_env}" >"${invalid_env}"
