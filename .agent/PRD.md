@@ -13,6 +13,10 @@
 
 Dokumen ini adalah kontrak produk dan implementasi v1. Kata **MUST/wajib**, **MUST NOT/dilarang**, **SHOULD/sebaiknya**, dan **MAY/dapat** bersifat normatif. Bila source code, prototype, slide, atau asumsi implementasi berbeda dengan dokumen ini, tim wajib mengeskalasi perbedaan tersebut dan tidak boleh memilih perilaku secara diam-diam.
 
+### Amendment navigasi dan editing master data — 25 September 2026
+
+Portal TMMIN dapat diakses pada seluruh ukuran viewport; tabel lebar boleh memiliki scroll horizontal lokal, sementara navigasi dan aksi utama tetap dapat dijangkau. Supplier Admin dapat mengubah nama job pada line tanpa membuat job baru. Setelah edit master data berhasil, pengguna kembali ke daftar resource terkait. Inspector Tanoko menggulir identitas MP, job, dan line bersama kontrol level; header dan aksi simpan tetap mudah dijangkau.
+
 ### Amendment privasi MP dan pilihan Part Other — 24 September 2026
 
 MP tidak memakai nomor registrasi. Nomor registrasi wajib hanya untuk Supervisor, Line Leader,

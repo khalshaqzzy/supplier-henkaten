@@ -17,6 +17,23 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
 
   const tmminA11y = await new AxeBuilder({ page: tmmin }).analyze();
   expect(tmminA11y.violations).toEqual([]);
+  for (const viewport of [
+    { width: 390, height: 640 },
+    { width: 768, height: 1024 },
+    { width: 1024, height: 768 },
+  ]) {
+    await tmmin.setViewportSize(viewport);
+    await expect(tmmin.getByRole('navigation', { name: 'Navigasi utama' })).toBeVisible();
+    await expect(tmmin.getByRole('heading', { name: 'Ringkasan Global' })).toBeVisible();
+    expect(await tmmin.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      await tmmin.evaluate(() => document.documentElement.clientWidth),
+    );
+    await tmmin.screenshot({
+      path: testInfo.outputPath(`tmmin-overview-${viewport.width}x${viewport.height}.png`),
+      animations: 'disabled',
+    });
+  }
+  await tmmin.setViewportSize({ width: 1280, height: 720 });
 
   await tmmin.goto(`${runtime.tmminOrigin}/suppliers/new`);
   await tmmin.getByLabel('Supplier code').fill('E2E-ONBOARD');

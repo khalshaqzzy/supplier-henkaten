@@ -392,6 +392,10 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
       await queryClient.invalidateQueries({
         queryKey: scopedKey(scope, `master-${kind}`).slice(0, -1),
       });
+      if (editing) {
+        void navigate(`/master-data/${kind}`, { replace: true });
+        return;
+      }
       if (!editing && (kind !== 'members' || ('role' in resource && resource.role === 'MP')))
         void navigate(`/master-data/${kind}/${resource.id}`, { replace: true });
     },
@@ -844,16 +848,27 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [skillCategory, setSkillCategory] = useState('MEDIUM');
+  const [editingJobId, setEditingJobId] = useState<string | null>(null);
+  const [editingJobName, setEditingJobName] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
   const jobs = useQuery({
     queryKey: scopedKey(scope, 'line-jobs', lineId),
     queryFn: () => supplierApi.jobs(lineId, { limit: 100, active: 'ALL' }),
   });
+  const refreshJobViews = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'line-jobs', lineId) }),
+      queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'tanoko') }),
+      queryClient.invalidateQueries({
+        queryKey: scopedKey(scope, 'assignment-board').slice(0, -1),
+      }),
+      queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'line-shifts', lineId) }),
+    ]);
   const create = useMutation({
     mutationFn: () => supplierApi.createJob(lineId, { name, skillCategory }),
     onSuccess: async () => {
       setName('');
-      await queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'line-jobs', lineId) });
+      await refreshJobViews();
     },
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
@@ -869,8 +884,29 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
       version: number;
       skillCategory: string;
     }) => supplierApi.updateJob(lineId, id, { name, expectedVersion: version, skillCategory }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'line-jobs', lineId) }),
+    onSuccess: refreshJobViews,
+    onError: (error) => setProblem(masterMutationProblem(error)),
+  });
+  const rename = useMutation({
+    mutationFn: ({
+      id,
+      version,
+      skillCategory,
+    }: {
+      id: string;
+      version: number;
+      skillCategory: string | null;
+    }) =>
+      supplierApi.updateJob(lineId, id, {
+        name: editingJobName.trim(),
+        expectedVersion: version,
+        ...(skillCategory ? { skillCategory } : {}),
+      }),
+    onSuccess: async () => {
+      await refreshJobViews();
+      setEditingJobId(null);
+      setEditingJobName('');
+    },
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
   const change = useMutation({
@@ -898,8 +934,7 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
         items: reordered.map((job) => ({ id: job.id, expectedVersion: job.version })),
       });
     },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'line-jobs', lineId) }),
+    onSuccess: refreshJobViews,
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
   return (
@@ -941,11 +976,64 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
         {jobs.data?.items.map((job, index) => (
           <li key={job.id}>
             <span>{job.displayOrder}</span>
-            <strong>{job.name}</strong>
+            {editingJobId === job.id ? (
+              <form
+                className="job-rename"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (editingJobName.trim() && editingJobName.trim() !== job.name) {
+                    setProblem(null);
+                    rename.mutate({
+                      id: job.id,
+                      version: job.version,
+                      skillCategory: job.skillCategory ?? null,
+                    });
+                  }
+                }}
+              >
+                <Input
+                  aria-label={`Nama job ${job.name}`}
+                  autoFocus
+                  required
+                  maxLength={150}
+                  value={editingJobName}
+                  disabled={rename.isPending}
+                  onChange={(event) => setEditingJobName(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape' && !rename.isPending) {
+                      setEditingJobId(null);
+                      setEditingJobName('');
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  type="submit"
+                  loading={rename.isPending}
+                  disabled={!editingJobName.trim() || editingJobName.trim() === job.name}
+                >
+                  Simpan
+                </Button>
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                  disabled={rename.isPending}
+                  onClick={() => {
+                    setEditingJobId(null);
+                    setEditingJobName('');
+                  }}
+                >
+                  Batal
+                </Button>
+              </form>
+            ) : (
+              <strong className="job-list__name">{job.name}</strong>
+            )}
             <NativeSelect
               aria-label={`Kategori skill ${job.name}`}
               value={job.skillCategory ?? ''}
-              disabled={categoryChange.isPending}
+              disabled={categoryChange.isPending || editingJobId !== null}
               onChange={(e) =>
                 categoryChange.mutate({
                   id: job.id,
@@ -964,10 +1052,25 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
             </NativeSelect>
             <small>{job.active ? 'Aktif' : 'Nonaktif'}</small>
             <div>
+              {editingJobId !== job.id && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`Ubah nama job ${job.name}`}
+                  disabled={rename.isPending || editingJobId !== null}
+                  onClick={() => {
+                    setProblem(null);
+                    setEditingJobId(job.id);
+                    setEditingJobName(job.name);
+                  }}
+                >
+                  Ubah nama
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={index === 0 || change.isPending}
+                disabled={index === 0 || change.isPending || editingJobId !== null}
                 onClick={() => {
                   setProblem(null);
                   change.mutate({ jobId: job.id, kind: 'up', index });
@@ -978,7 +1081,11 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={index === (jobs.data?.items.length ?? 0) - 1 || change.isPending}
+                disabled={
+                  index === (jobs.data?.items.length ?? 0) - 1 ||
+                  change.isPending ||
+                  editingJobId !== null
+                }
                 onClick={() => {
                   setProblem(null);
                   change.mutate({ jobId: job.id, kind: 'down', index });
@@ -989,7 +1096,7 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
               <Button
                 size="sm"
                 variant="secondary"
-                disabled={change.isPending}
+                disabled={change.isPending || editingJobId !== null}
                 onClick={() => {
                   setProblem(null);
                   if (window.confirm(`${job.active ? 'Nonaktifkan' : 'Aktifkan'} job ini?`))

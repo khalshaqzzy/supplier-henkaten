@@ -341,9 +341,9 @@ describe('TMMIN application boundary', () => {
     expect(screen.getByTestId('query').textContent).toBe('');
   });
 
-  it('keeps secure logout available on an unsupported viewport', async () => {
-    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1100 });
-    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 700 });
+  it('keeps the portal available on a compact viewport', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 640 });
     vi.spyOn(tmminApi, 'session').mockResolvedValue(
       session('TMMIN_ADMIN', ['TMMIN_SUPPLIER_READ']),
     );
@@ -352,8 +352,8 @@ describe('TMMIN application boundary', () => {
         <App />
       </MemoryRouter>,
     );
-    expect(await screen.findByText(/desktop minimal 1280 × 720/i)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Keluar dengan aman/i })).toBeTruthy();
+    expect(await screen.findByRole('link', { name: 'Akun' })).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Keluar' }).length).toBeGreaterThan(0);
   });
 
   it('stores only safe same-origin intended destinations', () => {

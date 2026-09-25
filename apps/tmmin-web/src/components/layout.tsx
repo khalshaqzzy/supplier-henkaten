@@ -21,7 +21,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import type { Capability } from '@tmmin-henkaten/contracts';
-import { BrandLockup, Button, IconButton, NativeSelect, Spinner } from '@tmmin-henkaten/ui';
+import { BrandLockup, IconButton, NativeSelect, Spinner } from '@tmmin-henkaten/ui';
 
 import { tmminApi } from '../app/api';
 import { tmminKey } from '../app/query';
@@ -135,9 +135,6 @@ export function TmminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [params, setParams] = useSearchParams();
-  const [supported, setSupported] = useState(
-    () => window.innerWidth >= 1280 && window.innerHeight >= 720,
-  );
   const [collapsed, setCollapsed] = useState(false);
   const identity = session?.principal;
   const admin = identity?.role === 'TMMIN_ADMIN';
@@ -167,36 +164,10 @@ export function TmminLayout() {
   );
 
   useEffect(() => {
-    const update = () => setSupported(window.innerWidth >= 1280 && window.innerHeight >= 720);
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
-  useEffect(() => {
     document.querySelector<HTMLElement>('#main-content h1')?.focus();
   }, [location.pathname]);
 
   if (!identity) return <Spinner label="Memuat TMMIN Portal" />;
-  if (!supported) {
-    return (
-      <main className="tmmin-unsupported">
-        <BrandLockup context="TMMIN Portal" />
-        <section>
-          <span className="tmmin-eyebrow">Viewport belum didukung</span>
-          <h1>Gunakan layar desktop minimal 1280 × 720.</h1>
-          <p>
-            Monitoring lintas supplier membutuhkan ruang yang cukup untuk tabel dan konteks sumber.
-          </p>
-          <Button
-            leadingIcon={<LogOut />}
-            onClick={() => void logout().then(() => navigate('/login'))}
-          >
-            Keluar dengan aman
-          </Button>
-        </section>
-      </main>
-    );
-  }
-
   const shared = new URLSearchParams();
   if (params.get('supplierId')) shared.set('supplierId', params.get('supplierId')!);
   if (params.get('sourceMode')) shared.set('sourceMode', params.get('sourceMode')!);
