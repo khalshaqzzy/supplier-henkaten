@@ -97,6 +97,17 @@ test('Tanoko freezes both axes, saves cross-line mapping and displays history @e
       .toBe(true);
     await page.screenshot({ path: testInfo.outputPath(`tanoko-${width}.png`) });
   }
+  await page.setViewportSize({ width: 390, height: 600 });
+  await page.locator('.tanoko-cell').first().click();
+  const inspectorBody = page.locator('.tanoko-inspector-body');
+  const identity = page.locator('.tanoko-inspector-identity');
+  const initialY = (await identity.boundingBox())!.y;
+  await inspectorBody.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  expect((await identity.boundingBox())!.y).toBeLessThan(initialY);
+  await expect(page.locator('.tanoko-inspector-footer')).toBeVisible();
+  await page.getByRole('button', { name: 'Tutup editor' }).click();
   const matrix = await get<{
     members: { id: string }[];
     jobs: { id: string }[];

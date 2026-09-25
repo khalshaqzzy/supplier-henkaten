@@ -883,18 +883,18 @@ function SkillInspector({
           <X />
         </button>
       </div>
-      <div className="tanoko-inspector-identity">
-        <h2 id="skill-inspector-title" tabIndex={-1} ref={header}>
-          {selection.member.name}
-        </h2>
-        <p className="tanoko-inspector-job">{selection.job.name}</p>
-        <p className="tanoko-inspector-line">{selection.job.lineName}</p>
-        <div className="tanoko-inspector-category">
-          <span>Kategori job</span>
-          <Category value={selection.job.category} />
-        </div>
-      </div>
       <div className="tanoko-inspector-body">
+        <div className="tanoko-inspector-identity">
+          <h2 id="skill-inspector-title" tabIndex={-1} ref={header}>
+            {selection.member.name}
+          </h2>
+          <p className="tanoko-inspector-job">{selection.job.name}</p>
+          <p className="tanoko-inspector-line">{selection.job.lineName}</p>
+          <div className="tanoko-inspector-category">
+            <span>Kategori job</span>
+            <Category value={selection.job.category} />
+          </div>
+        </div>
         <form
           id="tanoko-edit-form"
           onSubmit={(e) => {

@@ -437,9 +437,13 @@ describe('Supplier application foundation', () => {
     });
   });
 
-  it('uses the updated Part version for an immediate lifecycle action', async () => {
+  it('returns to the Part list after saving an edit', async () => {
     vi.spyOn(supplierApi, 'session').mockResolvedValue(
-      session('NORMAL', ['SUPPLIER_SELF_SERVICE', 'SUPPLIER_MASTER_DATA_MANAGE']),
+      session('NORMAL', [
+        'SUPPLIER_SELF_SERVICE',
+        'SUPPLIER_MASTER_DATA_READ',
+        'SUPPLIER_MASTER_DATA_MANAGE',
+      ]),
     );
     const partId = '00000000-0000-4000-8000-000000000042';
     const part = {
@@ -457,13 +461,10 @@ describe('Supplier application foundation', () => {
       partName: 'Updated part',
       version: 3,
     });
-    const lifecycle = vi.spyOn(supplierApi, 'partAction').mockResolvedValue({
-      ...part,
-      partName: 'Updated part',
-      active: false,
-      version: 4,
+    vi.spyOn(supplierApi, 'parts').mockResolvedValue({
+      items: [{ ...part, partName: 'Updated part', version: 3 }],
+      pageInfo: { hasNextPage: false, nextCursor: null },
     });
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     render(
       <MemoryRouter initialEntries={[`/master-data/parts/${partId}`]}>
@@ -491,9 +492,74 @@ describe('Supplier application foundation', () => {
         ),
       ).toMatchObject({ version: 3, partName: 'Updated part' }),
     );
-    await user.click(screen.getByRole('button', { name: 'Nonaktifkan' }));
+    expect(await screen.findByRole('heading', { name: 'Part' })).toBeTruthy();
+    expect(screen.getByText('Updated part')).toBeTruthy();
+  });
+
+  it('renames an existing job within its line', async () => {
+    vi.spyOn(supplierApi, 'session').mockResolvedValue(
+      session('NORMAL', [
+        'SUPPLIER_SELF_SERVICE',
+        'SUPPLIER_MASTER_DATA_READ',
+        'SUPPLIER_MASTER_DATA_MANAGE',
+      ]),
+    );
+    const lineId = '00000000-0000-4000-8000-000000000043';
+    const jobId = '00000000-0000-4000-8000-000000000044';
+    vi.spyOn(supplierApi, 'line').mockResolvedValue({
+      id: lineId,
+      code: 'L-01',
+      name: 'Line Satu',
+      displayOrder: 1,
+      active: true,
+      version: 1,
+      createdAt: '2026-09-24T01:00:00.000Z',
+      updatedAt: '2026-09-24T01:00:00.000Z',
+    });
+    vi.spyOn(supplierApi, 'jobs').mockResolvedValue({
+      items: [
+        {
+          id: jobId,
+          lineId,
+          name: 'Job lama',
+          displayOrder: 1,
+          skillCategory: 'MEDIUM',
+          active: true,
+          version: 2,
+          createdAt: '2026-09-24T01:00:00.000Z',
+          updatedAt: '2026-09-24T01:00:00.000Z',
+        },
+      ],
+      pageInfo: { hasNextPage: false, nextCursor: null },
+    });
+    const update = vi.spyOn(supplierApi, 'updateJob').mockResolvedValue({
+      id: jobId,
+      lineId,
+      name: 'Job baru',
+      displayOrder: 1,
+      skillCategory: 'MEDIUM',
+      active: true,
+      version: 3,
+      createdAt: '2026-09-24T01:00:00.000Z',
+      updatedAt: '2026-09-24T01:00:00.000Z',
+    });
+    render(
+      <MemoryRouter initialEntries={[`/master-data/lines/${lineId}`]}>
+        <App />
+      </MemoryRouter>,
+    );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Ubah nama job Job lama' }));
+    const input = screen.getByRole('textbox', { name: 'Nama job Job lama' });
+    await user.clear(input);
+    await user.type(input, 'Job baru');
+    await user.click(screen.getByRole('button', { name: 'Simpan' }));
     await waitFor(() =>
-      expect(lifecycle).toHaveBeenCalledWith(partId, 'deactivate', { expectedVersion: 3 }),
+      expect(update).toHaveBeenCalledWith(lineId, jobId, {
+        name: 'Job baru',
+        expectedVersion: 2,
+        skillCategory: 'MEDIUM',
+      }),
     );
   });
 

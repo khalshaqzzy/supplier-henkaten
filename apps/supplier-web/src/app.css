@@ -2079,6 +2079,36 @@ a.overview-activity-identifier:hover {
   padding: var(--hds-space-3);
   border-bottom: 1px solid var(--hds-border-subtle);
 }
+.job-list li {
+  align-items: center;
+  grid-template-columns: 32px minmax(140px, 1fr) auto auto auto;
+}
+.job-list__name {
+  overflow-wrap: anywhere;
+}
+.job-rename {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.job-rename input {
+  min-width: 130px;
+  flex: 1;
+}
+.job-list li > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+@media (max-width: 900px) {
+  .job-list li {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+  }
+  .job-list li > div:last-child {
+    grid-column: 2 / -1;
+  }
+}
 
 .checklist-editor {
   display: grid;

@@ -1238,7 +1238,7 @@
 }
 
 .tanoko-inspector-identity {
-  padding: 12px 16px 0;
+  padding: 0;
 }
 .tanoko-inspector-identity h2 {
   font-size: 16px;
@@ -1251,7 +1251,7 @@
   margin-bottom: 0;
 }
 .tanoko-inspector-body {
-  padding-top: 12px;
+  padding-top: 16px;
 }
 .tanoko-level-options label {
   line-height: 1.35;
