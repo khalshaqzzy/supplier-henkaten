@@ -6,6 +6,7 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { supplierSetupReadinessSchema } from '@tmmin-henkaten/contracts';
 
 import { AppModule } from '../app.module.js';
 import { PasswordService } from '../auth/password.service.js';
@@ -108,6 +109,27 @@ describe('supplier master data', () => {
 
   afterAll(async () => {
     await app.close();
+  });
+
+  it('returns contract-valid blockers for an empty Hosted supplier', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/supplier/setup-readiness')
+      .set('Cookie', supplierCookie);
+    expect(response.status).toBe(200);
+    const readiness = supplierSetupReadinessSchema.parse(response.body);
+    expect(readiness.ready).toBe(false);
+    expect(readiness.blockers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'ACTIVE_SHIFT_TEMPLATE_MISSING' }),
+        expect.objectContaining({ code: 'ACTIVE_LINE_MISSING' }),
+        expect.objectContaining({ code: 'LINE_SHIFT_CONFIGURATION_PENDING' }),
+      ]),
+    );
+    expect(readiness.areas.find(({ area }) => area === 'DEFAULT_ASSIGNMENTS')).toMatchObject({
+      ready: false,
+      activeCount: 0,
+      requiredCount: 1,
+    });
   });
 
   it('provisions role-linked members while MP remains credential-free', async () => {
@@ -227,6 +249,23 @@ describe('supplier master data', () => {
       version: number;
       assignments: Array<{ jobId: string }>;
     };
+    const incompleteReadinessResponse = await request(app.getHttpServer())
+      .get('/api/v1/supplier/setup-readiness')
+      .set('Cookie', supplierCookie);
+    expect(incompleteReadinessResponse.status).toBe(200);
+    const incompleteReadiness = supplierSetupReadinessSchema.parse(
+      incompleteReadinessResponse.body,
+    );
+    expect(incompleteReadiness.blockers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'LINE_SHIFT_SUPERVISOR_MISSING' }),
+        expect.objectContaining({ code: 'LINE_SHIFT_LEADER_MISSING' }),
+        expect.objectContaining({ code: 'LINE_SHIFT_MP_MISSING' }),
+      ]),
+    );
+    expect(incompleteReadiness.blockers).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'LINE_SHIFT_MISSING' })]),
+    );
     const configured = await supplierPatch(
       `/api/v1/supplier/master-data/line-shifts/${lineShiftBody.id}/assignments`,
       {

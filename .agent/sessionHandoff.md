@@ -1,4 +1,35 @@
-# Current Session Handoff — MP registration and undisclosed Other part
+# Current Session Handoff — Supplier setup readiness
+
+- Date: 2026-09-25
+- Branch: `fix/supplier-setup-readiness`
+- Scope: first-login Hosted Supplier Admin setup and partial Line–Shift readiness; Phase 15 remains in progress.
+
+The Supplier Setup endpoint previously returned internal `contributor` fields inside every
+blocker, while the shared supplier response schema rejected unknown fields. An incomplete or
+empty tenant therefore received HTTP 200 but the frontend displayed “Readiness tidak dapat dimuat”.
+The endpoint now removes this internal field while Source Governance continues to use it for
+preflight. Readiness also retains partially configured Line–Shifts when checking missing
+Supervisor, Line Leader, or MP defaults; inactive assignees do not count as complete. An empty
+supplier's Default Assignments area remains pending until a line exists.
+
+The API integration test parses the actual empty and partial endpoint responses through the
+shared strict schema. The onboarding browser journey opens Setup immediately after the first
+password change and confirms that blockers render. All 34 API integration tests and all six
+Chromium/Edge browser journeys passed. Clean-artifact frozen install, format, lint, typecheck,
+repository unit tests, OpenAPI/client parity, production builds, fresh and previous-SHA migration,
+deployment env/harness, security exceptions, dependency audit, Actionlint, ShellCheck, Hadolint,
+Ubuntu bootstrap input validation, Gitleaks directory scan, Trivy filesystem and five rebuilt
+image scans passed. Production-like five-service Compose migration/bootstrap, routing, readiness,
+non-root and database isolation, idempotent bootstrap, and restart persistence checks passed; its
+containers were stopped. The host runs Node 22.23.2 rather than CI's 22.23.1; the Docker builds
+use pinned 22.23.1. macOS has no `flock`, so Linux CI remains authoritative for lock contention.
+Browser reports were moved temporarily outside the repository for Gitleaks and restored after
+the scan. No schema migration or product contract change is required. Staging and production
+behavior have not been verified.
+
+---
+
+# Previous Session Handoff — MP registration and undisclosed Other part
 
 - Date: 2026-09-24
 - Branch: `feat/supplier-privacy`

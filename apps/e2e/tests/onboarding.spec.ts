@@ -57,6 +57,13 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
   await supplier.getByLabel('Password').fill(supplierPassword);
   await supplier.getByRole('button', { name: 'Masuk' }).click();
   await expect(supplier.getByRole('heading', { name: 'Overview Supplier' })).toBeVisible();
+  await supplier.goto(`${runtime.supplierOrigin}/setup`);
+  await expect(supplier.getByRole('heading', { name: 'Setup Supplier' })).toBeVisible();
+  await expect(supplier.getByText('Readiness tidak dapat dimuat')).toHaveCount(0);
+  await expect(supplier.getByText('Minimal satu Shift Template aktif diperlukan.')).toBeVisible();
+  await expect(
+    supplier.getByText('Tambahkan line sebelum mengatur assignment line dan shift.'),
+  ).toBeVisible();
 
   await createResource(supplier, 'lines', {
     'Kode line': 'LINE-ONBOARD',

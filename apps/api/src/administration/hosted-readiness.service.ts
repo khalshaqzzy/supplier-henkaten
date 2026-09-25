@@ -65,19 +65,33 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
         active: true,
         line: { active: true },
         shiftTemplate: { active: true },
-        supervisor: {
-          active: true,
-          users: { some: { status: 'ACTIVE', role: 'SUPERVISOR' } },
-        },
       },
       select: {
         id: true,
         lineId: true,
-        supervisorMemberId: true,
-        lineLeaderMemberId: true,
+        supervisor: {
+          select: {
+            active: true,
+            users: {
+              where: { status: 'ACTIVE', role: 'SUPERVISOR' },
+              select: { id: true },
+              take: 1,
+            },
+          },
+        },
+        lineLeader: {
+          select: {
+            active: true,
+            users: {
+              where: { status: 'ACTIVE', role: 'LINE_LEADER' },
+              select: { id: true },
+              take: 1,
+            },
+          },
+        },
         jobAssignments: {
           where: { job: { active: true } },
-          select: { jobId: true, mpMemberId: true },
+          select: { jobId: true, mp: { select: { active: true } } },
         },
       },
     }),
@@ -129,6 +143,13 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
   }
 
   const configuredLines = new Set(lineShifts.map(({ lineId }) => lineId));
+  if (!lines.length) {
+    add(
+      'DEFAULT_ASSIGNMENTS',
+      'LINE_SHIFT_CONFIGURATION_PENDING',
+      'Tambahkan line sebelum mengatur assignment line dan shift.',
+    );
+  }
   for (const { id } of lines) {
     if (!configuredLines.has(id)) {
       add(
@@ -140,7 +161,7 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
     }
   }
   for (const lineShift of lineShifts) {
-    if (!lineShift.supervisorMemberId) {
+    if (!lineShift.supervisor?.active || !lineShift.supervisor.users.length) {
       add(
         'DEFAULT_ASSIGNMENTS',
         'LINE_SHIFT_SUPERVISOR_MISSING',
@@ -148,7 +169,7 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
         lineShift.id,
       );
     }
-    if (!lineShift.lineLeaderMemberId) {
+    if (!lineShift.lineLeader?.active || !lineShift.lineLeader.users.length) {
       add(
         'DEFAULT_ASSIGNMENTS',
         'LINE_SHIFT_LEADER_MISSING',
@@ -157,7 +178,7 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
       );
     }
     const staffed = new Set(
-      lineShift.jobAssignments.filter(({ mpMemberId }) => mpMemberId).map(({ jobId }) => jobId),
+      lineShift.jobAssignments.filter(({ mp }) => mp?.active).map(({ jobId }) => jobId),
     );
     for (const { id: jobId } of jobs.filter((job) => job.lineId === lineShift.lineId)) {
       if (!staffed.has(jobId)) {
@@ -178,9 +199,9 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
   const assignmentActiveCount = lineShifts.reduce(
     (total, item) =>
       total +
-      Number(Boolean(item.supervisorMemberId)) +
-      Number(Boolean(item.lineLeaderMemberId)) +
-      item.jobAssignments.filter(({ mpMemberId }) => mpMemberId).length,
+      Number(Boolean(item.supervisor?.active && item.supervisor.users.length)) +
+      Number(Boolean(item.lineLeader?.active && item.lineLeader.users.length)) +
+      item.jobAssignments.filter(({ mp }) => mp?.active).length,
     0,
   );
   const counts: Record<SupplierSetupArea, { activeCount: number; requiredCount: number }> = {
@@ -194,7 +215,7 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
     CHECKLISTS: { activeCount: categories.size, requiredCount: 4 },
     DEFAULT_ASSIGNMENTS: {
       activeCount: assignmentActiveCount,
-      requiredCount: assignmentRequiredCount,
+      requiredCount: Math.max(1, assignmentRequiredCount),
     },
   };
   const order = Object.keys(counts) as SupplierSetupArea[];

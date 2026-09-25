@@ -51,6 +51,25 @@ The recurring model deliberately permits duplicate MP assignment. Any attendance
 workforce-conflict policy would be a separate future requirement and must not be reintroduced as a
 Henkaten blocker implicitly.
 
+## Setup readiness correction (2026-09-25)
+
+Hosted readiness evaluates each active Line–Shift even while its Supervisor or Line Leader is
+unset. This distinguishes a missing Line–Shift from an existing shift with missing assignments.
+An assigned Supervisor or Line Leader counts only with an active member and active account for
+the expected role; a default MP counts only while active. Before any line exists, the Default
+Assignments area remains pending, since a zero-of-zero count is not a completed configuration.
+
+The supplier-facing readiness response omits the internal `contributor` property used by Source
+Governance preflight. This keeps the strict shared API contract usable when blockers exist; the
+preflight contributor identifier remains available inside governance. Returning `contributor` in
+the public response or relaxing the shared schema would expose an internal detail without helping
+the Supplier Admin resolve a blocker.
+
+API integration validates strict parsing for empty and partial setup responses. The onboarding
+browser journey checks the visible blockers immediately after first login and password change,
+before master data entry. Remaining risk is release drift until staging UAT checks this route;
+no migration or historical assignment rewrite is involved.
+
 Removing the legacy partial unique index on active `WorkingAssignment.effectiveMpMemberId` is
 therefore an intentional metadata-only schema change: it removes an obsolete uniqueness invariant
 without deleting assignment or Henkaten rows. The migration uses the exact-name
