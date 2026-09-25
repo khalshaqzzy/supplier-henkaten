@@ -124,9 +124,13 @@ export class SupplierReadModelController {
 
   @RequireCapabilities('SUPPLIER_MASTER_DATA_READ')
   @Get('/setup-readiness')
-  setupReadiness(@Req() request: ContextRequest) {
+  async setupReadiness(@Req() request: ContextRequest) {
     const scope = this.access.supplierScope(request);
-    return this.hostedReadiness.evaluate(scope.supplierId);
+    const readiness = await this.hostedReadiness.evaluate(scope.supplierId);
+    return {
+      ...readiness,
+      blockers: readiness.blockers.map(({ contributor: _contributor, ...blocker }) => blocker),
+    };
   }
 
   @RequireCapabilities('SUPPLIER_AUDIT_READ')
