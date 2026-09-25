@@ -493,7 +493,7 @@ describe('Supplier application foundation', () => {
       ).toMatchObject({ version: 3, partName: 'Updated part' }),
     );
     expect(await screen.findByRole('heading', { name: 'Part' })).toBeTruthy();
-    expect(screen.getByText('Updated part')).toBeTruthy();
+    expect(await screen.findByText('Updated part')).toBeTruthy();
   });
 
   it('renames an existing job within its line', async () => {
