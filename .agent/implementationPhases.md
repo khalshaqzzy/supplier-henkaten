@@ -1,6 +1,6 @@
 # Enterprise Digital Henkaten Management — Implementation Roadmap
 
-Status: active · Updated: 2026-09-25 · Approach: backend first, dependency driven
+Status: active · Updated: 2026-09-26 · Approach: backend first, dependency driven
 
 This file tracks sequence, current state, dependencies, and remaining acceptance gates. The [PRD](PRD.md) defines product behavior; [rules](rules.md) define agent and engineering process; [session handoff](sessionHandoff.md) records recent changes and checks; [ADRs](../docs/adr/) explain durable decisions. Detailed local browser evidence and unresolved checks live in the [QA report](../docs/audits/local-browser-qa-2026-09-24.md) and [scenario plan](../docs/qa/browser-local-end-to-end-verification-plan.md). Do not copy their histories into this roadmap.
 
@@ -43,6 +43,7 @@ The completion index is a navigation aid, not a substitute for the PRD or test e
 - **PCR indication:** independent advisory assessment from Hosted submit or changed External evidence; versioned Admin/Quality correction; failures/low confidence go to Review. It does not submit or approve a PCR. Local 70-case classifier evaluation requires TMMIN QD adjudication and missing-evidence/adversarial regression before production reliance on automatic No-PCR. See [ADR 0034](../docs/adr/0034-durable-local-pcr-screening-and-human-correction.md) and [evaluation](../docs/reports/pcr-classifier-70-case-local-evaluation-2026-09-23.md).
 - **Local browser QA, 2026-09-24:** 47 rows: 22 PASS, 15 FAIL, 10 BLOCKED/partial. Some PASS/FAIL rows retain untested branches. No product fixes were made during that run. Baseline was restored to two Hosted suppliers and 240 Henkaten; containers were stopped. Push permission/subscription/delivery/revoke were excluded by user direction for that local QA run, without removing the separate staging device gate. See [QA report](../docs/audits/local-browser-qa-2026-09-24.md) and [ADR 0035](../docs/adr/0035-isolated-local-qa-epochs-and-browser-evidence.md).
 - **Portal and master data polish, 2026-09-25:** TMMIN viewport gate removed with compact navigation, job rename added to Line & Job, successful master edits return to their lists, and Tanoko inspector identity scrolls with level controls. See [ADR 0039](../docs/adr/0039-responsive-tmmin-and-master-edit-flow.md). Local verification and PR CI are recorded in the handoff; staging/device acceptance remains part of Phase 15.
+- **Supplier Admin flow improvement, 2026-09-26:** Supplier and TMMIN login visibility controls, reviewed Part CSV/Excel import, Member archive workflow and username, current/other shift board filter, saved-change feedback, explicit Master Data back links, and responsive Checklist 4M editor. See [ADR 0040](../docs/adr/0040-supplier-master-data-import-and-navigation.md). Local implementation and verification are recorded in the handoff; staging/device acceptance remains part of Phase 15.
 
 ## Cross-cutting gates
 
@@ -111,4 +112,4 @@ External prerequisites: staging/production DNS and TLS, VMs/SSH, GitHub and runt
 
 Explicit v1 exclusions remain in [PRD §§34–36](PRD.md): backup/recovery/PITR, HA, MFA/SSO, native mobile, integrations outside the External API, and other listed scope. The PCR amendment is an approved exception to the older “AI/ML out of scope” roadmap text; it is implemented as advisory screening with the production gate above. Update the PRD and roadmap together for any future scope change.
 
-**Next action:** inspect current branch/remote/CI and staging configuration, reproduce or resolve F-06 and the other QA findings as separate tracked work, complete 15.9 with hosted evidence, then run 15.11. Record the exact checks and outcomes in [sessionHandoff.md](sessionHandoff.md). Before a commit, run the workflow-equivalent local checks required by [rules.md](rules.md); before reporting delivery after a push, verify required GitHub jobs are green.
+**Next action:** inspect current branch/remote/CI and staging configuration, reproduce or resolve F-06 and the other QA findings as separate tracked work, then run 15.11 staging rehearsal. Record the exact checks and outcomes in [sessionHandoff.md](sessionHandoff.md). Before a commit, run the workflow-equivalent local checks required by [rules.md](rules.md); before reporting delivery after a push, verify required GitHub jobs are green.

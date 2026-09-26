@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { KeyRound, LogOut, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, KeyRound, LogOut, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
@@ -37,6 +37,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [problem, setProblem] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const form = useForm<LoginValues>({
     resolver: zodResolver(supplierLoginRequestSchema),
     defaultValues: { supplierCode: '', username: '', password: '' },
@@ -107,19 +108,30 @@ export function LoginPage() {
           >
             <Input id="username" autoComplete="username" {...form.register('username')} />
           </Field>
-          <Field
-            label="Password"
-            htmlFor="password"
-            errorText={form.formState.errors.password?.message}
-            required
-          >
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              {...form.register('password')}
-            />
-          </Field>
+          <div className="password-field">
+            <Field
+              label="Password"
+              htmlFor="password"
+              errorText={form.formState.errors.password?.message}
+              required
+            >
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                {...form.register('password')}
+              />
+            </Field>
+            <button
+              type="button"
+              className="password-field__toggle"
+              aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+              aria-pressed={showPassword}
+              onClick={() => setShowPassword((visible) => !visible)}
+            >
+              {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+            </button>
+          </div>
           <Button type="submit" size="lg" loading={form.formState.isSubmitting}>
             Masuk
           </Button>

@@ -33,6 +33,7 @@ describe('read-model contracts', () => {
           lineCode: 'L1',
           lineName: 'Assembly',
           shiftName: 'Shift 1',
+          isCurrent: true,
           businessDate: '2026-07-23',
           supervisor: { memberId: null, name: null },
           lineLeader: { memberId: null, name: null },

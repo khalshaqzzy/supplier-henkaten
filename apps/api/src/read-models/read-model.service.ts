@@ -20,10 +20,17 @@ export class ReadModelService {
     private readonly lineShifts: LineShiftService,
   ) {}
 
-  async board(scope: TenantScope, principal: RequestPrincipal, requestedLineId?: string) {
+  async board(
+    scope: TenantScope,
+    principal: RequestPrincipal,
+    requestedLineId?: string,
+    shiftStatus: 'CURRENT' | 'OTHER' | 'ALL' = 'CURRENT',
+  ) {
     const context = await this.lineShifts.operationalContext(scope, principal);
     const occurrences = context.items.filter(
-      (item) => item.current && (!requestedLineId || item.lineId === requestedLineId),
+      (item) =>
+        (shiftStatus === 'ALL' || (shiftStatus === 'CURRENT' ? item.current : !item.current)) &&
+        (!requestedLineId || item.lineId === requestedLineId),
     );
     const memberIds = [
       ...new Set(
@@ -97,6 +104,7 @@ export class ReadModelService {
         lineCode: item.lineCode,
         lineName: item.lineName,
         shiftName: item.shiftName,
+        isCurrent: item.current,
         businessDate: item.businessDate,
         supervisor: { memberId: item.supervisorMemberId, name: item.supervisorName },
         lineLeader: { memberId: item.lineLeaderMemberId, name: item.lineLeaderName },

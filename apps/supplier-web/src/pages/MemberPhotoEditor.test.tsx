@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { supplierApi } from '../app/api';
@@ -112,12 +113,16 @@ function renderEditor(value: Parameters<typeof MemberLifecycle>[0]['member']) {
   const setQueryData = vi.spyOn(queryClient, 'setQueryData');
   render(
     createElement(
-      QueryClientProvider,
-      { client: queryClient },
-      createElement(MemberLifecycle, {
-        member: value,
-        scope,
-      }),
+      MemoryRouter,
+      {},
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(MemberLifecycle, {
+          member: value,
+          scope,
+        }),
+      ),
     ),
   );
   return { invalidateQueries, setQueryData };

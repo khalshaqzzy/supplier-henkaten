@@ -24,6 +24,8 @@ import {
   createLineShiftRequestSchema,
   createMemberRequestSchema,
   createPartRequestSchema,
+  partImportPreviewRequestSchema,
+  partImportCommitRequestSchema,
   createShiftTemplateRequestSchema,
   expectedVersionSchema,
   henkatenCategorySchema,
@@ -42,6 +44,7 @@ import {
   type CreateLineShiftRequest,
   type HenkatenCategory,
   type MasterListQuery,
+  type PartImportCommitRequest,
   type UpdateLineShiftAssignmentsRequest,
 } from '@tmmin-henkaten/contracts';
 
@@ -478,6 +481,27 @@ export class SupplierCatalogController {
     @Req() request: ContextRequest,
   ) {
     return this.catalog.listParts(this.access.supplierScope(request), query);
+  }
+
+  @RequireCapabilities('SUPPLIER_MASTER_DATA_MANAGE')
+  @Post('/parts/import/preview')
+  async previewPartImport(
+    @ValidatedBody(partImportPreviewRequestSchema)
+    body: { rows: { partNumber: string; partName: string }[] },
+    @Req() request: ContextRequest,
+  ) {
+    const scope = await this.access.assertWritable(principal(request));
+    return this.catalog.previewPartImport(scope, body.rows);
+  }
+
+  @RequireCapabilities('SUPPLIER_MASTER_DATA_MANAGE')
+  @Post('/parts/import/commit')
+  async commitPartImport(
+    @ValidatedBody(partImportCommitRequestSchema) body: PartImportCommitRequest,
+    @Req() request: ContextRequest,
+  ) {
+    const scope = await this.access.assertWritable(principal(request));
+    return this.catalog.commitPartImport(scope, body.rows, mutationContext(request));
   }
 
   @RequireCapabilities('SUPPLIER_MASTER_DATA_MANAGE')

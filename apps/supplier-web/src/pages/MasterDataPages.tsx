@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   ArrowRight,
   Camera,
   Check,
@@ -14,6 +15,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import {
   Alert,
+  AlertDialog,
   Button,
   Card,
   EmptyState,
@@ -24,6 +26,7 @@ import {
   NativeSelect,
   Panel,
   Skeleton,
+  toast,
 } from '@tmmin-henkaten/ui';
 
 import { ApiProblemError } from '@tmmin-henkaten/api-client';
@@ -39,7 +42,7 @@ const resources = {
     title: 'Member & Akun',
     description: '',
     createLabel: 'Tambah member',
-    columns: ['Member', 'Registrasi', 'Role', 'Akun', 'Status'],
+    columns: ['Member', 'Registrasi', 'Role', 'Username', 'Akun', 'Status'],
   },
   lines: {
     title: 'Line & Job',
@@ -60,6 +63,14 @@ const resources = {
     columns: ['Template', 'Jam', 'Timezone', 'Status'],
   },
 } as const;
+
+export function MasterBackLink({ to, label }: { to: string; label: string }) {
+  return (
+    <Link className="master-back-link" to={to}>
+      <ArrowLeft aria-hidden="true" /> Kembali ke {label}
+    </Link>
+  );
+}
 
 type ResourceKind = keyof typeof resources;
 
@@ -140,18 +151,29 @@ export function MasterListPage({ kind }: { kind: ResourceKind }) {
 
   return (
     <div className="product-page">
+      <MasterBackLink to="/master-data" label="Master Data" />
       <PageHeader
         eyebrow="Master Data"
         title={meta.title}
         description={meta.description}
         actions={
-          <Link
-            className="hds-button hds-button--primary hds-button--md"
-            to={`/master-data/${kind}/new`}
-          >
-            <Plus aria-hidden="true" />
-            {meta.createLabel}
-          </Link>
+          <div className="master-header-actions">
+            {kind === 'parts' && (
+              <Link
+                className="hds-button hds-button--secondary hds-button--md"
+                to="/master-data/parts/import"
+              >
+                Import CSV / Excel
+              </Link>
+            )}
+            <Link
+              className="hds-button hds-button--primary hds-button--md"
+              to={`/master-data/${kind}/new`}
+            >
+              <Plus aria-hidden="true" />
+              {meta.createLabel}
+            </Link>
+          </div>
         }
       />
       <FilterBar>
@@ -167,7 +189,7 @@ export function MasterListPage({ kind }: { kind: ResourceKind }) {
           <span>Status</span>
           <NativeSelect value={active} onChange={(event) => update('active', event.target.value)}>
             <option value="ACTIVE">Aktif</option>
-            <option value="INACTIVE">Nonaktif</option>
+            <option value="INACTIVE">{kind === 'members' ? 'Arsip' : 'Nonaktif'}</option>
             <option value="ALL">Semua</option>
           </NativeSelect>
         </label>
@@ -264,6 +286,7 @@ function MasterRow({
           </span>,
           item.registrationNumber ?? '—',
           label(item.role),
+          item.account?.username ?? '—',
           item.account?.status ?? 'Tanpa akun',
           item.active ? 'Aktif' : 'Nonaktif',
         ]
@@ -392,6 +415,7 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
       await queryClient.invalidateQueries({
         queryKey: scopedKey(scope, `master-${kind}`).slice(0, -1),
       });
+      toast.success(editing ? 'Perubahan disimpan' : `${resources[kind].title} ditambahkan`);
       if (editing) {
         void navigate(`/master-data/${kind}`, { replace: true });
         return;
@@ -425,6 +449,7 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
 
   return (
     <div className="product-page">
+      <MasterBackLink to={`/master-data/${kind}`} label={resources[kind].title} />
       <PageHeader
         eyebrow={resources[kind].title}
         title={editing ? 'Edit data' : resources[kind].createLabel}
@@ -451,7 +476,11 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
               <Button type="submit" loading={save.isPending}>
                 {editing ? 'Simpan perubahan' : 'Buat data'}
               </Button>
-              <Button type="button" variant="ghost" onClick={() => void navigate(-1)}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => void navigate(`/master-data/${kind}`)}
+              >
                 Batal
               </Button>
             </div>
@@ -492,9 +521,11 @@ function ResourceLifecycle({
       return supplierApi.shiftTemplateAction(resource.id, next, body);
     },
     onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: scopedKey(scope, `master-${kind}-detail`, resource.id),
-      }),
+      queryClient
+        .invalidateQueries({
+          queryKey: scopedKey(scope, `master-${kind}-detail`, resource.id),
+        })
+        .then(() => toast.success(active ? 'Data dinonaktifkan' : 'Data diaktifkan')),
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
   return (
@@ -669,6 +700,7 @@ export function MemberLifecycle({
   scope: ReturnType<typeof scopeOf>;
 }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [secret, setSecret] = useState<{ username: string; temporaryPassword: string } | null>(
     null,
   );
@@ -700,10 +732,18 @@ export function MemberLifecycle({
         expectedVersion: member.version,
       });
     },
-    onSuccess: () =>
-      queryClient.invalidateQueries({
+    onSuccess: async (_, kind) => {
+      await queryClient.invalidateQueries({
         queryKey: scopedKey(scope, 'master-members-detail', member.id),
-      }),
+      });
+      if (kind === 'status') {
+        await queryClient.invalidateQueries({
+          queryKey: scopedKey(scope, 'master-members').slice(0, -1),
+        });
+        toast.success(member.active ? 'Member dipindahkan ke arsip' : 'Member diaktifkan');
+        if (member.active) void navigate('/master-data/members', { replace: true });
+      } else toast.success('Password berhasil direset');
+    },
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
   const photo = useMutation({
@@ -798,27 +838,42 @@ export function MemberLifecycle({
         </div>
       </div>
       <div className="lifecycle-actions">
-        <Button
-          variant="secondary"
-          onClick={() => {
-            setProblem(null);
-            if (window.confirm(`${member.active ? 'Nonaktifkan' : 'Aktifkan'} member ini?`))
-              action.mutate('status');
-          }}
-        >
-          {member.active ? 'Nonaktifkan member' : 'Aktifkan member'}
-        </Button>
         {member.account && (
-          <Button
-            variant="secondary"
-            onClick={() => {
+          <p className="member-account-identity">
+            <span>Username</span>
+            <strong>{member.account.username}</strong>
+          </p>
+        )}
+        <AlertDialog
+          title={member.active ? 'Hapus member dari daftar aktif?' : 'Pulihkan member?'}
+          description={
+            member.active
+              ? `${member.fullName} akan dipindahkan ke Arsip. Riwayatnya tetap tersedia.`
+              : `${member.fullName} akan kembali ke daftar member aktif.`
+          }
+          confirmLabel={member.active ? 'Hapus member' : 'Pulihkan member'}
+          destructive={member.active}
+          onConfirm={() => {
+            setProblem(null);
+            action.mutate('status');
+          }}
+          trigger={
+            <Button variant={member.active ? 'danger' : 'secondary'} loading={action.isPending}>
+              {member.active ? 'Hapus member' : 'Pulihkan member'}
+            </Button>
+          }
+        />
+        {member.account && (
+          <AlertDialog
+            title="Reset password member?"
+            description="Password sementara yang baru akan ditampilkan satu kali."
+            confirmLabel="Reset password"
+            onConfirm={() => {
               setProblem(null);
-              if (window.confirm('Reset password dan tampilkan temporary password baru?'))
-                action.mutate('reset');
+              action.mutate('reset');
             }}
-          >
-            Reset password
-          </Button>
+            trigger={<Button variant="secondary">Reset password</Button>}
+          />
         )}
       </div>
     </Panel>
@@ -869,6 +924,7 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
     onSuccess: async () => {
       setName('');
       await refreshJobViews();
+      toast.success('Job ditambahkan');
     },
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
@@ -884,7 +940,10 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
       version: number;
       skillCategory: string;
     }) => supplierApi.updateJob(lineId, id, { name, expectedVersion: version, skillCategory }),
-    onSuccess: refreshJobViews,
+    onSuccess: async () => {
+      await refreshJobViews();
+      toast.success('Kategori job disimpan');
+    },
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
   const rename = useMutation({
@@ -906,6 +965,7 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
       await refreshJobViews();
       setEditingJobId(null);
       setEditingJobName('');
+      toast.success('Nama job disimpan');
     },
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
@@ -934,7 +994,10 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
         items: reordered.map((job) => ({ id: job.id, expectedVersion: job.version })),
       });
     },
-    onSuccess: refreshJobViews,
+    onSuccess: async () => {
+      await refreshJobViews();
+      toast.success('Job diperbarui');
+    },
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
   return (
@@ -1165,6 +1228,7 @@ function OneTimeCredential({
 export function ChecklistOverviewPage() {
   return (
     <div className="product-page">
+      <MasterBackLink to="/master-data" label="Master Data" />
       <PageHeader eyebrow="Master Data" title="Checklist 4M" description="" />
       <section className="checklist-category-grid">
         {(['MAN', 'MACHINE', 'MATERIAL', 'METHOD'] as const).map((category) => (
@@ -1194,6 +1258,11 @@ export function ChecklistDetailPage() {
   });
   const [items, setItems] = useState<string[]>([]);
   const [problem, setProblem] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const dirty = draft.data
+    ? JSON.stringify(items) !== JSON.stringify(draft.data.items.map((item) => item.label))
+    : false;
+  const invalid = items.some((item) => !item.trim());
   useEffect(() => {
     if (draft.data) setItems(draft.data.items.map((item) => item.label));
   }, [draft.data]);
@@ -1203,8 +1272,13 @@ export function ChecklistDetailPage() {
         expectedVersion: draft.data?.version,
         items: items.filter(Boolean).map((item) => ({ label: item })),
       }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'checklist-draft', category) }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: scopedKey(scope, 'checklist-draft', category),
+      });
+      setNotice('Draft disimpan.');
+      toast.success('Draft disimpan');
+    },
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
   const publish = useMutation({
@@ -1217,6 +1291,8 @@ export function ChecklistDetailPage() {
       await queryClient.invalidateQueries({
         queryKey: scopedKey(scope, 'checklist-versions', category),
       });
+      setNotice('Checklist dipublikasikan.');
+      toast.success('Checklist dipublikasikan');
     },
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
@@ -1225,13 +1301,23 @@ export function ChecklistDetailPage() {
       supplierApi.checklistAction(category, draft.data!.active ? 'deactivate' : 'activate', {
         expectedVersion: draft.data!.version,
       }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'checklist-draft', category) }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: scopedKey(scope, 'checklist-draft', category),
+      });
+      toast.success('Status checklist diperbarui');
+    },
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
   return (
     <div className="product-page">
+      <MasterBackLink to="/master-data/checklists" label="Checklist 4M" />
       <PageHeader eyebrow="Checklist 4M" title={label(category)} description="" />
+      {notice && (
+        <div role="status" className="sr-only">
+          {notice}
+        </div>
+      )}
       {problem && (
         <Alert tone="danger" title="Perubahan checklist gagal">
           {problem}
@@ -1242,13 +1328,22 @@ export function ChecklistDetailPage() {
         <div className="checklist-editor">
           <Panel
             title="Draft saat ini"
-            description={`Version ${draft.data.version} · ${draft.data.active ? 'aktif' : 'nonaktif'}`}
+            description={`${items.length} item · Versi draft ${draft.data.version}`}
+            className="checklist-editor__draft"
           >
+            <div className="checklist-editor__state">
+              <span className={draft.data.active ? 'is-active' : 'is-inactive'}>
+                {draft.data.active ? 'Aktif' : 'Nonaktif'}
+              </span>
+              {dirty && <span className="checklist-editor__dirty">Belum disimpan</span>}
+            </div>
             <ol>
               {items.map((item, index) => (
                 <li key={index}>
                   <span>{index + 1}</span>
                   <Input
+                    aria-label={`Item checklist ${index + 1}`}
+                    placeholder={`Item ${index + 1}`}
                     value={item}
                     onChange={(event) =>
                       setItems(
@@ -1261,9 +1356,10 @@ export function ChecklistDetailPage() {
                   <Button
                     variant="ghost"
                     size="sm"
+                    aria-label={`Hapus item ${index + 1}`}
                     onClick={() => setItems(items.filter((_, itemIndex) => itemIndex !== index))}
                   >
-                    Hapus
+                    <Trash2 aria-hidden="true" />
                   </Button>
                 </li>
               ))}
@@ -1274,6 +1370,7 @@ export function ChecklistDetailPage() {
               </Button>
               <Button
                 loading={save.isPending}
+                disabled={!dirty || invalid || save.isPending}
                 onClick={() => {
                   setProblem(null);
                   save.mutate();
@@ -1281,44 +1378,48 @@ export function ChecklistDetailPage() {
               >
                 Simpan draft
               </Button>
-              <Button
-                variant="danger"
-                disabled={!items.some(Boolean)}
-                loading={publish.isPending}
-                onClick={() => {
-                  setProblem(null);
-                  if (window.confirm('Publish draft ini sebagai versi baru?')) publish.mutate();
-                }}
-              >
-                Publish
-              </Button>
-              <Button
-                variant="secondary"
-                loading={lifecycle.isPending}
-                onClick={() => {
-                  setProblem(null);
-                  if (
-                    window.confirm(
-                      `${draft.data.active ? 'Nonaktifkan' : 'Aktifkan'} checklist ${label(category)}?`,
-                    )
-                  )
-                    lifecycle.mutate();
-                }}
-              >
-                {draft.data.active ? 'Nonaktifkan' : 'Aktifkan'}
-              </Button>
             </div>
+            {dirty && <p className="checklist-editor__hint">Simpan draft sebelum publish.</p>}
           </Panel>
-          <Panel title="Riwayat versi" description="">
-            <ol className="version-list">
-              {versions.data?.items.map((version) => (
-                <li key={version.id}>
-                  <strong>Version {version.versionNumber}</strong>
-                  <span>{version.items.length} item</span>
-                  <small>{new Date(version.publishedAt).toLocaleString('id-ID')}</small>
-                </li>
-              ))}
-            </ol>
+          <Panel title="Publikasi" description="" className="checklist-editor__side">
+            <Button
+              disabled={dirty || invalid || !items.length || publish.isPending}
+              loading={publish.isPending}
+              onClick={() => {
+                setProblem(null);
+                if (window.confirm('Publish draft ini sebagai versi baru?')) publish.mutate();
+              }}
+            >
+              Publish versi baru
+            </Button>
+            <Button
+              variant="secondary"
+              loading={lifecycle.isPending}
+              onClick={() => {
+                setProblem(null);
+                if (
+                  window.confirm(
+                    `${draft.data.active ? 'Nonaktifkan' : 'Aktifkan'} checklist ${label(category)}?`,
+                  )
+                )
+                  lifecycle.mutate();
+              }}
+            >
+              {draft.data.active ? 'Nonaktifkan checklist' : 'Aktifkan checklist'}
+            </Button>
+            <div className="checklist-editor__history">
+              <h3>Riwayat versi</h3>
+              <ol className="version-list">
+                {versions.data?.items.map((version) => (
+                  <li key={version.id}>
+                    <strong>Versi {version.versionNumber}</strong>
+                    <span>{version.items.length} item</span>
+                    <small>{new Date(version.publishedAt).toLocaleString('id-ID')}</small>
+                  </li>
+                ))}
+              </ol>
+              {!versions.data?.items.length && <p>Belum ada versi terbit.</p>}
+            </div>
           </Panel>
         </div>
       )}

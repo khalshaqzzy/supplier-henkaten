@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import type { MasterListQuery } from '@tmmin-henkaten/contracts';
+import type { MasterListQuery, PartImportCommitRequest } from '@tmmin-henkaten/contracts';
 
 import type { Prisma } from '../generated/prisma/client.js';
 import { normalizeLookup } from '../auth/auth.service.js';
@@ -360,6 +360,7 @@ export class CatalogService {
     context: MutationContext,
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
+      await lockSupplier(tx, scope.supplierId);
       const created = await tx.part.create({
         data: {
           supplierId: scope.supplierId,
@@ -380,6 +381,108 @@ export class CatalogService {
     return presentPart(row);
   }
 
+  async previewPartImport(scope: TenantScope, rows: { partNumber: string; partName: string }[]) {
+    assertDistinctPartNumbers(rows);
+    const existing = await this.prisma.part.findMany({
+      where: {
+        supplierId: scope.supplierId,
+        normalizedPartNumber: { in: rows.map((row) => normalizeLookup(row.partNumber)) },
+      },
+      select: { id: true, normalizedPartNumber: true, partName: true, active: true, version: true },
+    });
+    const byNumber = new Map(existing.map((part) => [part.normalizedPartNumber, part]));
+    return {
+      rows: rows.map((row) => {
+        const part = byNumber.get(normalizeLookup(row.partNumber));
+        return {
+          partNumber: row.partNumber.trim(),
+          partName: row.partName.trim(),
+          existing: part
+            ? { id: part.id, partName: part.partName, active: part.active, version: part.version }
+            : null,
+        };
+      }),
+    };
+  }
+
+  async commitPartImport(
+    scope: TenantScope,
+    rows: PartImportCommitRequest['rows'],
+    context: MutationContext,
+  ) {
+    assertDistinctPartNumbers(rows);
+    return this.prisma.$transaction(async (tx) => {
+      await lockSupplier(tx, scope.supplierId);
+      const existing = await tx.part.findMany({
+        where: {
+          supplierId: scope.supplierId,
+          normalizedPartNumber: { in: rows.map((row) => normalizeLookup(row.partNumber)) },
+        },
+      });
+      const byNumber = new Map(existing.map((part) => [part.normalizedPartNumber, part]));
+      let created = 0;
+      let updated = 0;
+      let skipped = 0;
+      for (const row of rows) {
+        const normalizedPartNumber = normalizeLookup(row.partNumber);
+        const current = byNumber.get(normalizedPartNumber);
+        if (row.action === 'SKIP') {
+          skipped++;
+          continue;
+        }
+        if (row.action === 'CREATE') {
+          if (current)
+            throw partImportConflict('A part number already exists. Review the file again.');
+          const part = await tx.part.create({
+            data: {
+              supplierId: scope.supplierId,
+              partNumber: row.partNumber.trim(),
+              normalizedPartNumber,
+              partName: row.partName.trim(),
+              normalizedPartName: normalizeLookup(row.partName),
+              createdById: context.actorUserId,
+              updatedById: context.actorUserId,
+            },
+          });
+          await this.audit.write(
+            masterAudit(context, scope.supplierId, 'PART_CREATED', 'Part', part.id, {
+              source: 'IMPORT',
+            }),
+            tx,
+          );
+          created++;
+          continue;
+        }
+        if (!current || current.id !== row.existingId || current.version !== row.expectedVersion)
+          throw partImportConflict(
+            'A part changed while you were reviewing the file. Review the file again.',
+          );
+        if (current.partName === row.partName.trim()) {
+          skipped++;
+          continue;
+        }
+        await tx.part.update({
+          where: { id: current.id },
+          data: {
+            partName: row.partName.trim(),
+            normalizedPartName: normalizeLookup(row.partName),
+            version: { increment: 1 },
+            updatedById: context.actorUserId,
+          },
+        });
+        await this.audit.write(
+          masterAudit(context, scope.supplierId, 'PART_UPDATED', 'Part', current.id, {
+            source: 'IMPORT',
+            fields: ['partName'],
+          }),
+          tx,
+        );
+        updated++;
+      }
+      return { created, updated, skipped };
+    });
+  }
+
   async getPart(scope: TenantScope, id: string) {
     const row = await this.prisma.part.findFirst({
       where: { id, supplierId: scope.supplierId },
@@ -395,6 +498,7 @@ export class CatalogService {
     context: MutationContext,
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
+      await lockSupplier(tx, scope.supplierId);
       const current = await tx.part.findFirst({ where: { id, supplierId: scope.supplierId } });
       if (!current) throw missing('Part');
       if (current.version !== input.expectedVersion) throw versionConflict();
@@ -434,6 +538,7 @@ export class CatalogService {
     context: MutationContext,
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
+      await lockSupplier(tx, scope.supplierId);
       const current = await tx.part.findFirst({ where: { id, supplierId: scope.supplierId } });
       if (!current) throw missing('Part');
       if (current.version !== expectedVersion) throw versionConflict();
@@ -693,6 +798,27 @@ export class CatalogService {
 
 function activeWhere(active: MasterListQuery['active']) {
   return active === 'ACTIVE' ? { active: true } : active === 'INACTIVE' ? { active: false } : {};
+}
+
+function assertDistinctPartNumbers(rows: { partNumber: string }[]) {
+  const numbers = rows.map((row) => normalizeLookup(row.partNumber));
+  if (new Set(numbers).size !== numbers.length) {
+    throw new ProblemException({
+      status: 400,
+      code: 'VALIDATION_FAILED',
+      title: 'Duplicate part numbers',
+      detail: 'The file contains a part number more than once.',
+    });
+  }
+}
+
+function partImportConflict(detail: string) {
+  return new ProblemException({
+    status: 409,
+    code: 'VERSION_CONFLICT',
+    title: 'Import review is out of date',
+    detail,
+  });
 }
 
 function page<T extends { id: string }>(rows: T[], limit: number, presenter: (row: T) => unknown) {

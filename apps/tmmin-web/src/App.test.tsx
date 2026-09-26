@@ -68,7 +68,7 @@ describe('TMMIN application boundary', () => {
     expect(sessionSpy).not.toHaveBeenCalled();
   });
 
-  it('shows the shared 4M legend on the TMMIN login without placeholder copy', async () => {
+  it('shows the 4M legend and toggles password visibility on the TMMIN login', async () => {
     vi.spyOn(tmminApi, 'session').mockRejectedValue(new Error('anonymous'));
     render(
       <MemoryRouter initialEntries={['/login']}>
@@ -86,6 +86,10 @@ describe('TMMIN application boundary', () => {
     expect(screen.queryByRole('heading', { name: '.' })).toBeNull();
     expect(screen.getByLabelText(/^Username/)).toBeTruthy();
     expect(screen.getByLabelText(/^Password/)).toBeTruthy();
+    const password = screen.getByLabelText<HTMLInputElement>(/^Password/);
+    expect(password.type).toBe('password');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Tampilkan password' }));
+    expect(password.type).toBe('text');
   });
 
   it('forces temporary-password identities to the reset guard', async () => {

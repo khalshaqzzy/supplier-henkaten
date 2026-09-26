@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -27,6 +28,7 @@ export function LoginPage() {
   const { login } = useTmminSession();
   const navigate = useNavigate();
   const [problem, setProblem] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const form = useForm<z.infer<typeof loginSchema>>({ resolver: zodResolver(loginSchema) });
   return (
     <main className="tmmin-auth">
@@ -75,19 +77,29 @@ export function LoginPage() {
           >
             <Input id="username" autoComplete="username" {...form.register('username')} />
           </Field>
-          <Field
-            label="Password"
-            htmlFor="password"
-            errorText={form.formState.errors.password?.message}
-            required
-          >
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              {...form.register('password')}
-            />
-          </Field>
+          <div className="tmmin-password-field">
+            <Field
+              label="Password"
+              htmlFor="password"
+              errorText={form.formState.errors.password?.message}
+              required
+            >
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                {...form.register('password')}
+              />
+            </Field>
+            <button
+              type="button"
+              aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+              aria-pressed={showPassword}
+              onClick={() => setShowPassword((visible) => !visible)}
+            >
+              {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+            </button>
+          </div>
           <Button type="submit" variant="primary" loading={form.formState.isSubmitting}>
             Masuk
           </Button>

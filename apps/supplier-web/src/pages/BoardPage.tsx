@@ -49,6 +49,10 @@ export function BoardPage() {
   const [connection, setConnection] = useState<RealtimeConnectionState>('connecting');
   const [canvasDirty, setCanvasDirty] = useState(false);
   const lineId = params.get('lineId') ?? undefined;
+  const shiftStatus =
+    params.get('shiftStatus') === 'OTHER' || params.get('shiftStatus') === 'ALL'
+      ? (params.get('shiftStatus') as 'OTHER' | 'ALL')
+      : 'CURRENT';
   const view = params.get('view') === 'canvas' ? 'canvas' : 'default';
   const scope = {
     userId: session!.principal.userId,
@@ -60,8 +64,8 @@ export function BoardPage() {
     [scope.purpose, scope.supplierId, scope.userId],
   );
   const board = useQuery({
-    queryKey: boardKey,
-    queryFn: () => supplierApi.board({}),
+    queryKey: [...boardKey, shiftStatus],
+    queryFn: () => supplierApi.board({ shiftStatus }),
   });
   const realtime = useMemo(
     () =>
@@ -137,6 +141,29 @@ export function BoardPage() {
       )}
       <div className="board-toolbar">
         <label>
+          <span>Shift</span>
+          <NativeSelect
+            aria-label="Filter shift"
+            value={shiftStatus}
+            onChange={(event) => {
+              if (
+                canvasDirty &&
+                !window.confirm('Ganti shift dan buang perubahan Canvas yang belum disimpan?')
+              )
+                return;
+              const next = new URLSearchParams(params);
+              if (event.target.value === 'CURRENT') next.delete('shiftStatus');
+              else next.set('shiftStatus', event.target.value);
+              next.delete('view');
+              setParams(next, { replace: true });
+            }}
+          >
+            <option value="CURRENT">Sedang aktif</option>
+            <option value="OTHER">Shift lain</option>
+            <option value="ALL">Semua shift</option>
+          </NativeSelect>
+        </label>
+        <label>
           <span>Line dalam scope</span>
           <NativeSelect
             value={lineId ?? ''}
@@ -188,8 +215,12 @@ export function BoardPage() {
             size="sm"
             variant={view === 'canvas' ? 'primary' : 'ghost'}
             aria-pressed={view === 'canvas'}
-            disabled={!lineId}
-            title={lineId ? 'Buka Canvas' : 'Pilih satu line untuk membuka Canvas'}
+            disabled={!lineId || lines.length !== 1}
+            title={
+              lineId && lines.length === 1
+                ? 'Buka Canvas'
+                : 'Pilih satu line dan satu shift untuk membuka Canvas'
+            }
             onClick={() => {
               const next = new URLSearchParams(params);
               next.set('view', 'canvas');
@@ -238,14 +269,21 @@ export function BoardPage() {
         />
       )}
       {board.data && lines.length === 0 && (
-        <EmptyState title="Belum ada assignment" description="" />
+        <EmptyState
+          title={
+            shiftStatus === 'CURRENT' ? 'Tidak ada shift yang sedang aktif' : 'Belum ada assignment'
+          }
+          description=""
+        />
       )}
       {board.data && lines.length > 0 && (
-        <div className={`board-workspace${view === 'canvas' ? ' is-canvas' : ''}`}>
+        <div
+          className={`board-workspace${view === 'canvas' && lines.length === 1 ? ' is-canvas' : ''}`}
+        >
           <div className="board-workspace__main">
             <SummaryStrip label="Ringkasan Assignment Board" className="board-metrics">
-              <SummaryMetric label="Line aktif" value={lines.length} icon={<Users />} />
-              <SummaryMetric label="Job aktif" value={jobs.length} icon={<CheckCircle2 />} />
+              <SummaryMetric label="Line–shift" value={lines.length} icon={<Users />} />
+              <SummaryMetric label="Job" value={jobs.length} icon={<CheckCircle2 />} />
               <SummaryMetric
                 label="Open Henkaten"
                 value={openIndicators}
@@ -259,7 +297,7 @@ export function BoardPage() {
                 tone={issues ? 'danger' : 'neutral'}
               />
             </SummaryStrip>
-            {view === 'canvas' && contextLine ? (
+            {view === 'canvas' && lines.length === 1 && contextLine ? (
               <Suspense
                 fallback={
                   <div className="board-canvas-skeleton">
@@ -281,6 +319,11 @@ export function BoardPage() {
                         <h2>{line.lineName}</h2>
                         <p>
                           {line.shiftName} · {line.businessDate}
+                          <span
+                            className={`board-shift-badge ${line.isCurrent ? 'is-current' : ''}`}
+                          >
+                            {line.isCurrent ? 'Sedang aktif' : 'Shift berikutnya'}
+                          </span>
                         </p>
                       </div>
                       <dl>
