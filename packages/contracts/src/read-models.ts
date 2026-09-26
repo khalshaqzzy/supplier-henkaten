@@ -77,7 +77,12 @@ export type NotificationReadRequest = z.infer<typeof notificationReadRequestSche
 
 export const notificationUnreadCountSchema = z.object({ count: z.number().int().nonnegative() });
 
-export const boardQuerySchema = z.object({ lineId: opaqueIdSchema.optional() }).strict();
+export const boardQuerySchema = z
+  .object({
+    lineId: opaqueIdSchema.optional(),
+    shiftStatus: z.enum(['CURRENT', 'OTHER', 'ALL']).optional(),
+  })
+  .strict();
 export type BoardQuery = z.infer<typeof boardQuerySchema>;
 
 export const boardIndicatorSchema = z
@@ -107,6 +112,7 @@ export const assignmentBoardSchema = z
           lineCode: z.string(),
           lineName: z.string(),
           shiftName: z.string(),
+          isCurrent: z.boolean(),
           businessDate: z.string().date(),
           supervisor: z
             .object({ memberId: opaqueIdSchema.nullable(), name: z.string().nullable() })

@@ -12,12 +12,14 @@ import {
   NativeSelect,
   Panel,
   Skeleton,
+  toast,
 } from '@tmmin-henkaten/ui';
 
 import { supplierApi } from '../app/api';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { PageHeader } from '../components/layout';
+import { MasterBackLink } from './MasterDataPages';
 
 export function DefaultAssignmentsPage() {
   const { session } = useSession();
@@ -88,13 +90,17 @@ export function DefaultAssignmentsPage() {
       );
       setSelectedShiftId(created.id);
       await invalidate();
+      toast.success('Shift ditambahkan');
     },
     onError: (error) => setProblem(problemDetail(error, 'Shift tidak dapat ditambahkan.')),
   });
   const action = useMutation({
     mutationFn: ({ item, active }: { item: LineShift; active: boolean }) =>
       supplierApi.lineShiftAction(item.id, active ? 'activate' : 'deactivate', item.version),
-    onSuccess: invalidate,
+    onSuccess: async () => {
+      await invalidate();
+      toast.success('Status shift diperbarui');
+    },
     onError: (error) => setProblem(problemDetail(error, 'Status shift tidak dapat diubah.')),
   });
   const loading =
@@ -102,6 +108,7 @@ export function DefaultAssignmentsPage() {
 
   return (
     <div className="product-page">
+      <MasterBackLink to="/master-data" label="Master Data" />
       <PageHeader eyebrow="Master Data" title="Line Setup" description="" />
       <div className="defaults-toolbar">
         <label>
@@ -249,6 +256,7 @@ function AssignmentEditor({
     onSuccess: async () => {
       onProblem(null);
       await onSaved();
+      toast.success('Assignment disimpan');
     },
     onError: (error) => onProblem(problemDetail(error, 'Assignment tidak dapat disimpan.')),
   });

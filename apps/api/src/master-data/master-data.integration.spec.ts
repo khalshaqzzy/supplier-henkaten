@@ -286,6 +286,30 @@ describe('supplier master data', () => {
       true,
     );
 
+    const boardAll = await request(app.getHttpServer())
+      .get('/api/v1/supplier/assignment-board?shiftStatus=ALL')
+      .set('Cookie', supplierCookie);
+    const boardCurrent = await request(app.getHttpServer())
+      .get('/api/v1/supplier/assignment-board?shiftStatus=CURRENT')
+      .set('Cookie', supplierCookie);
+    const boardOther = await request(app.getHttpServer())
+      .get('/api/v1/supplier/assignment-board?shiftStatus=OTHER')
+      .set('Cookie', supplierCookie);
+    expect([boardAll.status, boardCurrent.status, boardOther.status]).toEqual([200, 200, 200]);
+    const allShifts = (
+      boardAll.body as { lines: Array<{ shiftRunId: string; isCurrent: boolean }> }
+    ).lines;
+    const currentShifts = (
+      boardCurrent.body as { lines: Array<{ shiftRunId: string; isCurrent: boolean }> }
+    ).lines;
+    const otherShifts = (
+      boardOther.body as { lines: Array<{ shiftRunId: string; isCurrent: boolean }> }
+    ).lines;
+    expect(allShifts.map((item) => item.shiftRunId)).toContain(lineShiftBody.id);
+    expect(currentShifts.every((item) => item.isCurrent)).toBe(true);
+    expect(otherShifts.every((item) => !item.isCurrent)).toBe(true);
+    expect(currentShifts.length + otherShifts.length).toBe(allShifts.length);
+
     const blocked = await supplierPost(`/api/v1/supplier/master-data/members/${mpId}/deactivate`, {
       expectedVersion: 1,
     });
@@ -516,6 +540,74 @@ describe('supplier master data', () => {
       .set('Cookie', tmminQualityCookie)
       .send({ partNumber: 'NO', partName: 'NO' });
     expect(forbiddenMutation.status).toBe(401);
+  });
+
+  it('reviews part conflicts and applies only selected import changes atomically', async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const currentNumber = `IMP-EXIST-${suffix}`;
+    const newNumber = `IMP-NEW-${suffix}`;
+    const created = await supplierPost('/api/v1/supplier/master-data/parts', {
+      partNumber: currentNumber,
+      partName: 'Current name',
+    });
+    expect(created.status).toBe(201);
+    const currentId = (created.body as { id: string }).id;
+    const preview = await supplierPost('/api/v1/supplier/master-data/parts/import/preview', {
+      rows: [
+        { partNumber: currentNumber.toLowerCase(), partName: 'File name' },
+        { partNumber: newNumber, partName: 'New part' },
+      ],
+    });
+    expect(preview.status).toBe(201);
+    const reviewed = preview.body as {
+      rows: Array<{ existing: { id: string; version: number } | null }>;
+    };
+    expect(reviewed.rows[0]?.existing?.id).toBe(currentId);
+    expect(reviewed.rows[1]?.existing).toBeNull();
+
+    const committed = await supplierPost('/api/v1/supplier/master-data/parts/import/commit', {
+      rows: [
+        {
+          partNumber: currentNumber,
+          partName: 'File name',
+          action: 'UPDATE',
+          existingId: currentId,
+          expectedVersion: reviewed.rows[0]?.existing?.version,
+        },
+        { partNumber: newNumber, partName: 'New part', action: 'CREATE' },
+      ],
+    });
+    expect(committed.status).toBe(201);
+    expect(committed.body).toEqual({ created: 1, updated: 1, skipped: 0 });
+    const saved = await prisma.part.findFirst({
+      where: { supplierId, normalizedPartNumber: newNumber.toLowerCase() },
+    });
+    expect(saved?.partName).toBe('New part');
+
+    const staleNumber = `IMP-STALE-${suffix}`;
+    const stale = await supplierPost('/api/v1/supplier/master-data/parts/import/commit', {
+      rows: [
+        {
+          partNumber: currentNumber,
+          partName: 'Stale name',
+          action: 'UPDATE',
+          existingId: currentId,
+          expectedVersion: reviewed.rows[0]?.existing?.version,
+        },
+        { partNumber: staleNumber, partName: 'Must roll back', action: 'CREATE' },
+      ],
+    });
+    expect(stale.status).toBe(409);
+    expect(
+      await prisma.part.count({
+        where: { supplierId, normalizedPartNumber: staleNumber.toLowerCase() },
+      }),
+    ).toBe(0);
+
+    const skipped = await supplierPost('/api/v1/supplier/master-data/parts/import/commit', {
+      rows: [{ partNumber: currentNumber, partName: 'Ignored', action: 'SKIP' }],
+    });
+    expect(skipped.body).toEqual({ created: 0, updated: 0, skipped: 1 });
   });
 
   function supplierPost(path: string, body: unknown) {

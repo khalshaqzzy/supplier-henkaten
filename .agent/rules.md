@@ -152,6 +152,8 @@ After pushing:
 
 ## 5. When To Update `.agent`
 
+When a database schema, API contract, or shared validation schema changes, inspect the local seed and its fixtures in the same task. Update seed data and calls when the change affects them, then run a fresh seed smoke against the current migrations and built API. Record the compatibility decision and smoke result in `sessionHandoff.md`, including when no seed edit is needed.
+
 Update `.agent` when implementation changes:
 
 - product scope

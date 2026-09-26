@@ -87,7 +87,7 @@ describe('Supplier application foundation', () => {
     );
   });
 
-  it('shows the shared 4M legend on the Supplier login without changing its form', async () => {
+  it('shows the shared 4M legend and toggles password visibility on the Supplier login', async () => {
     vi.spyOn(supplierApi, 'session').mockRejectedValue(new Error('anonymous'));
     render(
       <MemoryRouter initialEntries={['/login']}>
@@ -105,6 +105,12 @@ describe('Supplier application foundation', () => {
     expect(screen.getByLabelText(/^Supplier Code/)).toBeTruthy();
     expect(screen.getByLabelText(/^Username/)).toBeTruthy();
     expect(screen.getByLabelText(/^Password/)).toBeTruthy();
+    const password = screen.getByLabelText<HTMLInputElement>(/^Password/);
+    expect(password.type).toBe('password');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Tampilkan password' }));
+    expect(password.type).toBe('text');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Sembunyikan password' }));
+    expect(password.type).toBe('password');
   });
 
   it('redirects Hosted Preparation home to authoritative setup progress', async () => {

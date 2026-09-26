@@ -13,6 +13,16 @@
 
 Dokumen ini adalah kontrak produk dan implementasi v1. Kata **MUST/wajib**, **MUST NOT/dilarang**, **SHOULD/sebaiknya**, dan **MAY/dapat** bersifat normatif. Bila source code, prototype, slide, atau asumsi implementasi berbeda dengan dokumen ini, tim wajib mengeskalasi perbedaan tersebut dan tidak boleh memilih perilaku secara diam-diam.
 
+### Amendment pengalaman Supplier Admin — 26 September 2026
+
+Login Supplier dan TMMIN menyediakan kontrol tampil/sembunyikan password yang dapat diakses melalui keyboard. Master Data Supplier memiliki navigasi kembali yang eksplisit pada daftar dan halaman turunannya, termasuk Line Setup serta editor Checklist 4M. Perubahan yang berhasil disimpan memberikan konfirmasi singkat; kegagalan tetap terlihat pada halaman. Editor checklist membedakan draft, publish, dan riwayat versi serta mewajibkan penyimpanan draft sebelum publish.
+
+Daftar Member & Akun menampilkan username untuk member yang mempunyai akun. Aksi **Hapus member** berarti deaktivasi dan memindahkan member dari daftar aktif ke filter **Arsip**; riwayat dan audit tetap dipertahankan. Deaktivasi tetap ditolak bila member dibutuhkan assignment aktif atau Henkaten Open. Member arsip dapat dipulihkan sesuai pemeriksaan kapasitas dan validasi backend.
+
+Daftar Part mendukung impor CSV dan Excel `.xlsx` maksimum 2 MB atau 500 baris per batch. File ditinjau sebelum disimpan. Part number baru ditambahkan; untuk nomor yang sudah ada, Supplier Admin memilih per baris apakah nama part diperbarui dari file atau dilewati, dengan aksi bulk untuk pilihan tersebut. Nomor yang duplikat dalam file dan kolom wajib hilang ditolak sebelum review. Sel Excel numerik diterima bila berisi bilangan bulat nonnegatif yang masih presisi; nomor panjang atau dengan nol di depan harus disimpan sebagai teks agar identitasnya terjaga. Commit bersifat atomik, tenant scoped, tercatat di audit, dan menolak review yang kedaluwarsa. Status aktif/nonaktif part yang sudah ada tidak berubah saat nama diperbarui.
+
+Assignment Board menyediakan filter shift **Sedang aktif**, **Shift lain**, dan **Semua shift** berdasarkan jadwal saat ini. Shift lain menampilkan occurrence berikutnya dan assignment yang berlaku untuk occurrence tersebut; label status membedakannya dari shift saat ini. Default tetap Sedang aktif. Canvas tersedia hanya ketika satu pasangan Line–Shift terlihat.
+
 ### Amendment navigasi dan editing master data — 25 September 2026
 
 Portal TMMIN dapat diakses pada seluruh ukuran viewport; tabel lebar boleh memiliki scroll horizontal lokal, sementara navigasi dan aksi utama tetap dapat dijangkau. Supplier Admin dapat mengubah nama job pada line tanpa membuat job baru. Setelah edit master data berhasil, pengguna kembali ke daftar resource terkait. Inspector Tanoko menggulir identitas MP, job, dan line bersama kontrol level; header dan aksi simpan tetap mudah dijangkau.
@@ -539,8 +549,8 @@ Shift yang melewati tengah malam wajib didukung. Business date mengikuti tanggal
 
 ### 10.7 CRUD dan Deactivation
 
-- v1 hanya menyediakan individual CRUD form.
-- Bulk CSV import/export tidak termasuk v1.
+- v1 menyediakan individual CRUD form; Part juga menyediakan reviewed CSV/Excel import sesuai amendment 26 September 2026.
+- Bulk import untuk resource selain Part dan bulk export tidak termasuk v1.
 - Seluruh master data permanen sejak dibuat dan tidak memiliki hard-delete API.
 - Koreksi dilakukan melalui update atau deactivation; reactivation tetap mempertahankan identity
   dan history yang sama.
@@ -2295,7 +2305,7 @@ Metrik adoption, cycle time approval, reject rate, dan aging dipantau melalui da
 - quality inspection execution di luar Henkaten checklist;
 - TMMIN QC × production integration;
 - email, SMS, native push, Slack, Teams, atau webhook notification;
-- bulk CSV/Excel import/export;
+- bulk CSV/Excel import untuk resource selain Part, serta bulk export;
 - document/photo attachment pada Henkaten selain member photo;
 - native mobile app;
 - AI/ML di luar penilaian indikasi PCR Henkaten; vector search;
@@ -2321,7 +2331,7 @@ Metrik adoption, cycle time approval, reject rate, dan aging dipantau melalui da
 | Vendor/OS Web Push terlambat atau tidak tampil | High | Mitigated | Persistent notification center authoritative, bounded retry, delivery metrics; push bukan guarantee. |
 | Permanent PII retention | High | Open governance dependency | Least privilege, no hard delete, legal/privacy approval sebelum go-live. |
 | Satu Supplier Admin menjadi operational bottleneck | Medium | Accepted | TMMIN reset/replacement capability; multi-admin deferred. |
-| CRUD-only onboarding lambat untuk 300 member/500 job | Medium | Accepted | Clear forms, validation, progressive setup; bulk import deferred. |
+| CRUD-only onboarding lambat untuk 300 member/500 job | Medium | Accepted | Clear forms and progressive setup; Part has reviewed CSV/Excel import, while Member and Job bulk import remain deferred. |
 | Responsive dense workflow menyembunyikan konteks/action | High | Mitigated | Locked breakpoint patterns, no-overflow/action checks, role matrix, real-device rehearsal; desktop regression retained. |
 | Line Leader tidak dapat bekerja karena permission/browser push | High | Mitigated | Explicit activation guidance, supported-browser matrix, per-installation status/troubleshooting, backend exempt activation routes. |
 | Service worker lama menahan release atau mutation | High | Mitigated | Non-stale HTML/manifest/worker headers, prompted activation, network-only mutation/data, recovery runbook. |
@@ -2398,7 +2408,7 @@ Ringkasan keputusan yang tidak boleh ditafsirkan ulang saat implementasi:
 - tidak ada backup/recovery/RPO/RTO/HA;
 - staging dan production memakai VM terpisah;
 - baseline kapasitas Compact;
-- master data CRUD individual tanpa bulk import/export;
+- master data CRUD individual; impor CSV/Excel khusus Part mengikuti amendment 26 September 2026, tanpa bulk export;
 - Supplier responsive mobile/tablet/desktop; TMMIN tetap desktop-only;
 - production deploy otomatis dari `main`;
 - supplier login memakai Supplier Code + Username;
