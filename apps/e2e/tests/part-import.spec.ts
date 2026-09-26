@@ -16,12 +16,34 @@ test('reviews CSV conflicts and imports an Excel workbook @edge', async ({
     name: 'parts.csv',
     mimeType: 'text/csv',
     buffer: Buffer.from(
-      'Part number,Nama part\r\nPART-part-import,"Updated, existing part"\r\nPART-NEW-1,New imported part\r\n',
+      'Catatan,Kode produksi,Deskripsi,Area\r\nAudit,PART-part-import,"Updated, existing part",A\r\nBaru,PART-NEW-1,New imported part,B\r\n',
     ),
   });
-  await page.getByRole('button', { name: 'Review file' }).click();
+  await expect(page.getByRole('heading', { name: 'Pilih data yang akan diimpor' })).toBeVisible();
+  await expect(page.locator('.part-import-sample tbody tr')).toHaveCount(2);
+  await page.getByLabel('Kolom Part number').selectOption('1');
+  await page.getByLabel('Kolom Nama part').selectOption('2');
+  await expect(page.locator('.part-import-sample th.is-selected')).toHaveCount(2);
+  await page.screenshot({
+    path: testInfo.outputPath('part-import-mapping-desktop.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    await page.evaluate(() => document.documentElement.clientWidth),
+  );
+  await page.screenshot({
+    path: testInfo.outputPath('part-import-mapping-mobile.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.getByRole('button', { name: 'Review perubahan' }).click();
   await expect(page.getByRole('heading', { name: '2 part dalam file' })).toBeVisible();
   await expect(page.getByText('Part part-import')).toBeVisible();
+  await expect(page.locator('.part-import-table tbody tr')).toHaveCount(1);
+  await expect(page.getByText('New imported part')).toHaveCount(0);
   await page.screenshot({
     path: testInfo.outputPath('part-import-review-desktop.png'),
     fullPage: true,
@@ -47,12 +69,27 @@ test('reviews CSV conflicts and imports an Excel workbook @edge', async ({
   );
   expect(part.partName).toBe('Updated, existing part');
   await page.getByRole('button', { name: 'Import file lain' }).click();
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'same.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      'Part number,Nama part\r\nPART-part-import,"Updated, existing part"\r\nPART-NEW-2,Another new part\r\n',
+    ),
+  });
+  await page.getByRole('button', { name: 'Review perubahan' }).click();
+  await expect(page.getByText('Tidak ada nama yang berbeda')).toBeVisible();
+  await expect(page.locator('.part-import-table')).toHaveCount(0);
+  await expect(page.getByLabel('Keputusan PART-part-import')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Simpan import' }).click();
+  await expect(page.locator('.part-import-stats')).toContainText('1Dilewati');
+  await page.getByRole('button', { name: 'Import file lain' }).click();
   await page
     .locator('input[type=file]')
     .setInputFiles(fileURLToPath(new URL('../fixtures/part-import.xlsx', import.meta.url)));
-  await page.getByRole('button', { name: 'Review file' }).click();
+  await page.getByRole('button', { name: 'Review perubahan' }).click();
   await expect(page.getByRole('heading', { name: '1 part dalam file' })).toBeVisible();
-  await expect(page.getByText('123456789')).toBeVisible();
+  await expect(page.getByText('Tidak ada nama yang berbeda')).toBeVisible();
+  await expect(page.locator('.part-import-table')).toHaveCount(0);
   await page.getByRole('button', { name: 'Simpan import' }).click();
   await expect(page.getByRole('heading', { name: 'Import selesai' })).toBeVisible();
   await expect(page.locator('.part-import-stats')).toContainText('1Ditambahkan');

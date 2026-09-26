@@ -16818,7 +16818,7 @@
                 "properties": {
                   "rows": {
                     "minItems": 1,
-                    "maxItems": 500,
+                    "maxItems": 50000,
                     "type": "array",
                     "items": {
                       "type": "object",
@@ -17038,7 +17038,7 @@
                 "properties": {
                   "rows": {
                     "minItems": 1,
-                    "maxItems": 500,
+                    "maxItems": 50000,
                     "type": "array",
                     "items": {
                       "type": "object",
