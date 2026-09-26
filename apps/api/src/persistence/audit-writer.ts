@@ -37,32 +37,36 @@ export class AuditWriter {
   constructor(private readonly prisma: PrismaService) {}
 
   async write(input: AuditInput, client: AuditClient = this.prisma): Promise<void> {
-    const lineId = input.lineId ?? inferredLineId(input.changeSummary);
-    const data: Prisma.AuditEventUncheckedCreateInput = {
-      actorKind: input.actorKind,
-      ...(input.actorUserId ? { actorUserId: input.actorUserId } : {}),
-      ...(input.actorRole ? { actorRole: input.actorRole } : {}),
-      ...(input.actorSupplierId ? { actorSupplierId: input.actorSupplierId } : {}),
-      ...(input.supplierId ? { supplierId: input.supplierId } : {}),
-      ...(lineId ? { lineId } : {}),
-      action: input.action,
-      resourceType: input.resourceType,
-      ...(input.resourceId ? { resourceId: input.resourceId } : {}),
-      ...(input.changeSummary
-        ? { changeSummary: input.changeSummary as Prisma.InputJsonValue }
-        : {}),
-      ...(input.reason ? { reason: input.reason } : {}),
-      correlationId: input.correlationId,
-      ...(input.sourceIp ? { sourceIp: input.sourceIp } : {}),
-      ...(input.userAgent ? { userAgent: input.userAgent } : {}),
-      result: input.result ?? 'SUCCESS',
-      ...(input.sourceMode ? { sourceMode: input.sourceMode } : {}),
-      ...(input.sourceEpoch ? { sourceEpoch: input.sourceEpoch } : {}),
-    };
-    await client.auditEvent.create({
-      data,
-    });
+    await client.auditEvent.create({ data: auditData(input) });
   }
+
+  async writeMany(inputs: AuditInput[], client: AuditClient = this.prisma): Promise<void> {
+    if (!inputs.length) return;
+    await client.auditEvent.createMany({ data: inputs.map(auditData) });
+  }
+}
+
+function auditData(input: AuditInput): Prisma.AuditEventUncheckedCreateInput {
+  const lineId = input.lineId ?? inferredLineId(input.changeSummary);
+  return {
+    actorKind: input.actorKind,
+    ...(input.actorUserId ? { actorUserId: input.actorUserId } : {}),
+    ...(input.actorRole ? { actorRole: input.actorRole } : {}),
+    ...(input.actorSupplierId ? { actorSupplierId: input.actorSupplierId } : {}),
+    ...(input.supplierId ? { supplierId: input.supplierId } : {}),
+    ...(lineId ? { lineId } : {}),
+    action: input.action,
+    resourceType: input.resourceType,
+    ...(input.resourceId ? { resourceId: input.resourceId } : {}),
+    ...(input.changeSummary ? { changeSummary: input.changeSummary as Prisma.InputJsonValue } : {}),
+    ...(input.reason ? { reason: input.reason } : {}),
+    correlationId: input.correlationId,
+    ...(input.sourceIp ? { sourceIp: input.sourceIp } : {}),
+    ...(input.userAgent ? { userAgent: input.userAgent } : {}),
+    result: input.result ?? 'SUCCESS',
+    ...(input.sourceMode ? { sourceMode: input.sourceMode } : {}),
+    ...(input.sourceEpoch ? { sourceEpoch: input.sourceEpoch } : {}),
+  };
 }
 
 function inferredLineId(changeSummary?: Record<string, unknown>): string | undefined {

@@ -29,6 +29,10 @@ async function bootstrap(): Promise<void> {
   app.use(correlationMiddleware);
   app.use(helmet());
   app.use(cookieParser());
+  app.use(
+    '/api/v1/supplier/master-data/parts/import',
+    express.json({ limit: '80mb', type: 'application/json' }),
+  );
   app.use(express.json({ limit: '5mb', type: 'application/json' }));
   app.enableCors({
     credentials: true,

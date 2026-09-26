@@ -173,7 +173,7 @@ export const createPartRequestSchema = z
   .strict();
 export const partImportPreviewRequestSchema = z
   .object({
-    rows: z.array(createPartRequestSchema).min(1).max(500),
+    rows: z.array(createPartRequestSchema).min(1).max(50_000),
   })
   .strict();
 export const partImportPreviewResponseSchema = z
@@ -210,7 +210,7 @@ export const partImportCommitRequestSchema = z
           .strict(),
       )
       .min(1)
-      .max(500),
+      .max(50_000),
   })
   .strict();
 export const partImportCommitResponseSchema = z

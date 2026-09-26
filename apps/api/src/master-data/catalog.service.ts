@@ -383,13 +383,30 @@ export class CatalogService {
 
   async previewPartImport(scope: TenantScope, rows: { partNumber: string; partName: string }[]) {
     assertDistinctPartNumbers(rows);
-    const existing = await this.prisma.part.findMany({
-      where: {
-        supplierId: scope.supplierId,
-        normalizedPartNumber: { in: rows.map((row) => normalizeLookup(row.partNumber)) },
-      },
-      select: { id: true, normalizedPartNumber: true, partName: true, active: true, version: true },
-    });
+    const existing = [] as {
+      id: string;
+      normalizedPartNumber: string;
+      partName: string;
+      active: boolean;
+      version: number;
+    }[];
+    for (const batch of chunks(rows, 1_000)) {
+      existing.push(
+        ...(await this.prisma.part.findMany({
+          where: {
+            supplierId: scope.supplierId,
+            normalizedPartNumber: { in: batch.map((row) => normalizeLookup(row.partNumber)) },
+          },
+          select: {
+            id: true,
+            normalizedPartNumber: true,
+            partName: true,
+            active: true,
+            version: true,
+          },
+        })),
+      );
+    }
     const byNumber = new Map(existing.map((part) => [part.normalizedPartNumber, part]));
     return {
       rows: rows.map((row) => {
@@ -411,76 +428,109 @@ export class CatalogService {
     context: MutationContext,
   ) {
     assertDistinctPartNumbers(rows);
-    return this.prisma.$transaction(async (tx) => {
-      await lockSupplier(tx, scope.supplierId);
-      const existing = await tx.part.findMany({
-        where: {
-          supplierId: scope.supplierId,
-          normalizedPartNumber: { in: rows.map((row) => normalizeLookup(row.partNumber)) },
-        },
-      });
-      const byNumber = new Map(existing.map((part) => [part.normalizedPartNumber, part]));
-      let created = 0;
-      let updated = 0;
-      let skipped = 0;
-      for (const row of rows) {
-        const normalizedPartNumber = normalizeLookup(row.partNumber);
-        const current = byNumber.get(normalizedPartNumber);
-        if (row.action === 'SKIP') {
-          skipped++;
-          continue;
+    return this.prisma.$transaction(
+      async (tx) => {
+        await lockSupplier(tx, scope.supplierId);
+        const existing = [] as Awaited<ReturnType<typeof tx.part.findMany>>;
+        for (const batch of chunks(rows, 1_000)) {
+          existing.push(
+            ...(await tx.part.findMany({
+              where: {
+                supplierId: scope.supplierId,
+                normalizedPartNumber: { in: batch.map((row) => normalizeLookup(row.partNumber)) },
+              },
+            })),
+          );
         }
-        if (row.action === 'CREATE') {
-          if (current)
-            throw partImportConflict('A part number already exists. Review the file again.');
-          const part = await tx.part.create({
-            data: {
+        const byNumber = new Map(existing.map((part) => [part.normalizedPartNumber, part]));
+        const creates: PartImportCommitRequest['rows'] = [];
+        const updates: { id: string; partName: string; version: number }[] = [];
+        let skipped = 0;
+        for (const row of rows) {
+          const normalizedPartNumber = normalizeLookup(row.partNumber);
+          const current = byNumber.get(normalizedPartNumber);
+          if (row.action === 'SKIP') {
+            skipped++;
+            continue;
+          }
+          if (row.action === 'CREATE') {
+            if (current)
+              throw partImportConflict('A part number already exists. Review the file again.');
+            creates.push(row);
+            continue;
+          }
+          if (!current || current.id !== row.existingId || current.version !== row.expectedVersion)
+            throw partImportConflict(
+              'A part changed while you were reviewing the file. Review the file again.',
+            );
+          if (current.partName === row.partName.trim()) {
+            skipped++;
+            continue;
+          }
+          updates.push({ id: current.id, partName: row.partName.trim(), version: current.version });
+        }
+        for (const batch of chunks(creates, 500)) {
+          const saved = await tx.part.createManyAndReturn({
+            data: batch.map((row) => ({
               supplierId: scope.supplierId,
               partNumber: row.partNumber.trim(),
-              normalizedPartNumber,
+              normalizedPartNumber: normalizeLookup(row.partNumber),
               partName: row.partName.trim(),
               normalizedPartName: normalizeLookup(row.partName),
               createdById: context.actorUserId,
               updatedById: context.actorUserId,
-            },
+            })),
+            select: { id: true },
           });
-          await this.audit.write(
-            masterAudit(context, scope.supplierId, 'PART_CREATED', 'Part', part.id, {
-              source: 'IMPORT',
-            }),
+          await this.audit.writeMany(
+            saved.map((part) =>
+              masterAudit(context, scope.supplierId, 'PART_CREATED', 'Part', part.id, {
+                source: 'IMPORT',
+              }),
+            ),
             tx,
           );
-          created++;
-          continue;
         }
-        if (!current || current.id !== row.existingId || current.version !== row.expectedVersion)
-          throw partImportConflict(
-            'A part changed while you were reviewing the file. Review the file again.',
+        for (const batch of chunks(updates, 500)) {
+          const payload = JSON.stringify(
+            batch.map((row) => ({
+              id: row.id,
+              version: row.version,
+              partName: row.partName,
+              normalizedPartName: normalizeLookup(row.partName),
+            })),
           );
-        if (current.partName === row.partName.trim()) {
-          skipped++;
-          continue;
+          const changed = await tx.$executeRaw`
+          UPDATE "Part" AS part
+          SET "partName" = source."partName",
+              "normalizedPartName" = source."normalizedPartName",
+              version = part.version + 1,
+              "updatedAt" = CURRENT_TIMESTAMP,
+              "updatedById" = ${context.actorUserId}::uuid
+          FROM jsonb_to_recordset(${payload}::jsonb) AS source(
+            id uuid, version integer, "partName" text, "normalizedPartName" text
+          )
+          WHERE part.id = source.id AND part."supplierId" = ${scope.supplierId}::uuid
+            AND part.version = source.version
+        `;
+          if (changed !== batch.length)
+            throw partImportConflict(
+              'A part changed while you were reviewing the file. Review the file again.',
+            );
+          await this.audit.writeMany(
+            batch.map((row) =>
+              masterAudit(context, scope.supplierId, 'PART_UPDATED', 'Part', row.id, {
+                source: 'IMPORT',
+                fields: ['partName'],
+              }),
+            ),
+            tx,
+          );
         }
-        await tx.part.update({
-          where: { id: current.id },
-          data: {
-            partName: row.partName.trim(),
-            normalizedPartName: normalizeLookup(row.partName),
-            version: { increment: 1 },
-            updatedById: context.actorUserId,
-          },
-        });
-        await this.audit.write(
-          masterAudit(context, scope.supplierId, 'PART_UPDATED', 'Part', current.id, {
-            source: 'IMPORT',
-            fields: ['partName'],
-          }),
-          tx,
-        );
-        updated++;
-      }
-      return { created, updated, skipped };
-    });
+        return { created: creates.length, updated: updates.length, skipped };
+      },
+      { maxWait: 10_000, timeout: 300_000 },
+    );
   }
 
   async getPart(scope: TenantScope, id: string) {
@@ -810,6 +860,10 @@ function assertDistinctPartNumbers(rows: { partNumber: string }[]) {
       detail: 'The file contains a part number more than once.',
     });
   }
+}
+
+function* chunks<T>(items: T[], size: number): Generator<T[]> {
+  for (let index = 0; index < items.length; index += size) yield items.slice(index, index + size);
 }
 
 function partImportConflict(detail: string) {

@@ -4,6 +4,7 @@ import {
   createMemberRequestSchema,
   createShiftTemplateRequestSchema,
   masterListQuerySchema,
+  partImportPreviewRequestSchema,
   updateMemberRequestSchema,
 } from './master-data.js';
 
@@ -45,6 +46,16 @@ describe('master-data contracts', () => {
         endTime: '06:00',
         timezone: 'Asia/Jakarta',
       }).success,
+    ).toBe(false);
+  });
+
+  it('accepts at most 50,000 part import rows', () => {
+    const row = { partNumber: '1', partName: 'Part' };
+    expect(
+      partImportPreviewRequestSchema.safeParse({ rows: Array(50_000).fill(row) }).success,
+    ).toBe(true);
+    expect(
+      partImportPreviewRequestSchema.safeParse({ rows: Array(50_001).fill(row) }).success,
     ).toBe(false);
   });
 });
