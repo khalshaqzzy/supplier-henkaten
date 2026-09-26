@@ -16,7 +16,7 @@ Staging CI parity also passed: `pnpm migrations:destructive-check 3576d957a4ec43
 
 The first final browser rerun found a transient offline PWA banner intercepting the mobile import save button in Edge. The mobile banner was moved below the header, and its non-interactive area now lets pointer events pass through; the affected Edge journey and the subsequent full suite passed.
 
-The final Supplier image was rebuilt after the PWA/dialog changes and its HIGH/CRITICAL Trivy scan passed with no findings. Next: commit and run commit-state OpenAPI/client and Gitleaks checks, push this branch, open a PR to `staging`, and inspect the required GitHub jobs. Staging touch-device and operator acceptance remain separate release gates.
+The final Supplier image was rebuilt after the PWA/dialog changes and its HIGH/CRITICAL Trivy scan passed with no findings. Commit `445d379` passed post-commit OpenAPI/client drift and Gitleaks commit scans; the branch was pushed and [PR #27](https://github.com/khalshaqzzy/supplier-henkaten/pull/27) opened against `staging`. Release CI run `36235112737` was in progress when this handoff was written. Next: inspect every required job, fix any failure, and continue the separate staging touch-device and operator acceptance gates.
 
 ---
 
