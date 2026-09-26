@@ -114,7 +114,7 @@ export type HostedFixture = {
 export async function loginBootstrapThroughUi(page: Page): Promise<string> {
   await page.goto(`${runtime.tmminOrigin}/login`);
   await page.getByLabel('Username').fill(runtime.bootstrapUsername);
-  await page.getByLabel('Password').fill(runtime.bootstrapPassword);
+  await page.getByLabel(/^Password/).fill(runtime.bootstrapPassword);
   await page.getByRole('button', { name: 'Masuk' }).click();
   await expect(page).toHaveURL(/\/change-password$/);
   await page.getByLabel('Password sekarang').fill(runtime.bootstrapPassword);
@@ -123,7 +123,7 @@ export async function loginBootstrapThroughUi(page: Page): Promise<string> {
   await page.getByRole('button', { name: 'Simpan dan masuk ulang' }).click();
   await expect(page).toHaveURL(/\/login$/);
   await page.getByLabel('Username').fill(runtime.bootstrapUsername);
-  await page.getByLabel('Password').fill(runtime.changedPassword);
+  await page.getByLabel(/^Password/).fill(runtime.changedPassword);
   await page.getByRole('button', { name: 'Masuk' }).click();
   await expect(page.getByRole('heading', { name: 'Ringkasan Global' })).toBeVisible();
   return sessionCsrf(page.context().request, 'tmmin');

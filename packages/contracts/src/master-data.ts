@@ -171,6 +171,56 @@ export const createPartRequestSchema = z
     partName: z.string().trim().min(1).max(200),
   })
   .strict();
+export const partImportPreviewRequestSchema = z
+  .object({
+    rows: z.array(createPartRequestSchema).min(1).max(500),
+  })
+  .strict();
+export const partImportPreviewResponseSchema = z
+  .object({
+    rows: z.array(
+      z
+        .object({
+          partNumber: z.string(),
+          partName: z.string(),
+          existing: z
+            .object({
+              id: opaqueIdSchema,
+              partName: z.string(),
+              active: z.boolean(),
+              version: optimisticVersionSchema,
+            })
+            .strict()
+            .nullable(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export const partImportCommitRequestSchema = z
+  .object({
+    rows: z
+      .array(
+        createPartRequestSchema
+          .extend({
+            action: z.enum(['CREATE', 'UPDATE', 'SKIP']),
+            existingId: opaqueIdSchema.optional(),
+            expectedVersion: optimisticVersionSchema.optional(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(500),
+  })
+  .strict();
+export const partImportCommitResponseSchema = z
+  .object({
+    created: z.number().int().nonnegative(),
+    updated: z.number().int().nonnegative(),
+    skipped: z.number().int().nonnegative(),
+  })
+  .strict();
+export type PartImportCommitRequest = z.infer<typeof partImportCommitRequestSchema>;
 export const updatePartRequestSchema = z
   .object({
     expectedVersion: optimisticVersionSchema,

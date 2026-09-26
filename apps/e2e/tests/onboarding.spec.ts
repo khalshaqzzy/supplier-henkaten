@@ -60,7 +60,7 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
   await captureAuthEvidence(supplier, 'supplier-login', testInfo);
   await supplier.getByLabel('Supplier Code').fill('E2E-ONBOARD');
   await supplier.getByLabel('Username').fill('supplier.admin');
-  await supplier.getByLabel('Password').fill(temporaryPassword);
+  await supplier.getByLabel(/^Password/).fill(temporaryPassword);
   await supplier.getByRole('button', { name: 'Masuk' }).click();
   await expect(supplier).toHaveURL(/\/change-password$/);
   const supplierPassword = 'E2e-Onboard-Supplier-Password';
@@ -71,7 +71,7 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
   await expect(supplier).toHaveURL(/\/login$/);
   await supplier.getByLabel('Supplier Code').fill('E2E-ONBOARD');
   await supplier.getByLabel('Username').fill('supplier.admin');
-  await supplier.getByLabel('Password').fill(supplierPassword);
+  await supplier.getByLabel(/^Password/).fill(supplierPassword);
   await supplier.getByRole('button', { name: 'Masuk' }).click();
   await expect(supplier.getByRole('heading', { name: 'Overview Supplier' })).toBeVisible();
   await supplier.goto(`${runtime.supplierOrigin}/setup`);
@@ -129,10 +129,24 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
     await supplier.getByRole('button', { name: 'Tambah item' }).click();
     await supplier.locator('.checklist-editor input').last().fill(`${category} verified`);
     await supplier.getByRole('button', { name: 'Simpan draft' }).click();
-    await expect(supplier.getByText(/Version 2/)).toBeVisible();
+    await expect(supplier.getByText(/Versi draft 2/)).toBeVisible();
+    await supplier.screenshot({
+      path: testInfo.outputPath(`checklist-${category.toLowerCase()}-desktop.png`),
+      animations: 'disabled',
+      fullPage: true,
+    });
+    if (category === 'MAN') {
+      await supplier.setViewportSize({ width: 390, height: 844 });
+      await supplier.screenshot({
+        path: testInfo.outputPath('checklist-man-mobile.png'),
+        animations: 'disabled',
+        fullPage: true,
+      });
+      await supplier.setViewportSize({ width: 1280, height: 720 });
+    }
     supplier.once('dialog', (dialog) => dialog.accept());
-    await supplier.getByRole('button', { name: 'Publish' }).click();
-    await expect(supplier.getByText('Version 1', { exact: false })).toBeVisible();
+    await supplier.getByRole('button', { name: 'Publish versi baru' }).click();
+    await expect(supplier.getByText('Versi 1', { exact: false })).toBeVisible();
   }
 
   await supplier.goto(`${runtime.supplierOrigin}/master-data/line-setup`);
@@ -193,12 +207,16 @@ async function expectFourMLegend(page: Page) {
 }
 
 async function expectKeyboardSequence(page: Page, fieldLabels: string[], submitName: string) {
-  await page.getByLabel(fieldLabels[0]!).focus();
+  await page.getByLabel(new RegExp(`^${fieldLabels[0]}`)).focus();
   for (const label of fieldLabels.slice(1)) {
     await page.keyboard.press('Tab');
-    await expect(page.getByLabel(label)).toBeFocused();
+    await expect(page.getByLabel(new RegExp(`^${label}`))).toBeFocused();
   }
   await page.keyboard.press('Tab');
+  if (await page.getByRole('button', { name: 'Tampilkan password' }).count()) {
+    await expect(page.getByRole('button', { name: 'Tampilkan password' })).toBeFocused();
+    await page.keyboard.press('Tab');
+  }
   await expect(page.getByRole('button', { name: submitName })).toBeFocused();
 }
 

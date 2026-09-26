@@ -36,6 +36,8 @@ import {
   pushSubscriptionSchema,
   partPageSchema,
   partSchema,
+  partImportPreviewResponseSchema,
+  partImportCommitResponseSchema,
   sessionResponseSchema,
   shiftTemplatePageSchema,
   shiftTemplateSchema,
@@ -359,6 +361,22 @@ export class SupplierApi {
       method: 'POST',
       body,
       responseSchema: partSchema,
+    });
+  }
+
+  previewPartImport(body: unknown) {
+    return this.client.request('/api/v1/supplier/master-data/parts/import/preview', {
+      method: 'POST',
+      body,
+      responseSchema: partImportPreviewResponseSchema,
+    });
+  }
+
+  commitPartImport(body: unknown) {
+    return this.client.request('/api/v1/supplier/master-data/parts/import/commit', {
+      method: 'POST',
+      body,
+      responseSchema: partImportCommitResponseSchema,
     });
   }
 

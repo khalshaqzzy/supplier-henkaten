@@ -1,4 +1,26 @@
-# Current Session Handoff — Supplier setup readiness
+# Current Session Handoff — Supplier Admin flow improvements
+
+- Date: 2026-09-26
+- Branch: `feat/feedback-26-sep`
+- Scope: Supplier and TMMIN login visibility, Supplier Master Data and Assignment Board UX, reviewed Part import, and Checklist 4M layout. Phase 15 remains `in_progress`; staging rehearsal and device acceptance are separate pending gates.
+
+Implemented keyboard accessible password visibility on both login pages; explicit back links on Master Data lists, forms, Checklist 4M, Line Setup, and Part import; transient success messages after saved changes; Member username in list/detail; and Hapus member as deactivation into the Arsip filter, preserving history and existing reference checks. Member archive and password reset use in-app confirmation dialogs. The board filters currently scheduled, other configured, or all Line–Shift occurrences and labels each result. Canvas requires one visible Line–Shift. Checklist editing now separates draft controls from publication/history, signals unsaved edits, and blocks publish until the draft is saved. Desktop captures cover Man, Machine, Material, and Method; mobile captures cover Man and the import review.
+
+Part import accepts CSV and first-sheet `.xlsx`, validates headers, 2 MB/500-row limits, required names, and duplicate identifiers, then previews new and existing parts. Existing names default to Skip with individual and bulk Update/Skip controls. One atomic supplier-scoped commit checks current versions and audits writes. Excel numeric cells are accepted only as exact nonnegative safe integers; long identifiers and leading-zero identifiers must be text. The downloadable template uses a numeric example. The API contract, OpenAPI document, generated client, PRD, roadmap, rules, and ADR 0040 were updated. No database migration was needed. The local seed uses compatible individual Part creation and board-layout calls, so no seed edit was needed; a fresh seed against the built API completed with two Hosted suppliers and 240 Henkaten. `.agent/rules.md` now requires seed review and a fresh smoke when schema or contracts change.
+
+Changed files are in `.agent/`, `docs/adr/0040-*`, the Supplier/TMMIN web apps, Part and Board API services/controllers, shared contracts/client, E2E journeys and XLSX fixture, and `pnpm-lock.yaml`. No staging or production deployment occurred in this task.
+
+Local verification from a clean TypeScript artifact state: `pnpm clean`, `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit` (59 API, 57 Supplier web, 14 TMMIN web and all shared tests), `VITE_API_ORIGIN=https://api.example.invalid pnpm build`, `docker compose config --quiet`, `pnpm db:up`, `pnpm db:wait`, `pnpm db:verify`, `pnpm db:test:reset`, `pnpm db:test:migrate`, and `NODE_ENV=test DATABASE_URL=<disposable-test-url> RELEASE_SHA=ci SESSION_CSRF_SECRET=<safe-test-value> AUTH_THROTTLE_SECRET=<safe-test-value> OUTBOX_ENABLED=false pnpm test:integration` (35/35) passed. OpenAPI and generated client were regenerated twice with identical SHA-256 outputs; the HEAD-comparing `pnpm openapi:check` is deferred until after the generated files are committed. The final `pnpm test:e2e` passed all eight isolated Chromium/Edge journeys, including the corrected CSV/XLSX import in both browsers.
+
+Staging CI parity also passed: `pnpm migrations:destructive-check 3576d957a4ec43493db80b6c020e60b32e410cb6`, fresh and previous-SHA-to-current migrations with status current, `pnpm deployment:validate`, the deployment harness inside Linux Docker with real `flock`, `pnpm security:exceptions:check`, `pnpm security:audit`, workflow-pinned Actionlint/ShellCheck/Hadolint, `bash -n`, both Ubuntu 22.04 bootstrap input checks, Gitleaks v8.24.3 directory scan, Trivy 0.70.0 filesystem and five image scans. The production-like Compose stack passed build, migrate, bootstrap/idempotence, routing, headers, non-root/private database checks, and restart persistence; all project containers were stopped. Trivy used the local vulnerability DB cache because a fresh registry download was exceptionally slow. The host runs Node 22.23.2 versus CI's pinned 22.23.1; Docker builds used 22.23.1. Existing local Playwright failure reports contained synthetic E2E passwords; their generated Markdown was removed and the final Gitleaks scan passed without a source exception.
+
+The first final browser rerun found a transient offline PWA banner intercepting the mobile import save button in Edge. The mobile banner was moved below the header, and its non-interactive area now lets pointer events pass through; the affected Edge journey and the subsequent full suite passed.
+
+The final Supplier image was rebuilt after the PWA/dialog changes and its HIGH/CRITICAL Trivy scan passed with no findings. Next: commit and run commit-state OpenAPI/client and Gitleaks checks, push this branch, open a PR to `staging`, and inspect the required GitHub jobs. Staging touch-device and operator acceptance remain separate release gates.
+
+---
+
+# Previous Session Handoff — Supplier setup readiness
 
 - Date: 2026-09-25
 - Branch: `fix/supplier-setup-readiness`

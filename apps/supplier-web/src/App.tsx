@@ -3,6 +3,7 @@ import { Component, lazy, Suspense, useEffect, type ErrorInfo, type ReactNode } 
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 import type { Capability } from '@tmmin-henkaten/contracts';
+import { ToastViewport } from '@tmmin-henkaten/ui';
 
 import { queryClient } from './app/query';
 import { PwaLifecycle } from './app/pwa';
@@ -24,6 +25,7 @@ import {
   MasterListPage,
 } from './pages/MasterDataPages';
 import { OverviewPage } from './pages/OverviewPage';
+import { PartImportPage } from './pages/PartImportPage';
 import { SetupPage } from './pages/SetupPage';
 import { AppLoading, ForbiddenPage, NotFoundPage, RouteErrorPage } from './pages/StatePages';
 
@@ -44,6 +46,7 @@ export function App() {
           <PushProvider>
             <ProductRoutes />
             <PwaLifecycle />
+            <ToastViewport />
           </PushProvider>
         </SessionProvider>
       </QueryClientProvider>
@@ -221,6 +224,14 @@ function ProductRoutes() {
           element={
             <CapabilityRoute capability="SUPPLIER_MASTER_DATA_READ" allowPreparation>
               <MasterListPage kind="parts" />
+            </CapabilityRoute>
+          }
+        />
+        <Route
+          path="master-data/parts/import"
+          element={
+            <CapabilityRoute capability="SUPPLIER_MASTER_DATA_MANAGE" allowPreparation>
+              <PartImportPage />
             </CapabilityRoute>
           }
         />

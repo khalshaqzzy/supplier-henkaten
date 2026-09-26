@@ -63,6 +63,10 @@ import {
   memberSchema,
   partPageSchema,
   partSchema,
+  partImportPreviewRequestSchema,
+  partImportPreviewResponseSchema,
+  partImportCommitRequestSchema,
+  partImportCommitResponseSchema,
   reorderRequestSchema,
   shiftTemplatePageSchema,
   shiftTemplateSchema,
@@ -964,6 +968,24 @@ function masterDataPaths() {
       createPartRequestSchema,
       partSchema,
     ),
+    '/api/v1/supplier/master-data/parts/import/preview': {
+      post: {
+        requestBody: body(partImportPreviewRequestSchema),
+        responses: {
+          '201': json('Part import review', partImportPreviewResponseSchema),
+          '400': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/master-data/parts/import/commit': {
+      post: {
+        requestBody: body(partImportCommitRequestSchema),
+        responses: {
+          '201': json('Part import result', partImportCommitResponseSchema),
+          '409': problem,
+        },
+      },
+    },
     '/api/v1/supplier/master-data/parts/{id}': mutablePath(updatePartRequestSchema, partSchema),
     '/api/v1/supplier/master-data/parts/{id}/activate': action(partSchema),
     '/api/v1/supplier/master-data/parts/{id}/deactivate': action(partSchema),

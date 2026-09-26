@@ -1,5 +1,38 @@
 @import '@tmmin-henkaten/ui/styles.css';
 
+.tmmin-password-field {
+  position: relative;
+}
+.tmmin-password-field input {
+  padding-right: 3.25rem;
+}
+.tmmin-password-field > button {
+  position: absolute;
+  bottom: 0.15rem;
+  right: 0.35rem;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.5rem;
+  border: 0;
+  border-radius: var(--hds-radius-md);
+  color: var(--hds-text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+.tmmin-password-field > button:hover {
+  color: var(--hds-text-primary);
+  background: var(--hds-color-slate-50);
+}
+.tmmin-password-field > button:focus-visible {
+  outline: 2px solid var(--hds-action-primary);
+  outline-offset: 1px;
+}
+.tmmin-password-field > button svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
 #root {
   min-height: 100dvh;
 }
