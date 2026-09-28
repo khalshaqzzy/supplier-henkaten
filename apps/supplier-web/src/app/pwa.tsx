@@ -6,6 +6,8 @@ import { Button } from '@tmmin-henkaten/ui';
 export function PwaLifecycle() {
   const [offline, setOffline] = useState(() => !navigator.onLine);
   const [updateReady, setUpdateReady] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState(false);
   const [applyUpdate, setApplyUpdate] = useState<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
@@ -41,10 +43,24 @@ export function PwaLifecycle() {
           Coba lagi
         </Button>
       ) : (
-        <Button size="sm" onClick={() => void applyUpdate?.()}>
+        <Button
+          size="sm"
+          loading={updating}
+          disabled={!applyUpdate}
+          onClick={() => {
+            if (!applyUpdate) return;
+            setUpdating(true);
+            setUpdateError(false);
+            void applyUpdate().catch(() => {
+              setUpdating(false);
+              setUpdateError(true);
+            });
+          }}
+        >
           Muat versi baru
         </Button>
       )}
+      {updateError && <span>Gagal memuat versi baru. Coba lagi.</span>}
     </div>
   );
 }

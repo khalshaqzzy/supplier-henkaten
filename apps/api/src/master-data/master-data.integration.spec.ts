@@ -292,6 +292,66 @@ describe('supplier master data', () => {
       true,
     );
 
+    const overlappingTemplate = await supplierPost('/api/v1/supplier/master-data/shift-templates', {
+      name: 'Overlapping Night Shift',
+      startTime: '23:00',
+      endTime: '07:00',
+      timezone: 'Asia/Jakarta',
+    });
+    expect(overlappingTemplate.status).toBe(201);
+    const overlappingShift = await supplierPost(
+      `/api/v1/supplier/master-data/lines/${lineId}/shifts`,
+      { shiftTemplateId: overlappingTemplate.body.id },
+    );
+    expect(overlappingShift.status).toBe(201);
+    const overlappingBody = overlappingShift.body as {
+      id: string;
+      version: number;
+      assignments: Array<{ jobId: string }>;
+    };
+    const duplicateLeader = await supplierPatch(
+      `/api/v1/supplier/master-data/line-shifts/${overlappingBody.id}/assignments`,
+      {
+        expectedVersion: overlappingBody.version,
+        supervisorMemberId: supervisorId,
+        lineLeaderMemberId: leaderId,
+        jobs: overlappingBody.assignments.map((assignment) => ({
+          jobId: assignment.jobId,
+          mpMemberId: mpId,
+        })),
+      },
+    );
+    expect(duplicateLeader.status).toBe(409);
+    expect(duplicateLeader.body.detail).toContain('Line Leader sudah ditugaskan');
+    const secondLeader = await supplierPost('/api/v1/supplier/master-data/members', {
+      role: 'LINE_LEADER',
+      fullName: 'Overlap Line Leader',
+      registrationNumber: `REG-L-${randomUUID()}`,
+      username: `overlap-leader-${randomUUID()}`,
+    });
+    expect(secondLeader.status).toBe(201);
+    const assignedOverlap = await supplierPatch(
+      `/api/v1/supplier/master-data/line-shifts/${overlappingBody.id}/assignments`,
+      {
+        expectedVersion: overlappingBody.version,
+        supervisorMemberId: supervisorId,
+        lineLeaderMemberId: secondLeader.body.member.id,
+        jobs: overlappingBody.assignments.map((assignment) => ({
+          jobId: assignment.jobId,
+          mpMemberId: mpId,
+        })),
+      },
+    );
+    expect(assignedOverlap.status).toBe(200);
+    const allLineShifts = await request(app.getHttpServer())
+      .get('/api/v1/supplier/master-data/line-shifts')
+      .set('Cookie', supplierCookie);
+    expect(allLineShifts.status).toBe(200);
+    const allLineShiftsBody = allLineShifts.body as { items: Array<{ id: string }> };
+    expect(allLineShiftsBody.items.map((item) => item.id)).toEqual(
+      expect.arrayContaining([lineShiftBody.id, overlappingBody.id]),
+    );
+
     const boardAll = await request(app.getHttpServer())
       .get('/api/v1/supplier/assignment-board?shiftStatus=ALL')
       .set('Cookie', supplierCookie);

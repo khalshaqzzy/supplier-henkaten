@@ -455,6 +455,45 @@ textarea {
   padding: var(--hds-space-2) var(--hds-space-3);
 }
 
+.hds-password-input {
+  position: relative;
+  width: 100%;
+}
+
+.hds-password-input .hds-input {
+  padding-right: 3.25rem;
+}
+
+.hds-password-input__toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.35rem;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 0;
+  color: var(--hds-text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.hds-password-input__toggle:hover {
+  color: var(--hds-text-primary);
+}
+
+.hds-password-input__toggle:focus-visible {
+  outline: var(--hds-focus-width) solid var(--hds-focus-color);
+  outline-offset: -3px;
+}
+
+.hds-password-input__toggle svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
 .hds-input:hover:not(:disabled),
 .hds-search:hover,
 .hds-native-select:hover {

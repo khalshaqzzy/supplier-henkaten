@@ -6,6 +6,8 @@ import {
   ChevronRight,
   CircleAlert,
   CircleCheck,
+  Eye,
+  EyeOff,
   Info,
   LoaderCircle,
   Search,
@@ -201,6 +203,26 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     />
   );
 });
+
+export const PasswordInput = forwardRef<HTMLInputElement, Omit<InputProps, 'type'>>(
+  function PasswordInput({ className, ...props }, ref) {
+    const [visible, setVisible] = useState(false);
+    return (
+      <div className="hds-password-input">
+        <Input {...props} ref={ref} className={className} type={visible ? 'text' : 'password'} />
+        <button
+          type="button"
+          className="hds-password-input__toggle"
+          aria-label={visible ? 'Sembunyikan password' : 'Tampilkan password'}
+          aria-pressed={visible}
+          onClick={() => setVisible((current) => !current)}
+        >
+          {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+        </button>
+      </div>
+    );
+  },
+);
 
 export const Textarea = forwardRef<
   HTMLTextAreaElement,

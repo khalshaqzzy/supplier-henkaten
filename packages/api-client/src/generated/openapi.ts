@@ -5864,6 +5864,75 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/supplier/master-data/line-shifts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Line shifts */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              items: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                lineId: string;
+                lineCode: string;
+                lineName: string;
+                /** Format: uuid */
+                shiftTemplateId: string;
+                shiftName: string;
+                startTime: string;
+                endTime: string;
+                timezone: string;
+                crossesMidnight: boolean;
+                supervisorMemberId: string | null;
+                supervisorName: string | null;
+                lineLeaderMemberId: string | null;
+                lineLeaderName: string | null;
+                active: boolean;
+                assignments: {
+                  /** Format: uuid */
+                  id: string;
+                  /** Format: uuid */
+                  jobId: string;
+                  jobName: string;
+                  jobDisplayOrder: number;
+                  mpMemberId: string | null;
+                  mpName: string | null;
+                  mpRegistrationNumber: string | null;
+                  version: number;
+                }[];
+                version: number;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/supplier/master-data/line-shifts/operational-context': {
     parameters: {
       query?: never;
@@ -10988,7 +11057,9 @@ export interface paths {
           'application/json':
             | {
                 /** Format: uuid */
-                lineShiftId: string;
+                lineShiftId?: string;
+                /** Format: date-time */
+                expectedEffectiveStartAt?: string;
                 /** Format: uuid */
                 jobId: string;
                 /** Format: uuid */
@@ -11016,7 +11087,9 @@ export interface paths {
               }
             | {
                 /** Format: uuid */
-                lineShiftId: string;
+                lineShiftId?: string;
+                /** Format: date-time */
+                expectedEffectiveStartAt?: string;
                 /** Format: uuid */
                 jobId: string;
                 /** Format: uuid */
@@ -11042,7 +11115,9 @@ export interface paths {
               }
             | {
                 /** Format: uuid */
-                lineShiftId: string;
+                lineShiftId?: string;
+                /** Format: date-time */
+                expectedEffectiveStartAt?: string;
                 /** Format: uuid */
                 jobId: string;
                 /** Format: uuid */
@@ -11068,7 +11143,9 @@ export interface paths {
               }
             | {
                 /** Format: uuid */
-                lineShiftId: string;
+                lineShiftId?: string;
+                /** Format: date-time */
+                expectedEffectiveStartAt?: string;
                 /** Format: uuid */
                 jobId: string;
                 /** Format: uuid */

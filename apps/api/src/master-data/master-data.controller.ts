@@ -707,6 +707,12 @@ export class SupplierConfigurationController {
   ) {}
 
   @RequireCapabilities('SUPPLIER_MASTER_DATA_READ')
+  @Get('/line-shifts')
+  allLineShifts(@Req() request: ContextRequest) {
+    return this.lineShifts.list(this.access.supplierScope(request));
+  }
+
+  @RequireCapabilities('SUPPLIER_MASTER_DATA_READ')
   @Get('/lines/:lineId/shifts')
   lineShiftList(@Param('lineId') lineId: string, @Req() request: ContextRequest) {
     return this.lineShifts.list(

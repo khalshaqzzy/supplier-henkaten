@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiProblemError, createIdempotencyKey } from '@tmmin-henkaten/api-client';
@@ -23,7 +23,6 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
     purpose: session!.principal.purpose,
   };
   const [category, setCategory] = useState<HenkatenCategory>('MAN');
-  const [lineShiftId, setLineShiftId] = useState(params.get('lineShiftId') ?? '');
   const [jobId, setJobId] = useState(params.get('jobId') ?? '');
   const [partId, setPartId] = useState('');
   const [partSearch, setPartSearch] = useState('');
@@ -38,6 +37,8 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
   const context = useQuery({
     queryKey: scopedKey(scope, 'line-shift-operational-context'),
     queryFn: () => supplierApi.lineShiftOperationalContext(),
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
   const clonePrefill = useQuery({
     queryKey: scopedKey(scope, 'henkaten-clone-prefill', henkatenId),
@@ -53,13 +54,6 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
       }),
   });
   useEffect(() => {
-    const currentIds = context.data?.currentLineShiftIds ?? [];
-    if (currentIds.length > 0 && !currentIds.includes(lineShiftId)) {
-      setLineShiftId(currentIds[0]!);
-      setJobId('');
-    }
-  }, [context.data?.currentLineShiftIds, lineShiftId]);
-  useEffect(() => {
     setAnswers({});
     setReplacementMpId('');
   }, [category]);
@@ -67,7 +61,6 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
     const prefill = clonePrefill.data;
     if (!prefill) return;
     setCategory(prefill.category);
-    setLineShiftId(prefill.lineShiftId ?? '');
     setJobId(prefill.jobStillValid ? prefill.jobId : '');
     setPartId(prefill.partStillValid ? (prefill.partId ?? 'OTHER') : '');
     setCause(prefill.cause);
@@ -75,7 +68,16 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
     setAffectedObject(prefill.affectedObject ?? '');
     setReplacementObject(prefill.replacementObject ?? '');
   }, [clonePrefill.data]);
-  const selectedShift = context.data?.items.find(({ id }) => id === lineShiftId);
+  const selectedShift = context.data?.items.length === 1 ? context.data.items[0] : undefined;
+  useEffect(() => {
+    if (
+      selectedShift &&
+      jobId &&
+      !selectedShift.assignments.some(({ jobId: id }) => id === jobId)
+    ) {
+      setJobId('');
+    }
+  }, [selectedShift, jobId]);
   const selectedAssignment = selectedShift?.assignments.find(({ jobId: id }) => id === jobId);
   const selectedPart = options.data?.parts.find(({ id }) => id === partId);
   const replacement = options.data?.replacementMembers.find(({ id }) => id === replacementMpId);
@@ -96,15 +98,11 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
     categoryComplete &&
     checklistComplete,
   );
-  const selectableShifts = useMemo(() => {
-    const items = context.data?.items ?? [];
-    const currentIds = context.data?.currentLineShiftIds ?? [];
-    return currentIds.length ? items.filter(({ id }) => currentIds.includes(id)) : items;
-  }, [context.data]);
   const submit = useMutation({
     mutationFn: () => {
       const base = {
-        lineShiftId,
+        lineShiftId: selectedShift!.id,
+        expectedEffectiveStartAt: selectedShift!.effectiveStartAt,
         jobId,
         ...(partId === 'OTHER' ? { otherPart: true as const } : { partId }),
         checklistVersionId: checklist!.id,
@@ -151,9 +149,11 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
           {problem}
         </Alert>
       )}
-      {!context.isLoading && selectableShifts.length === 0 && (
+      {!context.isLoading && !selectedShift && (
         <Alert tone="danger" title="Line shift tidak tersedia">
-          Hubungi Supplier Admin.
+          {context.data?.items.length
+            ? 'Assignment Line Leader perlu diperiksa oleh Supplier Admin.'
+            : 'Line Leader belum ditugaskan pada Line–Shift aktif. Hubungi Supplier Admin.'}
         </Alert>
       )}
       <form onSubmit={send} className="henkaten-form">
@@ -162,36 +162,30 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
             <HenkatenCategoryPicker value={category} onChange={setCategory} />
           </Panel>
           <Panel title="Line dan shift">
-            <Field label="Line · Shift" htmlFor="line-shift" required>
-              <NativeSelect
-                id="line-shift"
-                value={lineShiftId}
-                disabled={
-                  selectableShifts.length === 1 && Boolean(context.data?.currentLineShiftId)
-                }
-                onChange={(event) => {
-                  setLineShiftId(event.target.value);
-                  setJobId('');
-                }}
-              >
-                <option value="">Pilih line dan shift</option>
-                {selectableShifts.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.lineCode} · {item.lineName} · {item.shiftName} · {item.startTime}–
-                    {item.endTime}
-                  </option>
-                ))}
-              </NativeSelect>
-            </Field>
             {selectedShift && (
-              <div className="defaults-summary">
+              <div className="henkaten-assigned-shift" aria-live="polite">
+                <div className="henkaten-assigned-shift__top">
+                  <span className="henkaten-assigned-shift__eyebrow">Assignment Anda</span>
+                  <span className={selectedShift.current ? 'is-current' : 'is-next'}>
+                    {selectedShift.current ? 'Sedang berlangsung' : 'Shift berikutnya'}
+                  </span>
+                </div>
+                <strong>
+                  {selectedShift.lineCode} · {selectedShift.lineName}
+                </strong>
                 <span>
-                  <strong>{selectedShift.current ? 'Sedang berjalan' : 'Shift berikutnya'}</strong>
-                  <small>
-                    {formatDateTime(selectedShift.effectiveStartAt)} –{' '}
-                    {formatDateTime(selectedShift.effectiveEndAt)}
-                  </small>
+                  {selectedShift.shiftName} · {selectedShift.startTime}–{selectedShift.endTime}
+                  {selectedShift.crossesMidnight ? ' (hari berikutnya)' : ''}
                 </span>
+                <small>
+                  {selectedShift.current ? 'Berlaku hingga ' : 'Berlaku mulai '}
+                  {formatDateTime(
+                    selectedShift.current
+                      ? selectedShift.effectiveEndAt
+                      : selectedShift.effectiveStartAt,
+                  )}
+                  {' · '}Tanggal operasional {selectedShift.businessDate}
+                </small>
               </div>
             )}
             <Field label="Job" htmlFor="job" required>

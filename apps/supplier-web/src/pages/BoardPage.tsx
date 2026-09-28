@@ -49,6 +49,7 @@ export function BoardPage() {
   const [connection, setConnection] = useState<RealtimeConnectionState>('connecting');
   const [canvasDirty, setCanvasDirty] = useState(false);
   const lineId = params.get('lineId') ?? undefined;
+  const lineShiftId = params.get('lineShiftId') ?? undefined;
   const shiftStatus =
     params.get('shiftStatus') === 'OTHER' || params.get('shiftStatus') === 'ALL'
       ? (params.get('shiftStatus') as 'OTHER' | 'ALL')
@@ -98,7 +99,16 @@ export function BoardPage() {
   }, [realtime]);
 
   const allLines = board.data?.lines ?? [];
-  const lines = lineId ? allLines.filter((line) => line.lineId === lineId) : allLines;
+  const lineOptions = [...new Map(allLines.map((line) => [line.lineId, line])).values()];
+  const shiftOptions = lineId ? allLines.filter((line) => line.lineId === lineId) : [];
+  const selectedLineShiftId = shiftOptions.some((line) => line.shiftRunId === lineShiftId)
+    ? lineShiftId
+    : undefined;
+  const lines = allLines.filter(
+    (line) =>
+      (!lineId || line.lineId === lineId) &&
+      (!selectedLineShiftId || line.shiftRunId === selectedLineShiftId),
+  );
   const jobs = lines.flatMap((line) => line.jobs);
   const openIndicators = jobs
     .flatMap((job) => job.indicators)
@@ -154,6 +164,7 @@ export function BoardPage() {
               const next = new URLSearchParams(params);
               if (event.target.value === 'CURRENT') next.delete('shiftStatus');
               else next.set('shiftStatus', event.target.value);
+              next.delete('lineShiftId');
               next.delete('view');
               setParams(next, { replace: true });
             }}
@@ -180,17 +191,46 @@ export function BoardPage() {
                 next.delete('lineId');
                 next.delete('view');
               }
+              next.delete('lineShiftId');
               setParams(next, { replace: true });
             }}
           >
             <option value="">Semua line</option>
-            {allLines.map((line) => (
+            {lineOptions.map((line) => (
               <option key={line.lineId} value={line.lineId}>
                 {line.lineCode} · {line.lineName}
               </option>
             ))}
           </NativeSelect>
         </label>
+        {lineId && shiftOptions.length > 1 && (
+          <label>
+            <span>Shift pada line</span>
+            <NativeSelect
+              aria-label="Pilih shift pada line"
+              value={selectedLineShiftId ?? ''}
+              onChange={(event) => {
+                if (
+                  canvasDirty &&
+                  !window.confirm('Ganti shift dan buang perubahan Canvas yang belum disimpan?')
+                )
+                  return;
+                const next = new URLSearchParams(params);
+                if (event.target.value) next.set('lineShiftId', event.target.value);
+                else next.delete('lineShiftId');
+                next.delete('view');
+                setParams(next, { replace: true });
+              }}
+            >
+              <option value="">Semua shift pada line</option>
+              {shiftOptions.map((line) => (
+                <option key={line.shiftRunId} value={line.shiftRunId}>
+                  {line.shiftName} · {line.businessDate} · {line.lineLeader.name ?? 'Tanpa LL'}
+                </option>
+              ))}
+            </NativeSelect>
+          </label>
+        )}
         <div className="board-view-toggle" role="group" aria-label="Tampilan assignment board">
           <Button
             size="sm"
