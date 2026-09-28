@@ -1,4 +1,16 @@
-# Current Session Handoff — Supplier Admin flow improvements
+# Current Session Handoff — Part import mapping and selective conflicts
+
+- Date: 2026-09-26
+- Branch: `feat/part-import-mapping`
+- Scope: Supplier Part import refinement within Phase 15; API row limits changed without a database schema change.
+
+The browser reads the first Excel sheet or CSV, shows ten source rows, suggests recognized headers, and lets Supplier Admin map the Part number and Nama part columns. The review sends only mapped number/name pairs to the tenant-scoped preview and commit endpoints. The original File is not retained after parsing; source cells are held in page memory for mapping and released after commit, replacement, or navigation. The server never receives or stores the file. The limit is 50 MB and 50,000 data rows. Duplicate-number rejection, exact safe-integer handling, atomic commit, audit, version check, and preservation of active status remain in force. Only existing parts with a different trimmed name appear in the review table, 50 per page; new and matching parts appear in summary counts. Matching names are skipped automatically. The UI adds a three-step progression, highlighted preview columns, responsive mapping controls, and clear read/validate/match/save loading states.
+
+Changed files: Supplier import parser, page, CSS, unit tests; API import body limit, batched transaction, audit writer, integration coverage; shared row-limit contract and generated OpenAPI document (client regenerated with no type diff); focused Playwright journey; PRD, implementation roadmap, and ADR 0040. Seed compatibility: individual Part creation and import payload shape are unchanged, so no seed edit is required. A fresh disposable seed against the built API passed with two Hosted suppliers and 240 Henkaten. The first smoke hit the default request rate limit; after resetting the disposable database, a runtime with seed-appropriate throttle limits passed. All smoke processes, temporary credentials/photos, and containers were stopped or removed.
+
+Validation completed: pinned frozen install; format, lint, typecheck, all unit tests, OpenAPI document generation/check, production build; fresh 15-migration test database and 36 API integration tests, including one 50,000-part create with a request exceeding the ordinary 5 MB body limit, matching per-part audit count, and 510 updates across database batches. The full isolated Chromium/Edge E2E suite passed; import captures cover desktop/mobile mapping and conflict review. Browser inspection found local horizontal scrolling for extra source columns; a mobile swipe hint was added and the focused journey passed again in Chromium and Edge. Production-like five-image Compose build, migration, bootstrap/idempotence, routing, headers, non-root execution, private database, and restart persistence passed. Actionlint, ShellCheck, Hadolint, bash syntax, Ubuntu bootstrap input checks, Linux deployment harness (including flock), migration policy, deployment env validation, security exception registry, dependency audit, Gitleaks directory scan, and Trivy filesystem plus all five runtime images passed. No staging deployment was performed. Delivery follows post-commit generated-client parity and Gitleaks commit scan, then a branch push and PR to staging. The request explicitly waives post-push check monitoring.
+
+## Previous Handoff — Supplier Admin flow improvements
 
 - Date: 2026-09-26
 - Branch: `feat/feedback-26-sep`

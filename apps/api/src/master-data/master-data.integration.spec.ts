@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import cookieParser from 'cookie-parser';
+import express from 'express';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -43,6 +44,11 @@ describe('supplier master data', () => {
     app = module.createNestApplication();
     app.use(correlationMiddleware);
     app.use(cookieParser());
+    app.use(
+      '/api/v1/supplier/master-data/parts/import',
+      express.json({ limit: '80mb', type: 'application/json' }),
+    );
+    app.use(express.json({ limit: '5mb', type: 'application/json' }));
     await app.init();
     prisma = app.get(PrismaService);
     const passwords = app.get(PasswordService);
@@ -609,6 +615,58 @@ describe('supplier master data', () => {
     });
     expect(skipped.body).toEqual({ created: 0, updated: 0, skipped: 1 });
   });
+
+  it('commits 50,000 parts atomically with audit events', async () => {
+    const prefix = `BULK-${randomUUID().slice(0, 8)}`;
+    const auditBefore = await prisma.auditEvent.count({
+      where: { supplierId, action: 'PART_CREATED' },
+    });
+    const rows = Array.from({ length: 50_000 }, (_, index) => ({
+      partNumber: `${prefix}-${index}`,
+      partName: `Part ${index}`.padEnd(200, 'X'),
+    }));
+    expect(Buffer.byteLength(JSON.stringify({ rows }))).toBeGreaterThan(5 * 1024 * 1024);
+    const preview = await supplierPost('/api/v1/supplier/master-data/parts/import/preview', {
+      rows,
+    });
+    expect(preview.status).toBe(201);
+    expect((preview.body as { rows: unknown[] }).rows).toHaveLength(rows.length);
+    const committed = await supplierPost('/api/v1/supplier/master-data/parts/import/commit', {
+      rows: rows.map((row) => ({ ...row, action: 'CREATE' })),
+    });
+    expect(committed.status).toBe(201);
+    expect(committed.body).toEqual({ created: rows.length, updated: 0, skipped: 0 });
+    const created = await prisma.part.findMany({
+      where: { supplierId, partNumber: { startsWith: prefix } },
+      orderBy: { partNumber: 'asc' },
+      select: { id: true, partNumber: true, version: true },
+    });
+    expect(created).toHaveLength(rows.length);
+    expect(
+      (await prisma.auditEvent.count({ where: { supplierId, action: 'PART_CREATED' } })) -
+        auditBefore,
+    ).toBe(rows.length);
+    const changed = await supplierPost('/api/v1/supplier/master-data/parts/import/commit', {
+      rows: created.slice(0, 510).map((part) => ({
+        partNumber: part.partNumber,
+        partName: 'Updated by bulk import',
+        action: 'UPDATE',
+        existingId: part.id,
+        expectedVersion: part.version,
+      })),
+    });
+    expect(changed.status).toBe(201);
+    expect(changed.body).toEqual({ created: 0, updated: 510, skipped: 0 });
+    expect(
+      await prisma.part.count({
+        where: {
+          supplierId,
+          partNumber: { startsWith: prefix },
+          partName: 'Updated by bulk import',
+        },
+      }),
+    ).toBe(510);
+  }, 120_000);
 
   function supplierPost(path: string, body: unknown) {
     return request(app.getHttpServer())

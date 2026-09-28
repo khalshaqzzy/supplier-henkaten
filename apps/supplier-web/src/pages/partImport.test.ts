@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { parsePartMatrix } from './partImport';
+import {
+  parsePartMatrix,
+  preparePartSheet,
+  readPartFile,
+  suggestedPartMapping,
+} from './partImport';
 
 describe('part import rows', () => {
   it('preserves text part numbers and source row numbers', () => {
@@ -46,5 +51,38 @@ describe('part import rows', () => {
         ['a-1', 'Second'],
       ]),
     ).toThrow(/baris 2 dan 3/);
+  });
+
+  it('maps arbitrary columns and ignores unrelated Excel values', () => {
+    const sheet = preparePartSheet([
+      ['Catatan', 'Kode produksi', 'Deskripsi', 'Tanggal'],
+      ['A', 123456789, 'Bracket', new Date('2026-09-26T00:00:00Z')],
+    ]);
+    expect(suggestedPartMapping(sheet.headers)).toEqual({ numberIndex: -1, nameIndex: -1 });
+    expect(parsePartMatrix(sheet.matrix, { numberIndex: 1, nameIndex: 2 })).toEqual([
+      { partNumber: '123456789', partName: 'Bracket', sourceRow: 2 },
+    ]);
+    expect(() => parsePartMatrix(sheet.matrix, { numberIndex: 1, nameIndex: 1 })).toThrow(
+      /dua kolom berbeda/,
+    );
+  });
+
+  it('reads CSV and rejects files larger than 50 MB', async () => {
+    const csv = new File(['Part number,Nama part\n123,Bracket\n'], 'parts.csv', {
+      type: 'text/csv',
+    });
+    expect((await readPartFile(csv)).dataRowCount).toBe(1);
+    const oversized = { name: 'parts.csv', size: 50 * 1024 * 1024 + 1 } as File;
+    await expect(readPartFile(oversized)).rejects.toThrow(/50 MB/);
+  });
+
+  it('accepts 50,000 mapped rows and rejects the next row', () => {
+    const matrix = [
+      ['Number', 'Name'],
+      ...Array.from({ length: 50_000 }, (_, index) => [String(index + 1), `Part ${index + 1}`]),
+    ];
+    expect(parsePartMatrix(matrix, { numberIndex: 0, nameIndex: 1 })).toHaveLength(50_000);
+    matrix.push(['50001', 'Part 50001']);
+    expect(() => preparePartSheet(matrix)).toThrow(/50.000 baris/);
   });
 });
