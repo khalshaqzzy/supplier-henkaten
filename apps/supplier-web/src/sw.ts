@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { bypassRuntimeCache, safePushDeepLink } from './sw-policy';
+import { bypassRuntimeCache, isSkipWaitingMessage, safePushDeepLink } from './sw-policy';
 
 declare const self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<{ url: string; revision?: string | null }>;
@@ -79,7 +79,8 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 self.addEventListener('message', (event) => {
-  if (event.data !== 'SKIP_WAITING') return;
+  // Workbox Window sends an object, not a bare string.
+  if (!isSkipWaitingMessage(event.data)) return;
   event.waitUntil(
     (async () => {
       const source = event.source;

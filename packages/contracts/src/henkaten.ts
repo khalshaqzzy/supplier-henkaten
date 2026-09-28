@@ -27,7 +27,10 @@ export const checklistSubmissionAnswerSchema = z
   .strict();
 
 const submissionBase = {
-  lineShiftId: opaqueIdSchema,
+  // Legacy clients may send this as an expectation. The server always resolves
+  // the authoritative LineShift from the authenticated Line Leader.
+  lineShiftId: opaqueIdSchema.optional(),
+  expectedEffectiveStartAt: utcTimestampSchema.optional(),
   jobId: opaqueIdSchema,
   partId: opaqueIdSchema.optional(),
   otherPart: z.literal(true).optional(),

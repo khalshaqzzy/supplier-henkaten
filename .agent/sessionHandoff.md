@@ -1,4 +1,26 @@
-# Current Session Handoff — Part import mapping and selective conflicts
+# Current Session Handoff — Overlapping Line–Shifts and LL-derived submission
+
+- Date: 2026-09-28
+- Branch: `feat/overlapping-shifts-ll`, created from `main`
+- Target: PR to `main`; post-push check monitoring explicitly waived for this delivery.
+
+Active Line–Shift schedules may overlap on the same line or across lines. One LL may hold exactly one active Line–Shift assignment across a supplier. Assignment and activation reject a duplicate LL with a contextual conflict; the database partial unique index protects concurrent writes. A new Line–Shift copied from another shift leaves its LL empty. The forward migration keeps the oldest active assignment by `createdAt, id`, clears only the duplicate LL field on other active Line–Shifts, increments their version, and writes a SYSTEM audit event. It preserves Supervisor, MP, shift, and historical Henkaten data.
+
+Hosted Henkaten submission resolves the authenticated LL's active Line–Shift in the creation transaction, with the current occurrence during that shift or the next occurrence while off shift. The form has no shift picker; it displays the assignment and effective occurrence, refreshes its context, and sends the shown shift/start as stale-context assertions. The board filters Canvas by Line–Shift when overlapping shifts share a line. Supplier Admin Line Setup lists all active LL occupancy, disables occupied LL options, gives availability guidance, and uses an interactive 24-hour timeline to select a shift. A mobile inspection found and corrected overflow in the create toolbar; desktop and mobile screenshots then showed no horizontal page overflow at 390 px.
+
+The local seed now assigns distinct LL accounts to its three lines and three shifts. A clean local full-stack reseed passed with two Hosted suppliers and 240 Henkaten. The PWA update button now accepts Workbox's `{ type: 'SKIP_WAITING' }` message and reports loading/error state, fixing the stuck refresh prompt. Supplier and TMMIN login/password-change forms now use a shared password input with the visibility control inside the field.
+
+Changed files: `.agent/PRD.md`, `.agent/implementationPhases.md`, this handoff, ADR 0033; API LineShift and Henkaten services, controller, migration, Prisma comment, seed, OpenAPI document and freeze test, integration tests; Supplier Line Setup, Henkaten create, board, PWA files and CSS; TMMIN auth/CSS; shared contracts, generated API client, and shared password input/CSS.
+
+Validation: clean artifacts and frozen install; format, lint, typecheck, all unit suites; API OpenAPI generation/check and production build; fresh 16-migration disposable database and 37/37 API integration tests (rerun after locking LL assignment during submission); previous-`main` 15-migration to current 16-migration upgrade; and duplicate-LL migration backfill/audit smoke. The clean local full-stack seed created two Hosted suppliers and 240 Henkaten. Four isolated Chromium browser journeys passed, followed by a focused onboarding rerun after the final mobile UI changes. Visual inspection covered Admin Line Setup and LL Henkaten on desktop/mobile and login mobile; the 390 px Admin page had no horizontal overflow.
+
+Local CI-equivalent delivery checks passed: `docker compose config --quiet`, deployment env validation, deployment script harness both on macOS and in Linux with real `flock`, security exception registry, dependency audit threshold, pinned Actionlint/ShellCheck/Hadolint, `bash -n`, Ubuntu 22.04 bootstrap input checks, Gitleaks v8.24.3 directory scan, and Trivy 0.70.0 filesystem plus all five freshly rebuilt production runtime images at HIGH/CRITICAL. A production-like five-image Compose stack passed current migration, first bootstrap and idempotence, routing/release identity, security headers, non-root/private database, and persistence across PostgreSQL/API restart. The macOS Playwright Edge installation requested a sudo password and could not run unattended; Chromium coverage passed. The host runs Node 22.23.2 versus CI's pinned 22.23.1; Docker production builds used pinned 22.23.1. All local, E2E, and production-like project containers were stopped. After the delivery commit, the migration policy checker recognized the new SQL, OpenAPI/client regeneration had no drift, and Gitleaks scanned the commit without findings. The branch is ready for a PR to `main`; no post-push check monitoring is requested.
+
+Current roadmap state remains Phase 15 `in_progress`; staging rehearsal and device acceptance have not been completed by this branch. No staging or production deployment has been performed. The next recommended action after PR review is staging verification of migrated incomplete assignments and overlapping shift handover, followed by the existing release gates.
+
+---
+
+# Previous Session Handoff — Part import mapping and selective conflicts
 
 - Date: 2026-09-26
 - Branch: `feat/part-import-mapping`

@@ -13,6 +13,27 @@
 
 Dokumen ini adalah kontrak produk dan implementasi v1. Kata **MUST/wajib**, **MUST NOT/dilarang**, **SHOULD/sebaiknya**, dan **MAY/dapat** bersifat normatif. Bila source code, prototype, slide, atau asumsi implementasi berbeda dengan dokumen ini, tim wajib mengeskalasi perbedaan tersebut dan tidak boleh memilih perilaku secara diam-diam.
 
+### Amendment shift beririsan dan penentuan LL — 28 September 2026
+
+Line–Shift aktif boleh memiliki jadwal yang beririsan, termasuk pada line yang sama. Satu Line
+Leader hanya boleh ditugaskan pada **satu Line–Shift aktif di seluruh supplier**, tanpa memandang
+apakah jadwalnya sedang berlangsung. Assignment pada Line–Shift nonaktif dapat tersimpan, tetapi
+aktivasi harus menolak konflik LL. Supervisor dan MP tidak mengikuti batas unik ini. Saat menyalin
+assignment Line–Shift, LL tidak ikut disalin.
+
+Pada submission Hosted, server menentukan Line–Shift dari LL yang terautentikasi. Nilai
+`lineShiftId` dari klien lama hanya menjadi pemeriksaan kesesuaian dan tidak boleh menentukan
+shift. Bila shift LL sedang berlangsung, Henkaten berlaku pada occurrence itu; bila sedang off,
+Henkaten berlaku mulai occurrence berikutnya dari shift LL tersebut. Submission tanpa tepat satu
+Line–Shift aktif dan tersedia ditolak. Perubahan assignment atau occurrence selama form terbuka
+wajib menghasilkan konflik dan refresh, bukan perpindahan target diam-diam. Henkaten tetap
+menyimpan snapshot shift, business date, dan interval efektifnya.
+
+Migrasi mempertahankan assignment LL pada Line–Shift aktif yang paling awal dibuat
+(`createdAt`, lalu `id` sebagai tie-breaker). Pada Line–Shift aktif lainnya yang memakai LL
+yang sama, migrasi mengosongkan hanya assignment LL, menaikkan version, dan mencatat audit
+sistem. Line–Shift, Supervisor, MP, dan Henkaten historis tidak dihapus.
+
 ### Amendment pengalaman Supplier Admin — 26 September 2026
 
 Import Part menerima CSV dan Excel `.xlsx` hingga 50 MB serta maksimum 50.000 baris data per batch. Setelah file dibaca, Supplier Admin memilih kolom Part number dan Nama part dari seluruh kolom pada baris pertama, dengan saran otomatis untuk nama kolom yang dikenal dan preview 10 baris. Kolom lain diabaikan saat impor. File diproses di browser dan tidak disimpan sebagai berkas di server; hanya pasangan nomor/nama part yang dikirim ke API. Pada review, tabel hanya menampilkan part yang nomornya sudah ada dan namanya berbeda, maksimum 50 baris per halaman. Part baru dan part yang sudah sesuai ditampilkan sebagai jumlah ringkasan; nama yang sudah sesuai dilewati otomatis. Konflik nama menawarkan Update atau Skip per part dan aksi bulk. Status pemrosesan file, validasi, pencocokan, serta penyimpanan harus terlihat jelas. Aturan validasi nomor duplikat dalam file, commit atomik, audit, status aktif, dan konflik versi tetap berlaku.
@@ -48,12 +69,13 @@ Start/End/Emergency Start, MP reservation, exclusivity MP, donor vacancy, dan As
 berasal dari perpindahan MP. Shift adalah konfigurasi berulang per line. Supplier Admin mengatur
 Supervisor, Line Leader, dan MP default secara terpisah untuk setiap pasangan Line–Shift.
 
-Henkaten memakai occurrence berdasarkan waktu: saat berada dalam jadwal, Line–Shift dipilih otomatis;
-di luar jadwal LL memilih shift dan efek dimulai pada start berikutnya. Man replacement langsung
+Henkaten memakai occurrence berdasarkan assignment LL dan waktu: saat berada dalam jadwal, occurrence
+yang berjalan dipakai; di luar jadwal, occurrence berikutnya dari assignment LL yang sama dipakai.
+Man replacement langsung
 mengubah assignment occurrence tersebut, hanya diblokir bila MP tidak aktif atau Tanoko job kurang
 dari level 3. MP yang sama boleh berada di banyak assignment pada waktu yang sama. Reject/Withdraw
 mengembalikan assignment efektif sebelumnya/default, dan occurrence shift berikutnya selalu kembali
-ke default. API Supplier hanya menerima konteks `lineShiftId`; `shiftRunId` tidak dapat dipakai untuk
+ke default. API Supplier menerima `lineShiftId` sebagai pemeriksaan konteks opsional; `shiftRunId` tidak dapat dipakai untuk
 membuat Henkaten baru. Detail keputusan ada pada ADR 0033; klausul lama yang bertentangan tidak
 berlaku.
 

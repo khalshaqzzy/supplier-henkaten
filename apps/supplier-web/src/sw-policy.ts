@@ -15,3 +15,9 @@ export function safePushDeepLink(value: unknown): string {
     ? value
     : '/notifications';
 }
+
+export function isSkipWaitingMessage(value: unknown): boolean {
+  return (
+    typeof value === 'object' && value !== null && 'type' in value && value.type === 'SKIP_WAITING'
+  );
+}

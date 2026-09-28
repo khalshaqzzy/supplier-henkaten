@@ -866,6 +866,8 @@ model LineShift {
   @@unique([id, supplierId])
   @@unique([supplierId, lineId, shiftTemplateId])
   @@index([supplierId, lineId, active])
+  // A partial unique index in the migration permits one active LineShift per LL.
+  // Prisma cannot express the active-only predicate.
   @@index([supplierId, lineLeaderMemberId, active])
   @@index([supplierId, supervisorMemberId, active])
 }

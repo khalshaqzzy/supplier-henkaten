@@ -6,7 +6,7 @@ import type {
   UpdateLineShiftAssignmentsRequest,
 } from '@tmmin-henkaten/contracts';
 
-import type { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '../generated/prisma/client.js';
 import type { MutationContext } from '../administration/mutation-context.js';
 import { versionConflict } from '../administration/user-admin.service.js';
 import { ProblemException } from '../common/problem.js';
@@ -150,28 +150,44 @@ export class LineShiftService {
     };
   }
 
-  async resolveOccurrence(
+  async resolveAssignedOccurrence(
     tx: Prisma.TransactionClient,
     scope: TenantScope,
-    id: string,
     principal: RequestPrincipal,
-    now = new Date(),
+    now?: Date,
   ) {
+    if (principal.role !== 'LINE_LEADER' || !principal.memberId) {
+      throw missing('Assigned Line Shift');
+    }
+    const locked = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM "LineShift"
+      WHERE "supplierId" = ${scope.supplierId}::uuid
+        AND "lineLeaderMemberId" = ${principal.memberId}::uuid
+        AND active = true
+      FOR SHARE
+    `;
+    if (locked.length !== 1) {
+      throw conflict(
+        locked.length === 0
+          ? 'Line Leader belum memiliki satu Line–Shift aktif. Hubungi Supplier Admin.'
+          : 'Line Leader memiliki lebih dari satu Line–Shift aktif. Hubungi Supplier Admin.',
+      );
+    }
     const row = await tx.lineShift.findFirst({
       where: {
-        id,
+        id: locked[0]!.id,
         supplierId: scope.supplierId,
+        lineLeaderMemberId: principal.memberId,
         active: true,
         line: { active: true },
         shiftTemplate: { active: true },
-        ...(principal.role === 'LINE_LEADER' && principal.memberId
-          ? { lineLeaderMemberId: principal.memberId }
-          : {}),
       },
       include: includeLineShift,
     });
-    if (!row) throw missing('Assigned Line Shift');
-    return occurrenceFor(row, now);
+    if (!row) {
+      throw conflict('Line–Shift LL tidak tersedia. Hubungi Supplier Admin.');
+    }
+    return occurrenceFor(row, now ?? new Date());
   }
 
   async create(
@@ -181,7 +197,7 @@ export class LineShiftService {
     context: MutationContext,
   ) {
     const id = await this.prisma.$transaction(async (tx) => {
-      const [line, shift, existing, source, activeForLine, jobs] = await Promise.all([
+      const [line, shift, existing, source, jobs] = await Promise.all([
         tx.line.findFirst({ where: { id: lineId, supplierId: scope.supplierId, active: true } }),
         tx.shiftTemplate.findFirst({
           where: { id: input.shiftTemplateId, supplierId: scope.supplierId, active: true },
@@ -199,10 +215,6 @@ export class LineShiftService {
               include: { jobAssignments: true },
             })
           : Promise.resolve(null),
-        tx.lineShift.findMany({
-          where: { supplierId: scope.supplierId, lineId, active: true },
-          include: { shiftTemplate: true },
-        }),
         tx.job.findMany({
           where: { supplierId: scope.supplierId, lineId, active: true },
           orderBy: [{ displayOrder: 'asc' }, { id: 'asc' }],
@@ -212,18 +224,6 @@ export class LineShiftService {
       if (!shift) throw missing('Active Shift Template');
       if (existing) throw conflict('Shift tersebut sudah ditambahkan ke line.');
       if (input.copyFromLineShiftId && !source) throw missing('Source Line Shift');
-      if (
-        activeForLine.some(({ shiftTemplate }) =>
-          overlaps(
-            shift.startMinute,
-            shift.endMinute,
-            shiftTemplate.startMinute,
-            shiftTemplate.endMinute,
-          ),
-        )
-      ) {
-        throw conflict('Jadwal shift overlap dengan shift aktif lain pada line ini.');
-      }
       const sourceMps = new Map(
         source?.jobAssignments.map((assignment) => [assignment.jobId, assignment.mpMemberId]) ?? [],
       );
@@ -233,7 +233,9 @@ export class LineShiftService {
           lineId,
           shiftTemplateId: shift.id,
           supervisorMemberId: source?.supervisorMemberId ?? null,
-          lineLeaderMemberId: source?.lineLeaderMemberId ?? null,
+          // A copied shift needs its own LL. Copying the source LL would violate
+          // the one-active-LineShift-per-LL invariant.
+          lineLeaderMemberId: null,
           createdById: context.actorUserId,
           updatedById: context.actorUserId,
         },
@@ -269,86 +271,110 @@ export class LineShiftService {
     input: UpdateLineShiftAssignmentsRequest,
     context: MutationContext,
   ) {
-    await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM "LineShift" WHERE id = ${id}::uuid FOR UPDATE`;
-      const current = await tx.lineShift.findFirst({
-        where: { id, supplierId: scope.supplierId },
-        include: { line: { include: { jobs: { where: { active: true } } } } },
-      });
-      if (!current) throw missing('Line Shift');
-      if (current.version !== input.expectedVersion) throw versionConflict();
-      const expectedJobs = new Set(current.line.jobs.map(({ id: jobId }) => jobId));
-      const submittedJobs = new Set(input.jobs.map(({ jobId }) => jobId));
-      if (
-        expectedJobs.size !== submittedJobs.size ||
-        [...expectedJobs].some((jobId) => !submittedJobs.has(jobId))
-      ) {
-        throw conflict('Assignment harus memuat tepat seluruh job aktif pada line.');
-      }
-      const memberIds = [
-        ...(input.supervisorMemberId ? [input.supervisorMemberId] : []),
-        ...(input.lineLeaderMemberId ? [input.lineLeaderMemberId] : []),
-        ...input.jobs.flatMap(({ mpMemberId }) => (mpMemberId ? [mpMemberId] : [])),
-      ];
-      const members = memberIds.length
-        ? await tx.member.findMany({
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "LineShift" WHERE id = ${id}::uuid FOR UPDATE`;
+        const current = await tx.lineShift.findFirst({
+          where: { id, supplierId: scope.supplierId },
+          include: { line: { include: { jobs: { where: { active: true } } } } },
+        });
+        if (!current) throw missing('Line Shift');
+        if (current.version !== input.expectedVersion) throw versionConflict();
+        const expectedJobs = new Set(current.line.jobs.map(({ id: jobId }) => jobId));
+        const submittedJobs = new Set(input.jobs.map(({ jobId }) => jobId));
+        if (
+          expectedJobs.size !== submittedJobs.size ||
+          [...expectedJobs].some((jobId) => !submittedJobs.has(jobId))
+        ) {
+          throw conflict('Assignment harus memuat tepat seluruh job aktif pada line.');
+        }
+        const memberIds = [
+          ...(input.supervisorMemberId ? [input.supervisorMemberId] : []),
+          ...(input.lineLeaderMemberId ? [input.lineLeaderMemberId] : []),
+          ...input.jobs.flatMap(({ mpMemberId }) => (mpMemberId ? [mpMemberId] : [])),
+        ];
+        const members = memberIds.length
+          ? await tx.member.findMany({
+              where: {
+                supplierId: scope.supplierId,
+                id: { in: [...new Set(memberIds)] },
+                active: true,
+              },
+            })
+          : [];
+        const roles = new Map(members.map((member) => [member.id, member.role]));
+        if (input.supervisorMemberId && roles.get(input.supervisorMemberId) !== 'SUPERVISOR')
+          throw missing('Active Supervisor');
+        if (input.lineLeaderMemberId && roles.get(input.lineLeaderMemberId) !== 'LINE_LEADER')
+          throw missing('Active Line Leader');
+        if (input.jobs.some(({ mpMemberId }) => mpMemberId && roles.get(mpMemberId) !== 'MP'))
+          throw missing('Active MP');
+        if (current.active && input.lineLeaderMemberId) {
+          const occupied = await tx.lineShift.findFirst({
             where: {
               supplierId: scope.supplierId,
-              id: { in: [...new Set(memberIds)] },
+              lineLeaderMemberId: input.lineLeaderMemberId,
               active: true,
+              id: { not: id },
             },
-          })
-        : [];
-      const roles = new Map(members.map((member) => [member.id, member.role]));
-      if (input.supervisorMemberId && roles.get(input.supervisorMemberId) !== 'SUPERVISOR')
-        throw missing('Active Supervisor');
-      if (input.lineLeaderMemberId && roles.get(input.lineLeaderMemberId) !== 'LINE_LEADER')
-        throw missing('Active Line Leader');
-      if (input.jobs.some(({ mpMemberId }) => mpMemberId && roles.get(mpMemberId) !== 'MP'))
-        throw missing('Active MP');
+            include: { line: true, shiftTemplate: true },
+          });
+          if (occupied) throw leaderConflict(occupied.line.code, occupied.shiftTemplate.name);
+        }
 
-      await tx.lineShift.update({
-        where: { id },
-        data: {
-          supervisorMemberId: input.supervisorMemberId,
-          lineLeaderMemberId: input.lineLeaderMemberId,
-          version: { increment: 1 },
-          updatedById: context.actorUserId,
-        },
-      });
-      for (const assignment of input.jobs) {
-        await tx.lineShiftJobAssignment.upsert({
-          where: {
-            supplierId_lineShiftId_jobId: {
-              supplierId: scope.supplierId,
-              lineShiftId: id,
-              jobId: assignment.jobId,
-            },
-          },
-          create: {
-            supplierId: scope.supplierId,
-            lineShiftId: id,
-            jobId: assignment.jobId,
-            mpMemberId: assignment.mpMemberId,
-            createdById: context.actorUserId,
-            updatedById: context.actorUserId,
-          },
-          update: {
-            mpMemberId: assignment.mpMemberId,
+        await tx.lineShift.update({
+          where: { id },
+          data: {
+            supervisorMemberId: input.supervisorMemberId,
+            lineLeaderMemberId: input.lineLeaderMemberId,
             version: { increment: 1 },
             updatedById: context.actorUserId,
           },
         });
-      }
-      await this.audit.write(
-        masterAudit(context, scope.supplierId, 'LINE_SHIFT_ASSIGNMENTS_UPDATED', 'LineShift', id, {
-          lineId: current.lineId,
-          shiftTemplateId: current.shiftTemplateId,
-          assignedJobs: input.jobs.filter(({ mpMemberId }) => mpMemberId).length,
-        }),
-        tx,
-      );
-    });
+        for (const assignment of input.jobs) {
+          await tx.lineShiftJobAssignment.upsert({
+            where: {
+              supplierId_lineShiftId_jobId: {
+                supplierId: scope.supplierId,
+                lineShiftId: id,
+                jobId: assignment.jobId,
+              },
+            },
+            create: {
+              supplierId: scope.supplierId,
+              lineShiftId: id,
+              jobId: assignment.jobId,
+              mpMemberId: assignment.mpMemberId,
+              createdById: context.actorUserId,
+              updatedById: context.actorUserId,
+            },
+            update: {
+              mpMemberId: assignment.mpMemberId,
+              version: { increment: 1 },
+              updatedById: context.actorUserId,
+            },
+          });
+        }
+        await this.audit.write(
+          masterAudit(
+            context,
+            scope.supplierId,
+            'LINE_SHIFT_ASSIGNMENTS_UPDATED',
+            'LineShift',
+            id,
+            {
+              lineId: current.lineId,
+              shiftTemplateId: current.shiftTemplateId,
+              assignedJobs: input.jobs.filter(({ mpMemberId }) => mpMemberId).length,
+            },
+          ),
+          tx,
+        );
+      });
+    } catch (error) {
+      if (isLeaderUniqueViolation(error)) throw leaderConflict();
+      throw error;
+    }
     return this.get(scope, id);
   }
 
@@ -359,48 +385,45 @@ export class LineShiftService {
     active: boolean,
     context: MutationContext,
   ) {
-    await this.prisma.$transaction(async (tx) => {
-      const current = await tx.lineShift.findFirst({ where: { id, supplierId: scope.supplierId } });
-      if (!current) throw missing('Line Shift');
-      if (current.version !== expectedVersion) throw versionConflict();
-      if (active && !current.active) {
-        const [target, siblings] = await Promise.all([
-          tx.shiftTemplate.findUnique({ where: { id: current.shiftTemplateId } }),
-          tx.lineShift.findMany({
-            where: { supplierId: scope.supplierId, lineId: current.lineId, active: true },
-            include: { shiftTemplate: true },
-          }),
-        ]);
-        if (
-          !target ||
-          siblings.some(({ shiftTemplate }) =>
-            overlaps(
-              target.startMinute,
-              target.endMinute,
-              shiftTemplate.startMinute,
-              shiftTemplate.endMinute,
-            ),
-          )
-        ) {
-          throw conflict('Jadwal shift overlap dengan shift aktif lain pada line ini.');
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const current = await tx.lineShift.findFirst({
+          where: { id, supplierId: scope.supplierId },
+        });
+        if (!current) throw missing('Line Shift');
+        if (current.version !== expectedVersion) throw versionConflict();
+        if (active && !current.active && current.lineLeaderMemberId) {
+          const occupied = await tx.lineShift.findFirst({
+            where: {
+              supplierId: scope.supplierId,
+              lineLeaderMemberId: current.lineLeaderMemberId,
+              active: true,
+              id: { not: id },
+            },
+            include: { line: true, shiftTemplate: true },
+          });
+          if (occupied) throw leaderConflict(occupied.line.code, occupied.shiftTemplate.name);
         }
-      }
-      await tx.lineShift.update({
-        where: { id },
-        data: { active, version: { increment: 1 }, updatedById: context.actorUserId },
+        await tx.lineShift.update({
+          where: { id },
+          data: { active, version: { increment: 1 }, updatedById: context.actorUserId },
+        });
+        await this.audit.write(
+          masterAudit(
+            context,
+            scope.supplierId,
+            active ? 'LINE_SHIFT_ACTIVATED' : 'LINE_SHIFT_DEACTIVATED',
+            'LineShift',
+            id,
+            { lineId: current.lineId, shiftTemplateId: current.shiftTemplateId },
+          ),
+          tx,
+        );
       });
-      await this.audit.write(
-        masterAudit(
-          context,
-          scope.supplierId,
-          active ? 'LINE_SHIFT_ACTIVATED' : 'LINE_SHIFT_DEACTIVATED',
-          'LineShift',
-          id,
-          { lineId: current.lineId, shiftTemplateId: current.shiftTemplateId },
-        ),
-        tx,
-      );
-    });
+    } catch (error) {
+      if (isLeaderUniqueViolation(error)) throw leaderConflict();
+      throw error;
+    }
     return this.get(scope, id);
   }
 
@@ -478,20 +501,20 @@ function occurrenceFor(row: IncludedLineShift, now: Date) {
   };
 }
 
-function overlaps(startA: number, endA: number, startB: number, endB: number) {
-  const normalized = (start: number, end: number): [number, number] => [
-    start,
-    end <= start ? end + 1_440 : end,
-  ];
-  const [aStart, aEnd] = normalized(startA, endA);
-  const [bStart, bEnd] = normalized(startB, endB);
-  return [bStart - 1_440, bStart, bStart + 1_440].some(
-    (candidate) => aStart < candidate + (bEnd - bStart) && candidate < aEnd,
-  );
-}
-
 function minuteToTime(value: number) {
   return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
+}
+
+function isLeaderUniqueViolation(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+}
+
+function leaderConflict(lineCode?: string, shiftName?: string) {
+  return conflict(
+    lineCode && shiftName
+      ? `Line Leader sudah ditugaskan pada ${lineCode} · ${shiftName}. Pilih LL lain atau lepaskan assignment sebelumnya.`
+      : 'Line Leader sudah ditugaskan pada Line–Shift aktif lain. Pilih LL lain atau lepaskan assignment sebelumnya.',
+  );
 }
 
 function conflict(detail: string) {

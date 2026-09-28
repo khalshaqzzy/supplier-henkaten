@@ -482,6 +482,12 @@ export class SupplierApi {
     });
   }
 
+  allLineShifts() {
+    return this.client.request('/api/v1/supplier/master-data/line-shifts', {
+      responseSchema: lineShiftListSchema,
+    });
+  }
+
   lineShiftOperationalContext() {
     return this.client.request('/api/v1/supplier/master-data/line-shifts/operational-context', {
       responseSchema: lineShiftOperationalContextSchema,

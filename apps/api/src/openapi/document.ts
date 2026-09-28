@@ -907,6 +907,9 @@ function masterDataPaths() {
         responses: { '201': json('Line shift', lineShiftSchema), '409': problem },
       },
     },
+    '/api/v1/supplier/master-data/line-shifts': {
+      get: { responses: { '200': json('Line shifts', lineShiftListSchema) } },
+    },
     '/api/v1/supplier/master-data/line-shifts/operational-context': {
       get: { responses: { '200': json('Line shift context', lineShiftOperationalContextSchema) } },
     },

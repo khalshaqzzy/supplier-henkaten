@@ -40,7 +40,7 @@ export function DefaultAssignmentsPage() {
   });
   const members = useQuery({
     queryKey: scopedKey(scope, 'line-setup-members'),
-    queryFn: () => supplierApi.members({ limit: 100, active: 'ACTIVE' }),
+    queryFn: loadAllActiveMembers,
   });
   const templates = useQuery({
     queryKey: scopedKey(scope, 'line-setup-shifts'),
@@ -51,6 +51,10 @@ export function DefaultAssignmentsPage() {
     queryKey: scopedKey(scope, 'line-shifts', lineId),
     queryFn: () => supplierApi.lineShifts(lineId),
     enabled: Boolean(lineId),
+  });
+  const allLineShifts = useQuery({
+    queryKey: scopedKey(scope, 'all-line-shifts'),
+    queryFn: () => supplierApi.allLineShifts(),
   });
   const selected =
     lineShifts.data?.items.find(({ id }) => id === selectedShiftId) ?? lineShifts.data?.items[0];
@@ -68,6 +72,7 @@ export function DefaultAssignmentsPage() {
   const invalidate = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'line-shifts', lineId) }),
+      queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'all-line-shifts') }),
       queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'setup-readiness') }),
     ]);
   };
@@ -104,7 +109,11 @@ export function DefaultAssignmentsPage() {
     onError: (error) => setProblem(problemDetail(error, 'Status shift tidak dapat diubah.')),
   });
   const loading =
-    lines.isLoading || members.isLoading || templates.isLoading || lineShifts.isLoading;
+    lines.isLoading ||
+    members.isLoading ||
+    templates.isLoading ||
+    lineShifts.isLoading ||
+    allLineShifts.isLoading;
 
   return (
     <div className="product-page">
@@ -140,7 +149,11 @@ export function DefaultAssignmentsPage() {
           <Skeleton />
         </div>
       )}
-      {(lines.isError || members.isError || templates.isError || lineShifts.isError) && (
+      {(lines.isError ||
+        members.isError ||
+        templates.isError ||
+        lineShifts.isError ||
+        allLineShifts.isError) && (
         <ErrorState
           title="Line Setup tidak dapat dimuat"
           description=""
@@ -151,7 +164,14 @@ export function DefaultAssignmentsPage() {
       {lineId && lineShifts.data && (
         <>
           <Panel title="Shift line">
-            <div className="defaults-toolbar">
+            {lineShifts.data.items.length > 0 && (
+              <ShiftTimeline
+                items={lineShifts.data.items}
+                selectedId={selected?.id ?? ''}
+                onSelect={setSelectedShiftId}
+              />
+            )}
+            <div className="defaults-toolbar defaults-toolbar--create">
               <label>
                 <span>Shift baru</span>
                 <NativeSelect
@@ -188,27 +208,13 @@ export function DefaultAssignmentsPage() {
                 Tambah shift
               </Button>
             </div>
-            {lineShifts.data.items.length > 0 && (
-              <div className="defaults-toolbar" role="tablist" aria-label="Shift line">
-                {lineShifts.data.items.map((item) => (
-                  <Button
-                    key={item.id}
-                    size="sm"
-                    variant={selected?.id === item.id ? 'primary' : 'secondary'}
-                    onClick={() => setSelectedShiftId(item.id)}
-                  >
-                    {item.shiftName} · {item.startTime}–{item.endTime}
-                    {item.active ? '' : ' · Nonaktif'}
-                  </Button>
-                ))}
-              </div>
-            )}
           </Panel>
           {selected ? (
             <AssignmentEditor
               key={`${selected.id}:${selected.version}`}
               item={selected}
               members={members.data?.items ?? []}
+              allLineShifts={allLineShifts.data?.items ?? []}
               onSaved={invalidate}
               onProblem={setProblem}
               onToggle={() => action.mutate({ item: selected, active: !selected.active })}
@@ -225,9 +231,25 @@ export function DefaultAssignmentsPage() {
 
 type Member = Awaited<ReturnType<typeof supplierApi.members>>['items'][number];
 
+async function loadAllActiveMembers(): Promise<{ items: Member[] }> {
+  const items: Member[] = [];
+  let cursor: string | null = null;
+  do {
+    const page = await supplierApi.members({
+      limit: 100,
+      active: 'ACTIVE',
+      ...(cursor ? { cursor } : {}),
+    });
+    items.push(...page.items);
+    cursor = page.pageInfo.nextCursor;
+  } while (cursor);
+  return { items };
+}
+
 function AssignmentEditor({
   item,
   members,
+  allLineShifts,
   onSaved,
   onProblem,
   onToggle,
@@ -235,6 +257,7 @@ function AssignmentEditor({
 }: {
   item: LineShift;
   members: Member[];
+  allLineShifts: LineShift[];
   onSaved: () => Promise<void>;
   onProblem: (value: string | null) => void;
   onToggle: () => void;
@@ -242,6 +265,11 @@ function AssignmentEditor({
 }) {
   const [supervisorId, setSupervisorId] = useState(item.supervisorMemberId ?? '');
   const [leaderId, setLeaderId] = useState(item.lineLeaderMemberId ?? '');
+  const leaderOccupancy = new Map(
+    allLineShifts
+      .filter((shift) => shift.active && shift.id !== item.id && shift.lineLeaderMemberId)
+      .map((shift) => [shift.lineLeaderMemberId!, `${shift.lineCode} · ${shift.shiftName}`]),
+  );
   const [mps, setMps] = useState<Record<string, string>>(
     Object.fromEntries(item.assignments.map(({ jobId, mpMemberId }) => [jobId, mpMemberId ?? ''])),
   );
@@ -274,6 +302,7 @@ function AssignmentEditor({
           label="Line Leader"
           value={leaderId}
           members={role('LINE_LEADER')}
+          occupied={leaderOccupancy}
           onChange={setLeaderId}
         />
       </div>
@@ -321,11 +350,13 @@ function MemberSelect({
   label,
   value,
   members,
+  occupied,
   onChange,
 }: {
   label: string;
   value: string;
   members: Member[];
+  occupied?: Map<string, string>;
   onChange: (value: string) => void;
 }) {
   return (
@@ -334,13 +365,90 @@ function MemberSelect({
       <NativeSelect value={value} onChange={(event) => onChange(event.target.value)}>
         <option value="">Pilih {label}</option>
         {members.map((member) => (
-          <option key={member.id} value={member.id}>
+          <option key={member.id} value={member.id} disabled={Boolean(occupied?.has(member.id))}>
             {member.fullName}
             {member.role === 'MP' ? '' : ` · ${member.registrationNumber}`}
+            {occupied?.has(member.id) ? ` · Ditugaskan di ${occupied.get(member.id)}` : ''}
           </option>
         ))}
       </NativeSelect>
+      {occupied && occupied.size > 0 && (
+        <small className="sheet-field__hint">
+          {members.filter((member) => !occupied.has(member.id)).length} LL tersedia · LL yang
+          ditugaskan di shift aktif lain tidak dapat dipilih.
+        </small>
+      )}
     </label>
+  );
+}
+
+function ShiftTimeline({
+  items,
+  selectedId,
+  onSelect,
+}: {
+  items: LineShift[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
+  const minute = (time: string) => {
+    const [hour, part] = time.split(':').map(Number);
+    return hour! * 60 + part!;
+  };
+  return (
+    <div className="shift-timeline" role="group" aria-label="Pilih shift line">
+      <div className="shift-timeline__axis" aria-hidden="true">
+        <span>00:00</span>
+        <span>06:00</span>
+        <span>12:00</span>
+        <span>18:00</span>
+        <span>24:00</span>
+      </div>
+      {items.map((item) => {
+        const start = minute(item.startTime);
+        const end = minute(item.endTime);
+        const spans =
+          end < start
+            ? [
+                [start, 1440],
+                [0, end],
+              ]
+            : [[start, end]];
+        return (
+          <button
+            type="button"
+            className={`shift-timeline__row${item.id === selectedId ? ' is-selected' : ''}`}
+            key={item.id}
+            aria-pressed={item.id === selectedId}
+            onClick={() => onSelect(item.id)}
+          >
+            <span className="shift-timeline__label">
+              {item.shiftName}
+              {item.active ? '' : ' · Nonaktif'}
+            </span>
+            <div
+              className="shift-timeline__track"
+              aria-label={`${item.shiftName}, ${item.startTime} sampai ${item.endTime}${item.crossesMidnight ? ' hari berikutnya' : ''}`}
+            >
+              {spans.map(([from, to], index) => (
+                <span
+                  key={index}
+                  className={`shift-timeline__bar${item.active ? '' : ' is-inactive'}`}
+                  style={{
+                    left: `${(from! / 1440) * 100}%`,
+                    width: `${((to! - from!) / 1440) * 100}%`,
+                  }}
+                />
+              ))}
+            </div>
+            <span className="shift-timeline__hours">
+              {item.startTime}–{item.endTime}
+              {item.crossesMidnight ? ' +1' : ''}
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

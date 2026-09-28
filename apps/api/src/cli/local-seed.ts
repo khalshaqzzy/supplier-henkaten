@@ -51,6 +51,7 @@ type MemberResource = Resource & { fullName?: string };
 type LineShiftDefinition = Resource & {
   lineId: string;
   shiftTemplateId: string;
+  lineLeaderMemberId: string | null;
   shiftName: string;
   startTime: string;
   endTime: string;
@@ -394,7 +395,7 @@ async function provisionSupplier(
     );
   }
   const supervisors = await createRoleMembers(admin, plan.code, 'SUPERVISOR', 2, accounts);
-  const leaders = await createRoleMembers(admin, plan.code, 'LINE_LEADER', 3, accounts);
+  const leaders = await createRoleMembers(admin, plan.code, 'LINE_LEADER', 9, accounts);
   const qcs = await createRoleMembers(admin, plan.code, 'QC', 2, accounts);
   const mps: MemberResource[] = [];
   for (let index = 0; index < 15; index += 1) {
@@ -506,7 +507,7 @@ async function provisionSupplier(
       );
     }
     const configuredLineShifts: LineShiftDefinition[] = [];
-    for (const shift of shifts) {
+    for (const [shiftIndex, shift] of shifts.entries()) {
       const lineShift = await admin.api.request<{
         id: string;
         version: number;
@@ -524,7 +525,7 @@ async function provisionSupplier(
           {
             expectedVersion: lineShift.version,
             supervisorMemberId: supervisors[lineIndex % supervisors.length]!.memberId,
-            lineLeaderMemberId: leaders[lineIndex]!.memberId,
+            lineLeaderMemberId: leaders[lineIndex * shifts.length + shiftIndex]!.memberId,
             jobs: lineShift.assignments.map(({ jobId }, jobIndex) => ({
               jobId,
               mpMemberId: mps[(lineIndex * 4 + jobIndex) % mps.length]!.id,
@@ -668,11 +669,13 @@ async function seedHenkatens(prisma: PrismaClient, runtime: SupplierRuntime) {
       throw new Error(`Historical Line Shift occurrence ${group} has no planned Henkaten.`);
     }
     const lineIndex = records[0]!.lineIndex!;
-    const occurrence = await currentOccurrence(runtime.leaders[lineIndex]!);
+    const leader = currentSeedLeader(runtime, lineIndex);
+    const occurrence = await currentOccurrence(leader);
     let shiftRunId: string | undefined;
     for (const [index, record] of records.entries()) {
       const created = await createSeedHenkaten(
         runtime,
+        leader,
         occurrence,
         lineIndex,
         record,
@@ -683,7 +686,7 @@ async function seedHenkatens(prisma: PrismaClient, runtime: SupplierRuntime) {
       if (shiftRunId !== created.shiftRunId) {
         throw new Error('Historical seed group unexpectedly crossed automatic occurrences.');
       }
-      await applySeedOutcome(runtime, lineIndex, created, record.outcome);
+      await applySeedOutcome(runtime, leader, lineIndex, created, record.outcome);
     }
     await relocateHistoricalOccurrence(
       prisma,
@@ -696,16 +699,18 @@ async function seedHenkatens(prisma: PrismaClient, runtime: SupplierRuntime) {
 
   for (const [index, record] of runtime.plan.live.entries()) {
     const lineIndex = index % runtime.lines.length;
-    const occurrence = await currentOccurrence(runtime.leaders[lineIndex]!);
+    const leader = currentSeedLeader(runtime, lineIndex);
+    const occurrence = await currentOccurrence(leader);
     const created = await createSeedHenkaten(
       runtime,
+      leader,
       occurrence,
       lineIndex,
       record,
       `live-${index}`,
       index + runtime.plan.historical.length,
     );
-    await applySeedOutcome(runtime, lineIndex, created, record.outcome);
+    await applySeedOutcome(runtime, leader, lineIndex, created, record.outcome);
   }
 }
 
@@ -924,8 +929,15 @@ async function currentOccurrence(leader: SessionClient): Promise<LineShiftOccurr
   return occurrence;
 }
 
+function currentSeedLeader(runtime: SupplierRuntime, lineIndex: number) {
+  const minute = jakartaMinute(new Date());
+  const shiftIndex = minute >= 360 && minute < 840 ? 0 : minute >= 840 && minute < 1320 ? 1 : 2;
+  return runtime.leaders[lineIndex * runtime.shifts.length + shiftIndex]!;
+}
+
 async function createSeedHenkaten(
   runtime: SupplierRuntime,
+  leader: SessionClient,
   occurrence: LineShiftOccurrence,
   lineIndex: number,
   record: SeedHenkatenPlan,
@@ -957,11 +969,11 @@ async function createSeedHenkaten(
           affectedObject: narrative.affectedObject ?? 'Kondisi proses sebelum perubahan',
           replacementObject: narrative.replacementObject ?? 'Kondisi proses setelah perubahan',
         };
-  return runtime.leaders[lineIndex]!.api.request<HenkatenResource>(
+  return leader.api.request<HenkatenResource>(
     'POST',
     '/api/v1/supplier/henkatens',
     body,
-    runtime.leaders[lineIndex]!.csrf,
+    leader.csrf,
     201,
     `local-${runtime.plan.code}-${key}`,
   );
@@ -991,6 +1003,7 @@ async function seedManBody(
 
 async function applySeedOutcome(
   runtime: SupplierRuntime,
+  leader: SessionClient,
   lineIndex: number,
   henkaten: HenkatenResource,
   outcome: SeedOutcome,
@@ -1028,14 +1041,14 @@ async function applySeedOutcome(
   } else if (outcome === 'REJECTED_QC') {
     await decideSeed(qc, henkaten, 'REJECTED', `${runtime.plan.code}-${henkaten.id}-qc-reject`);
   } else if (outcome === 'CANCELLED_WITHDRAWN') {
-    await runtime.leaders[lineIndex]!.api.request(
+    await leader.api.request(
       'POST',
       `/api/v1/supplier/henkatens/${henkaten.id}/withdraw`,
       {
         expectedVersion: henkaten.version,
         reason: 'Data objek perubahan perlu dikoreksi sebelum diajukan kembali.',
       },
-      runtime.leaders[lineIndex]!.csrf,
+      leader.csrf,
       201,
       `${runtime.plan.code}-${henkaten.id}-withdraw`,
     );
@@ -1110,6 +1123,15 @@ async function relocateHistoricalOccurrence(
   targetLineShift: LineShiftDefinition,
   daysAgo: number,
 ) {
+  if (!targetLineShift.lineLeaderMemberId) {
+    throw new Error('Historical seed target must have a Line Leader.');
+  }
+  const targetLeader = await prisma.member.findFirstOrThrow({
+    where: { id: targetLineShift.lineLeaderMemberId, supplierId: runtime.supplier.id },
+  });
+  const targetUser = await prisma.user.findFirstOrThrow({
+    where: { memberId: targetLeader.id, supplierId: runtime.supplier.id, status: 'ACTIVE' },
+  });
   const businessDate = jakartaDate(daysAgo);
   const scheduledStartAt = jakartaInstant(businessDate, targetLineShift.startTime);
   const scheduledEndAt = jakartaInstant(businessDate, targetLineShift.endTime);
@@ -1124,6 +1146,7 @@ async function relocateHistoricalOccurrence(
         businessDate: new Date(`${businessDate}T00:00:00.000Z`),
         shiftTemplateId: targetLineShift.shiftTemplateId,
         shiftNameSnapshot: targetLineShift.shiftName,
+        lineLeaderMemberId: targetLeader.id,
         shiftStartMinuteSnapshot: minuteOfDay(targetLineShift.startTime),
         shiftEndMinuteSnapshot: minuteOfDay(targetLineShift.endTime),
         scheduledStartAt,
@@ -1137,6 +1160,11 @@ async function relocateHistoricalOccurrence(
       UPDATE "Henkaten" h
       SET "businessDate" = ${businessDate}::date,
           "lineShiftId" = ${targetLineShift.id}::uuid,
+          "creatorMemberId" = ${targetLeader.id}::uuid,
+          "creatorNameSnapshot" = ${targetLeader.fullName},
+          "createdById" = ${targetUser.id}::uuid,
+          "finalizedById" = CASE WHEN h.status = 'CANCELLED'
+            THEN ${targetUser.id}::uuid ELSE h."finalizedById" END,
           "shiftNameSnapshot" = ${targetLineShift.shiftName},
           "identifier" = 'HEN-' || ${runtime.plan.code} || '-' || replace(${businessDate}, '-', '')
             || '-' || lpad(h."dailySequence"::text, 4, '0'),
@@ -1181,7 +1209,11 @@ async function relocateHistoricalOccurrence(
     prisma.$executeRaw`
       UPDATE "HenkatenTransition" t
       SET "occurredAt" = CASE WHEN t."fromStatus" IS NULL THEN h."occurredAt"
-        ELSE COALESCE(h."finalizedAt", h."occurredAt" + interval '10 minutes') END
+            ELSE COALESCE(h."finalizedAt", h."occurredAt" + interval '10 minutes') END,
+          "actorUserId" = CASE WHEN t."actorRole" = 'LINE_LEADER'
+            THEN ${targetUser.id}::uuid ELSE t."actorUserId" END,
+          "actorName" = CASE WHEN t."actorRole" = 'LINE_LEADER'
+            THEN ${targetLeader.fullName} ELSE t."actorName" END
       FROM "Henkaten" h WHERE t."henkatenId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
     `,
     prisma.$executeRaw`
@@ -1203,7 +1235,10 @@ async function relocateHistoricalOccurrence(
       WHERE o."aggregateId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
     `,
     prisma.$executeRaw`
-      UPDATE "AuditEvent" a SET "occurredAt" = h."occurredAt"
+      UPDATE "AuditEvent" a
+      SET "occurredAt" = h."occurredAt",
+          "actorUserId" = CASE WHEN a.action IN ('HENKATEN_CREATED', 'HENKATEN_WITHDRAWN')
+            THEN ${targetUser.id}::uuid ELSE a."actorUserId" END
       FROM "Henkaten" h
       WHERE a."resourceId" = h.id AND h."shiftRunId" = ${shiftRunId}::uuid
     `,
@@ -1428,7 +1463,7 @@ async function verifySeed(prisma: PrismaClient) {
     if (
       lines !== 3 ||
       jobs !== 12 ||
-      members !== 22 ||
+      members !== 28 ||
       parts !== 8 ||
       shiftTemplates !== 3 ||
       lineShifts !== 9 ||
@@ -1448,7 +1483,7 @@ async function verifySeed(prisma: PrismaClient) {
       categories.METHOD !== expected.categories.METHOD ||
       openWarnings !== expected.statuses.OPEN ||
       layouts !== 3 ||
-      photos !== 19 ||
+      photos !== 25 ||
       !assignmentsQualified
     ) {
       throw new Error(
@@ -1558,6 +1593,17 @@ function jakartaDate(daysAgo: number) {
   }).formatToParts(new Date(Date.now() - daysAgo * 86_400_000));
   const value = Object.fromEntries(parts.map(({ type, value: part }) => [type, part]));
   return `${value.year}-${value.month}-${value.day}`;
+}
+
+function jakartaMinute(instant: Date) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Jakarta',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(instant);
+  const value = Object.fromEntries(parts.map(({ type, value: part }) => [type, part]));
+  return Number(value.hour) * 60 + Number(value.minute);
 }
 
 function jakartaInstant(businessDate: string, time: string) {

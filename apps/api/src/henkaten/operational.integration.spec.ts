@@ -36,7 +36,10 @@ describe('Line Shift Henkaten operations', () => {
   let supervisorCookie: string[];
   let supervisorCsrf: string;
   let outsideLeaderCookie: string[];
+  let outsideLeaderCsrf: string;
   let outsideLineShiftId: string;
+  let outsideJobId: string;
+  let outsideAssignmentId: string;
 
   beforeAll(async () => {
     process.env['NODE_ENV'] = 'test';
@@ -198,6 +201,10 @@ describe('Line Shift Henkaten operations', () => {
         displayOrder: 1,
       },
     });
+    outsideJobId = outsideJob.id;
+    await prisma.tanokoMapping.create({
+      data: { supplierId, memberId: replacementMpId, jobId: outsideJobId, level: 3 },
+    });
     const outsideShift = await prisma.shiftTemplate.create({
       data: {
         supplierId,
@@ -218,7 +225,7 @@ describe('Line Shift Henkaten operations', () => {
       },
     });
     outsideLineShiftId = outsideConfig.id;
-    await prisma.lineShiftJobAssignment.create({
+    const outsideAssignment = await prisma.lineShiftJobAssignment.create({
       data: {
         supplierId,
         lineShiftId: outsideConfig.id,
@@ -226,8 +233,11 @@ describe('Line Shift Henkaten operations', () => {
         mpMemberId: defaultMpId,
       },
     });
+    outsideAssignmentId = outsideAssignment.id;
     ({ cookie: leaderCookie, csrf: leaderCsrf } = await supplierLogin(leader.username));
-    ({ cookie: outsideLeaderCookie } = await supplierLogin(outsideLeader.username));
+    ({ cookie: outsideLeaderCookie, csrf: outsideLeaderCsrf } = await supplierLogin(
+      outsideLeader.username,
+    ));
     ({ cookie: supervisorCookie, csrf: supervisorCsrf } = await supplierLogin(supervisor.username));
   });
 
@@ -321,6 +331,80 @@ describe('Line Shift Henkaten operations', () => {
     expect(response.body.currentLineShiftId).toBeNull();
     expect(response.body.items[0]).toMatchObject({ id: outsideLineShiftId, current: false });
     expect(new Date(response.body.items[0].effectiveStartAt).getTime()).toBeGreaterThan(before);
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/supplier/henkatens')
+      .set('Origin', supplierOrigin)
+      .set('Cookie', outsideLeaderCookie)
+      .set('X-CSRF-Token', outsideLeaderCsrf)
+      .set('Idempotency-Key', randomUUID())
+      .send({
+        category: 'MAN',
+        jobId: outsideJobId,
+        lineShiftJobAssignmentId: outsideAssignmentId,
+        partId,
+        replacementMpMemberId: replacementMpId,
+        cause: 'Planned replacement',
+        detail: 'Next occurrence assignment',
+        checklistVersionId,
+        checklistAnswers: [{ itemId: checklistItemId, answer: 'YES' }],
+      });
+    expect(created.status).toBe(201);
+    expect(created.body.lineShiftId).toBe(outsideLineShiftId);
+    expect(new Date(created.body.effectiveStartAt).getTime()).toBeGreaterThan(before);
+  });
+
+  it('derives the Line–Shift from the LL and rejects a stale displayed occurrence', async () => {
+    const context = await request(app.getHttpServer())
+      .get('/api/v1/supplier/master-data/line-shifts/operational-context')
+      .set('Cookie', leaderCookie);
+    const expectedStart = context.body.items[0].effectiveStartAt as string;
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/supplier/henkatens')
+      .set('Origin', supplierOrigin)
+      .set('Cookie', leaderCookie)
+      .set('X-CSRF-Token', leaderCsrf)
+      .set('Idempotency-Key', randomUUID())
+      .send({
+        category: 'MAN',
+        expectedEffectiveStartAt: expectedStart,
+        jobId: job1Id,
+        lineShiftJobAssignmentId: job1AssignmentId,
+        partId,
+        replacementMpMemberId: replacementMpId,
+        cause: 'Replacement',
+        detail: 'Resolved from LL',
+        checklistVersionId,
+        checklistAnswers: [{ itemId: checklistItemId, answer: 'YES' }],
+      });
+    expect(created.status).toBe(201);
+    expect(created.body.lineShiftId).toBe(lineShiftId);
+    const stale = await request(app.getHttpServer())
+      .post('/api/v1/supplier/henkatens')
+      .set('Origin', supplierOrigin)
+      .set('Cookie', leaderCookie)
+      .set('X-CSRF-Token', leaderCsrf)
+      .set('Idempotency-Key', randomUUID())
+      .send({
+        category: 'MAN',
+        expectedEffectiveStartAt: '2020-01-01T00:00:00.000Z',
+        jobId: job1Id,
+        lineShiftJobAssignmentId: job1AssignmentId,
+        partId,
+        replacementMpMemberId: replacementMpId,
+        cause: 'Replacement',
+        detail: 'Stale assignment',
+        checklistVersionId,
+        checklistAnswers: [{ itemId: checklistItemId, answer: 'YES' }],
+      });
+    expect(stale.status).toBe(409);
+    const withdrawn = await request(app.getHttpServer())
+      .post(`/api/v1/supplier/henkatens/${created.body.id}/withdraw`)
+      .set('Origin', supplierOrigin)
+      .set('Cookie', leaderCookie)
+      .set('X-CSRF-Token', leaderCsrf)
+      .set('Idempotency-Key', randomUUID())
+      .send({ expectedVersion: created.body.version, reason: 'Cleanup inferred shift test' });
+    expect(withdrawn.status).toBe(201);
   });
 
   it('applies a duplicate MP immediately without reservation and restores on reject', async () => {

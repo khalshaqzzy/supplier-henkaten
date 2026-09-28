@@ -22,10 +22,38 @@ create, activate, deactivate, or edit this configuration. Adding a Line–Shift 
 from another shift on the same line. Active schedules on one line may not overlap so automatic
 selection remains deterministic.
 
+### Amendment: overlapping schedules with one active assignment per LL (2026-09-28)
+
+The product owner permits overlapping Line–Shift schedules, including on the same line. The
+non-overlap rule above is superseded. One Line Leader can belong to only one active Line–Shift
+across the supplier; the rule applies even when that shift is not currently running. A partial
+database unique index enforces this under concurrent Admin writes. Inactive Line–Shift rows may
+retain an LL, but activation must resolve conflicts first. Copying a Line–Shift does not copy its
+LL. Supervisor and MP assignments remain unrestricted by this rule.
+
+Hosted submission derives the Line–Shift from the authenticated LL inside the creation
+transaction. A client-supplied Line–Shift ID is only a compatibility/stale-context assertion.
+During the assigned interval the current occurrence is used; outside it the next occurrence is
+used. The form displays that context without a shift picker and submits its expected occurrence
+start to reject a boundary or assignment change rather than silently retargeting. Existing
+Henkaten occurrence snapshots remain historical facts when assignments later change. Multiple
+current shifts may appear on the same line in the board, so Canvas selection requires an explicit
+Line–Shift filter.
+
+The forward migration keeps each LL's oldest active Line–Shift by `createdAt`, then `id`.
+Duplicate active rows lose only their LL assignment, gain a new version, and receive a SYSTEM
+audit event. They become incomplete until Supplier Admin assigns another LL. Existing Henkaten,
+Supervisor, and MP assignments are not rewritten. The local seed must give nine active
+Line–Shifts nine distinct LL identities and keep historical creator snapshots consistent.
+
+This choice makes LL assignment, rather than the clock alone, the authority for Hosted Henkaten.
+It does not model attendance or overtime extensions: a submission outside the LL's scheduled
+interval still targets that shift's next scheduled occurrence.
+
 There is no supplier-facing Shift Run preflight, Start Shift, Emergency Start, End Shift, or active
-shift state. A Line Leader's operational context is derived from the clock. During a shift its
-Line–Shift is selected automatically; outside shift time the Line Leader selects one and the
-Henkaten becomes effective at that shift's next start. The effect ends at that occurrence's end,
+shift state. A Line Leader's operational context is derived from the authenticated assignment and
+the clock. During a shift its Line–Shift is selected automatically; outside shift time the same
+assigned Line–Shift is selected for its next start. The effect ends at that occurrence's end,
 where the next occurrence naturally starts again from its configured defaults.
 
 Man Henkaten submission applies the replacement to the selected job immediately for that occurrence.
@@ -89,3 +117,11 @@ also pass. The local seed creates 240 Henkaten via Line–Shift commands, retain
 dashboard evidence using internal compatibility occurrence snapshots, and asserts the dashboard
 totals and trend before reporting success. Dedicated during-shift/outside-shift browser coverage and
 staging UAT remain pending.
+
+The 2026-09-28 amendment was validated with a clean 16-migration database, an upgrade from the
+15-migration `main` state, a duplicate-LL backfill and audit smoke, and 37 API integration tests.
+Those tests cover overlapping schedules, duplicate-LL assignment rejection, LL-derived current
+submission, stale occurrence rejection, and the next occurrence while off shift. The local seed
+completed for two Hosted suppliers and 240 Henkaten with distinct active LL assignments. Chromium
+browser journeys passed; desktop and mobile visual inspection covered Line Setup, LL submission,
+and the mobile assignment toolbar. Staging data repair and handover acceptance remain pending.

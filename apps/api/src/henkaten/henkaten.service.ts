@@ -52,19 +52,12 @@ export class HenkatenService {
     context: MutationContext,
   ) {
     if (principal.role !== 'LINE_LEADER' || !principal.memberId) throw forbidden();
-    const operational = await this.lineShifts.operationalContext(scope, principal);
-    if (
-      operational.currentLineShiftIds.length > 0 &&
-      !operational.currentLineShiftIds.includes(input.lineShiftId)
-    ) {
-      throw shiftSelectionConflict();
-    }
     return this.createForLineShift(scope, input, idempotencyKey, principal, context);
   }
 
   private async createForLineShift(
     scope: TenantScope,
-    input: CreateHenkatenRequest & { lineShiftId: string },
+    input: CreateHenkatenRequest,
     idempotencyKey: string,
     principal: RequestPrincipal,
     context: MutationContext,
@@ -85,12 +78,14 @@ export class HenkatenService {
         if (retry.submissionPayloadHash !== payloadHash) throw idempotencyConflict();
         return retry.id;
       }
-      const occurrence = await this.lineShifts.resolveOccurrence(
-        tx,
-        scope,
-        input.lineShiftId,
-        principal,
-      );
+      const occurrence = await this.lineShifts.resolveAssignedOccurrence(tx, scope, principal);
+      if (
+        (input.lineShiftId && input.lineShiftId !== occurrence.row.id) ||
+        (input.expectedEffectiveStartAt &&
+          input.expectedEffectiveStartAt !== occurrence.start.toISOString())
+      ) {
+        throw shiftSelectionConflict();
+      }
       const lineShift = occurrence.row;
       const [supplier, job, selectedPart, checklist] = await Promise.all([
         tx.supplier.findUnique({ where: { id: scope.supplierId } }),
@@ -1150,7 +1145,7 @@ async function ensureAutomaticOccurrence(
   tx: Prisma.TransactionClient,
   supplierId: string,
   sourceEpoch: number,
-  lineShift: Awaited<ReturnType<LineShiftService['resolveOccurrence']>>['row'],
+  lineShift: Awaited<ReturnType<LineShiftService['resolveAssignedOccurrence']>>['row'],
   businessDate: string,
   start: Date,
   end: Date,
@@ -1347,7 +1342,7 @@ function shiftSelectionConflict() {
     status: 409,
     code: 'STATE_CONFLICT',
     title: 'Shift selection conflict',
-    detail: 'Henkaten harus menggunakan shift yang sedang berjalan.',
+    detail: 'Assignment atau waktu shift berubah. Muat ulang konteks sebelum mengirim Henkaten.',
   });
 }
 
