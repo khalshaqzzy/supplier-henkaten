@@ -47,6 +47,7 @@ const environmentSchema = z
     AUTH_IP_LOGIN_LIMIT: z.coerce.number().int().min(5).default(50),
     AUTH_GLOBAL_LIMIT_PER_MINUTE: z.coerce.number().int().min(30).default(300),
     PHOTO_STORAGE_ROOT: z.string().min(1).default('.local/uploads/member-photos'),
+    EXPORT_STORAGE_ROOT: z.string().min(1).default('.local/exports'),
     PCR_OPENAI_BASE_URL: z.string().default(''),
     PCR_OPENAI_API_KEY: z.string().default(''),
     PCR_OPENAI_MODEL: z.string().default('inclusionAI/Ling-3.0-tiny-fp8'),
@@ -148,6 +149,7 @@ export type AppConfig = {
   authIpLoginLimit: number;
   authGlobalLimitPerMinute: number;
   photoStorageRoot: string;
+  exportStorageRoot: string;
   pcrOpenAiBaseUrl: string;
   pcrOpenAiApiKey: string;
   pcrOpenAiModel: string;
@@ -205,6 +207,7 @@ export function loadAppConfig(environment: NodeJS.ProcessEnv = process.env): App
     authIpLoginLimit: parsed.AUTH_IP_LOGIN_LIMIT,
     authGlobalLimitPerMinute: parsed.AUTH_GLOBAL_LIMIT_PER_MINUTE,
     photoStorageRoot: parsed.PHOTO_STORAGE_ROOT,
+    exportStorageRoot: parsed.EXPORT_STORAGE_ROOT,
     pcrOpenAiBaseUrl: parsed.PCR_OPENAI_BASE_URL,
     pcrOpenAiApiKey: parsed.PCR_OPENAI_API_KEY,
     pcrOpenAiModel: parsed.PCR_OPENAI_MODEL,

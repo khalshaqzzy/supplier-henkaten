@@ -1,12 +1,15 @@
 import { randomUUID } from 'node:crypto';
+import { join } from 'node:path';
 
 import cookieParser from 'cookie-parser';
+import ExcelJS from 'exceljs';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { AppModule } from '../app.module.js';
+import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PasswordService } from '../auth/password.service.js';
 import { correlationMiddleware } from '../common/request-context.js';
 import { PrismaService } from '../persistence/prisma.service.js';
@@ -676,6 +679,109 @@ describe('Line Shift Henkaten operations', () => {
         expectedVersion: 0,
       });
     expect(staleFirstDecision.status).toBe(409);
+  });
+
+  it('exports Hosted traceability with summary graphics for Supplier and TMMIN Admin', async () => {
+    const created = await createManHenkaten();
+    expect(created.status).toBe(201);
+    const supplierUsername = `export-admin-${randomUUID()}`;
+    await prisma.user.create({
+      data: {
+        realm: 'SUPPLIER',
+        supplierId,
+        role: 'SUPPLIER_ADMIN',
+        username: supplierUsername,
+        normalizedUsername: supplierUsername.toLowerCase(),
+        displayName: 'Export Supplier Admin',
+        passwordHash: await app.get(PasswordService).hash(password),
+        mustChangePassword: false,
+      },
+    });
+    const supplierAdmin = await supplierLogin(supplierUsername);
+    const denied = await request(app.getHttpServer())
+      .post('/api/v1/supplier/henkatens/exports')
+      .set('Origin', supplierOrigin)
+      .set('Cookie', leaderCookie)
+      .set('X-CSRF-Token', leaderCsrf)
+      .send({});
+    expect(denied.status).toBe(403);
+    const record = await prisma.henkaten.findUniqueOrThrow({
+      where: { id: created.body.id as string },
+    });
+    const date = record.businessDate.toISOString().slice(0, 10);
+    const requested = await request(app.getHttpServer())
+      .post('/api/v1/supplier/henkatens/exports')
+      .set('Origin', supplierOrigin)
+      .set('Cookie', supplierAdmin.cookie)
+      .set('X-CSRF-Token', supplierAdmin.csrf)
+      .send({ from: date, to: date, lineId: record.lineId });
+    expect(requested.status).toBe(201);
+    const exportId = requested.body.id as string;
+    let status = requested.body.status as string;
+    for (let attempt = 0; attempt < 60 && status !== 'READY' && status !== 'FAILED'; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/supplier/henkatens/exports/${exportId}`)
+        .set('Cookie', supplierAdmin.cookie);
+      expect(response.status).toBe(200);
+      status = response.body.status as string;
+    }
+    expect(status).toBe('READY');
+    const downloaded = await request(app.getHttpServer())
+      .get(`/api/v1/supplier/henkatens/exports/${exportId}/file`)
+      .set('Cookie', supplierAdmin.cookie);
+    expect(downloaded.status).toBe(200);
+    expect(downloaded.headers['cache-control']).toBe('private, no-store');
+    const workbook = new ExcelJS.Workbook();
+    const config = app.get<AppConfig>(APP_CONFIG);
+    await workbook.xlsx.readFile(join(config.exportStorageRoot, `${exportId}.xlsx`));
+    expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual([
+      'Ringkasan',
+      'Henkaten',
+      'Approval',
+      'Checklist',
+      'Riwayat',
+    ]);
+    const records = workbook.getWorksheet('Henkaten')!;
+    const identifiers = Array.from(
+      { length: records.rowCount - 1 },
+      (_, index) => records.getCell(index + 2, 1).value,
+    );
+    expect(identifiers).toContain(record.identifier);
+    expect(workbook.getWorksheet('Checklist')!.rowCount).toBeGreaterThan(1);
+    expect(workbook.getWorksheet('Approval')!.rowCount).toBeGreaterThan(1);
+    const summary = workbook.getWorksheet('Ringkasan')!;
+    expect(summary.getCell('A1').value).toBe('HENKATEN · RINGKASAN');
+    expect(summary.getCell('A1').fill).toMatchObject({ fgColor: { argb: 'FF18365B' } });
+    expect(summary.rowCount).toBeGreaterThan(15);
+
+    const tmminUsername = `export-tmmin-${randomUUID()}`;
+    await prisma.user.create({
+      data: {
+        realm: 'TMMIN',
+        role: 'TMMIN_ADMIN',
+        username: tmminUsername,
+        normalizedUsername: tmminUsername.toLowerCase(),
+        displayName: 'Export TMMIN Admin',
+        passwordHash: await app.get(PasswordService).hash(password),
+        mustChangePassword: false,
+      },
+    });
+    const tmminLogin = await request(app.getHttpServer())
+      .post('/api/v1/auth/tmmin/login')
+      .set('Origin', 'http://localhost:5174')
+      .send({ username: tmminUsername, password });
+    expect(tmminLogin.status).toBe(200);
+    const tmminCookie = Array.isArray(tmminLogin.headers['set-cookie'])
+      ? tmminLogin.headers['set-cookie']
+      : [tmminLogin.headers['set-cookie'] as string];
+    const tmminRequested = await request(app.getHttpServer())
+      .post(`/api/v1/tmmin/suppliers/${supplierId}/henkatens/exports`)
+      .set('Origin', 'http://localhost:5174')
+      .set('Cookie', tmminCookie)
+      .set('X-CSRF-Token', tmminLogin.body.csrfToken as string)
+      .send({ from: date, to: date });
+    expect(tmminRequested.status).toBe(201);
   });
 
   async function createManHenkaten(idempotencyKey = randomUUID(), otherPart = false) {

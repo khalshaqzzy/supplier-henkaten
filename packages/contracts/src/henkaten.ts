@@ -229,6 +229,39 @@ export const henkatenListQuerySchema = z
   .strict();
 export type HenkatenListQuery = z.infer<typeof henkatenListQuerySchema>;
 
+export const henkatenExportFiltersSchema = z
+  .object({
+    from: z.string().date().optional(),
+    to: z.string().date().optional(),
+    lineId: opaqueIdSchema.optional(),
+    shiftTemplateId: opaqueIdSchema.optional(),
+    status: henkatenStatusSchema.optional(),
+    category: henkatenCategorySchema.optional(),
+    part: z.string().trim().min(1).max(200).optional(),
+    approvalRoute: approvalRouteSchema.optional(),
+    approvalStatus: approvalRouteStatusSchema.optional(),
+    pcrStatus: pcrStatusSchema.optional(),
+  })
+  .strict()
+  .refine((value) => !value.from || !value.to || value.from <= value.to, {
+    path: ['to'],
+    message: 'Tanggal akhir harus setelah tanggal awal.',
+  });
+export type HenkatenExportFilters = z.infer<typeof henkatenExportFiltersSchema>;
+
+export const henkatenExportJobSchema = z
+  .object({
+    id: opaqueIdSchema,
+    status: z.enum(['QUEUED', 'RUNNING', 'READY', 'FAILED']),
+    total: z.number().int().nonnegative(),
+    processed: z.number().int().nonnegative(),
+    errorCode: z.string().nullable(),
+    createdAt: utcTimestampSchema,
+    expiresAt: utcTimestampSchema,
+  })
+  .strict();
+export type HenkatenExportJob = z.infer<typeof henkatenExportJobSchema>;
+
 export const henkatenPageSchema = z
   .object({ items: z.array(henkatenSummarySchema), pageInfo: pageInfoSchema })
   .strict();

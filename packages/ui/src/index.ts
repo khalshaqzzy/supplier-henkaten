@@ -4,4 +4,5 @@ export * from './components/primitives';
 export * from './components/advanced';
 export * from './components/data-display';
 export * from './components/domain';
+export * from './components/henkaten-export';
 export * from './showcase/patterns';

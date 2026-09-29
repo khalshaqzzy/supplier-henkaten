@@ -1,4 +1,22 @@
-# Current Session Handoff — Supplier dashboard filter and TMMIN magic link
+# Current Session Handoff — Hosted Henkaten Excel export
+
+- Date: 2026-09-29
+- Branch: `feat/excel-export`, based on `origin/main`; target PR to `main`.
+- Phase: 15 remains `in_progress`; staging rehearsal and device acceptance remain pending.
+
+Supplier Admin now exports Hosted Henkaten from Master Data beside Lihat readiness. TMMIN Admin uses the same filter sheet from supplier detail. The sheet covers business date, line, shift, status, 4M, part, approval route/status, and PCR, with queued/running/ready/failed states and progress. A workbook contains concise `Ringkasan`, `Henkaten`, `Approval`, `Checklist`, and `Riwayat` tabs. The Henkaten identifier links traceability details across tabs; the summary uses compact cell-bar graphics. External records are excluded. A durable job streams bounded batches to a private XLSX file, expires after one hour, checks requester/realm and Supplier Hosted epoch on reads, and audits requests and downloads. Request creation and audit are one transaction. The TMMIN support session remains a Supplier Admin session, with the initiating TMMIN user identified in audit.
+
+Changed files: Henkaten export service/controller/module, Prisma schema and forward migration, config and Compose volume paths, shared contract and generated OpenAPI/client, Supplier/TMMIN pages, shared sheet and CSS, focused integration test, dependency lockfile, PRD/roadmap, and ADR 0043. Seed data shape and API calls were inspected. The new job table and additive endpoints do not require changing seed fixtures. `pnpm local:reseed` succeeded with two Hosted suppliers and 240 Henkaten. Browser smoke exported all 120 records for one supplier to a valid downloadable XLSX.
+
+Validation: clean-artifact `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, API `openapi:check`, and `VITE_API_ORIGIN=https://api.example.invalid pnpm build` passed. `docker compose config --quiet`, `pnpm db:up`, `pnpm db:wait`, `pnpm db:verify`, `pnpm db:test:reset`, `pnpm db:test:migrate`, and the CI-environment `pnpm test:integration` passed: 18 fresh migrations and 41/41 integration tests. A 17-migration `origin/main` database upgraded to 18 migrations and reached current status. Four isolated Chromium E2E journeys passed; Supplier and TMMIN export sheets were opened in seeded browser sessions, and Supplier sheet was visually inspected at 1440 and 390 px. `pnpm deployment:validate`, `pnpm test:deployment`, `pnpm security:exceptions:check`, `pnpm security:audit`, Actionlint, ShellCheck, Hadolint, Ubuntu bootstrap checks, and Gitleaks directory scan passed. The deployment harness passed under a Linux Docker CLI image with real `flock`. macOS Edge is absent and its installer requires interactive privileges, so local browser E2E used Chromium; CI can run Edge. The five-image production Compose build passed. A production-like stack passed migration, bootstrap idempotence, routing/release identity, headers, non-root/private database, and restart persistence. Trivy 0.70.0 filesystem plus all five runtime image scans passed at HIGH/CRITICAL with the exact ignore file. All test/stack containers started for this task were stopped. `git diff --check` passed. The first bootstrap could not be reverified because the existing temporary staging data path already contained an administrator; CI uses a fresh path.
+
+Delivery: commit `c3813e3` passed post-commit `pnpm migrations:destructive-check c5785fe28ce0c92b0997e936f7285943808fb4bb`, `pnpm openapi:check`, and the Gitleaks v8.24.3 commit scan. The branch was pushed and [PR #33](https://github.com/khalshaqzzy/supplier-henkaten/pull/33) opened against `main` and attached to the task. The user explicitly requested no check monitoring after the PR; no PR check status is claimed here.
+
+Next: review PR #33 and perform the existing Phase 15 staging and device acceptance gates before any release claim. Larger-history export/storage-capacity testing and multi-instance worker coordination remain staging scale checks (ADR 0043).
+
+---
+
+# Previous Session Handoff — Supplier dashboard filter and TMMIN magic link
 
 - Date: 2026-09-29
 - Branch: `feat/suppluer-filter-ui`, based on `origin/main`; target PR to `main`.

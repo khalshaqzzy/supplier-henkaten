@@ -12,6 +12,7 @@ import {
   externalProjectionDetailSchema,
   externalProjectionPageSchema,
   henkatenDetailSchema,
+  henkatenExportJobSchema,
   henkatenPageSchema,
   hostedPreparationCredentialSchema,
   linePageSchema,
@@ -52,6 +53,7 @@ import {
   type SupplierListQuery,
   type TmminDashboardQuery,
   type TmminHenkatenQuery,
+  type HenkatenExportFilters,
   type PcrCorrectionRequest,
   type TmminLoginRequest,
   type UpdateSupplierRequest,
@@ -61,6 +63,20 @@ import { ApiClient, type QueryRecord } from './core';
 
 export class TmminApi {
   constructor(private readonly client: ApiClient) {}
+
+  createHenkatenExport(supplierId: string, filters: HenkatenExportFilters) {
+    return this.client.request(`/api/v1/tmmin/suppliers/${supplierId}/henkatens/exports`, {
+      method: 'POST',
+      body: filters,
+      responseSchema: henkatenExportJobSchema,
+    });
+  }
+
+  henkatenExport(supplierId: string, id: string) {
+    return this.client.request(`/api/v1/tmmin/suppliers/${supplierId}/henkatens/exports/${id}`, {
+      responseSchema: henkatenExportJobSchema,
+    });
+  }
 
   login(body: TmminLoginRequest) {
     return this.client.request('/api/v1/auth/tmmin/login', {

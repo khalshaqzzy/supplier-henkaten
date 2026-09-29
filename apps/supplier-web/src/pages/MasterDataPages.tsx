@@ -10,7 +10,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import {
@@ -26,6 +26,7 @@ import {
   NativeSelect,
   Panel,
   Skeleton,
+  HenkatenExportSheet,
   toast,
 } from '@tmmin-henkaten/ui';
 
@@ -75,6 +76,27 @@ export function MasterBackLink({ to, label }: { to: string; label: string }) {
 type ResourceKind = keyof typeof resources;
 
 export function MasterDataOverviewPage() {
+  const { session } = useSession();
+  const loadExportOptions = useCallback(async () => {
+    const [lines, shifts] = await Promise.all([
+      supplierApi.lines({ limit: 100, active: 'ALL' }),
+      supplierApi.shiftTemplates({ limit: 100, active: 'ALL' }),
+    ]);
+    return {
+      lines: lines.items.map((line) => ({ id: line.id, label: `${line.code} · ${line.name}` })),
+      shifts: shifts.items.map((shift) => ({ id: shift.id, label: shift.name })),
+    };
+  }, []);
+  const createExport = useCallback(
+    (filters: Parameters<typeof supplierApi.createHenkatenExport>[0]) =>
+      supplierApi.createHenkatenExport(filters),
+    [],
+  );
+  const getExport = useCallback((id: string) => supplierApi.henkatenExport(id), []);
+  const downloadUrl = useCallback(
+    (id: string) => supplierAssetUrl(`/api/v1/supplier/henkatens/exports/${id}/file`),
+    [],
+  );
   const cards = [
     ['Member & Akun', '', '/master-data/members'],
     ['Line & Job', '', '/master-data/lines'],
@@ -90,9 +112,22 @@ export function MasterDataOverviewPage() {
         title="Master Data"
         description=""
         actions={
-          <Link className="hds-button hds-button--secondary hds-button--md" to="/setup">
-            Lihat readiness
-          </Link>
+          <div className="master-overview-actions">
+            <Link className="hds-button hds-button--secondary hds-button--md" to="/setup">
+              Lihat readiness
+            </Link>
+            {session?.principal.role === 'SUPPLIER_ADMIN' &&
+              session.principal.purpose === 'NORMAL' && (
+                <HenkatenExportSheet
+                  loadOptions={loadExportOptions}
+                  createExport={createExport}
+                  getExport={getExport}
+                  downloadUrl={downloadUrl}
+                  storageKey={`henkaten-export:supplier:${session.principal.userId}:${session.supplier?.id}`}
+                  supplierLabel={session.supplier?.name}
+                />
+              )}
+          </div>
         }
       />
       <section className="master-overview">

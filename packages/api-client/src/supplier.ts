@@ -16,6 +16,7 @@ import {
   clonePrefillSchema,
   defaultAssignmentsSchema,
   henkatenDetailSchema,
+  henkatenExportJobSchema,
   henkatenFormOptionsSchema,
   henkatenPageSchema,
   henkatenTransitionSchema,
@@ -51,6 +52,7 @@ import {
   type DashboardQuery,
   type HenkatenFormOptionsQuery,
   type HenkatenListQuery,
+  type HenkatenExportFilters,
   type CreateLineShiftRequest,
   type UpdateLineShiftAssignmentsRequest,
   type MasterListQuery,
@@ -569,6 +571,20 @@ export class SupplierApi {
     return this.client.request('/api/v1/supplier/henkatens', {
       query,
       responseSchema: henkatenPageSchema,
+    });
+  }
+
+  createHenkatenExport(filters: HenkatenExportFilters) {
+    return this.client.request('/api/v1/supplier/henkatens/exports', {
+      method: 'POST',
+      body: filters,
+      responseSchema: henkatenExportJobSchema,
+    });
+  }
+
+  henkatenExport(id: string) {
+    return this.client.request(`/api/v1/supplier/henkatens/exports/${id}`, {
+      responseSchema: henkatenExportJobSchema,
     });
   }
 

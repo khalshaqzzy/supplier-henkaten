@@ -1,9 +1,10 @@
-import { Controller, Get, Param, Post, Req } from '@nestjs/common';
+import { Controller, Get, Header, Param, Post, Req, StreamableFile } from '@nestjs/common';
 
 import {
   createHenkatenRequestSchema,
   decideHenkatenRequestSchema,
   henkatenListQuerySchema,
+  henkatenExportFiltersSchema,
   henkatenFormOptionsQuerySchema,
   tmminHenkatenQuerySchema,
   opaqueIdSchema,
@@ -12,6 +13,7 @@ import {
   type CreateHenkatenRequest,
   type DecideHenkatenRequest,
   type HenkatenListQuery,
+  type HenkatenExportFilters,
   type HenkatenFormOptionsQuery,
   type TmminHenkatenQuery,
   type RerouteSupervisorRequest,
@@ -26,6 +28,7 @@ import { parseWithSchema, ValidatedBody, ValidatedQuery } from '../common/zod.js
 import { OperationalAccessService } from '../shifts/operational-access.service.js';
 import { HenkatenService } from './henkaten.service.js';
 import { ApprovalService } from './approval.service.js';
+import { HenkatenExportService } from './henkaten-export.service.js';
 
 @Controller('/api/v1/supplier/henkatens')
 export class SupplierHenkatenController {
@@ -33,6 +36,7 @@ export class SupplierHenkatenController {
     private readonly access: OperationalAccessService,
     private readonly henkatens: HenkatenService,
     private readonly approvals: ApprovalService,
+    private readonly exports: HenkatenExportService,
   ) {}
 
   @RequireCapabilities('SUPPLIER_HENKATEN_READ')
@@ -46,6 +50,46 @@ export class SupplierHenkatenController {
       query,
       this.access.principal(request),
     );
+  }
+
+  @RequireCapabilities('SUPPLIER_HENKATEN_READ')
+  @Post('/exports')
+  createExport(
+    @ValidatedBody(henkatenExportFiltersSchema) filters: HenkatenExportFilters,
+    @Req() request: ContextRequest,
+  ) {
+    return this.exports.create(
+      this.access.supplierScope(request).supplierId,
+      this.access.principal(request),
+      filters,
+      mutationContext(request),
+    );
+  }
+
+  @RequireCapabilities('SUPPLIER_HENKATEN_READ')
+  @Get('/exports/:exportId')
+  exportStatus(@Param('exportId') exportId: string, @Req() request: ContextRequest) {
+    return this.exports.status(
+      this.access.supplierScope(request).supplierId,
+      this.access.principal(request),
+      parseWithSchema(opaqueIdSchema, exportId),
+    );
+  }
+
+  @RequireCapabilities('SUPPLIER_HENKATEN_READ')
+  @Get('/exports/:exportId/file')
+  @Header('Cache-Control', 'private, no-store')
+  async exportFile(@Param('exportId') exportId: string, @Req() request: ContextRequest) {
+    const file = await this.exports.file(
+      this.access.supplierScope(request).supplierId,
+      this.access.principal(request),
+      parseWithSchema(opaqueIdSchema, exportId),
+      mutationContext(request),
+    );
+    return new StreamableFile(file.stream, {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      disposition: `attachment; filename="${file.filename}"`,
+    });
   }
 
   @RequireCapabilities('SUPPLIER_HENKATEN_SUBMIT')
@@ -160,6 +204,7 @@ export class TmminHenkatenController {
   constructor(
     private readonly access: OperationalAccessService,
     private readonly henkatens: HenkatenService,
+    private readonly exports: HenkatenExportService,
   ) {}
 
   @RequireCapabilities('TMMIN_HENKATEN_READ')
@@ -174,6 +219,55 @@ export class TmminHenkatenController {
       await this.access.assertTmminReadable(id, this.access.principal(request)),
       query,
     );
+  }
+
+  @RequireCapabilities('TMMIN_HENKATEN_READ')
+  @Post('/exports')
+  createExport(
+    @Param('supplierId') supplierId: string,
+    @ValidatedBody(henkatenExportFiltersSchema) filters: HenkatenExportFilters,
+    @Req() request: ContextRequest,
+  ) {
+    return this.exports.create(
+      parseWithSchema(opaqueIdSchema, supplierId),
+      this.access.principal(request),
+      filters,
+      mutationContext(request),
+    );
+  }
+
+  @RequireCapabilities('TMMIN_HENKATEN_READ')
+  @Get('/exports/:exportId')
+  exportStatus(
+    @Param('supplierId') supplierId: string,
+    @Param('exportId') exportId: string,
+    @Req() request: ContextRequest,
+  ) {
+    return this.exports.status(
+      parseWithSchema(opaqueIdSchema, supplierId),
+      this.access.principal(request),
+      parseWithSchema(opaqueIdSchema, exportId),
+    );
+  }
+
+  @RequireCapabilities('TMMIN_HENKATEN_READ')
+  @Get('/exports/:exportId/file')
+  @Header('Cache-Control', 'private, no-store')
+  async exportFile(
+    @Param('supplierId') supplierId: string,
+    @Param('exportId') exportId: string,
+    @Req() request: ContextRequest,
+  ) {
+    const file = await this.exports.file(
+      parseWithSchema(opaqueIdSchema, supplierId),
+      this.access.principal(request),
+      parseWithSchema(opaqueIdSchema, exportId),
+      mutationContext(request),
+    );
+    return new StreamableFile(file.stream, {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      disposition: `attachment; filename="${file.filename}"`,
+    });
   }
 
   @RequireCapabilities('TMMIN_HENKATEN_READ')

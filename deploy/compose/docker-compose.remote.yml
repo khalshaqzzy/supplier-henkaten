@@ -49,6 +49,7 @@ x-api-environment: &api-environment
   ARGON2_ITERATIONS: ${ARGON2_ITERATIONS:-2}
   ARGON2_PARALLELISM: ${ARGON2_PARALLELISM:-1}
   PHOTO_STORAGE_ROOT: /var/lib/supplier-henkaten/member-photos
+  EXPORT_STORAGE_ROOT: /var/lib/supplier-henkaten/member-photos/exports
 
 services:
   postgres:
