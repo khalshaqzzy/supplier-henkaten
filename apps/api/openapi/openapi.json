@@ -26917,6 +26917,9 @@
                             ],
                             "additionalProperties": false
                           },
+                          "shiftName": {
+                            "type": "string"
+                          },
                           "jobName": {
                             "type": "string"
                           },
@@ -27345,6 +27348,7 @@
                           "effectiveStartAt",
                           "effectiveEndAt",
                           "line",
+                          "shiftName",
                           "jobName",
                           "part",
                           "routes",
@@ -27957,6 +27961,9 @@
                       ],
                       "additionalProperties": false
                     },
+                    "shiftName": {
+                      "type": "string"
+                    },
                     "jobName": {
                       "type": "string"
                     },
@@ -28368,9 +28375,6 @@
                       ]
                     },
                     "timezone": {
-                      "type": "string"
-                    },
-                    "shiftName": {
                       "type": "string"
                     },
                     "creatorName": {
@@ -28857,13 +28861,13 @@
                     "effectiveStartAt",
                     "effectiveEndAt",
                     "line",
+                    "shiftName",
                     "jobName",
                     "part",
                     "routes",
                     "version",
                     "pcr",
                     "timezone",
-                    "shiftName",
                     "creatorName",
                     "cause",
                     "detail",
@@ -29994,6 +29998,9 @@
                       ],
                       "additionalProperties": false
                     },
+                    "shiftName": {
+                      "type": "string"
+                    },
                     "jobName": {
                       "type": "string"
                     },
@@ -30405,9 +30412,6 @@
                       ]
                     },
                     "timezone": {
-                      "type": "string"
-                    },
-                    "shiftName": {
                       "type": "string"
                     },
                     "creatorName": {
@@ -30894,13 +30898,13 @@
                     "effectiveStartAt",
                     "effectiveEndAt",
                     "line",
+                    "shiftName",
                     "jobName",
                     "part",
                     "routes",
                     "version",
                     "pcr",
                     "timezone",
-                    "shiftName",
                     "creatorName",
                     "cause",
                     "detail",
@@ -31318,6 +31322,9 @@
                       ],
                       "additionalProperties": false
                     },
+                    "shiftName": {
+                      "type": "string"
+                    },
                     "jobName": {
                       "type": "string"
                     },
@@ -31729,9 +31736,6 @@
                       ]
                     },
                     "timezone": {
-                      "type": "string"
-                    },
-                    "shiftName": {
                       "type": "string"
                     },
                     "creatorName": {
@@ -32218,13 +32222,13 @@
                     "effectiveStartAt",
                     "effectiveEndAt",
                     "line",
+                    "shiftName",
                     "jobName",
                     "part",
                     "routes",
                     "version",
                     "pcr",
                     "timezone",
-                    "shiftName",
                     "creatorName",
                     "cause",
                     "detail",
@@ -32543,6 +32547,9 @@
                       ],
                       "additionalProperties": false
                     },
+                    "shiftName": {
+                      "type": "string"
+                    },
                     "jobName": {
                       "type": "string"
                     },
@@ -32954,9 +32961,6 @@
                       ]
                     },
                     "timezone": {
-                      "type": "string"
-                    },
-                    "shiftName": {
                       "type": "string"
                     },
                     "creatorName": {
@@ -33443,13 +33447,13 @@
                     "effectiveStartAt",
                     "effectiveEndAt",
                     "line",
+                    "shiftName",
                     "jobName",
                     "part",
                     "routes",
                     "version",
                     "pcr",
                     "timezone",
-                    "shiftName",
                     "creatorName",
                     "cause",
                     "detail",
@@ -33761,6 +33765,9 @@
                       ],
                       "additionalProperties": false
                     },
+                    "shiftName": {
+                      "type": "string"
+                    },
                     "jobName": {
                       "type": "string"
                     },
@@ -34172,9 +34179,6 @@
                       ]
                     },
                     "timezone": {
-                      "type": "string"
-                    },
-                    "shiftName": {
                       "type": "string"
                     },
                     "creatorName": {
@@ -34661,13 +34665,13 @@
                     "effectiveStartAt",
                     "effectiveEndAt",
                     "line",
+                    "shiftName",
                     "jobName",
                     "part",
                     "routes",
                     "version",
                     "pcr",
                     "timezone",
-                    "shiftName",
                     "creatorName",
                     "cause",
                     "detail",
@@ -35467,6 +35471,9 @@
                             ],
                             "additionalProperties": false
                           },
+                          "shiftName": {
+                            "type": "string"
+                          },
                           "jobName": {
                             "type": "string"
                           },
@@ -35895,6 +35902,7 @@
                           "effectiveStartAt",
                           "effectiveEndAt",
                           "line",
+                          "shiftName",
                           "jobName",
                           "part",
                           "routes",
@@ -37030,6 +37038,9 @@
                       ],
                       "additionalProperties": false
                     },
+                    "shiftName": {
+                      "type": "string"
+                    },
                     "jobName": {
                       "type": "string"
                     },
@@ -37441,9 +37452,6 @@
                       ]
                     },
                     "timezone": {
-                      "type": "string"
-                    },
-                    "shiftName": {
                       "type": "string"
                     },
                     "creatorName": {
@@ -37930,13 +37938,13 @@
                     "effectiveStartAt",
                     "effectiveEndAt",
                     "line",
+                    "shiftName",
                     "jobName",
                     "part",
                     "routes",
                     "version",
                     "pcr",
                     "timezone",
-                    "shiftName",
                     "creatorName",
                     "cause",
                     "detail",

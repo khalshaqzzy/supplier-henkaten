@@ -54,7 +54,7 @@ export function SetupPage() {
       />
       {identity.purpose === 'HOSTED_PREPARATION' && (
         <Alert tone="warning" title="Mode persiapan aktif">
-          Route operasional ditolak server sampai source governance menyelesaikan cutover.
+          Henkaten baru dapat diajukan setelah persiapan selesai.
         </Alert>
       )}
       {readiness.isLoading && (

@@ -325,7 +325,7 @@ export function PageHeader({
         )}
         {eyebrow && <span className="tmmin-eyebrow">{eyebrow}</span>}
         <h1 tabIndex={-1}>{title}</h1>
-        <p>{description}</p>
+        {description && <p>{description}</p>}
       </div>
       {actions && <div>{actions}</div>}
     </header>

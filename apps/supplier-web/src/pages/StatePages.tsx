@@ -18,7 +18,7 @@ export function ForbiddenPage() {
         <Ban aria-hidden="true" />
         <span className="product-eyebrow">403 · Akses ditolak</span>
         <h1>Anda tidak memiliki akses ke halaman ini.</h1>
-        <p>Capability dan scope line diverifikasi kembali oleh server pada setiap permintaan.</p>
+        <p>Hubungi admin jika Anda perlu akses.</p>
         <Link className="hds-button hds-button--primary hds-button--md" to="/">
           Kembali ke halaman utama
         </Link>

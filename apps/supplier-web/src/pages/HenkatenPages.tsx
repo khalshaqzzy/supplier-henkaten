@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiProblemError, createIdempotencyKey } from '@tmmin-henkaten/api-client';
-import type { HenkatenListQuery } from '@tmmin-henkaten/contracts';
+import type { ApprovalRouteStatus, HenkatenListQuery, PcrStatus } from '@tmmin-henkaten/contracts';
 import {
   Alert,
   AlertDialog,
@@ -86,10 +86,14 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
     next.delete('cursor');
     setParams(next, { replace: true });
   };
+  const advancedKeys = approvalQueue
+    ? ['from', 'to']
+    : ['from', 'to', 'approvalRoute', 'approvalStatus'];
+  const advancedCount = advancedKeys.filter((key) => params.has(key)).length;
   return (
-    <div className="product-page">
+    <div className="product-page henkaten-list-page">
       <PageHeader
-        eyebrow={approvalQueue ? 'Ruang keputusan' : 'Ketertelusuran 4M'}
+        eyebrow={approvalQueue ? '' : 'Ketertelusuran 4M'}
         title={approvalQueue ? 'Antrean Approval' : 'Henkaten'}
         description=""
         actions={
@@ -176,62 +180,67 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
             ))}
           </NativeSelect>
         </label>
-        <label>
-          <span>Dari</span>
-          <Input
-            type="date"
-            value={params.get('from') ?? ''}
-            onChange={(event) => update('from', event.target.value)}
-          />
-        </label>
-        <label>
-          <span>Sampai</span>
-          <Input
-            type="date"
-            value={params.get('to') ?? ''}
-            onChange={(event) => update('to', event.target.value)}
-          />
-        </label>
-        {!approvalQueue && (
-          <>
-            <label>
-              <span>Approval route</span>
-              <NativeSelect
-                value={params.get('approvalRoute') ?? ''}
-                onChange={(event) => update('approvalRoute', event.target.value)}
-              >
-                <option value="">Semua route</option>
-                <option value="SUPERVISOR">Supervisor</option>
-                <option value="QC">QC</option>
-              </NativeSelect>
-            </label>
-            <label>
-              <span>Approval status</span>
-              <NativeSelect
-                value={params.get('approvalStatus') ?? ''}
-                onChange={(event) => update('approvalStatus', event.target.value)}
-              >
-                <option value="">Semua approval</option>
-                <option value="PENDING">Pending</option>
-                <option value="APPROVED">Approved</option>
-                <option value="REJECTED">Rejected</option>
-                <option value="NOT_REQUIRED">Not Required</option>
-              </NativeSelect>
-            </label>
-          </>
-        )}
       </FilterBar>
+      <details className="henkaten-more-filters" open={advancedCount > 0}>
+        <summary>Filter lainnya{advancedCount ? ` (${advancedCount} aktif)` : ''}</summary>
+        <div className="henkaten-more-filters__fields">
+          <label>
+            <span>Dari</span>
+            <Input
+              type="date"
+              value={params.get('from') ?? ''}
+              onChange={(event) => update('from', event.target.value)}
+            />
+          </label>
+          <label>
+            <span>Sampai</span>
+            <Input
+              type="date"
+              value={params.get('to') ?? ''}
+              onChange={(event) => update('to', event.target.value)}
+            />
+          </label>
+          {!approvalQueue && (
+            <>
+              <label>
+                <span>Approval route</span>
+                <NativeSelect
+                  value={params.get('approvalRoute') ?? ''}
+                  onChange={(event) => update('approvalRoute', event.target.value)}
+                >
+                  <option value="">Semua route</option>
+                  <option value="SUPERVISOR">Supervisor</option>
+                  <option value="QC">QC</option>
+                </NativeSelect>
+              </label>
+              <label>
+                <span>Approval status</span>
+                <NativeSelect
+                  value={params.get('approvalStatus') ?? ''}
+                  onChange={(event) => update('approvalStatus', event.target.value)}
+                >
+                  <option value="">Semua approval</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="REJECTED">Rejected</option>
+                  <option value="NOT_REQUIRED">Not Required</option>
+                </NativeSelect>
+              </label>
+            </>
+          )}
+        </div>
+      </details>
       {list.isLoading && <HenkatenSkeleton />}
       {list.isError && (
         <ErrorState
           title={`${approvalQueue ? 'Antrean Approval' : 'Henkaten'} tidak dapat dimuat`}
-          description="Coba refetch tanpa mengubah filter URL."
+          description="Filter tetap tersimpan."
           action={<Button onClick={() => void list.refetch()}>Coba lagi</Button>}
         />
       )}
       {list.data?.items.length === 0 && (
         <EmptyState
-          title={approvalQueue ? 'Tidak ada approval pending' : 'Belum ada Henkaten'}
+          title={approvalQueue ? 'Tidak ada approval tertunda' : 'Tidak ada Henkaten'}
           description=""
           action={
             params.size ? (
@@ -244,25 +253,40 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
         <>
           <div className="data-table-wrap">
             <table className="data-table henkaten-table">
+              <colgroup>
+                <col className="henkaten-table__identity" />
+                <col className="henkaten-table__category" />
+                <col className="henkaten-table__line" />
+                <col className="henkaten-table__shift" />
+                <col className="henkaten-table__part" />
+                <col className="henkaten-table__supervisor" />
+                <col className="henkaten-table__qc" />
+                <col className="henkaten-table__pcr" />
+                <col className="henkaten-table__status" />
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Identifier</th>
+                  <th>Henkaten</th>
                   <th>4M</th>
                   <th>Line / Job</th>
+                  <th>Shift</th>
                   <th>Part</th>
-                  <th>Business date</th>
                   <th>Supervisor</th>
                   <th>QC</th>
+                  <th>PCR</th>
                   <th>Status</th>
-                  <th />
                 </tr>
               </thead>
               <tbody>
                 {list.data.items.map((item) => (
                   <tr key={item.id}>
-                    <td data-label="Identifier">
-                      <strong>{item.identifier}</strong>
-                      {item.pcr?.status === 'PCR' && <PcrBadge />}
+                    <td data-label="Henkaten">
+                      <div className="henkaten-table__stack">
+                        <Link className="henkaten-table__record-link" to={`/henkatens/${item.id}`}>
+                          {item.identifier}
+                        </Link>
+                        <small>{item.businessDate}</small>
+                      </div>
                     </td>
                     <td data-label="4M">
                       <span className={`category-badge is-${item.category.toLowerCase()}`}>
@@ -270,29 +294,31 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
                       </span>
                     </td>
                     <td data-label="Line / Job">
-                      {item.line.code} · {item.jobName}
+                      <div className="henkaten-table__stack">
+                        <strong>{item.line.code}</strong>
+                        <small>{item.jobName}</small>
+                      </div>
                     </td>
+                    <td data-label="Shift">{item.shiftName}</td>
                     <td data-label="Part">
-                      <strong>{item.part.number}</strong>
-                      <small>{item.part.name}</small>
-                    </td>
-                    <td data-label="Business date">
-                      {item.businessDate}
-                      <small>{formatDate(item.occurredAt, session!.supplier!.timezone)}</small>
+                      <div className="henkaten-table__stack">
+                        <strong>{item.part.number}</strong>
+                        <small>{item.part.name}</small>
+                      </div>
                     </td>
                     <td data-label="Supervisor">
-                      <RouteStatus value={item.routes.supervisor.status} />
+                      <CompactRouteStatus value={item.routes.supervisor.status} />
                     </td>
                     <td data-label="QC">
-                      <RouteStatus value={item.routes.qc.status} />
+                      <CompactRouteStatus value={item.routes.qc.status} />
+                    </td>
+                    <td data-label="PCR">
+                      <PcrListStatus value={item.pcr?.status} />
                     </td>
                     <td data-label="Status">
                       <span className={`status-label is-${item.status.toLowerCase()}`}>
                         {humanize(item.status)}
                       </span>
-                    </td>
-                    <td data-label="Aksi">
-                      <Link to={`/henkatens/${item.id}`}>Buka</Link>
                     </td>
                   </tr>
                 ))}
@@ -415,6 +441,18 @@ export function HenkatenDetailPage() {
         status={
           <div className="henkaten-header-status">
             {item.pcr?.status === 'PCR' && <PcrBadge />}
+            {item.pcr?.status !== 'PCR' && (
+              <span className="henkaten-detail-pcr">
+                PCR:{' '}
+                {item.pcr?.status === 'NO_PCR'
+                  ? 'No-PCR'
+                  : item.pcr?.status === 'PENDING'
+                    ? 'Menunggu'
+                    : item.pcr?.status === 'REVIEW'
+                      ? 'Perlu tinjauan'
+                      : 'Belum dinilai'}
+              </span>
+            )}
             <span className={`status-label is-${item.status.toLowerCase()}`}>
               {humanize(item.status)}
             </span>
@@ -713,8 +751,33 @@ function RouteStatus({ value }: { value: string }) {
     </span>
   );
 }
+function CompactRouteStatus({ value }: { value: ApprovalRouteStatus }) {
+  if (value === 'NOT_REQUIRED') {
+    return <span className="route-status is-not-required">Tidak perlu</span>;
+  }
+  return <RouteStatus value={value} />;
+}
 function PcrBadge() {
   return <span className="pcr-badge">PCR</span>;
+}
+export function PcrListStatus({ value }: { value: PcrStatus | undefined }) {
+  const label = value === 'PCR' ? 'PCR' : value === 'NO_PCR' ? 'No-PCR' : '-';
+  const accessibleLabel =
+    value === 'PENDING'
+      ? 'Menunggu penilaian PCR'
+      : value === 'REVIEW'
+        ? 'Penilaian PCR perlu ditinjau'
+        : value === undefined
+          ? 'Belum dinilai untuk PCR'
+          : undefined;
+  return (
+    <span
+      className={`henkaten-pcr-status is-${value?.toLowerCase() ?? 'unassessed'}`}
+      aria-label={accessibleLabel}
+    >
+      {label}
+    </span>
+  );
 }
 function HenkatenSkeleton() {
   return (

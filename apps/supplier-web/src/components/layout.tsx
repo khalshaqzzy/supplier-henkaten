@@ -404,7 +404,7 @@ export function PageHeader({
           <h1 tabIndex={-1}>{title}</h1>
           {status}
         </div>
-        <p>{description}</p>
+        {description && <p>{description}</p>}
         {meta && <div className="product-page-header__meta">{meta}</div>}
       </div>
       {actions && <div className="product-page-header__actions">{actions}</div>}

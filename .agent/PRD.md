@@ -2479,6 +2479,17 @@ assessment result and resumes after refresh. PCR detail shows the assessment and
 submit through the established route and contact TMMIN QD for technical difficulty or a suspected
 classification error. Notifications use the transactional outbox and access-scoped deep links.
 
+After Hosted submission, only the submitting Line Leader sees a PCR dialog when the assessment
+resolves to PCR, including after refresh of the waiting screen. It instructs submission through
+the established PCR route, shows the assessment explanation (identified as AI when sourced from
+AI), and briefly advises contacting TMMIN QD for a difficulty or suspected
+classification error. Direct links and other Supplier roles do not open the dialog. The Supplier
+Henkaten list shows the saved shift snapshot and PCR in separate columns, with Supervisor and QC
+approval in separate status columns. PCR and No-PCR have visible labels; Pending, Review, and
+unassessed records display `-` in the compact PCR column. Their precise state remains available
+to assistive technology and on detail. The desktop table fits without horizontal scrolling, and
+the list header and filters use compact vertical spacing.
+
 Local seed retains two suppliers and 240 Henkaten. It creates deterministic PCR, No-PCR, review,
 and manual-correction examples on Open and Closed records without bulk model inference. Production
 requires explicit PCR inference endpoint and credential configuration; absent or failed inference

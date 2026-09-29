@@ -120,6 +120,7 @@ export const henkatenSummarySchema = z
     effectiveStartAt: utcTimestampSchema.nullable(),
     effectiveEndAt: utcTimestampSchema.nullable(),
     line: z.object({ code: z.string(), name: z.string() }).strict(),
+    shiftName: z.string(),
     jobName: z.string(),
     part: z.object({ number: z.string(), name: z.string() }).strict(),
     routes: approvalRouteSummarySchema,
@@ -161,7 +162,6 @@ export const henkatenTransitionSchema = z
 export const henkatenDetailSchema = henkatenSummarySchema
   .extend({
     timezone: z.string(),
-    shiftName: z.string(),
     creatorName: z.string(),
     cause: z.string(),
     detail: z.string(),
