@@ -381,6 +381,14 @@ describe('Line Shift Henkaten operations', () => {
       });
     expect(created.status).toBe(201);
     expect(created.body.lineShiftId).toBe(lineShiftId);
+    const listed = await request(app.getHttpServer())
+      .get('/api/v1/supplier/henkatens?limit=25')
+      .set('Cookie', leaderCookie);
+    expect(listed.status).toBe(200);
+    const items = listed.body.items as Array<{ id: string; shiftName: string }>;
+    expect(items.find((item) => item.id === created.body.id)).toMatchObject({
+      shiftName: created.body.shiftName,
+    });
     const stale = await request(app.getHttpServer())
       .post('/api/v1/supplier/henkatens')
       .set('Origin', supplierOrigin)

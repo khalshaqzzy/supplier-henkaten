@@ -41,6 +41,7 @@ export function presentHenkatenSummary(row: SummaryRow) {
     effectiveStartAt: row.effectiveStartAt?.toISOString() ?? null,
     effectiveEndAt: row.effectiveEndAt?.toISOString() ?? null,
     line: { code: row.lineCodeSnapshot, name: row.lineNameSnapshot },
+    shiftName: row.shiftNameSnapshot,
     jobName: row.jobNameSnapshot,
     part: { number: row.partNumberSnapshot, name: row.partNameSnapshot },
     routes: routeSummary(row.approvalRoutes),
@@ -64,7 +65,6 @@ export function presentHenkatenDetail(row: DetailRow) {
   return {
     ...presentHenkatenSummary(row),
     timezone: row.timezoneSnapshot,
-    shiftName: row.shiftNameSnapshot,
     creatorName: row.creatorNameSnapshot,
     cause: row.cause,
     detail: row.detail,

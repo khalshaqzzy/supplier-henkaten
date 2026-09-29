@@ -1,6 +1,8 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { canDecideHenkaten } from './HenkatenPages';
+import { PcrListStatus, canDecideHenkaten } from './HenkatenPages';
 
 describe('Henkaten approval action ownership', () => {
   it('offers a pending Supervisor decision only to its current owner and keeps QC shared', () => {
@@ -25,5 +27,20 @@ describe('Henkaten approval action ownership', () => {
         memberId: 'new-supervisor',
       }),
     ).toBe(false);
+  });
+});
+
+describe('Henkaten PCR status labels', () => {
+  it('shows a dash for unresolved states while keeping their accessible meaning', () => {
+    for (const [value, label] of [
+      ['PENDING', 'Menunggu penilaian PCR'],
+      ['REVIEW', 'Penilaian PCR perlu ditinjau'],
+      [undefined, 'Belum dinilai untuk PCR'],
+    ] as const) {
+      const html = renderToStaticMarkup(createElement(PcrListStatus, { value }));
+      expect(html).toContain(`aria-label="${label}"`);
+      expect(html).toContain('>-</span>');
+      expect(html).not.toContain('No-PCR');
+    }
   });
 });

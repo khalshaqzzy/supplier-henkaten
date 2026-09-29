@@ -65,7 +65,7 @@ export function OverviewPage() {
       <PageHeader
         eyebrow="Monitoring lintas supplier"
         title="Ringkasan Global"
-        description="Pantau risiko, warning, dan freshness dari sumber Hosted dan External dalam satu tampilan."
+        description=""
         actions={
           <UpdatedAt
             value={result.data?.generatedAt}
@@ -165,7 +165,7 @@ export function OverviewPage() {
                 ]}
               />
             </Panel>
-            <Panel title="Tren outcome" description="Status lifecycle per periode">
+            <Panel title="Tren status" description="">
               <ChartFrame
                 title=""
                 data={result.data.trend.map((item) => ({
@@ -197,7 +197,7 @@ export function OverviewPage() {
             <RankingPanel rankings={result.data.rankings} />
           </div>
           <div className="tmmin-signal-grid">
-            <Panel title="Ringkasan freshness" description="Kondisi data supplier saat ini">
+            <Panel title="Keterbaruan data" description="">
               <FreshnessSummary
                 summary={result.data.freshnessSummary}
                 total={
@@ -208,7 +208,7 @@ export function OverviewPage() {
                 }
               />
             </Panel>
-            <Panel title="Kesehatan ingesti" description="Aktivitas External authoritative">
+            <Panel title="Data External" description="">
               <div className="tmmin-health-list">
                 <HealthRow
                   label="Accepted"
@@ -267,7 +267,7 @@ export function OverviewPage() {
           </div>
           <Panel
             title="Ringkasan risiko supplier"
-            description="Maksimal 10 supplier, diurutkan server berdasarkan Open Henkaten dan warning"
+            description="10 supplier dengan Henkaten Open dan peringatan terbanyak"
             action={
               <Link className="tmmin-panel-link" to="/suppliers">
                 Lihat semua supplier
@@ -478,9 +478,9 @@ export function HenkatenExplorerPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Penelusuran source-aware"
+        eyebrow="Penelusuran"
         title="Henkaten"
-        description="Identitas Hosted dan snapshot External tetap terpisah dalam satu urutan stabil."
+        description=""
         actions={<UpdatedAt fetching={result.isFetching} retry={() => void result.refetch()} />}
       />
       <div className="tmmin-filter-strip">
@@ -534,7 +534,7 @@ export function HenkatenExplorerPage() {
       ) : result.data.items.length === 0 ? (
         <QueryState />
       ) : (
-        <Panel title="Record Henkaten" description="Hasil source-aware yang difilter server">
+        <Panel title="Daftar Henkaten" description="">
           <div className="tmmin-table-scroll">
             <table className="tmmin-table">
               <thead>
@@ -641,7 +641,7 @@ export function HenkatenDetailPage() {
       <PageHeader
         eyebrow={`${external ? 'External snapshot' : 'Hosted operational record'} · Epoch ${stringValue(data.sourceEpoch)}`}
         title={stringValue(data.sourceHenkatenId) || stringValue(data.identifier) || recordId}
-        description="Tinjau bukti perubahan, penilaian PCR, dan keputusan tindak lanjut."
+        description=""
       />
       <div className="tmmin-detail-layout">
         <div>
@@ -701,7 +701,7 @@ export function HenkatenDetailPage() {
               Tinjau bukti perubahan dan tetapkan keputusan bila tindak lanjut PCR diperlukan.
             </Alert>
           )}
-          <Panel title="Penyebab & detail" description="Bukti perubahan yang dilaporkan Supplier">
+          <Panel title="Penyebab & detail" description="">
             <div className="tmmin-evidence">
               <div>
                 <span>PENYEBAB</span>
@@ -736,7 +736,7 @@ export function HenkatenDetailPage() {
               <div>
                 <span className="tmmin-section-kicker">TMMIN REVIEW</span>
                 <h2>Ubah keputusan PCR</h2>
-                <p>Keputusan dan alasan tersimpan dalam riwayat audit.</p>
+                <p>Alasan wajib diisi.</p>
               </div>
               <form
                 onSubmit={(event) => {
@@ -1062,11 +1062,7 @@ export function NotificationsPage() {
   });
   return (
     <>
-      <PageHeader
-        eyebrow="Inbox berbasis role"
-        title="Notifikasi"
-        description="Pembaruan PCR dan Henkaten yang perlu ditinjau tersedia di tab khusus."
-      />
+      <PageHeader eyebrow="Inbox berbasis role" title="Notifikasi" description="" />
       <div className="tmmin-pcr-tabs" role="tablist" aria-label="Jenis notifikasi">
         {(
           [

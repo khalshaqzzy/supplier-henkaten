@@ -305,9 +305,12 @@ export function Popover({
 }
 
 export interface DialogProps {
-  trigger: ReactElement;
+  trigger?: ReactElement;
   title: string;
   description?: string;
+  eyebrow?: string;
+  headerAdornment?: ReactNode;
+  className?: string;
   children?: ReactNode;
   footer?: ReactNode;
   open?: boolean;
@@ -320,6 +323,9 @@ export function Dialog({
   trigger,
   title,
   description,
+  eyebrow,
+  headerAdornment,
+  className,
   children,
   footer,
   open,
@@ -333,12 +339,14 @@ export function Dialog({
       {...(defaultOpen !== undefined ? { defaultOpen } : {})}
       {...(onOpenChange ? { onOpenChange } : {})}
     >
-      <RadixDialog.Trigger asChild>{trigger}</RadixDialog.Trigger>
+      {trigger && <RadixDialog.Trigger asChild>{trigger}</RadixDialog.Trigger>}
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="hds-dialog__overlay" />
-        <RadixDialog.Content className={cn('hds-dialog', `hds-dialog--${size}`)}>
+        <RadixDialog.Content className={cn('hds-dialog', `hds-dialog--${size}`, className)}>
           <div className="hds-dialog__header">
+            {headerAdornment && <div className="hds-dialog__adornment">{headerAdornment}</div>}
             <div>
+              {eyebrow && <span className="hds-dialog__eyebrow">{eyebrow}</span>}
               <RadixDialog.Title>{title}</RadixDialog.Title>
               {description && <RadixDialog.Description>{description}</RadixDialog.Description>}
             </div>

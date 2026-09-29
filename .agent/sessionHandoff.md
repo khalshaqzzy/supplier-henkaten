@@ -1,4 +1,24 @@
-# Current Session Handoff — Hosted Henkaten Excel export
+# Current Session Handoff — Supplier Henkaten list and PCR guidance
+
+- Date: 2026-09-29
+- Branch: `feat/minor-ui-improvements`, based on `origin/main`; target PR to `main`.
+- Phase: 15 remains `in_progress`; staging and device acceptance remain pending.
+
+The submitting Line Leader now sees a PCR guidance dialog after the assessment resolves to PCR. The dialog shows the actual assessment text and labels it as AI only when the decision source is AI; it then directs PCR submission through the established channel, gives a short TMMIN QD contact note, and opens the Henkaten detail when dismissed. Other roles, direct links, and No-PCR results do not open it. The final design was refined from two imagegen-frontend-web references and user feedback: a full-height orange left field with a white document-check icon, no outer white border around the orange, an increased inset to the text column, concise hierarchy, and one compact detail action. Mobile uses a top accent and compact icon tile. Generated design references remain outside the repository.
+
+The Supplier Henkaten list now includes the stored shift snapshot and separate Supervisor, QC, and PCR columns. Approval decisions use compact icon and text pills. PCR and No-PCR have visible badges; unresolved and historical PCR states show a dash in the list with accessible state names and full detail state retained. The desktop table fits without horizontal scrolling at 1280, 1440, and 1672 px; 390 px uses labeled cards. The header, filters, and vertical gaps are tighter. Selected Supplier and TMMIN helper copy was shortened. The shared summary contract, presenter, OpenAPI artifact, client, focused tests, PRD, roadmap, and ADR 0044 were updated.
+
+Validation: clean-artifact `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, API OpenAPI generation/check, and `VITE_API_ORIGIN=https://api.example.invalid pnpm build` passed. A fresh disposable database applied all 18 migrations and `pnpm test:integration` passed 41/41. Four isolated Chromium browser journeys passed using `pnpm test:e2e:chromium`; local Edge installation was unavailable. A rendered desktop/mobile dialog fixture was inspected after the final spacing and border adjustments, with no viewport overflow. An isolated fresh local-seed smoke using uniquely named Compose volumes produced two Hosted suppliers and 240 Henkaten; `local-seed.ts` already writes `shiftNameSnapshot`, so no fixture edit was required. The first disposable seed attempt hit the default API rate limit, then passed after matching the local lifecycle's higher test limit.
+
+After the final dialog revision, the Supplier unit suite passed 66/66 tests, including AI and TMMIN source attribution; Supplier typecheck, production build, and repository format check passed again. The rendered desktop/mobile fixture was inspected with assessment text visible.
+
+The local deployment checks passed: migration destructive check against `origin/main`, `pnpm deployment:validate`, Linux Docker CLI `pnpm test:deployment` equivalent with real `flock`, `pnpm security:exceptions:check`, `pnpm security:audit` (one high finding already covered by the exact exception registry), workflow-pinned Actionlint, ShellCheck, Hadolint, Ubuntu 22.04 bootstrap input checks, and Gitleaks v8.24.3 directory scan. The five-image production Compose build, migration, bootstrap/idempotence, release routing, readiness, security headers, non-root/private database, and restart persistence passed; the stack was stopped. Trivy 0.70.0 filesystem and five runtime image HIGH/CRITICAL scans passed using the exact ignore file. All task-started containers were stopped. `git diff --check` passed. Host Node is 22.23.2 versus CI-pinned 22.23.1; Docker builds used 22.23.1.
+
+Delivery: the branch was pushed and [PR #34](https://github.com/khalshaqzzy/supplier-henkaten/pull/34) was opened against `main` and attached to this task. The HEAD-comparing combined `pnpm openapi:check`, migration policy check, and Gitleaks commit scan passed before push. The user explicitly requested no PR check monitoring, so no PR check status is claimed. Staging UAT remains the release gate; no production deployment is claimed.
+
+---
+
+# Previous Session Handoff — Hosted Henkaten Excel export
 
 - Date: 2026-09-29
 - Branch: `feat/excel-export`, based on `origin/main`; target PR to `main`.

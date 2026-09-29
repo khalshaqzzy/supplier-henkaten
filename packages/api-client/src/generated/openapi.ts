@@ -11278,6 +11278,7 @@ export interface paths {
                   code: string;
                   name: string;
                 };
+                shiftName: string;
                 jobName: string;
                 part: {
                   number: string;
@@ -11520,6 +11521,7 @@ export interface paths {
                 code: string;
                 name: string;
               };
+              shiftName: string;
               jobName: string;
               part: {
                 number: string;
@@ -11588,7 +11590,6 @@ export interface paths {
                 updatedAt: string;
               } | null;
               timezone: string;
-              shiftName: string;
               creatorName: string;
               cause: string;
               detail: string;
@@ -12151,6 +12152,7 @@ export interface paths {
                 code: string;
                 name: string;
               };
+              shiftName: string;
               jobName: string;
               part: {
                 number: string;
@@ -12219,7 +12221,6 @@ export interface paths {
                 updatedAt: string;
               } | null;
               timezone: string;
-              shiftName: string;
               creatorName: string;
               cause: string;
               detail: string;
@@ -12466,6 +12467,7 @@ export interface paths {
                 code: string;
                 name: string;
               };
+              shiftName: string;
               jobName: string;
               part: {
                 number: string;
@@ -12534,7 +12536,6 @@ export interface paths {
                 updatedAt: string;
               } | null;
               timezone: string;
-              shiftName: string;
               creatorName: string;
               cause: string;
               detail: string;
@@ -12731,6 +12732,7 @@ export interface paths {
                 code: string;
                 name: string;
               };
+              shiftName: string;
               jobName: string;
               part: {
                 number: string;
@@ -12799,7 +12801,6 @@ export interface paths {
                 updatedAt: string;
               } | null;
               timezone: string;
-              shiftName: string;
               creatorName: string;
               cause: string;
               detail: string;
@@ -12995,6 +12996,7 @@ export interface paths {
                 code: string;
                 name: string;
               };
+              shiftName: string;
               jobName: string;
               part: {
                 number: string;
@@ -13063,7 +13065,6 @@ export interface paths {
                 updatedAt: string;
               } | null;
               timezone: string;
-              shiftName: string;
               creatorName: string;
               cause: string;
               detail: string;
@@ -13390,6 +13391,7 @@ export interface paths {
                   code: string;
                   name: string;
                 };
+                shiftName: string;
                 jobName: string;
                 part: {
                   number: string;
@@ -13979,6 +13981,7 @@ export interface paths {
                 code: string;
                 name: string;
               };
+              shiftName: string;
               jobName: string;
               part: {
                 number: string;
@@ -14047,7 +14050,6 @@ export interface paths {
                 updatedAt: string;
               } | null;
               timezone: string;
-              shiftName: string;
               creatorName: string;
               cause: string;
               detail: string;

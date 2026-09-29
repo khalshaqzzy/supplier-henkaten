@@ -61,7 +61,7 @@ export function SuppliersPage() {
       <PageHeader
         eyebrow="Registry supplier"
         title="Supplier"
-        description="Lifecycle, source mode, timezone, dan konteks administrasi terkini."
+        description=""
         actions={
           admin ? (
             <Button
@@ -106,10 +106,7 @@ export function SuppliersPage() {
       ) : result.data.items.length === 0 ? (
         <QueryState />
       ) : (
-        <Panel
-          title={`${result.data.items.length} suppliers`}
-          description="Filter server-side dengan urutan cursor yang stabil"
-        >
+        <Panel title={`${result.data.items.length} suppliers`} description="">
           <div className="tmmin-table-scroll">
             <table className="tmmin-table">
               <thead>
@@ -239,11 +236,7 @@ export function SupplierCreatePage() {
   const sourceMode = form.watch('sourceMode');
   return (
     <>
-      <PageHeader
-        eyebrow="Provisioning supplier"
-        title="Buat supplier"
-        description="Timezone divalidasi sebagai IANA dan identitas Hosted memakai credential satu kali."
-      />
+      <PageHeader eyebrow="Provisioning supplier" title="Buat supplier" description="" />
       <Card className="tmmin-form-card">
         {credential ? (
           <OneTimeCredentialPanel
@@ -405,7 +398,7 @@ export function SupplierDetailPage() {
       <PageHeader
         eyebrow={`${supplier.code} · ${supplier.sourceMode} E${supplier.sourceEpoch}`}
         title={supplier.name}
-        description="Identitas, administrasi, monitoring, dan konteks sumber supplier."
+        description=""
         actions={
           admin ? (
             <div className="tmmin-actions">
@@ -427,7 +420,7 @@ export function SupplierDetailPage() {
                   </Button>
                 }
                 title={`${supplier.active ? 'Nonaktifkan' : 'Aktifkan'} supplier?`}
-                description="Tindakan ini mengubah akses dan ketersediaan operasional. Versi diverifikasi server."
+                description="Akses supplier akan berubah."
                 confirmLabel={supplier.active ? 'Nonaktifkan' : 'Aktifkan'}
                 destructive={supplier.active}
                 onConfirm={() => {
@@ -457,7 +450,7 @@ export function SupplierDetailPage() {
       )}
       <div className="tmmin-detail-layout">
         <div>
-          <Panel title="Konteks supplier" description="Status registry authoritative">
+          <Panel title="Konteks supplier" description="">
             <KeyValueGrid
               columns={3}
               items={[
@@ -473,7 +466,7 @@ export function SupplierDetailPage() {
               ]}
             />
           </Panel>
-          <Panel title="Ringkasan monitoring" description="Waktu data terakhir per sumber">
+          <Panel title="Ringkasan monitoring" description="">
             <KeyValueGrid
               columns={3}
               items={[
@@ -687,10 +680,7 @@ function SupplierEditPanel({
     values: { name: supplier.name, timezone: supplier.timezone },
   });
   return (
-    <Panel
-      title="Ubah supplier"
-      description="Nama dan timezone IANA memakai optimistic concurrency."
-    >
+    <Panel title="Ubah supplier" description="">
       <form
         className="tmmin-inline-form"
         onSubmit={(event) =>
@@ -785,7 +775,7 @@ export function SourceGovernancePage() {
     return (
       <SupplierChooser
         title="Tata Kelola Sumber"
-        description="Pilih supplier untuk meninjau preflight dan riwayat sumber."
+        description="Pilih supplier untuk melihat kesiapan dan riwayat sumber."
         onSelect={(id) => void navigate(`/source-governance?supplierId=${id}`)}
       />
     );
@@ -799,7 +789,7 @@ export function SourceGovernancePage() {
       <PageHeader
         eyebrow={`${data.supplier.code} · Epoch sumber ${data.supplier.sourceEpoch}`}
         title="Tata Kelola Sumber"
-        description="Kelola persiapan dan cutover sumber tunggal berdasarkan preflight server."
+        description=""
       />
       {problem && (
         <Alert tone="danger" title="Perubahan sumber gagal">
@@ -889,7 +879,7 @@ export function SourceGovernancePage() {
       </div>
       <div className="tmmin-detail-layout">
         <div>
-          <Panel title="Blocker preflight" description="Evidence dihitung ulang oleh server">
+          <Panel title="Yang perlu disiapkan" description="">
             <div className="tmmin-table-scroll">
               <table className="tmmin-table tmmin-blocker-table">
                 <thead>
@@ -930,7 +920,7 @@ export function SourceGovernancePage() {
               </table>
             </div>
           </Panel>
-          <Panel title="Riwayat sumber" description="Evidence epoch dan cutover yang immutable">
+          <Panel title="Riwayat sumber" description="">
             <Timeline
               items={data.history.map((entry) => ({
                 title: `${entry.mode} · Epoch ${entry.epoch}`,
