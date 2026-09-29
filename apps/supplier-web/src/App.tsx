@@ -1,11 +1,21 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { Component, lazy, Suspense, useEffect, type ErrorInfo, type ReactNode } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import {
+  Component,
+  lazy,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+  type ErrorInfo,
+  type ReactNode,
+} from 'react';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
 import type { Capability } from '@tmmin-henkaten/contracts';
 import { ToastViewport } from '@tmmin-henkaten/ui';
 
 import { queryClient } from './app/query';
+import { supplierApi } from './app/api';
 import { PwaLifecycle } from './app/pwa';
 import { PushProvider } from './app/push';
 import { rememberIntendedPath, SessionProvider, useSession } from './app/session';
@@ -65,6 +75,7 @@ function ProductRoutes() {
           </AnonymousRoute>
         }
       />
+      <Route path="/magic-login" element={<MagicLoginRoute />} />
       <Route
         path="/change-password"
         element={
@@ -324,6 +335,41 @@ function ProductRoutes() {
       </Route>
     </Routes>
   );
+}
+
+function MagicLoginRoute() {
+  const { status, refresh } = useSession();
+  const navigate = useNavigate();
+  const started = useRef(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  useEffect(() => {
+    if (status === 'loading' || started.current) return;
+    started.current = true;
+    const token = new URLSearchParams(window.location.hash.slice(1)).get('token');
+    window.history.replaceState(null, '', '/magic-login');
+    if (!token) {
+      setProblem('Tautan masuk tidak valid.');
+      return;
+    }
+    void supplierApi
+      .redeemMagicLink(token)
+      .then(async () => {
+        await refresh();
+        void navigate('/', { replace: true });
+      })
+      .catch(() => setProblem('Tautan sudah digunakan, kedaluwarsa, atau tidak valid.'));
+  }, [status, refresh, navigate]);
+  if (problem)
+    return (
+      <main className="auth-shell">
+        <div className="auth-card">
+          <h1>Gagal masuk</h1>
+          <p>{problem}</p>
+          <a href="/login">Kembali ke login</a>
+        </div>
+      </main>
+    );
+  return <AppLoading />;
 }
 
 function HomeRoute() {

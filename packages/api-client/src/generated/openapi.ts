@@ -201,6 +201,172 @@ export interface paths {
                 /** @enum {string} */
                 purpose: 'NORMAL' | 'HOSTED_PREPARATION';
                 mustChangePassword: boolean;
+                impersonatedBy?: {
+                  /** Format: uuid */
+                  userId: string;
+                  displayName: string;
+                };
+              };
+              capabilities: (
+                | 'SUPPLIER_TANOKO_READ'
+                | 'SUPPLIER_TANOKO_MANAGE'
+                | 'TMMIN_SUPPLIER_READ'
+                | 'TMMIN_SUPPLIER_MANAGE'
+                | 'TMMIN_QUALITY_MANAGE'
+                | 'TMMIN_SOURCE_MANAGE'
+                | 'SUPPLIER_SELF_SERVICE'
+                | 'SUPPLIER_MASTER_DATA_MANAGE'
+                | 'SUPPLIER_MASTER_DATA_READ'
+                | 'TMMIN_MASTER_DATA_READ'
+                | 'SUPPLIER_HOSTED_PREPARATION'
+                | 'SUPPLIER_SHIFT_READ'
+                | 'SUPPLIER_SHIFT_OPERATE'
+                | 'SUPPLIER_SHIFT_OVERRIDE'
+                | 'TMMIN_SHIFT_READ'
+                | 'SUPPLIER_HENKATEN_READ'
+                | 'SUPPLIER_HENKATEN_SUBMIT'
+                | 'SUPPLIER_HENKATEN_WITHDRAW'
+                | 'SUPPLIER_HENKATEN_DECIDE'
+                | 'SUPPLIER_APPROVAL_REROUTE'
+                | 'TMMIN_HENKATEN_READ'
+                | 'TMMIN_PCR_CORRECT'
+                | 'SUPPLIER_NOTIFICATION_READ'
+                | 'SUPPLIER_BOARD_READ'
+                | 'SUPPLIER_BOARD_LAYOUT_MANAGE'
+                | 'SUPPLIER_DASHBOARD_READ'
+                | 'SUPPLIER_AUDIT_READ'
+                | 'TMMIN_DASHBOARD_READ'
+                | 'TMMIN_AUDIT_READ'
+                | 'TMMIN_EXTERNAL_CLIENT_MANAGE'
+              )[];
+              supplier?: {
+                /** Format: uuid */
+                id: string;
+                code: string;
+                name: string;
+                timezone: string;
+                /** @enum {string} */
+                sourceMode: 'HOSTED' | 'EXTERNAL';
+                sourceEpoch: number;
+              };
+              /** Format: date-time */
+              idleExpiresAt: string;
+              /** Format: date-time */
+              absoluteExpiresAt: string;
+              csrfToken: string;
+            };
+          };
+        };
+        /** @description Problem Details */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/supplier/magic-link/redeem': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            token: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Supplier Admin session */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              principal: {
+                /** Format: uuid */
+                userId: string;
+                displayName: string;
+                /** @enum {string} */
+                realm: 'TMMIN' | 'SUPPLIER';
+                /** @enum {string} */
+                role:
+                  | 'TMMIN_ADMIN'
+                  | 'TMMIN_QUALITY'
+                  | 'SUPPLIER_ADMIN'
+                  | 'SUPERVISOR'
+                  | 'LINE_LEADER'
+                  | 'QC';
+                /** Format: uuid */
+                supplierId?: string;
+                /** Format: uuid */
+                memberId?: string;
+                /** @enum {string} */
+                purpose: 'NORMAL' | 'HOSTED_PREPARATION';
+                mustChangePassword: boolean;
+                impersonatedBy?: {
+                  /** Format: uuid */
+                  userId: string;
+                  displayName: string;
+                };
               };
               capabilities: (
                 | 'SUPPLIER_TANOKO_READ'
@@ -358,6 +524,11 @@ export interface paths {
                 /** @enum {string} */
                 purpose: 'NORMAL' | 'HOSTED_PREPARATION';
                 mustChangePassword: boolean;
+                impersonatedBy?: {
+                  /** Format: uuid */
+                  userId: string;
+                  displayName: string;
+                };
               };
               capabilities: (
                 | 'SUPPLIER_TANOKO_READ'
@@ -506,6 +677,11 @@ export interface paths {
                 /** @enum {string} */
                 purpose: 'NORMAL' | 'HOSTED_PREPARATION';
                 mustChangePassword: boolean;
+                impersonatedBy?: {
+                  /** Format: uuid */
+                  userId: string;
+                  displayName: string;
+                };
               };
               capabilities: (
                 | 'SUPPLIER_TANOKO_READ'
@@ -656,6 +832,11 @@ export interface paths {
                 /** @enum {string} */
                 purpose: 'NORMAL' | 'HOSTED_PREPARATION';
                 mustChangePassword: boolean;
+                impersonatedBy?: {
+                  /** Format: uuid */
+                  userId: string;
+                  displayName: string;
+                };
               };
               capabilities: (
                 | 'SUPPLIER_TANOKO_READ'
@@ -2846,6 +3027,138 @@ export interface paths {
         };
         /** @description Problem Details */
         404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tmmin/suppliers/{id}/supplier-admin/magic-link': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Single-use magic link */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: uri */
+              url: string;
+              /** Format: date-time */
+              expiresAt: string;
+            };
+          };
+        };
+        /** @description Problem Details */
+        403: {
           headers: {
             [name: string]: unknown;
           };

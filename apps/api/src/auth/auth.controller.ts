@@ -4,6 +4,7 @@ import type { Request, Response } from 'express';
 import {
   passwordChangeRequestSchema,
   supplierLoginRequestSchema,
+  supplierAdminMagicLinkRequestSchema,
   tmminLoginRequestSchema,
 } from '@tmmin-henkaten/contracts';
 
@@ -11,10 +12,25 @@ import { Authenticated, Public } from '../common/policy.js';
 import type { ContextRequest } from '../common/request-context.js';
 import { ValidatedBody } from '../common/zod.js';
 import { AuthControllerFacade } from './auth.facade.js';
+import { SupplierAdminMagicLinkService } from './supplier-admin-magic-link.service.js';
 
 @Controller('/api/v1/auth/supplier')
 export class SupplierAuthController {
-  constructor(private readonly facade: AuthControllerFacade) {}
+  constructor(
+    private readonly facade: AuthControllerFacade,
+    private readonly magicLinks: SupplierAdminMagicLinkService,
+  ) {}
+
+  @Public()
+  @Post('/magic-link/redeem')
+  @HttpCode(200)
+  redeem(
+    @ValidatedBody(supplierAdminMagicLinkRequestSchema) body: { token: string },
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    return this.magicLinks.redeem(body.token, request, response);
+  }
 
   @Public()
   @Post('/login')

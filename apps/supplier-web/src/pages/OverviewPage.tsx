@@ -1,11 +1,14 @@
 import {
   AlertTriangle,
+  CalendarDays,
   CheckCircle2,
+  ChevronDown,
   Clock3,
   Factory,
   FolderOpen,
   ListFilter,
   ShieldCheck,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -21,6 +24,7 @@ import {
   Input,
   LastUpdated,
   NativeSelect,
+  Popover,
   Skeleton,
 } from '@tmmin-henkaten/ui';
 
@@ -74,6 +78,15 @@ export function OverviewPage() {
     setDraft(new URLSearchParams(params));
     setActivityExpanded(false);
   }, [params]);
+  const advancedCount =
+    ['shiftTemplateId', 'part', 'approvalRoute', 'approvalStatus'].filter((key) => params.get(key))
+      .length + (params.get('granularity') && params.get('granularity') !== 'DAY' ? 1 : 0);
+  const applyFilters = () => {
+    const next = new URLSearchParams(draft);
+    next.delete('cursor');
+    setActivityExpanded(false);
+    setParams(next, { replace: true });
+  };
 
   return (
     <div className="product-page">
@@ -91,22 +104,42 @@ export function OverviewPage() {
       />
       <div className="overview-filter-shell">
         <FilterBar>
-          <label className="overview-filter overview-filter--from">
-            <span>Dari tanggal</span>
-            <Input
-              type="date"
-              value={draft.get('from') ?? ''}
-              onChange={(event) => updateDraft(draft, setDraft, 'from', event.target.value)}
-            />
-          </label>
-          <label className="overview-filter overview-filter--to">
-            <span>Sampai tanggal</span>
-            <Input
-              type="date"
-              value={draft.get('to') ?? ''}
-              onChange={(event) => updateDraft(draft, setDraft, 'to', event.target.value)}
-            />
-          </label>
+          <Popover
+            title="Periode"
+            trigger={
+              <button
+                className="overview-filter-period"
+                type="button"
+                aria-label={`Periode: ${formatDateRange(draft.get('from'), draft.get('to'))}`}
+              >
+                <span>Periode</span>
+                <span className="overview-filter-period__value">
+                  <CalendarDays aria-hidden="true" />
+                  <strong>{formatDateRange(draft.get('from'), draft.get('to'))}</strong>
+                  <ChevronDown aria-hidden="true" />
+                </span>
+              </button>
+            }
+          >
+            <div className="overview-filter-date-popover">
+              <label className="overview-filter">
+                <span>Dari tanggal</span>
+                <Input
+                  type="date"
+                  value={draft.get('from') ?? ''}
+                  onChange={(event) => updateDraft(draft, setDraft, 'from', event.target.value)}
+                />
+              </label>
+              <label className="overview-filter">
+                <span>Sampai tanggal</span>
+                <Input
+                  type="date"
+                  value={draft.get('to') ?? ''}
+                  onChange={(event) => updateDraft(draft, setDraft, 'to', event.target.value)}
+                />
+              </label>
+            </div>
+          </Popover>
           <label className="overview-filter overview-filter--status">
             <span>Status</span>
             <NativeSelect
@@ -133,22 +166,6 @@ export function OverviewPage() {
               <option value="METHOD">Method</option>
             </NativeSelect>
           </label>
-          <label className="overview-filter overview-filter--granularity">
-            <span>Interval tren</span>
-            <NativeSelect
-              value={draft.get('granularity') ?? 'DAY'}
-              onChange={(event) => updateDraft(draft, setDraft, 'granularity', event.target.value)}
-            >
-              <option value="DAY">Harian</option>
-              <option value="WEEK">Mingguan</option>
-              <option value="MONTH">Bulanan</option>
-            </NativeSelect>
-          </label>
-          <div className="overview-filter-updated">
-            {dashboard.data && (
-              <LastUpdated value={formatTime(dashboard.data.generatedAt, supplier.timezone)} />
-            )}
-          </div>
           <label className="overview-filter overview-filter--line">
             <span>Line</span>
             <NativeSelect
@@ -163,58 +180,91 @@ export function OverviewPage() {
               ))}
             </NativeSelect>
           </label>
-          <label className="overview-filter overview-filter--shift">
-            <span>Shift Template</span>
-            <NativeSelect
-              value={draft.get('shiftTemplateId') ?? ''}
-              onChange={(event) =>
-                updateDraft(draft, setDraft, 'shiftTemplateId', event.target.value)
-              }
-            >
-              <option value="">Semua shift</option>
-              {dashboard.data?.filterOptions.shiftTemplates.map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.name}
-                </option>
-              ))}
-            </NativeSelect>
-          </label>
-          <label className="overview-filter overview-filter--part">
-            <span>Part</span>
-            <Input
-              value={draft.get('part') ?? ''}
-              placeholder="Nomor atau nama"
-              onChange={(event) => updateDraft(draft, setDraft, 'part', event.target.value)}
-            />
-          </label>
-          <label className="overview-filter overview-filter--route">
-            <span>Approval route</span>
-            <NativeSelect
-              value={draft.get('approvalRoute') ?? ''}
-              onChange={(event) =>
-                updateDraft(draft, setDraft, 'approvalRoute', event.target.value)
-              }
-            >
-              <option value="">Semua route</option>
-              <option value="SUPERVISOR">Supervisor</option>
-              <option value="QC">QC</option>
-            </NativeSelect>
-          </label>
-          <label className="overview-filter overview-filter--approval">
-            <span>Approval status</span>
-            <NativeSelect
-              value={draft.get('approvalStatus') ?? ''}
-              onChange={(event) =>
-                updateDraft(draft, setDraft, 'approvalStatus', event.target.value)
-              }
-            >
-              <option value="">Semua status</option>
-              <option value="PENDING">Pending</option>
-              <option value="APPROVED">Approved</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="NOT_REQUIRED">Not Required</option>
-            </NativeSelect>
-          </label>
+          <Popover
+            title="Filter lainnya"
+            trigger={
+              <button className="overview-filter-more" type="button">
+                <SlidersHorizontal aria-hidden="true" />
+                <span>Filter lainnya</span>
+                {advancedCount > 0 && (
+                  <span
+                    className="overview-filter-count"
+                    aria-label={`${advancedCount} filter aktif`}
+                  >
+                    {advancedCount}
+                  </span>
+                )}
+              </button>
+            }
+          >
+            <div className="overview-filter-advanced">
+              <label className="overview-filter">
+                <span>Shift Template</span>
+                <NativeSelect
+                  value={draft.get('shiftTemplateId') ?? ''}
+                  onChange={(event) =>
+                    updateDraft(draft, setDraft, 'shiftTemplateId', event.target.value)
+                  }
+                >
+                  <option value="">Semua shift</option>
+                  {dashboard.data?.filterOptions.shiftTemplates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </label>
+              <label className="overview-filter">
+                <span>Part</span>
+                <Input
+                  value={draft.get('part') ?? ''}
+                  placeholder="Nomor atau nama"
+                  onChange={(event) => updateDraft(draft, setDraft, 'part', event.target.value)}
+                />
+              </label>
+              <label className="overview-filter">
+                <span>Approval route</span>
+                <NativeSelect
+                  value={draft.get('approvalRoute') ?? ''}
+                  onChange={(event) =>
+                    updateDraft(draft, setDraft, 'approvalRoute', event.target.value)
+                  }
+                >
+                  <option value="">Semua route</option>
+                  <option value="SUPERVISOR">Supervisor</option>
+                  <option value="QC">QC</option>
+                </NativeSelect>
+              </label>
+              <label className="overview-filter">
+                <span>Approval status</span>
+                <NativeSelect
+                  value={draft.get('approvalStatus') ?? ''}
+                  onChange={(event) =>
+                    updateDraft(draft, setDraft, 'approvalStatus', event.target.value)
+                  }
+                >
+                  <option value="">Semua status</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="REJECTED">Rejected</option>
+                  <option value="NOT_REQUIRED">Not Required</option>
+                </NativeSelect>
+              </label>
+              <label className="overview-filter">
+                <span>Interval tren</span>
+                <NativeSelect
+                  value={draft.get('granularity') ?? 'DAY'}
+                  onChange={(event) =>
+                    updateDraft(draft, setDraft, 'granularity', event.target.value)
+                  }
+                >
+                  <option value="DAY">Harian</option>
+                  <option value="WEEK">Mingguan</option>
+                  <option value="MONTH">Bulanan</option>
+                </NativeSelect>
+              </label>
+            </div>
+          </Popover>
           <div className="overview-filter-actions">
             <Button
               size="sm"
@@ -227,19 +277,21 @@ export function OverviewPage() {
             >
               Reset
             </Button>
-            <Button
-              size="sm"
-              leadingIcon={<ListFilter />}
-              onClick={() => {
-                const next = new URLSearchParams(draft);
-                next.delete('cursor');
-                setActivityExpanded(false);
-                setParams(next, { replace: true });
-              }}
-            >
+            <Button size="sm" variant="primary" leadingIcon={<ListFilter />} onClick={applyFilters}>
               Terapkan
             </Button>
           </div>
+          {dashboard.data && (
+            <div
+              className="overview-filter-updated"
+              role="status"
+              aria-label={`Terakhir diperbarui ${formatTime(dashboard.data.generatedAt, supplier.timezone)}`}
+              title={`Terakhir diperbarui ${formatTime(dashboard.data.generatedAt, supplier.timezone)}`}
+            >
+              <LastUpdated value={formatTime(dashboard.data.generatedAt, supplier.timezone)} />
+              <Clock3 aria-hidden="true" />
+            </div>
+          )}
         </FilterBar>
       </div>
       {dashboard.isLoading && <OverviewSkeleton />}
@@ -404,6 +456,14 @@ export function OverviewPage() {
       )}
     </div>
   );
+}
+
+function formatDateRange(from: string | null, to: string | null) {
+  const compact = (date: string) => date.split('-').reverse().join('/');
+  if (from && to) return `${compact(from)} – ${compact(to)}`;
+  if (from) return `Mulai ${compact(from)}`;
+  if (to) return `Sampai ${compact(to)}`;
+  return 'Semua tanggal';
 }
 
 function OverviewSkeleton() {

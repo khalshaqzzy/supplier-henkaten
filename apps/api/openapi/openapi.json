@@ -297,6 +297,355 @@
                         },
                         "mustChangePassword": {
                           "type": "boolean"
+                        },
+                        "impersonatedBy": {
+                          "type": "object",
+                          "properties": {
+                            "userId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "displayName": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 150
+                            }
+                          },
+                          "required": [
+                            "userId",
+                            "displayName"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "userId",
+                        "displayName",
+                        "realm",
+                        "role",
+                        "purpose",
+                        "mustChangePassword"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "capabilities": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "SUPPLIER_TANOKO_READ",
+                          "SUPPLIER_TANOKO_MANAGE",
+                          "TMMIN_SUPPLIER_READ",
+                          "TMMIN_SUPPLIER_MANAGE",
+                          "TMMIN_QUALITY_MANAGE",
+                          "TMMIN_SOURCE_MANAGE",
+                          "SUPPLIER_SELF_SERVICE",
+                          "SUPPLIER_MASTER_DATA_MANAGE",
+                          "SUPPLIER_MASTER_DATA_READ",
+                          "TMMIN_MASTER_DATA_READ",
+                          "SUPPLIER_HOSTED_PREPARATION",
+                          "SUPPLIER_SHIFT_READ",
+                          "SUPPLIER_SHIFT_OPERATE",
+                          "SUPPLIER_SHIFT_OVERRIDE",
+                          "TMMIN_SHIFT_READ",
+                          "SUPPLIER_HENKATEN_READ",
+                          "SUPPLIER_HENKATEN_SUBMIT",
+                          "SUPPLIER_HENKATEN_WITHDRAW",
+                          "SUPPLIER_HENKATEN_DECIDE",
+                          "SUPPLIER_APPROVAL_REROUTE",
+                          "TMMIN_HENKATEN_READ",
+                          "TMMIN_PCR_CORRECT",
+                          "SUPPLIER_NOTIFICATION_READ",
+                          "SUPPLIER_BOARD_READ",
+                          "SUPPLIER_BOARD_LAYOUT_MANAGE",
+                          "SUPPLIER_DASHBOARD_READ",
+                          "SUPPLIER_AUDIT_READ",
+                          "TMMIN_DASHBOARD_READ",
+                          "TMMIN_AUDIT_READ",
+                          "TMMIN_EXTERNAL_CLIENT_MANAGE"
+                        ]
+                      }
+                    },
+                    "supplier": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "code": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 50
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "sourceMode": {
+                          "type": "string",
+                          "enum": [
+                            "HOSTED",
+                            "EXTERNAL"
+                          ]
+                        },
+                        "sourceEpoch": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "code",
+                        "name",
+                        "timezone",
+                        "sourceMode",
+                        "sourceEpoch"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "idleExpiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "absoluteExpiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "csrfToken": {
+                      "type": "string",
+                      "minLength": 32,
+                      "maxLength": 512
+                    }
+                  },
+                  "required": [
+                    "principal",
+                    "capabilities",
+                    "idleExpiresAt",
+                    "absoluteExpiresAt",
+                    "csrfToken"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/supplier/magic-link/redeem": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{43}$"
+                  }
+                },
+                "required": [
+                  "token"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Supplier Admin session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "principal": {
+                      "type": "object",
+                      "properties": {
+                        "userId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 150
+                        },
+                        "realm": {
+                          "type": "string",
+                          "enum": [
+                            "TMMIN",
+                            "SUPPLIER"
+                          ]
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "TMMIN_ADMIN",
+                            "TMMIN_QUALITY",
+                            "SUPPLIER_ADMIN",
+                            "SUPERVISOR",
+                            "LINE_LEADER",
+                            "QC"
+                          ]
+                        },
+                        "supplierId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "memberId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "purpose": {
+                          "type": "string",
+                          "enum": [
+                            "NORMAL",
+                            "HOSTED_PREPARATION"
+                          ]
+                        },
+                        "mustChangePassword": {
+                          "type": "boolean"
+                        },
+                        "impersonatedBy": {
+                          "type": "object",
+                          "properties": {
+                            "userId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "displayName": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 150
+                            }
+                          },
+                          "required": [
+                            "userId",
+                            "displayName"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -613,6 +962,26 @@
                         },
                         "mustChangePassword": {
                           "type": "boolean"
+                        },
+                        "impersonatedBy": {
+                          "type": "object",
+                          "properties": {
+                            "userId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "displayName": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 150
+                            }
+                          },
+                          "required": [
+                            "userId",
+                            "displayName"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -902,6 +1271,26 @@
                         },
                         "mustChangePassword": {
                           "type": "boolean"
+                        },
+                        "impersonatedBy": {
+                          "type": "object",
+                          "properties": {
+                            "userId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "displayName": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 150
+                            }
+                          },
+                          "required": [
+                            "userId",
+                            "displayName"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -1191,6 +1580,26 @@
                         },
                         "mustChangePassword": {
                           "type": "boolean"
+                        },
+                        "impersonatedBy": {
+                          "type": "object",
+                          "properties": {
+                            "userId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "displayName": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 150
+                            }
+                          },
+                          "required": [
+                            "userId",
+                            "displayName"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -6158,6 +6567,254 @@
             }
           },
           "404": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tmmin/suppliers/{id}/supplier-admin/magic-link": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Single-use magic link",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "expiresAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
             "description": "Problem Details",
             "content": {
               "application/problem+json": {

@@ -80,6 +80,7 @@ export class AuthControllerFacade {
       ...(principal.memberId ? { memberId: principal.memberId } : {}),
       purpose: principal.purpose,
       mustChangePassword: principal.mustChangePassword,
+      ...(principal.impersonatedBy ? { impersonatedBy: principal.impersonatedBy } : {}),
     } as const;
     return {
       principal: publicPrincipal,
@@ -101,6 +102,13 @@ export class AuthControllerFacade {
     response: Response,
   ): Promise<void> {
     const principal = requirePrincipal(request);
+    if (principal.impersonatedBy)
+      throw new ProblemException({
+        status: 403,
+        code: 'FORBIDDEN',
+        title: 'Forbidden',
+        detail: 'Password changes require a direct login.',
+      });
     await this.auth.changePassword(principal.userId, body.currentPassword, body.newPassword);
     clearSessionCookie(response, principal.realm, this.config);
     response.status(204);

@@ -13,6 +13,10 @@
 
 Dokumen ini adalah kontrak produk dan implementasi v1. Kata **MUST/wajib**, **MUST NOT/dilarang**, **SHOULD/sebaiknya**, dan **MAY/dapat** bersifat normatif. Bila source code, prototype, slide, atau asumsi implementasi berbeda dengan dokumen ini, tim wajib mengeskalasi perbedaan tersebut dan tidak boleh memilih perilaku secara diam-diam.
 
+### Amendment akses TMMIN Admin ke portal Supplier — 29 September 2026
+
+TMMIN Admin dapat membuka portal Supplier sebagai Supplier Admin aktif untuk supplier Hosted aktif dari halaman detail supplier. Tombol menghasilkan tautan ke web Supplier yang berlaku dua menit dan hanya dapat ditukar sekali. Token acak hanya disimpan sebagai hash di database, dikirim melalui fragmen URL, dihapus dari alamat browser sebelum pertukaran, dan tidak dikirim ke supplier melalui email, push, atau Notification Center. Supplier Admin tetap satu akun aktif; akses ini tidak mengubah kata sandi atau membuat akun baru. Sesi Supplier yang diterbitkan memiliki identitas operator TMMIN untuk penanda UI dan audit akses, serta berakhir bila sesi TMMIN pembuatnya dicabut atau kedaluwarsa. Akses ditolak untuk supplier tidak aktif, sumber External, admin supplier tidak aktif, operator selain TMMIN Admin, tautan kedaluwarsa, dan penggunaan ulang. Sesi ini tidak boleh dipakai untuk mengubah kata sandi Supplier Admin.
+
 ### Amendment shift beririsan dan penentuan LL — 28 September 2026
 
 Line–Shift aktif boleh memiliki jadwal yang beririsan, termasuk pada line yang sama. Satu Line

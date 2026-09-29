@@ -151,6 +151,7 @@ export function ChangePasswordPage() {
       );
     }
   });
+  if (session?.principal.impersonatedBy) return <Navigate to="/account" replace />;
   return (
     <main className="auth-compact">
       <Card>
@@ -246,7 +247,9 @@ export function AccountPage() {
           ]}
         />
         <div className="form-actions">
-          <Button onClick={() => void navigate('/change-password')}>Ganti password</Button>
+          {!principal.impersonatedBy && (
+            <Button onClick={() => void navigate('/change-password')}>Ganti password</Button>
+          )}
           <Button
             variant="secondary"
             leadingIcon={<LogOut />}

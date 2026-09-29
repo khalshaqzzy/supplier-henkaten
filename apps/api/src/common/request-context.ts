@@ -14,6 +14,7 @@ export type RequestPrincipal = {
   sourceEpoch?: number;
   purpose: 'NORMAL' | 'HOSTED_PREPARATION';
   mustChangePassword: boolean;
+  impersonatedBy?: { userId: string; displayName: string };
   sessionId: string;
   rawSessionToken: string;
 };

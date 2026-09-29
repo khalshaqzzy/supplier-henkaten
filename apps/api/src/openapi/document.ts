@@ -30,6 +30,8 @@ import {
   supplierDetailSchema,
   supplierListQuerySchema,
   supplierLoginRequestSchema,
+  supplierAdminMagicLinkRequestSchema,
+  supplierAdminMagicLinkResponseSchema,
   supplierPageSchema,
   supplierSummarySchema,
   tmminLoginRequestSchema,
@@ -196,6 +198,15 @@ export function buildOpenApiDocument(): Record<string, unknown> {
           responses: { '200': json('Session', sessionResponseSchema), '401': problem },
         },
       },
+      '/api/v1/auth/supplier/magic-link/redeem': {
+        post: {
+          requestBody: body(supplierAdminMagicLinkRequestSchema),
+          responses: {
+            '200': json('Supplier Admin session', sessionResponseSchema),
+            '401': problem,
+          },
+        },
+      },
       '/api/v1/auth/tmmin/login': {
         post: {
           requestBody: body(tmminLoginRequestSchema),
@@ -298,6 +309,16 @@ export function buildOpenApiDocument(): Record<string, unknown> {
         replaceSupplierAdminRequestSchema,
         userCredentialResponseSchema,
       ),
+      '/api/v1/tmmin/suppliers/{id}/supplier-admin/magic-link': {
+        post: {
+          requestParams: idPath,
+          responses: {
+            '200': json('Single-use magic link', supplierAdminMagicLinkResponseSchema),
+            '403': problem,
+            '409': problem,
+          },
+        },
+      },
       '/api/v1/tmmin/suppliers/{id}/supplier-admin/reset-password': supplierActionPath(
         expectedVersionSchema,
         userCredentialResponseSchema,

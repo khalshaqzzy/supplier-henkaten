@@ -1,6 +1,6 @@
 # Enterprise Digital Henkaten Management — Implementation Roadmap
 
-Status: active · Updated: 2026-09-28 · Approach: backend first, dependency driven
+Status: active · Updated: 2026-09-29 · Approach: backend first, dependency driven
 
 This file tracks sequence, current state, dependencies, and remaining acceptance gates. The [PRD](PRD.md) defines product behavior; [rules](rules.md) define agent and engineering process; [session handoff](sessionHandoff.md) records recent changes and checks; [ADRs](../docs/adr/) explain durable decisions. Detailed local browser evidence and unresolved checks live in the [QA report](../docs/audits/local-browser-qa-2026-09-24.md) and [scenario plan](../docs/qa/browser-local-end-to-end-verification-plan.md). Do not copy their histories into this roadmap.
 
@@ -46,6 +46,8 @@ The completion index is a navigation aid, not a substitute for the PRD or test e
 - **Portal and master data polish, 2026-09-25:** TMMIN viewport gate removed with compact navigation, job rename added to Line & Job, successful master edits return to their lists, and Tanoko inspector identity scrolls with level controls. See [ADR 0039](../docs/adr/0039-responsive-tmmin-and-master-edit-flow.md). Local verification and PR CI are recorded in the handoff; staging/device acceptance remains part of Phase 15.
 - **Supplier Admin flow improvement, 2026-09-26:** Supplier and TMMIN login visibility controls, reviewed Part CSV/Excel import, Member archive workflow and username, current/other shift board filter, saved-change feedback, explicit Master Data back links, and responsive Checklist 4M editor. See [ADR 0040](../docs/adr/0040-supplier-master-data-import-and-navigation.md). Local implementation and verification are recorded in the handoff; staging/device acceptance remains part of Phase 15.
 - **Part import mapping and scale refinement, 2026-09-26:** CSV/Excel files up to 50 MB and 50,000 data rows can use arbitrary source headers and additional columns. Supplier Admin maps the two required fields with a ten-row preview; the paginated review displays only conflicting names and shows processing states. The API contract limit and import transaction changed without a database schema or seed edit. See [ADR 0040](../docs/adr/0040-supplier-master-data-import-and-navigation.md). Phase 15 staging/device acceptance remains in progress.
+- **Supplier dashboard filter, 2026-09-29:** The desktop Overview filter is one compact row with period, status, 4M category, and line visible; the remaining filter fields use an anchored popover. Existing URL-backed Apply/Reset semantics and query scope remain intact. See [ADR 0041](../docs/adr/0041-compact-supplier-dashboard-filter.md). Desktop browser checks cover 1280, 1440, and 1672 px; staging/device acceptance remains part of Phase 15.
+- **TMMIN Supplier Admin access, 2026-09-29:** An active TMMIN Admin can open the Supplier web as the active admin of an active Hosted supplier through a two-minute, single-use link. The token is hash-stored and exchanged into a distinct Supplier session, with operator identity retained and no supplier notification. See [ADR 0042](../docs/adr/0042-tmmin-supplier-admin-magic-link.md). Local auth and browser acceptance is required before delivery; staging acceptance remains part of Phase 15.
 
 ## Cross-cutting gates
 

@@ -291,6 +291,7 @@ export function Popover({
       <RadixPopover.Portal>
         <RadixPopover.Content
           className="hds-popover"
+          aria-label={typeof title === 'string' ? title : undefined}
           sideOffset={componentMetrics.popoverOffset}
           align="start"
         >
