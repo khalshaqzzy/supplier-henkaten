@@ -74,6 +74,45 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
   await supplier.getByLabel(/^Password/).fill(supplierPassword);
   await supplier.getByRole('button', { name: 'Masuk' }).click();
   await expect(supplier.getByRole('heading', { name: 'Overview Supplier' })).toBeVisible();
+  for (const width of [1280, 1440, 1672]) {
+    await supplier.setViewportSize({ width, height: 900 });
+    const filter = supplier.locator('.overview-filter-shell .hds-filter-bar');
+    const bounds = await filter.locator('.hds-filter-bar__controls > *').evaluateAll((elements) =>
+      elements.map((element) => {
+        const { bottom, right } = element.getBoundingClientRect();
+        return { bottom, right };
+      }),
+    );
+    expect(
+      Math.max(...bounds.map((item) => item.bottom)) -
+        Math.min(...bounds.map((item) => item.bottom)),
+    ).toBeLessThanOrEqual(2);
+    const filterBox = (await filter.boundingBox())!;
+    expect(Math.max(...bounds.map((item) => item.right))).toBeLessThanOrEqual(
+      filterBox.x + filterBox.width,
+    );
+    expect(await supplier.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      await supplier.evaluate(() => document.documentElement.clientWidth),
+    );
+    await supplier.screenshot({
+      path: testInfo.outputPath(`supplier-filter-${width}.png`),
+      animations: 'disabled',
+    });
+  }
+  await supplier.setViewportSize({ width: 1280, height: 900 });
+  await supplier.getByRole('button', { name: 'Filter lainnya' }).click();
+  await expect(supplier.getByLabel('Shift Template')).toBeVisible();
+  await expect(supplier.getByLabel('Approval status')).toBeVisible();
+  await supplier.locator('.hds-popover').evaluate((element) => {
+    for (const animation of element.getAnimations()) animation.finish();
+  });
+  expect((await new AxeBuilder({ page: supplier }).analyze()).violations).toEqual([]);
+  await supplier.screenshot({
+    path: testInfo.outputPath('supplier-filter-popover-1280.png'),
+    animations: 'disabled',
+  });
+  await supplier.keyboard.press('Escape');
+  await supplier.setViewportSize({ width: 1280, height: 720 });
   await supplier.goto(`${runtime.supplierOrigin}/setup`);
   await expect(supplier.getByRole('heading', { name: 'Setup Supplier' })).toBeVisible();
   await expect(supplier.getByText('Readiness tidak dapat dimuat')).toHaveCount(0);
@@ -171,6 +210,31 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
 
   await supplier.goto(`${runtime.supplierOrigin}/setup`);
   await expect(supplier.getByText('Siap beroperasi')).toBeVisible();
+
+  await tmmin.goto(`${runtime.tmminOrigin}/suppliers`);
+  await tmmin
+    .getByRole('row', { name: /E2E-ONBOARD/ })
+    .getByRole('link', { name: 'Lihat' })
+    .click();
+  await expect(tmmin.getByRole('button', { name: 'Masuk sebagai Supplier Admin' })).toBeVisible();
+  const [magicResponse, magicPage] = await Promise.all([
+    tmmin.waitForResponse(
+      (response) =>
+        response.url().includes('/supplier-admin/magic-link') &&
+        response.request().method() === 'POST',
+    ),
+    tmminContext.waitForEvent('page'),
+    tmmin.getByRole('button', { name: 'Masuk sebagai Supplier Admin' }).click(),
+  ]);
+  const magicLink = ((await magicResponse.json()) as { url: string }).url;
+  await expect(magicPage.getByRole('heading', { name: 'Overview Supplier' })).toBeVisible();
+  await expect(magicPage.getByText('Sesi TMMIN Admin')).toBeVisible();
+  expect(magicPage.url()).not.toContain('token=');
+  const replayContext = await browser.newContext();
+  const replay = await replayContext.newPage();
+  await replay.goto(magicLink);
+  await expect(replay.getByRole('heading', { name: 'Gagal masuk' })).toBeVisible();
+  await replayContext.close();
 
   const supplierA11y = await new AxeBuilder({ page: supplier }).analyze();
   expect(supplierA11y.violations).toEqual([]);

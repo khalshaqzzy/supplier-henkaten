@@ -30,6 +30,13 @@ export const tmminLoginRequestSchema = z
   .strict();
 export type TmminLoginRequest = z.infer<typeof tmminLoginRequestSchema>;
 
+export const supplierAdminMagicLinkRequestSchema = z
+  .object({ token: z.string().regex(/^[A-Za-z0-9_-]{43}$/) })
+  .strict();
+export const supplierAdminMagicLinkResponseSchema = z
+  .object({ url: z.string().url(), expiresAt: utcTimestampSchema })
+  .strict();
+
 export const sessionPrincipalSchema = z
   .object({
     userId: opaqueIdSchema,
@@ -40,6 +47,10 @@ export const sessionPrincipalSchema = z
     memberId: opaqueIdSchema.optional(),
     purpose: sessionPurposeSchema,
     mustChangePassword: z.boolean(),
+    impersonatedBy: z
+      .object({ userId: opaqueIdSchema, displayName: z.string().min(1).max(150) })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((value, context) => {

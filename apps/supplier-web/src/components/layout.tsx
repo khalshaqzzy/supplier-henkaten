@@ -303,6 +303,11 @@ export function ProductLayout() {
         </div>
       </aside>
       <div className="product-shell__main">
+        {identity.impersonatedBy && (
+          <div className="supplier-impersonation-banner" role="status">
+            Sesi TMMIN Admin · {identity.impersonatedBy.displayName} masuk sebagai Supplier Admin
+          </div>
+        )}
         <header className="product-topbar">
           <div>
             <IconButton

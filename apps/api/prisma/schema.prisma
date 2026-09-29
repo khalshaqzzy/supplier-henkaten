@@ -292,6 +292,8 @@ model UserSession {
   revocationReason   SessionRevocationReason?
   sourceIp           String?                  @db.VarChar(45)
   userAgent          String?                  @db.VarChar(512)
+  impersonatedByUserId String?                @db.Uuid
+  impersonatedBySessionId String?              @db.Uuid
   version            Int                      @default(1)
   user               User                     @relation(fields: [userId], references: [id], onDelete: Restrict)
   supplier           Supplier?                @relation(fields: [supplierId], references: [id], onDelete: Restrict)
@@ -299,6 +301,21 @@ model UserSession {
   @@index([userId, revokedAt])
   @@index([supplierId, revokedAt])
   @@index([idleExpiresAt, absoluteExpiresAt])
+}
+
+model SupplierAdminMagicLink {
+  id             String    @id @default(uuid()) @db.Uuid
+  tokenHash      Bytes     @unique
+  supplierId     String    @db.Uuid
+  adminUserId    String    @db.Uuid
+  actorUserId    String    @db.Uuid
+  actorSessionId String    @db.Uuid
+  sourceEpoch    Int
+  expiresAt      DateTime  @db.Timestamptz(3)
+  consumedAt     DateTime? @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([supplierId, expiresAt])
 }
 
 model PasswordHistory {

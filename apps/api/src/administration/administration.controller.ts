@@ -32,6 +32,7 @@ import { parseWithSchema, ValidatedBody, ValidatedQuery } from '../common/zod.js
 import { mutationContext } from './mutation-context.js';
 import { SourceGovernanceService } from './source-governance.service.js';
 import { SupplierAdminService } from './supplier-admin.service.js';
+import { SupplierAdminMagicLinkService } from '../auth/supplier-admin-magic-link.service.js';
 import { UserAdminService } from './user-admin.service.js';
 
 const sourcePreflightSchema = z.object({ targetMode: sourceModeSchema }).strict();
@@ -118,6 +119,7 @@ export class SupplierAdministrationController {
   constructor(
     private readonly suppliers: SupplierAdminService,
     private readonly source: SourceGovernanceService,
+    private readonly magicLinks: SupplierAdminMagicLinkService,
   ) {}
 
   @RequireCapabilities('TMMIN_SUPPLIER_READ')
@@ -217,6 +219,18 @@ export class SupplierAdministrationController {
       body,
       mutationContext(request),
     );
+  }
+
+  @RequireCapabilities('TMMIN_SUPPLIER_MANAGE')
+  @Post('/:id/supplier-admin/magic-link')
+  @HttpCode(200)
+  issueMagicLink(
+    @Param('id') id: string,
+    @Req() request: ContextRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    response.setHeader('Cache-Control', 'no-store');
+    return this.magicLinks.issue(parseWithSchema(opaqueIdSchema, id), request);
   }
 
   @RequireCapabilities('TMMIN_SUPPLIER_MANAGE')

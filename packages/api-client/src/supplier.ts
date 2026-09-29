@@ -91,6 +91,15 @@ export class SupplierApi {
     });
   }
 
+  redeemMagicLink(token: string) {
+    return this.client.request('/api/v1/auth/supplier/magic-link/redeem', {
+      method: 'POST',
+      body: { token },
+      responseSchema: sessionResponseSchema,
+      authenticated: false,
+    });
+  }
+
   session() {
     return this.client.request('/api/v1/auth/supplier/session', {
       responseSchema: sessionResponseSchema,

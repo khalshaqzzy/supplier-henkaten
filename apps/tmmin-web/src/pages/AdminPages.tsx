@@ -523,6 +523,8 @@ function SupplierAdminPanel({
   onCredential: (credential: { username: string; temporaryPassword: string }) => void;
   onChanged: () => void;
 }) {
+  const [magicLinkProblem, setMagicLinkProblem] = useState<string | null>(null);
+  const [openingMagicLink, setOpeningMagicLink] = useState(false);
   const form = useForm<z.infer<typeof supplierAdminSchema>>({
     resolver: zodResolver(supplierAdminSchema),
   });
@@ -556,6 +558,37 @@ function SupplierAdminPanel({
       )}
       {admin && current && (
         <>
+          <div className="tmmin-row-actions">
+            <Button
+              size="sm"
+              leadingIcon={<KeyRound />}
+              loading={openingMagicLink}
+              onClick={() => {
+                const tab = window.open('', '_blank');
+                if (tab) tab.opener = null;
+                setMagicLinkProblem(null);
+                setOpeningMagicLink(true);
+                void tmminApi
+                  .supplierAdminMagicLink(supplierId)
+                  .then(({ url }) => {
+                    if (tab) tab.location.href = url;
+                    else window.location.assign(url);
+                  })
+                  .catch((error: unknown) => {
+                    tab?.close();
+                    setMagicLinkProblem(tmminMutationProblem(error));
+                  })
+                  .finally(() => setOpeningMagicLink(false));
+              }}
+            >
+              Masuk sebagai Supplier Admin
+            </Button>
+          </div>
+          {magicLinkProblem && (
+            <Alert tone="danger" title="Tautan masuk gagal">
+              {magicLinkProblem}
+            </Alert>
+          )}
           <div className="tmmin-row-actions">
             <AlertDialog
               trigger={<Button size="sm">Reset temporary password</Button>}

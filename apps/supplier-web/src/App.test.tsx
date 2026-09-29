@@ -53,6 +53,14 @@ describe('Supplier application foundation', () => {
     queryClient.clear();
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
     vi.spyOn(supplierApi, 'pushConfig').mockResolvedValue({
       enabled: false,
       mandatory: false,
@@ -69,6 +77,7 @@ describe('Supplier application foundation', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('keeps /design public and does not bootstrap a product session', async () => {
@@ -226,6 +235,61 @@ describe('Supplier application foundation', () => {
     );
     expect(screen.queryByRole('link', { name: 'Assignment Board' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Antrean Approval' })).toBeNull();
+  });
+
+  it('keeps dashboard advanced filters in the popover until applied', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(supplierApi, 'session').mockResolvedValue(
+      session('NORMAL', ['SUPPLIER_SELF_SERVICE', 'SUPPLIER_DASHBOARD_READ']),
+    );
+    const dashboard = vi
+      .spyOn(supplierApi, 'dashboard')
+      .mockResolvedValue(supplierDashboardVisualFixture);
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Overview Supplier' })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Filter lainnya' }));
+    await user.selectOptions(screen.getByLabelText('Approval route'), 'QC');
+    await user.selectOptions(screen.getByLabelText('Interval tren'), 'WEEK');
+    expect(screen.getByRole('button', { name: 'Filter lainnya' })).toBeTruthy();
+    expect(dashboard).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: 'Terapkan' }));
+    await waitFor(() =>
+      expect(dashboard).toHaveBeenLastCalledWith(
+        expect.objectContaining({ approvalRoute: 'QC', granularity: 'WEEK' }),
+      ),
+    );
+    expect(screen.getByRole('button', { name: /Filter lainnya.*2 filter aktif/ })).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: /^Periode:/ }));
+    await user.type(screen.getByLabelText('Dari tanggal'), '2026-08-01');
+    await user.type(screen.getByLabelText('Sampai tanggal'), '2026-08-05');
+    await user.click(screen.getByRole('button', { name: 'Terapkan' }));
+    await waitFor(() =>
+      expect(dashboard).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          from: '2026-08-01T00:00:00.000Z',
+          to: '2026-08-05T23:59:59.999Z',
+          approvalRoute: 'QC',
+          granularity: 'WEEK',
+        }),
+      ),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^Periode:/ }).textContent).toContain(
+        'Semua tanggal',
+      );
+      expect(screen.getByRole('button', { name: 'Filter lainnya' })).toBeTruthy();
+      expect(screen.getByLabelText('Status')).toHaveProperty('value', '');
+    });
   });
 
   it('shows five rich dashboard activities and expands the bounded batch inline', async () => {

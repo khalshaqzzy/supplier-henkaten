@@ -23,6 +23,7 @@ import {
   qualityUserListQuerySchema,
   readinessResponseSchema,
   sessionResponseSchema,
+  supplierAdminMagicLinkResponseSchema,
   shiftTemplatePageSchema,
   shiftRunDetailSchema,
   shiftRunPageSchema,
@@ -159,6 +160,13 @@ export class TmminApi {
       method: 'POST',
       body: { expectedVersion },
       responseSchema: userCredentialResponseSchema,
+    });
+  }
+
+  supplierAdminMagicLink(id: string) {
+    return this.client.request(`/api/v1/tmmin/suppliers/${id}/supplier-admin/magic-link`, {
+      method: 'POST',
+      responseSchema: supplierAdminMagicLinkResponseSchema,
     });
   }
 

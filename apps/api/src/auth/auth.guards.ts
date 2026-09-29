@@ -65,6 +65,7 @@ export class CsrfGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<ContextRequest>();
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) return true;
+    if (request.path === '/api/v1/auth/supplier/magic-link/redeem') return true;
     if (!request.principal) return true;
     const expectedOrigin =
       request.principal.realm === 'TMMIN'

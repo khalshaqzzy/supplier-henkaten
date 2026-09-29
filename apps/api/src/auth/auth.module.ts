@@ -8,6 +8,7 @@ import { AuthService } from './auth.service.js';
 import { PasswordService } from './password.service.js';
 import { RateLimiterService } from './rate-limiter.service.js';
 import { SessionService } from './session.service.js';
+import { SupplierAdminMagicLinkService } from './supplier-admin-magic-link.service.js';
 import { PushModule } from '../push/push.module.js';
 
 @Module({
@@ -19,6 +20,7 @@ import { PushModule } from '../push/push.module.js';
     PasswordService,
     RateLimiterService,
     SessionService,
+    SupplierAdminMagicLinkService,
     SessionAuthenticationGuard,
     CsrfGuard,
     GlobalRateLimitGuard,
@@ -28,6 +30,7 @@ import { PushModule } from '../push/push.module.js';
     AuthService,
     PasswordService,
     SessionService,
+    SupplierAdminMagicLinkService,
     SessionAuthenticationGuard,
     CsrfGuard,
     GlobalRateLimitGuard,

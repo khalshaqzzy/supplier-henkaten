@@ -1,4 +1,22 @@
-# Current Session Handoff — Overlapping Line–Shifts and LL-derived submission
+# Current Session Handoff — Supplier dashboard filter and TMMIN magic link
+
+- Date: 2026-09-29
+- Branch: `feat/suppluer-filter-ui`, based on `origin/main`; target PR to `main`.
+- Phase: 15 remains `in_progress`; staging rehearsal and device acceptance remain pending.
+
+The Supplier Overview desktop filter now fits one row at 1280, 1440, and 1672 px. Period, status, 4M category, line, advanced filters, Apply, and update status remain accessible. Advanced fields (shift, part, approval route/status, trend interval) use a compact anchored popover. Draft, Apply, Reset, and URL query behavior remain intact. Variation A guided the implementation; the image concepts are preview references outside the repository.
+
+TMMIN Admin can issue a two-minute single-use link from an active Hosted supplier detail page. It opens the Supplier web in a new tab. The 32-byte random token is stored only as a SHA-256 hash, passed in the URL fragment, removed from the browser address, and atomically consumed by the Supplier API. The Supplier session identifies both the target Supplier Admin and the initiating TMMIN Admin/session; it becomes invalid when that TMMIN session is revoked or expires. Issuance and redemption are audited. The feature creates no supplier notification, outbox event, or password change; password change is blocked for the delegated session. Inactive/External supplier, inactive admin, non-admin actor, wrong origin, expired token, and replay are rejected. See ADR 0042. `fast-uri` was upgraded to 3.1.7 in the pnpm override and lockfile to resolve two high-severity findings in the previous 3.1.6 resolution.
+
+Changed files: Supplier Overview, dashboard CSS and focused tests; TMMIN supplier detail button; Supplier magic-login route, session banner and account affordance; API auth/session and administration controllers/service, Prisma schema plus forward migration, shared auth contracts, generated OpenAPI/client, integration and E2E tests; workspace dependency override/lockfile; PRD, roadmap, ADR 0041 and 0042. Local seed fixture and payload shapes were inspected and require no edit because the added columns are nullable and the new endpoints are additive.
+
+Verification to date: clean artifact/frozen install; format, lint, typecheck; unit suites (API 59, Supplier 62, TMMIN 14, shared suites) after updating the frozen route count; generated OpenAPI/client; production application build; fresh 17-migration disposable DB and 40/40 integration tests, plus a focused 3-test auth rerun after extending revocation coverage; previous 16-migration to current 17-migration upgrade; four isolated Chromium E2E journeys including filter accessibility and link replay; dependency audit threshold; deployment validation, security exceptions, Actionlint, ShellCheck, Hadolint, bash syntax, Ubuntu bootstrap checks, macOS and Linux deployment harness including `flock`, and Gitleaks directory scan. A separate fresh seed database completed with two Hosted suppliers and 240 Henkaten; its credential file and API process were removed/stopped. The five-image production-like Compose build, current migration, bootstrap/idempotence, routing, headers, non-root/private database, and persistence across PostgreSQL/API restart passed. Trivy 0.70.0 filesystem and all five runtime image scans passed with the exact ignore file. All local, E2E, and production-like containers started for this session were stopped. The generated client drift check necessarily differs from `HEAD` until the implementation commit; rerun `pnpm openapi:check` after commit. Final post-commit Gitleaks and GitHub checks remain. The macOS Edge installer requires interactive sudo; CI installs both Chromium and Edge on Linux. No staging or production deployment has occurred in this branch.
+
+Next action: finish local parity and cleanup, commit, push, open PR to `main`, attach it to this task, and monitor all PR gates until green. If CI fails, fix the issue and rerun affected local checks before pushing a correction.
+
+---
+
+# Previous Session Handoff — Overlapping Line–Shifts and LL-derived submission
 
 - Date: 2026-09-28
 - Branch: `feat/overlapping-shifts-ll`, created from `main`

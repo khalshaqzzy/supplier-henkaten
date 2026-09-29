@@ -38,6 +38,8 @@ export class SessionService {
     sourceEpoch: number | null,
     purpose: SessionPurpose,
     client: { sourceIp?: string; userAgent?: string },
+    impersonatedByUserId?: string,
+    impersonatedBySessionId?: string,
   ): Promise<CreatedSession> {
     const rawToken = randomBytes(32).toString('base64url');
     const now = this.clock.now();
@@ -58,6 +60,8 @@ export class SessionService {
         absoluteExpiresAt,
         ...(client.sourceIp ? { sourceIp: client.sourceIp } : {}),
         ...(client.userAgent ? { userAgent: client.userAgent.slice(0, 512) } : {}),
+        ...(impersonatedByUserId ? { impersonatedByUserId } : {}),
+        ...(impersonatedBySessionId ? { impersonatedBySessionId } : {}),
       },
       select: { id: true },
     });
@@ -76,6 +80,12 @@ export class SessionService {
         ? this.prisma.supplier.findUnique({ where: { id: session.supplierId } })
         : Promise.resolve(null),
     ]);
+    const actor = session.impersonatedByUserId
+      ? await this.prisma.user.findUnique({ where: { id: session.impersonatedByUserId } })
+      : null;
+    const actorSession = session.impersonatedBySessionId
+      ? await this.prisma.userSession.findUnique({ where: { id: session.impersonatedBySessionId } })
+      : null;
     if (
       !user ||
       session.realm !== expectedRealm ||
@@ -85,6 +95,19 @@ export class SessionService {
       user.status !== 'ACTIVE' ||
       user.passwordEpoch !== session.passwordEpoch ||
       user.authorizationEpoch !== session.authorizationEpoch ||
+      (session.impersonatedByUserId &&
+        (!actor || actor.status !== 'ACTIVE' || actor.role !== 'TMMIN_ADMIN')) ||
+      (session.impersonatedBySessionId &&
+        (!actorSession ||
+          !actor ||
+          actorSession.revokedAt ||
+          actorSession.idleExpiresAt <= now ||
+          actorSession.absoluteExpiresAt <= now ||
+          actorSession.realm !== 'TMMIN' ||
+          actorSession.purpose !== 'NORMAL' ||
+          actorSession.userId !== actor.id ||
+          actorSession.passwordEpoch !== actor.passwordEpoch ||
+          actorSession.authorizationEpoch !== actor.authorizationEpoch)) ||
       (supplier && (!supplier.active || supplier.sourceEpoch !== session.sourceEpoch))
     ) {
       return null;
@@ -110,7 +133,8 @@ export class SessionService {
       ...(user.memberId ? { memberId: user.memberId } : {}),
       ...(session.sourceEpoch ? { sourceEpoch: session.sourceEpoch } : {}),
       purpose: session.purpose,
-      mustChangePassword: user.mustChangePassword,
+      mustChangePassword: actor ? false : user.mustChangePassword,
+      ...(actor ? { impersonatedBy: { userId: actor.id, displayName: actor.displayName } } : {}),
       sessionId: session.id,
       rawSessionToken: rawToken,
     };
