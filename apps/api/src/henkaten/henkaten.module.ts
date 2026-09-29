@@ -11,6 +11,7 @@ import {
 import { HenkatenService } from './henkaten.service.js';
 import { ApprovalService } from './approval.service.js';
 import { PcrModule } from '../pcr/pcr.module.js';
+import { HenkatenExportService } from './henkaten-export.service.js';
 
 @Module({
   imports: [OperationsModule, MasterDataModule, PcrModule],
@@ -20,7 +21,7 @@ import { PcrModule } from '../pcr/pcr.module.js';
     TmminWarningController,
     TmminGlobalHenkatenController,
   ],
-  providers: [HenkatenService, ApprovalService],
+  providers: [HenkatenService, ApprovalService, HenkatenExportService],
   exports: [HenkatenService],
 })
 export class HenkatenModule {}

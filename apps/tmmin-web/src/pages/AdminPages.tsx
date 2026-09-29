@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, KeyRound, Plus, RefreshCw, UserRoundPlus } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
@@ -21,11 +21,12 @@ import {
   StatusBadge,
   Textarea,
   Timeline,
+  HenkatenExportSheet,
 } from '@tmmin-henkaten/ui';
 
 import { ApiProblemError } from '@tmmin-henkaten/api-client';
 
-import { tmminApi } from '../app/api';
+import { tmminApi, tmminAssetUrl } from '../app/api';
 import { tmminKey } from '../app/query';
 import { useTmminSession } from '../app/session';
 import { PageHeader } from '../components/layout';
@@ -354,6 +355,30 @@ export function SupplierDetailPage() {
     temporaryPassword: string;
   } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const loadExportOptions = useCallback(async () => {
+    const [lines, shifts] = await Promise.all([
+      tmminApi.hostedLines(supplierId, { limit: 100, active: 'ALL' }),
+      tmminApi.hostedShiftTemplates(supplierId, { limit: 100, active: 'ALL' }),
+    ]);
+    return {
+      lines: lines.items.map((line) => ({ id: line.id, label: `${line.code} · ${line.name}` })),
+      shifts: shifts.items.map((shift) => ({ id: shift.id, label: shift.name })),
+    };
+  }, [supplierId]);
+  const createExport = useCallback(
+    (filters: Parameters<typeof tmminApi.createHenkatenExport>[1]) =>
+      tmminApi.createHenkatenExport(supplierId, filters),
+    [supplierId],
+  );
+  const getExport = useCallback(
+    (id: string) => tmminApi.henkatenExport(supplierId, id),
+    [supplierId],
+  );
+  const downloadUrl = useCallback(
+    (id: string) =>
+      tmminAssetUrl(`/api/v1/tmmin/suppliers/${supplierId}/henkatens/exports/${id}/file`),
+    [supplierId],
+  );
   const result = useQuery({
     queryKey: tmminKey(session!.principal.userId, 'supplier', supplierId),
     queryFn: () => tmminApi.supplier(supplierId),
@@ -384,6 +409,14 @@ export function SupplierDetailPage() {
         actions={
           admin ? (
             <div className="tmmin-actions">
+              <HenkatenExportSheet
+                loadOptions={loadExportOptions}
+                createExport={createExport}
+                getExport={getExport}
+                downloadUrl={downloadUrl}
+                storageKey={`henkaten-export:tmmin:${session!.principal.userId}:${supplierId}`}
+                supplierLabel={supplier.name}
+              />
               <Button onClick={() => void navigate(`/source-governance?supplierId=${supplierId}`)}>
                 Tata Kelola Sumber
               </Button>

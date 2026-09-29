@@ -12,6 +12,9 @@ const client = new ApiClient({
 });
 
 export const tmminApi = new TmminApi(client);
+export function tmminAssetUrl(path: string): string {
+  return new URL(path, `${apiOrigin.replace(/\/+$/, '')}/`).toString();
+}
 export function setCsrfToken(value: string | null) {
   csrfToken = value;
 }

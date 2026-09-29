@@ -128,6 +128,13 @@ enum HenkatenStatus {
   CANCELLED
 }
 
+enum HenkatenExportStatus {
+  QUEUED
+  RUNNING
+  READY
+  FAILED
+}
+
 enum HenkatenCancellationReason {
   WITHDRAWN
   SHIFT_ENDED
@@ -219,6 +226,7 @@ model Supplier {
   assignmentIssues        AssignmentIssue[]
   henkatenDailySequences  HenkatenDailySequence[]
   henkatens               Henkaten[]
+  henkatenExportJobs      HenkatenExportJob[]
   pcrAssessments          PcrAssessment[]
   mpReservations          MPReservation[]
   warningInstances        WarningInstance[]
@@ -1108,6 +1116,27 @@ model HenkatenDailySequence {
   supplier     Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
 
   @@id([supplierId, businessDate])
+}
+
+model HenkatenExportJob {
+  id             String               @id @default(uuid()) @db.Uuid
+  supplierId     String               @db.Uuid
+  requestedById  String               @db.Uuid
+  requestedRealm IdentityRealm
+  status         HenkatenExportStatus @default(QUEUED)
+  filters        Json
+  total          Int                  @default(0)
+  processed      Int                  @default(0)
+  errorCode      String?              @db.VarChar(80)
+  createdAt      DateTime             @default(now()) @db.Timestamptz(3)
+  startedAt      DateTime?            @db.Timestamptz(3)
+  finishedAt     DateTime?            @db.Timestamptz(3)
+  expiresAt      DateTime             @db.Timestamptz(3)
+  supplier       Supplier             @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+  @@index([supplierId, requestedById, createdAt(sort: Desc)])
+  @@index([expiresAt])
 }
 
 model Henkaten {

@@ -86,6 +86,8 @@ import {
   createHenkatenRequestSchema,
   decideHenkatenRequestSchema,
   henkatenDetailSchema,
+  henkatenExportFiltersSchema,
+  henkatenExportJobSchema,
   henkatenFormOptionsQuerySchema,
   henkatenFormOptionsSchema,
   henkatenListQuerySchema,
@@ -152,6 +154,12 @@ const body = (schema: z.ZodType) => ({
   required: true,
   content: { 'application/json': { schema } },
 });
+const xlsx = {
+  description: 'Henkaten Excel workbook',
+  content: {
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': { schema: z.string() },
+  },
+};
 const idPath = { path: z.object({ id: z.string().uuid() }) };
 const optionalInstallationHeader = {
   header: z.object({ 'X-Device-Installation-ID': installationIdSchema.optional() }),
@@ -692,6 +700,24 @@ function operationalPaths() {
         responses: { '200': json('Henkaten form options', henkatenFormOptionsSchema) },
       },
     },
+    '/api/v1/supplier/henkatens/exports': {
+      post: {
+        requestBody: body(henkatenExportFiltersSchema),
+        responses: { '201': json('Export job', henkatenExportJobSchema), '403': problem },
+      },
+    },
+    '/api/v1/supplier/henkatens/exports/{exportId}': {
+      get: {
+        requestParams: { path: z.object({ exportId: z.string().uuid() }) },
+        responses: { '200': json('Export status', henkatenExportJobSchema), '404': problem },
+      },
+    },
+    '/api/v1/supplier/henkatens/exports/{exportId}/file': {
+      get: {
+        requestParams: { path: z.object({ exportId: z.string().uuid() }) },
+        responses: { '200': xlsx, '404': problem },
+      },
+    },
     '/api/v1/supplier/henkatens/{id}': {
       get: {
         requestParams: shiftId,
@@ -758,6 +784,29 @@ function operationalPaths() {
       get: {
         requestParams: { ...supplierOnly, query: henkatenListQuerySchema },
         responses: { '200': json('Supplier Henkaten records', henkatenPageSchema) },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/henkatens/exports': {
+      post: {
+        requestParams: supplierOnly,
+        requestBody: body(henkatenExportFiltersSchema),
+        responses: { '201': json('Export job', henkatenExportJobSchema), '403': problem },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/henkatens/exports/{exportId}': {
+      get: {
+        requestParams: {
+          path: z.object({ supplierId: z.string().uuid(), exportId: z.string().uuid() }),
+        },
+        responses: { '200': json('Export status', henkatenExportJobSchema), '404': problem },
+      },
+    },
+    '/api/v1/tmmin/suppliers/{supplierId}/henkatens/exports/{exportId}/file': {
+      get: {
+        requestParams: {
+          path: z.object({ supplierId: z.string().uuid(), exportId: z.string().uuid() }),
+        },
+        responses: { '200': xlsx, '404': problem },
       },
     },
     '/api/v1/tmmin/suppliers/{supplierId}/henkatens/warnings': {

@@ -2500,6 +2500,13 @@ a.overview-activity-identifier:hover {
 }
 
 /* Master data */
+.master-overview-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .master-overview,
 .checklist-category-grid {
   display: grid;
