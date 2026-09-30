@@ -13,6 +13,12 @@
 
 Dokumen ini adalah kontrak produk dan implementasi v1. Kata **MUST/wajib**, **MUST NOT/dilarang**, **SHOULD/sebaiknya**, dan **MAY/dapat** bersifat normatif. Bila source code, prototype, slide, atau asumsi implementasi berbeda dengan dokumen ini, tim wajib mengeskalasi perbedaan tersebut dan tidak boleh memilih perilaku secara diam-diam.
 
+### Amendment batas otorisasi dan retry — 30 September 2026
+
+Filter audit Supplier wajib tetap berada dalam tenant dan scope line sesi. Filter lintas supplier tetap tersedia untuk TMMIN sesuai peran. Impor Part berukuran besar wajib memeriksa sesi Supplier Admin, Origin/CSRF dan izin tulis sebelum parsing; Hosted Preparation yang sah tetap didukung. Stream realtime wajib memeriksa kembali sesi tanpa memperpanjang idle timeout dan menghentikan delivery setelah sesi tidak sah. Setiap transaksi event External, termasuk event berikutnya pada batch, wajib memeriksa kembali client/token yang berlaku.
+
+Form Hosted menyimpan konteks assignment yang ditampilkan dan mengirim expected LineShift version serta expected MP efektif untuk Man. Retry dengan hasil jaringan yang belum pasti memakai payload dan Idempotency-Key yang sama; perubahan form dinonaktifkan sampai hasil pasti. Job baru pada occurrence yang sudah tersedia wajib tetap dapat menerima Henkaten. Aktivasi kembali Line–Shift wajib menolak referensi line, shift, Supervisor, LL atau MP yang tidak aktif; assignment kosong untuk setup tetap diperbolehkan.
+
 ### Amendment ekspor Excel Henkaten — 29 September 2026
 
 Supplier Admin dapat membuat workbook `.xlsx` dari Master Data, di samping Lihat readiness. TMMIN Admin mendapat fungsi yang sama pada halaman detail supplier. Sheet sebelum ekspor menyediakan periode business date, line, shift, status, kategori 4M, part, route dan status approval, serta status PCR. Tanpa filter periode, seluruh Henkaten Hosted supplier yang tersedia masuk. Record External tidak masuk, termasuk riwayat sebelum cutover. Sesi dukungan TMMIN yang sedang masuk sebagai Supplier Admin tetap tunduk pada hak Supplier Admin dan mencatat identitas operator TMMIN pada audit.

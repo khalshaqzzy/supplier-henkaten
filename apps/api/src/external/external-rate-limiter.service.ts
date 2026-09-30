@@ -14,9 +14,17 @@ export class ExternalRateLimiterService {
 
   constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
 
+  static readonly MAX_TOKEN_BUCKETS = 5_000;
+
   token(clientId: string, ip: string, now = Date.now()) {
     const key = this.key(`token:${clientId}:${ip}`);
+    for (const [storedKey, stored] of this.tokenAttempts) {
+      if (stored.resetAt <= now) this.tokenAttempts.delete(storedKey);
+    }
     const current = this.tokenAttempts.get(key);
+    if (!current && this.tokenAttempts.size >= ExternalRateLimiterService.MAX_TOKEN_BUCKETS) {
+      return result(false, 0, now + 60_000, now);
+    }
     const bucket = current && current.resetAt > now ? current : { count: 0, resetAt: now + 60_000 };
     bucket.count += 1;
     this.tokenAttempts.set(key, bucket);

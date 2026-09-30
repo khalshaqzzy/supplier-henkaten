@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import {
   defer,
+  concatMap,
+  takeWhile,
   filter,
   from,
   interval,
@@ -12,6 +14,8 @@ import {
   type Observable,
 } from 'rxjs';
 
+import { SessionService } from '../auth/session.service.js';
+import { capabilitiesForPrincipal } from '../common/policy.js';
 import type { RequestPrincipal } from '../common/request-context.js';
 import { TenantScope } from '../common/scope.js';
 import { PrismaService } from '../persistence/prisma.service.js';
@@ -31,6 +35,7 @@ export class RealtimeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pump: RealtimeEventPump,
+    private readonly sessions: SessionService,
   ) {}
 
   stream(
@@ -85,6 +90,27 @@ export class RealtimeService {
           }),
         );
       }),
+      concatMap(async (message) => {
+        const current = await this.sessions.resolve(principal.rawSessionToken, 'SUPPLIER', false);
+        if (
+          !current ||
+          current.sessionId !== principal.sessionId ||
+          current.supplierId !== scope.supplierId ||
+          current.mustChangePassword ||
+          !capabilitiesForPrincipal(current).has('SUPPLIER_BOARD_READ')
+        )
+          return null;
+        const allowed = await this.allowedLines(scope, current);
+        return this.inScope(message, lineId, allowed)
+          ? message
+          : {
+              ...message,
+              type: 'heartbeat' as const,
+              id: undefined,
+              data: { at: new Date().toISOString() },
+            };
+      }),
+      takeWhile((message): message is StreamMessage => message !== null),
     );
   }
 

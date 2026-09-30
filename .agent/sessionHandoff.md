@@ -1,3 +1,71 @@
+# Session Handoff — Main audit fixes
+
+- Date: 2026-09-30
+- Branch: `fix/main-audit-findings`, created from clean `main` at `035c41631405d01df4c78deb30c4892b00ea650a`
+- Objective: resolve the five security findings and four correctness findings from the Standard main audit.
+- Delivery: user subsequently authorized pushing this branch and opening a comprehensive PR to `main`; merge and deployment are outside this delivery request.
+- Phase: Phase 15 remains in progress; staging/device and release acceptance gates are unchanged.
+
+## PR delivery validation — 2026-09-30
+
+Exact pinned runtime: Node 22.23.1 (official archive checksum verified, temporary PATH) and pnpm 11.16.0. Began with `pnpm clean`, removed only ignored generated/build roots, then `pnpm install --frozen-lockfile`. Delivery scans detected newly indexed high-severity Undici and brace-expansion advisories; existing overrides and lockfile are patched to 7.29.1 and 5.0.11 respectively. An exact Trivy exception for CVE-2026-84782 expires 2026-10-14: the newly reported OpenSSL DTLS retransmission vulnerability has no fixed Debian bookworm package, including the current distroless base; API/Prisma/PostgreSQL use TCP and Caddy uses Go TLS, with no OpenSSL DTLS path. The upstream advisory and Debian tracker are linked in securityExceptions.json. Other findings remain scanned.
+
+Completed checks:
+
+- `pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit && pnpm openapi:check`; production `VITE_API_ORIGIN=https://api.example.invalid pnpm build`. Repeated after dependency updates.
+- `pnpm db:up`, `pnpm db:wait`, `pnpm db:verify`, `pnpm db:test:reset`, `pnpm db:test:migrate`, then `NODE_ENV=test DATABASE_URL=<Docker disposable test URL> RELEASE_SHA=ci SESSION_CSRF_SECRET=<test value> AUTH_THROTTLE_SECRET=<test value> OUTBOX_ENABLED=false pnpm test:integration`: 49 tests/8 files passed.
+- Previous-main upgrade: `git archive origin/main apps/api/prisma`, previous `PRISMA_MIGRATIONS_PATH` plus current `pnpm --filter @tmmin-henkaten/api run prisma:migrate:deploy`, then `prisma migrate status --config prisma.config.ts` in `supplier_henkaten_upgrade_test`: all 18 migrations applied, current schema up to date; `pnpm db:down` completed.
+- `pnpm migrations:destructive-check origin/main`, `pnpm deployment:validate`, `pnpm security:exceptions:check`, `pnpm security:audit`: passed (audit retains 8 moderate and one existing ignored high).
+- Workflow-pinned Actionlint 1.7.7, ShellCheck 0.11.0 and Hadolint 2.14.0 Docker images; deployment harness in Linux `docker:29-cli` with real `flock`; pinned Ubuntu 22.04 staging/production `bootstrap-vm.sh --check`: passed.
+
+Final delivery checks passed:
+
+- `pnpm test:e2e`: all eight isolated journeys (four Chromium, four Microsoft Edge). Chromium installed by Playwright 1.62.0; Edge 154.0.4258.48 was extracted from the official hash-verified package into a temporary directory and selected through `E2E_EDGE_EXECUTABLE_PATH`, avoiding global installation. A first run overlapped shared-artifact builds and reported a Vite hot-reload/provider error; the full stable-artifact rerun passed. All ephemeral journey containers/volumes and processes were cleaned.
+- The `containers` job run steps from `.github/workflows/ci.yml`: rebuilt all five production images with `--pull`, ran migrate/bootstrap, verified routing/release/headers/non-root/private PostgreSQL and persistence after restart, then stopped the stack.
+- Trivy 0.70.0 with a refreshed vulnerability database: `fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --ignorefile .trivyignore --exit-code 1`, and `image --scanners vuln --severity HIGH,CRITICAL --ignorefile .trivyignore --exit-code 1` for API, Supplier, TMMIN, PostgreSQL and Caddy: passed with the exact registered exceptions. Latest distroless cc-debian12 was additionally inspected/scanned and also contains CVE-2026-84782; no fixed Debian package is available.
+- Workflow Gitleaks 8.24.3 `dir /repo --config=/repo/.gitleaks.toml --redact --verbose`: passed. The latest commit is also scanned using `detect --log-opts=-1` before push.
+- `bash -n deploy/scripts/*.sh deploy/tests/*.sh`, `git diff --check` and final formatting: passed.
+ GitHub CodeQL and dependency-review service checks run after PR creation; delivery is not reported successful until Release CI is green. No merge or deployment is performed.
+
+## Completed work
+
+Audit filtering intersects caller filters with trusted tenant/line predicates. Large imports use a shared production/test parser setup after CORS, authenticating Supplier Admin and Origin/CSRF/writable scope before the 80 MiB parser, with a per-IP throttle, two pending/in-flight slots and 60-second budget. Authorized Hosted Preparation is preserved. Realtime validates current sessions without activity extension and current scope before replay/live/heartbeat output. External ingestion locks and reloads client/token authorization per event; the duplicate fallback outside the transaction was removed. Anonymous token throttle state expires and has a 5,000-key hard cap without evicting active throttles.
+
+Hosted submission snapshots the payload/key for uncertain retries, disables editing until definitive outcomes, pins usable displayed context, and sends optional expected LineShift version/effective replaced MP assertions. Empty/ambiguous initial context can recover by refresh. Existing occurrences add only missing job working assignments. Reactivation locks Supplier/LineShift and rejects inactive populated references while retaining nullable setup assignments.
+
+Changed areas: API auth/parser/session, read models/realtime, External ingestion/throttle, Henkaten occurrence/submission, LineShift activation, Supplier create form, shared contracts, generated OpenAPI/client, regression tests, PRD/roadmap and ADR 0045. No database migration or new direct dependency is required. Delivery scans update existing overrides to Undici 7.29.1 and brace-expansion 5.0.11 for four high-severity advisories without broadening security exceptions.
+
+## Decisions and review
+
+The pre-patch boundary investigation checked direct callers, preparation modes, lifecycle races, duplicate handling, parser aliases and session idle behavior. One independent candidate review identified CORS error ordering, unusable initial context recovery and payload rebuilding on uncertain retry. Those issues were confirmed and corrected with regression tests. Legacy submission callers may omit the additive assertions; the current browser supplies them. A fresh seed smoke confirms existing seed/fixtures remain compatible, so no seed edit was needed.
+
+## Validation
+
+Runtime: Node 22.23.2 (repo pins 22.23.1; both satisfy the package engine), pnpm 11.16.0. This session did not create a commit and does not claim complete release/CI parity.
+
+Passed commands/results:
+
+- `pnpm clean` and `pnpm install --frozen-lockfile`.
+- `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`: workspace suites passed; API 68, Supplier 68, TMMIN 14, contracts 38, client 9, UI 21, fixtures 6 and script 2 tests.
+- `pnpm db:up`, `pnpm db:wait`, `pnpm db:verify`, `pnpm db:test:reset`, `pnpm db:test:migrate`: Docker PostgreSQL 18.4/pgvector 0.8.5; fresh 18-migration test database.
+- `NODE_ENV=test DATABASE_URL=<Docker disposable test URL> RELEASE_SHA=ci SESSION_CSRF_SECRET=<local test value> AUTH_THROTTLE_SECRET=<local test value> OUTBOX_ENABLED=false pnpm --filter @tmmin-henkaten/api run test:integration`: all 49 tests across 8 files passed.
+- `pnpm openapi:generate`, `pnpm api-client:generate`, `pnpm --filter @tmmin-henkaten/api run openapi:check`: schema artifacts generated and API drift check passed. Client regeneration was compared for byte-stable output. The wrapper `pnpm openapi:check` includes a working-tree `git diff --exit-code`; the subsequent delivery run passed with the intended generated-client change staged.
+- `VITE_API_ORIGIN=https://api.example.invalid pnpm build`: all production applications built.
+- `pnpm format:check`, `git diff --check`, `docker compose config --quiet`.
+- `pnpm --filter @tmmin-henkaten/e2e exec node scripts/run.mjs --chromium-only --spec=part-import`: CSV conflict review and Excel workbook journey passed (1 Chromium test); isolated database/server/frontend processes cleaned by the harness.
+- Fresh seed smoke in a separate Docker database, with `NODE_ENV=development`, explicit loopback API/DB, local seed confirmation and temporary credentials/files: migrations, `pnpm admin:bootstrap`, built API, and `pnpm --filter @tmmin-henkaten/api run local:seed` completed with two Hosted suppliers and 240 Henkaten. Temporary API, database, photo/export directories and credentials were removed.
+- `docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.24.3 dir /repo --config=/repo/.gitleaks.toml --redact --verbose`: no leaks found.
+
+Intermediate failures corrected: overlapping generation commands caused Prisma ENOTEMPTY and downstream generated-type errors; generation/check commands were then serialized and regenerated. Test fixtures initially omitted Supplier.sourceMode and session revocation consistency fields; these fixtures were corrected. Test-only typing/lint assertions and parser formatting were corrected. The first production build omitted required VITE_API_ORIGIN; it passed with the workflow value above.
+
+## Remaining limits and next action
+
+No staging/production deployment, full Edge/device journey, production load/exhaustion test, deployment image/security scan or complete release parity was performed. Parser resource limits are process-local; staging capacity and device acceptance remain release gates. Existing legacy clients require adoption of expected context assertions to obtain stale-form conflicts.
+
+Review the working diff and, if delivery is requested, run the full branch-triggered workflow parity with the exact pinned Node version before committing/pushing. Re-run the generated-client HEAD drift gate after commit. All session-started servers and Docker test containers have been stopped.
+
+---
+
 # Current Session Handoff — Editable Excel export summary
 
 - Date: 2026-09-29

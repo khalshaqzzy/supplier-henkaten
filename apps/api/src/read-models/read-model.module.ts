@@ -1,3 +1,4 @@
+import { AuthModule } from '../auth/auth.module.js';
 import { Module } from '@nestjs/common';
 
 import { OperationsModule } from '../operations/operations.module.js';
@@ -12,7 +13,7 @@ import { BoardLayoutService } from './board-layout.service.js';
 import { MasterDataModule } from '../master-data/master-data.module.js';
 
 @Module({
-  imports: [OperationsModule, AdministrationModule, PushModule, MasterDataModule],
+  imports: [AuthModule, OperationsModule, AdministrationModule, PushModule, MasterDataModule],
   controllers: [SupplierReadModelController, TmminReadModelController],
   providers: [
     NotificationService,

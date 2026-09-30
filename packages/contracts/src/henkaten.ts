@@ -31,6 +31,7 @@ const submissionBase = {
   // the authoritative LineShift from the authenticated Line Leader.
   lineShiftId: opaqueIdSchema.optional(),
   expectedEffectiveStartAt: utcTimestampSchema.optional(),
+  expectedLineShiftVersion: optimisticVersionSchema.optional(),
   jobId: opaqueIdSchema,
   partId: opaqueIdSchema.optional(),
   otherPart: z.literal(true).optional(),
@@ -49,6 +50,7 @@ export const createHenkatenRequestSchema = z
         category: z.literal('MAN'),
         lineShiftJobAssignmentId: opaqueIdSchema,
         replacementMpMemberId: opaqueIdSchema,
+        expectedReplacedMpMemberId: opaqueIdSchema.nullable().optional(),
       })
       .strict(),
     ...(['MACHINE', 'MATERIAL', 'METHOD'] as const).map((category) =>

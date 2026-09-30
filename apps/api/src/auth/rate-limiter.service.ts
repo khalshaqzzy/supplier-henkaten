@@ -28,7 +28,7 @@ export class RateLimiterService {
   }
 
   consume(
-    category: 'login-account' | 'login-ip' | 'global-ip',
+    category: 'login-account' | 'login-ip' | 'global-ip' | 'import-ip',
     rawKey: string,
     now: Date,
   ): { allowed: boolean; retryAfterSeconds: number } {
@@ -38,7 +38,7 @@ export class RateLimiterService {
         : category === 'login-ip'
           ? this.config.authIpLoginLimit
           : this.config.authGlobalLimitPerMinute;
-    const windowMs = category === 'global-ip' ? 60_000 : 15 * 60_000;
+    const windowMs = category === 'global-ip' || category === 'import-ip' ? 60_000 : 15 * 60_000;
     const key = `${category}:${this.digest(rawKey)}`;
     const nowMs = now.getTime();
     const existing = this.buckets.get(key);

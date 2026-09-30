@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import cookieParser from 'cookie-parser';
-import express from 'express';
+import { installJsonBodyParsers } from '../auth/import-body.middleware.js';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -44,11 +44,8 @@ describe('supplier master data', () => {
     app = module.createNestApplication();
     app.use(correlationMiddleware);
     app.use(cookieParser());
-    app.use(
-      '/api/v1/supplier/master-data/parts/import',
-      express.json({ limit: '80mb', type: 'application/json' }),
-    );
-    app.use(express.json({ limit: '5mb', type: 'application/json' }));
+    app.enableCors({ credentials: true, origin: [supplierOrigin] });
+    installJsonBodyParsers(app);
     await app.init();
     prisma = app.get(PrismaService);
     const passwords = app.get(PasswordService);
@@ -115,6 +112,17 @@ describe('supplier master data', () => {
 
   afterAll(async () => {
     await app.close();
+  });
+
+  it('returns readable cross-origin import errors before parsing', async () => {
+    const denied = await request(app.getHttpServer())
+      .post('/api/v1/supplier/master-data/parts/import/preview')
+      .set('Origin', supplierOrigin)
+      .type('json')
+      .send('{malformed');
+    expect(denied.status).toBe(403);
+    expect(denied.headers['access-control-allow-origin']).toBe(supplierOrigin);
+    expect(denied.headers['access-control-allow-credentials']).toBe('true');
   });
 
   it('returns contract-valid blockers for an empty Hosted supplier', async () => {

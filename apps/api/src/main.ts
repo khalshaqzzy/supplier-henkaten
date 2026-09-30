@@ -1,12 +1,12 @@
 import 'reflect-metadata';
 
 import cookieParser from 'cookie-parser';
-import express from 'express';
 import helmet from 'helmet';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
 
 import { AppModule } from './app.module.js';
+import { installJsonBodyParsers } from './auth/import-body.middleware.js';
 import { correlationMiddleware } from './common/request-context.js';
 import { APP_CONFIG, type AppConfig } from './config/app-config.js';
 
@@ -29,11 +29,6 @@ async function bootstrap(): Promise<void> {
   app.use(correlationMiddleware);
   app.use(helmet());
   app.use(cookieParser());
-  app.use(
-    '/api/v1/supplier/master-data/parts/import',
-    express.json({ limit: '80mb', type: 'application/json' }),
-  );
-  app.use(express.json({ limit: '5mb', type: 'application/json' }));
   app.enableCors({
     credentials: true,
     origin: [...config.corsAllowedOrigins],
@@ -48,6 +43,7 @@ async function bootstrap(): Promise<void> {
     exposedHeaders: ['X-Correlation-ID', 'Retry-After'],
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
+  installJsonBodyParsers(app);
   app.enableShutdownHooks(['SIGINT', 'SIGTERM']);
   await app.listen(config.port, config.host);
 }
