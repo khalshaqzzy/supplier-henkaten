@@ -78,6 +78,10 @@ Recommend a durable import operation with polling/status recovery, rather than a
 
 The same Idempotency-Key and immutable payload are reused for uncertain retries. A different payload with the same key is rejected. Only the operation ID may be kept in session storage, scoped by supplier/user; raw rows, passwords and workbook contents remain outside browser persistent storage. Requester, session/source context and authorization are checked on operation access and before application. When authentication is no longer valid the pending write is rejected; commit-boundary checks are consistent with existing request lifecycle controls.
 
+Because import/reset request identity includes password fields, the durable retry digest uses Argon2id with the account-password work settings. Its deterministic salt is HMAC-derived from the server secret, supplier, requester, operation kind and idempotency key. Exact retries reproduce the digest without storing credentials or sharing password fingerprints across operations. Account hashes continue to use independent random salts. Changing the digest secret or work settings invalidates old retry comparisons; existing operation receipts remain readable by ID.
+
+The workbook dedicated worker accepts only File messages on its private parent port: the standard empty origin and null Window source are checked before parsing. Unexpected origins, Window sources and payload types are ignored; cross-document messaging is not used for workbook transfer.
+
 ### 4. Result
 
 Display confirmed totals per sheet and readiness next actions, with Lihat readiness and Tutup. Missing Tanoko assessment is shown as an actionable next step when relevant; import must not claim Man replacement is ready. Closing/reopening during server application reconnects to status. Closing a populated, unsubmitted draft requires confirmation and clears sensitive memory.

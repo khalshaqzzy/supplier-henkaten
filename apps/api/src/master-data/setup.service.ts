@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import * as argon2 from 'argon2';
 import {
   Inject,
   Injectable,
@@ -95,10 +96,30 @@ export class SetupService implements OnModuleInit, BeforeApplicationShutdown {
     };
   }
 
-  private digest(value: unknown) {
-    return createHmac('sha256', this.config.authThrottleSecret)
-      .update(JSON.stringify(value))
-      .digest('hex');
+  private async digest(
+    value: unknown,
+    principal: RequestPrincipal,
+    key: string,
+    kind: 'IMPORT' | 'RESET',
+  ) {
+    // A secret, request-scoped salt keeps retries deterministic without sharing password
+    // fingerprints between operations. The payload includes credentials, so use Argon2id
+    // with the same work budget as account passwords rather than a fast request hash.
+    const salt = createHmac('sha256', this.config.authThrottleSecret)
+      .update(
+        JSON.stringify(['setup-digest-v1', principal.supplierId, principal.userId, kind, key]),
+      )
+      .digest();
+    const digest = await argon2.hash(JSON.stringify(value), {
+      type: argon2.argon2id,
+      memoryCost: this.config.argon2MemoryKib,
+      timeCost: this.config.argon2Iterations,
+      parallelism: this.config.argon2Parallelism,
+      hashLength: 32,
+      salt,
+      raw: true,
+    });
+    return digest.toString('hex');
   }
   private async prior(principal: RequestPrincipal, key: string, digest: string, kind: string) {
     const operation = await this.prisma.setupOperation.findUnique({
@@ -122,7 +143,7 @@ export class SetupService implements OnModuleInit, BeforeApplicationShutdown {
     context: MutationContext,
   ) {
     const scope = await this.access.assertWritable(principal);
-    const digest = this.digest(input);
+    const digest = await this.digest(input, principal, key, 'IMPORT');
     const previous = await this.prior(principal, key, digest, 'IMPORT');
     if (previous) return previous;
     const prepared = await this.prisma.$transaction(
@@ -792,7 +813,7 @@ export class SetupService implements OnModuleInit, BeforeApplicationShutdown {
     const scope = await this.access.assertWritable(principal);
     if (principal.impersonatedBy)
       throw fail('Reset hanya tersedia untuk Supplier Admin yang masuk langsung.', 403);
-    const digest = this.digest(input);
+    const digest = await this.digest(input, principal, key, 'RESET');
     const previous = await this.prior(principal, key, digest, 'RESET');
     if (previous) return previous;
     const rate = this.limiter.consume(

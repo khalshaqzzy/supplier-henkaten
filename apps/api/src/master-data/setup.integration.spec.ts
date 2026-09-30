@@ -123,6 +123,23 @@ describe('Supplier workbook import and reset', () => {
     const queued = await service.commit(principal, body, key, context);
     expect(queued.status).toBe('QUEUED');
     expect(await service.commit(principal, body, key, context)).toEqual(queued);
+    const credentialRow = inputRows.find((row) => row.data['password']);
+    if (credentialRow)
+      await expect(
+        service.commit(
+          principal,
+          {
+            ...body,
+            rows: inputRows.map((row) =>
+              row === credentialRow
+                ? { ...row, data: { ...row.data, password: `${row.data['password']}-changed` } }
+                : row,
+            ),
+          },
+          key,
+          context,
+        ),
+      ).rejects.toMatchObject({ problem: { status: 409 } });
     const persisted = await prisma.setupOperation.findUniqueOrThrow({ where: { id: queued.id } });
     for (const row of inputRows)
       if (row.data['password'])
