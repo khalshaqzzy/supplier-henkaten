@@ -1,6 +1,6 @@
 # Enterprise Digital Henkaten Management — Implementation Roadmap
 
-Status: active · Updated: 2026-09-29 · Approach: backend first, dependency driven
+Status: active · Updated: 2026-09-30 · Approach: backend first, dependency driven
 
 This file tracks sequence, current state, dependencies, and remaining acceptance gates. The [PRD](PRD.md) defines product behavior; [rules](rules.md) define agent and engineering process; [session handoff](sessionHandoff.md) records recent changes and checks; [ADRs](../docs/adr/) explain durable decisions. Detailed local browser evidence and unresolved checks live in the [QA report](../docs/audits/local-browser-qa-2026-09-24.md) and [scenario plan](../docs/qa/browser-local-end-to-end-verification-plan.md). Do not copy their histories into this roadmap.
 
@@ -33,6 +33,8 @@ Status vocabulary: `planned`, `in_progress`, `blocked`, `done`, `deferred`. Use 
 | 12 Supplier frontend | done | Hosted workflows across supplier roles |
 | 13 TMMIN frontend | done | Administration, monitoring, warning/Explorer, External health |
 | 14 Full-stack integration | done | Local Compose, isolated browser E2E, seeded role QA, accessibility and visual refinement |
+
+Main audit fixes on `fix/main-audit-findings`: tenant audit intersections, bounded authorized import parsing, passive realtime revalidation, per-event External authorization, bounded token throttles, exact submission retries, stale assignment assertions, missing occurrence jobs and safe reactivation. Local acceptance passed: lint/typecheck/unit/build, 49 PostgreSQL integration tests, Chromium import journey, fresh two-supplier/240-Henkaten seed and Gitleaks. Staging/device gates remain unchanged. See [ADR 0045](../docs/adr/0045-tenant-audit-and-request-lifecycle-boundaries.md).
 
 The completion index is a navigation aid, not a substitute for the PRD or test evidence. Preserve current behavior from the later amendments:
 

@@ -62,6 +62,7 @@ describe('RealtimeService', () => {
         outboxEvent: { findFirst: vi.fn().mockResolvedValue(null) },
       } as never,
       { events: () => pumpEvents.asObservable() } as never,
+      { resolve: vi.fn().mockResolvedValue(principal) } as never,
     );
 
     const message = await firstValueFrom(
@@ -82,6 +83,7 @@ describe('RealtimeService', () => {
         outboxEvent: { findMany: vi.fn().mockResolvedValue([]) },
       } as never,
       { events: () => pumpEvents.asObservable() } as never,
+      { resolve: vi.fn().mockResolvedValue(principal) } as never,
     );
     const nextInvalidation = firstValueFrom(
       service.stream(new TenantScope('supplier-1'), principal, 'line-a', undefined).pipe(
@@ -103,5 +105,58 @@ describe('RealtimeService', () => {
         refresh: ['assignment-board', 'assignment-board-layout', 'notifications', 'dashboard'],
       },
     });
+  });
+  it('closes a silent stream when the session is revoked without touching its activity', async () => {
+    vi.useFakeTimers();
+    try {
+      const events = new Subject<RealtimeOutboxEvent>();
+      const resolve = vi.fn().mockResolvedValue(principal);
+      const service = new RealtimeService(
+        {
+          line: { findMany: vi.fn().mockResolvedValue([{ id: 'line-a' }]) },
+          outboxEvent: { findMany: vi.fn().mockResolvedValue([]) },
+        } as never,
+        { events: () => events } as never,
+        { resolve } as never,
+      );
+      const messages: unknown[] = [];
+      const complete = vi.fn();
+      service
+        .stream(new TenantScope('supplier-1'), principal, undefined, undefined)
+        .subscribe({ next: (item) => messages.push(item), complete });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(resolve).toHaveBeenCalledWith('session-token', 'SUPPLIER', false);
+      resolve.mockResolvedValue(null);
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(complete).toHaveBeenCalledOnce();
+      expect(events.observed).toBe(false);
+      expect(messages).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('does not emit replay or live metadata after the line scope changes', async () => {
+    const events = new Subject<RealtimeOutboxEvent>();
+    const findMany = vi
+      .fn()
+      .mockResolvedValueOnce([{ id: 'line-a' }])
+      .mockResolvedValue([]);
+    const service = new RealtimeService(
+      {
+        line: { findMany },
+        outboxEvent: { findMany: vi.fn().mockResolvedValue([event()]) },
+      } as never,
+      { events: () => events } as never,
+      { resolve: vi.fn().mockResolvedValue(principal) } as never,
+    );
+    const received: string[] = [];
+    const sub = service
+      .stream(new TenantScope('supplier-1'), principal, undefined, undefined)
+      .subscribe((item) => received.push(item.type));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    events.next(event({ id: 'live' }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(received).not.toContain('invalidate');
+    sub.unsubscribe();
   });
 });

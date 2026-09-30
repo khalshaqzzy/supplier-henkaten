@@ -11374,6 +11374,7 @@ export interface paths {
                 lineShiftId?: string;
                 /** Format: date-time */
                 expectedEffectiveStartAt?: string;
+                expectedLineShiftVersion?: number;
                 /** Format: uuid */
                 jobId: string;
                 /** Format: uuid */
@@ -11398,12 +11399,14 @@ export interface paths {
                 lineShiftJobAssignmentId: string;
                 /** Format: uuid */
                 replacementMpMemberId: string;
+                expectedReplacedMpMemberId?: string | null;
               }
             | {
                 /** Format: uuid */
                 lineShiftId?: string;
                 /** Format: date-time */
                 expectedEffectiveStartAt?: string;
+                expectedLineShiftVersion?: number;
                 /** Format: uuid */
                 jobId: string;
                 /** Format: uuid */
@@ -11432,6 +11435,7 @@ export interface paths {
                 lineShiftId?: string;
                 /** Format: date-time */
                 expectedEffectiveStartAt?: string;
+                expectedLineShiftVersion?: number;
                 /** Format: uuid */
                 jobId: string;
                 /** Format: uuid */
@@ -11460,6 +11464,7 @@ export interface paths {
                 lineShiftId?: string;
                 /** Format: date-time */
                 expectedEffectiveStartAt?: string;
+                expectedLineShiftVersion?: number;
                 /** Format: uuid */
                 jobId: string;
                 /** Format: uuid */

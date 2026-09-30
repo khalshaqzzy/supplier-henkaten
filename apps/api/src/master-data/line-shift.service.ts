@@ -387,11 +387,35 @@ export class LineShiftService {
   ) {
     try {
       await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "Supplier" WHERE id = ${scope.supplierId}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM "LineShift" WHERE id = ${id}::uuid FOR UPDATE`;
         const current = await tx.lineShift.findFirst({
           where: { id, supplierId: scope.supplierId },
+          include: includeLineShift,
         });
         if (!current) throw missing('Line Shift');
         if (current.version !== expectedVersion) throw versionConflict();
+        if (active) {
+          if (!current.line.active || !current.shiftTemplate.active)
+            throw conflict('Line dan shift harus aktif.');
+          if (
+            current.supervisorMemberId &&
+            (!current.supervisor?.active || current.supervisor.role !== 'SUPERVISOR')
+          )
+            throw missing('Active Supervisor');
+          if (
+            current.lineLeaderMemberId &&
+            (!current.lineLeader?.active || current.lineLeader.role !== 'LINE_LEADER')
+          )
+            throw missing('Active Line Leader');
+          if (
+            current.jobAssignments.some(
+              ({ job, mpMemberId, mp }) =>
+                job.active && mpMemberId && (!mp?.active || mp.role !== 'MP'),
+            )
+          )
+            throw missing('Active MP');
+        }
         if (active && !current.active && current.lineLeaderMemberId) {
           const occupied = await tx.lineShift.findFirst({
             where: {

@@ -16,6 +16,9 @@ import { correlationMiddleware } from '../common/request-context.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 import { PcrService } from '../pcr/pcr.service.js';
 import { NotificationService } from '../read-models/notification.service.js';
+import { CatalogService } from '../master-data/catalog.service.js';
+import { LineShiftService } from '../master-data/line-shift.service.js';
+import { TenantScope } from '../common/scope.js';
 import { HenkatenService } from './henkaten.service.js';
 
 const supplierOrigin = 'http://localhost:5173';
@@ -831,6 +834,157 @@ describe('Line Shift Henkaten operations', () => {
       .set('X-CSRF-Token', tmminLogin.body.csrfToken as string)
       .send({ from: date, to: date });
     expect(tmminRequested.status).toBe(201);
+  });
+
+  it('rejects changed assignments even when the occurrence is unchanged', async () => {
+    const current = await prisma.lineShift.findUniqueOrThrow({ where: { id: lineShiftId } });
+    await prisma.lineShift.update({
+      where: { id: lineShiftId },
+      data: { version: { increment: 1 } },
+    });
+    const stale = await request(app.getHttpServer())
+      .post('/api/v1/supplier/henkatens')
+      .set('Origin', supplierOrigin)
+      .set('Cookie', leaderCookie)
+      .set('X-CSRF-Token', leaderCsrf)
+      .set('Idempotency-Key', randomUUID())
+      .send({
+        category: 'MAN',
+        lineShiftId,
+        expectedLineShiftVersion: current.version,
+        lineShiftJobAssignmentId: job1AssignmentId,
+        jobId: job1Id,
+        partId,
+        replacementMpMemberId: replacementMpId,
+        cause: 'Changed assignment',
+        detail: 'Same occurrence',
+        checklistVersionId,
+        checklistAnswers: [{ itemId: checklistItemId, answer: 'YES' }],
+      });
+    expect(stale.status).toBe(409);
+    const staleMp = await request(app.getHttpServer())
+      .post('/api/v1/supplier/henkatens')
+      .set('Origin', supplierOrigin)
+      .set('Cookie', leaderCookie)
+      .set('X-CSRF-Token', leaderCsrf)
+      .set('Idempotency-Key', randomUUID())
+      .send({
+        category: 'MAN',
+        lineShiftId,
+        expectedReplacedMpMemberId: randomUUID(),
+        lineShiftJobAssignmentId: job1AssignmentId,
+        jobId: job1Id,
+        partId,
+        replacementMpMemberId: replacementMpId,
+        cause: 'Changed MP',
+        detail: 'Same occurrence',
+        checklistVersionId,
+        checklistAnswers: [{ itemId: checklistItemId, answer: 'YES' }],
+      });
+    expect(staleMp.status).toBe(409);
+  });
+
+  it('materializes a job added after the current occurrence already exists', async () => {
+    const shift = await prisma.lineShift.findUniqueOrThrow({ where: { id: lineShiftId } });
+    const actor = await prisma.user.findFirstOrThrow({
+      where: { supplierId, role: 'LINE_LEADER' },
+    });
+    const context = {
+      actorUserId: actor.id,
+      actorRole: 'SUPPLIER_ADMIN' as const,
+      correlationId: randomUUID(),
+    };
+    const job = await app
+      .get(CatalogService)
+      .createJob(
+        new TenantScope(supplierId),
+        shift.lineId,
+        { name: 'Added mid-occurrence' },
+        context,
+      );
+    const template = await prisma.checklistTemplate.create({
+      data: { supplierId, category: 'MACHINE' },
+    });
+    const checklist = await prisma.checklistVersion.create({
+      data: {
+        supplierId,
+        templateId: template.id,
+        category: 'MACHINE',
+        versionNumber: 1,
+        items: { create: { label: 'Checked', displayOrder: 1 } },
+      },
+      include: { items: true },
+    });
+    const result = await request(app.getHttpServer())
+      .post('/api/v1/supplier/henkatens')
+      .set('Origin', supplierOrigin)
+      .set('Cookie', leaderCookie)
+      .set('X-CSRF-Token', leaderCsrf)
+      .set('Idempotency-Key', randomUUID())
+      .send({
+        category: 'MACHINE',
+        jobId: job.id,
+        partId,
+        cause: 'New job',
+        detail: 'Current occurrence',
+        affectedObject: 'Tool A',
+        replacementObject: 'Tool B',
+        checklistVersionId: checklist.id,
+        checklistAnswers: [{ itemId: checklist.items[0]!.id, answer: 'YES' }],
+      });
+    expect(result.status).toBe(201);
+    expect(await prisma.workingAssignment.count({ where: { supplierId, jobId: job.id } })).toBe(1);
+    expect(
+      await prisma.workingAssignment.count({ where: { supplierId, jobId: job1Id } }),
+    ).toBeGreaterThan(0);
+  });
+
+  it('rejects inactive references when reactivating a shift and permits repaired references', async () => {
+    const current = await prisma.lineShift.findUniqueOrThrow({ where: { id: lineShiftId } });
+    const actor = await prisma.user.findFirstOrThrow({
+      where: { supplierId, role: 'LINE_LEADER' },
+    });
+    const context = {
+      actorUserId: actor.id,
+      actorRole: 'SUPPLIER_ADMIN' as const,
+      correlationId: randomUUID(),
+    };
+    const service = app.get(LineShiftService);
+    await service.setActive(
+      new TenantScope(supplierId),
+      lineShiftId,
+      current.version,
+      false,
+      context,
+    );
+    await prisma.member.update({
+      where: { id: current.lineLeaderMemberId! },
+      data: { active: false },
+    });
+    await expect(
+      service.setActive(
+        new TenantScope(supplierId),
+        lineShiftId,
+        current.version + 1,
+        true,
+        context,
+      ),
+    ).rejects.toThrow();
+    expect((await prisma.lineShift.findUniqueOrThrow({ where: { id: lineShiftId } })).active).toBe(
+      false,
+    );
+    await prisma.member.update({
+      where: { id: current.lineLeaderMemberId! },
+      data: { active: true },
+    });
+    const repaired = await service.setActive(
+      new TenantScope(supplierId),
+      lineShiftId,
+      current.version + 1,
+      true,
+      context,
+    );
+    expect(repaired.active).toBe(true);
   });
 
   async function createManHenkaten(idempotencyKey = randomUUID(), otherPart = false) {

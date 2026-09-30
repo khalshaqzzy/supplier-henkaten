@@ -87,6 +87,12 @@ export class HenkatenService {
         throw shiftSelectionConflict();
       }
       const lineShift = occurrence.row;
+      if (
+        input.expectedLineShiftVersion !== undefined &&
+        input.expectedLineShiftVersion !== lineShift.version
+      ) {
+        throw shiftSelectionConflict();
+      }
       const [supplier, job, selectedPart, checklist] = await Promise.all([
         tx.supplier.findUnique({ where: { id: scope.supplierId } }),
         tx.job.findFirst({
@@ -196,6 +202,12 @@ export class HenkatenService {
           orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
         });
         const replacedMember = previousOverride?.manDetail?.replacementMp ?? assignment.mp;
+        if (
+          input.expectedReplacedMpMemberId !== undefined &&
+          input.expectedReplacedMpMemberId !== (replacedMember?.id ?? null)
+        ) {
+          throw shiftSelectionConflict();
+        }
         man = {
           assignment,
           replacement,
@@ -1160,52 +1172,59 @@ async function ensureAutomaticOccurrence(
     },
     include: { workingAssignments: true },
   });
-  if (existing) return existing;
-  const created = await tx.shiftRun.create({
-    data: {
-      supplierId,
-      lineId: lineShift.lineId,
-      shiftTemplateId: lineShift.shiftTemplateId,
-      status: 'NOT_STARTED',
-      businessDate: new Date(`${businessDate}T00:00:00.000Z`),
-      scheduledStartAt: start,
-      scheduledEndAt: end,
-      timezoneSnapshot: lineShift.shiftTemplate.timezone,
-      lineCodeSnapshot: lineShift.line.code,
-      lineNameSnapshot: lineShift.line.name,
-      shiftNameSnapshot: lineShift.shiftTemplate.name,
-      shiftStartMinuteSnapshot: lineShift.shiftTemplate.startMinute,
-      shiftEndMinuteSnapshot: lineShift.shiftTemplate.endMinute,
-      defaultAssignmentSetVersion: lineShift.version,
-      sourceEpoch,
-      supervisorMemberId: lineShift.supervisorMemberId,
-      supervisorNameSnapshot: lineShift.supervisor?.fullName ?? null,
-      lineLeaderMemberId: lineShift.lineLeaderMemberId,
-      lineLeaderNameSnapshot: lineShift.lineLeader?.fullName ?? null,
-      latestPreflight: [],
-      latestPreflightAt: new Date(),
-      createdById: actorUserId,
-      updatedById: actorUserId,
-    },
-  });
+  const created =
+    existing ??
+    (await tx.shiftRun.create({
+      data: {
+        supplierId,
+        lineId: lineShift.lineId,
+        shiftTemplateId: lineShift.shiftTemplateId,
+        status: 'NOT_STARTED',
+        businessDate: new Date(`${businessDate}T00:00:00.000Z`),
+        scheduledStartAt: start,
+        scheduledEndAt: end,
+        timezoneSnapshot: lineShift.shiftTemplate.timezone,
+        lineCodeSnapshot: lineShift.line.code,
+        lineNameSnapshot: lineShift.line.name,
+        shiftNameSnapshot: lineShift.shiftTemplate.name,
+        shiftStartMinuteSnapshot: lineShift.shiftTemplate.startMinute,
+        shiftEndMinuteSnapshot: lineShift.shiftTemplate.endMinute,
+        defaultAssignmentSetVersion: lineShift.version,
+        sourceEpoch,
+        supervisorMemberId: lineShift.supervisorMemberId,
+        supervisorNameSnapshot: lineShift.supervisor?.fullName ?? null,
+        lineLeaderMemberId: lineShift.lineLeaderMemberId,
+        lineLeaderNameSnapshot: lineShift.lineLeader?.fullName ?? null,
+        latestPreflight: [],
+        latestPreflightAt: new Date(),
+        createdById: actorUserId,
+        updatedById: actorUserId,
+      },
+    }));
   if (lineShift.jobAssignments.length) {
     await tx.workingAssignment.createMany({
-      data: lineShift.jobAssignments.map((assignment) => ({
-        supplierId,
-        shiftRunId: created.id,
-        lineId: lineShift.lineId,
-        jobId: assignment.jobId,
-        jobNameSnapshot: assignment.job.name,
-        jobDisplayOrderSnapshot: assignment.job.displayOrder,
-        effectiveMpMemberId: assignment.mpMemberId,
-        candidateMpMemberId: assignment.mpMemberId,
-        mpNameSnapshot: assignment.mp?.fullName ?? null,
-        mpRegistrationSnapshot: assignment.mp?.registrationNumber ?? null,
-        state: assignment.mpMemberId ? ('ASSIGNED' as const) : ('VACANT' as const),
-        active: true,
-        includedInPlan: true,
-        updatedById: actorUserId,
-      })),
+      skipDuplicates: true,
+      data: lineShift.jobAssignments
+        .filter(
+          (assignment) =>
+            !existing?.workingAssignments.some((working) => working.jobId === assignment.jobId),
+        )
+        .map((assignment) => ({
+          supplierId,
+          shiftRunId: created.id,
+          lineId: lineShift.lineId,
+          jobId: assignment.jobId,
+          jobNameSnapshot: assignment.job.name,
+          jobDisplayOrderSnapshot: assignment.job.displayOrder,
+          effectiveMpMemberId: assignment.mpMemberId,
+          candidateMpMemberId: assignment.mpMemberId,
+          mpNameSnapshot: assignment.mp?.fullName ?? null,
+          mpRegistrationSnapshot: assignment.mp?.registrationNumber ?? null,
+          state: assignment.mpMemberId ? ('ASSIGNED' as const) : ('VACANT' as const),
+          active: true,
+          includedInPlan: true,
+          updatedById: actorUserId,
+        })),
     });
   }
   return tx.shiftRun.findUniqueOrThrow({

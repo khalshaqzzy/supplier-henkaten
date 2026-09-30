@@ -68,7 +68,11 @@ export class SessionService {
     return { rawToken, id: session.id, idleExpiresAt, absoluteExpiresAt };
   }
 
-  async resolve(rawToken: string, expectedRealm: IdentityRealm): Promise<RequestPrincipal | null> {
+  async resolve(
+    rawToken: string,
+    expectedRealm: IdentityRealm,
+    touch = true,
+  ): Promise<RequestPrincipal | null> {
     const now = this.clock.now();
     const session = await this.prisma.userSession.findUnique({
       where: { tokenHash: this.hashToken(rawToken) },
@@ -113,7 +117,10 @@ export class SessionService {
       return null;
     }
 
-    if (now.getTime() - session.lastActivityAt.getTime() >= SessionService.TOUCH_INTERVAL_MS) {
+    if (
+      touch &&
+      now.getTime() - session.lastActivityAt.getTime() >= SessionService.TOUCH_INTERVAL_MS
+    ) {
       await this.prisma.userSession.updateMany({
         where: { id: session.id, version: session.version },
         data: {

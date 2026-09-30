@@ -810,19 +810,23 @@ export class ReadModelService {
     const cursor = decodeCursor(query.cursor);
     const rows = await this.prisma.auditEvent.findMany({
       where: {
-        ...where,
-        ...(query.action ? { action: query.action } : {}),
-        ...(query.resourceType ? { resourceType: query.resourceType } : {}),
-        ...(query.resourceId ? { resourceId: query.resourceId } : {}),
-        ...(query.supplierId ? { supplierId: query.supplierId } : {}),
-        ...(query.from || query.to
-          ? {
-              occurredAt: {
-                ...(query.from ? { gte: new Date(query.from) } : {}),
-                ...(query.to ? { lte: new Date(query.to) } : {}),
-              },
-            }
-          : {}),
+        AND: [
+          where,
+          {
+            ...(query.action ? { action: query.action } : {}),
+            ...(query.resourceType ? { resourceType: query.resourceType } : {}),
+            ...(query.resourceId ? { resourceId: query.resourceId } : {}),
+            ...(query.supplierId ? { supplierId: query.supplierId } : {}),
+            ...(query.from || query.to
+              ? {
+                  occurredAt: {
+                    ...(query.from ? { gte: new Date(query.from) } : {}),
+                    ...(query.to ? { lte: new Date(query.to) } : {}),
+                  },
+                }
+              : {}),
+          },
+        ],
       },
       include: { supplier: true },
       orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],

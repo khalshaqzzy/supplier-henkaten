@@ -1,15 +1,17 @@
 import { randomUUID } from 'node:crypto';
+import { externalHenkatenEventSchema } from '@tmmin-henkaten/contracts';
 
 import cookieParser from 'cookie-parser';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { AppModule } from '../app.module.js';
 import { PasswordService } from '../auth/password.service.js';
 import { correlationMiddleware } from '../common/request-context.js';
 import { PrismaService } from '../persistence/prisma.service.js';
+import { ExternalService } from './external.service.js';
 import { NotificationService } from '../read-models/notification.service.js';
 
 const tmminOrigin = 'http://localhost:5174';
@@ -393,6 +395,68 @@ describe('External API credential and ingestion boundary', () => {
     });
     expect(denied.status).toBe(401);
     expect(denied.body.code).toBe('AUTHENTICATION_FAILED');
+  });
+
+  it('stops independently committed batch events after credential revocation', async () => {
+    const service = app.get(ExternalService);
+    const principal = await service.authenticate(`Bearer ${accessToken}`, '127.0.0.1');
+    const original = service.ingest.bind(service);
+    let count = 0;
+    const spy = vi.spyOn(service, 'ingest').mockImplementation(async (...args) => {
+      if (++count === 2) {
+        const client = await prisma.externalApiClient.findUniqueOrThrow({
+          where: { id: clientRecordId },
+        });
+        await service.revokeClient(supplierId, clientRecordId, client.version, {
+          actorUserId: client.createdById,
+          actorRole: 'TMMIN_ADMIN',
+          correlationId: randomUUID(),
+        });
+      }
+      return original(...args);
+    });
+    const events = [1, 2].map((i) =>
+      event({
+        eventId: `revocation-event-${i}`,
+        sourceHenkatenId: `revocation-source-${i}`,
+        sourceVersion: 1,
+        eventType: 'HENKATEN_OPENED',
+        status: 'OPEN',
+      }),
+    );
+    try {
+      const batch = await request(app.getHttpServer())
+        .post('/api/v1/external/henkaten/events/batch')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ events });
+      expect(batch.status).toBe(200);
+      const body = batch.body as { results: Array<{ status: string }> };
+      expect(body.results.map((item) => item.status)).toEqual(['ACCEPTED', 'REJECTED']);
+      expect(
+        await prisma.externalHenkatenProjection.count({
+          where: { supplierId, sourceHenkatenId: 'revocation-source-2' },
+        }),
+      ).toBe(0);
+      await expect(
+        original(
+          principal,
+          externalHenkatenEventSchema.parse(events[0]),
+          randomUUID(),
+          '127.0.0.1',
+        ),
+      ).rejects.toThrow();
+    } finally {
+      spy.mockRestore();
+      // Restore fixture for the independent existing epoch-revocation scenario.
+      await prisma.externalApiClient.update({
+        where: { id: clientRecordId },
+        data: { status: 'ACTIVE', version: clientVersion },
+      });
+      await prisma.externalAccessToken.updateMany({
+        where: { clientId: clientRecordId },
+        data: { revokedAt: null },
+      });
+    }
   });
 
   it('invalidates old-epoch tokens and revokes all outstanding tokens immediately', async () => {

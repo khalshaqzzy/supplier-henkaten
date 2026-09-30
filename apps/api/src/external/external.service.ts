@@ -321,133 +321,18 @@ export class ExternalService {
     ip: string,
   ) {
     const payloadHash = createHash('sha256').update(canonicalizeExternalJson(event)).digest('hex');
-    try {
-      return await runSerializable(this.prisma, async (tx) => {
-        await tx.$queryRaw`SELECT id FROM "Supplier" WHERE id = ${principal.supplierId}::uuid FOR UPDATE`;
-        const supplier = await tx.supplier.findUnique({ where: { id: principal.supplierId } });
-        if (
-          !supplier?.active ||
-          supplier.sourceMode !== 'EXTERNAL' ||
-          supplier.sourceEpoch !== principal.sourceEpoch
-        ) {
-          throw sourceMismatch();
-        }
-        const duplicate = await tx.externalIngestionEvent.findUnique({
-          where: {
-            supplierId_sourceEpoch_eventId: {
-              supplierId: principal.supplierId,
-              sourceEpoch: principal.sourceEpoch,
-              eventId: event.eventId,
-            },
-          },
-        });
-        if (duplicate) {
-          if (duplicate.payloadHash !== payloadHash) throw idempotencyConflict();
-          await this.audit.write(
-            duplicateAudit(principal, duplicate.id, event.eventId, correlationId, ip),
-            tx,
-          );
-          return result(duplicate.id, event.eventId, 'DUPLICATE', correlationId);
-        }
-        await tx.$queryRaw`
-          SELECT id FROM "ExternalHenkatenProjection"
-          WHERE "supplierId" = ${principal.supplierId}::uuid
-            AND "sourceEpoch" = ${principal.sourceEpoch}
-            AND "sourceHenkatenId" = ${event.sourceHenkatenId}
-          FOR UPDATE
-        `;
-        const current = await tx.externalHenkatenProjection.findUnique({
-          where: {
-            supplierId_sourceEpoch_sourceHenkatenId: {
-              supplierId: principal.supplierId,
-              sourceEpoch: principal.sourceEpoch,
-              sourceHenkatenId: event.sourceHenkatenId,
-            },
-          },
-        });
-        assertExternalOrdering(current, event);
-        const projection = current
-          ? await tx.externalHenkatenProjection.update({
-              where: { id: current.id },
-              data: projectionData(event),
-            })
-          : await tx.externalHenkatenProjection.create({
-              data: {
-                supplierId: principal.supplierId,
-                sourceEpoch: principal.sourceEpoch,
-                sourceHenkatenId: event.sourceHenkatenId,
-                ...projectionData(event),
-              },
-            });
-        await this.pcr.queueExternal(tx, projection.id, principal.supplierId, {
-          category: event.changePoint,
-          cause: event.change.cause,
-          detail: event.change.detail,
-          affectedObject: 'affectedObject' in event.change ? event.change.affectedObject : null,
-          replacementObject:
-            'replacementObject' in event.change ? event.change.replacementObject : null,
-        });
-        const ingestion = await tx.externalIngestionEvent.create({
-          data: {
-            supplierId: principal.supplierId,
-            clientId: principal.clientId,
-            sourceEpoch: principal.sourceEpoch,
-            eventId: event.eventId,
-            sourceHenkatenId: event.sourceHenkatenId,
-            sourceVersion: event.sourceVersion,
-            eventType: event.eventType,
-            payloadHash,
-            canonicalPayload: event,
-            correlationId,
-            projectionId: projection.id,
-          },
-        });
-        await this.applyWarning(tx, principal.supplierId, projection, event);
-        await tx.externalApiClient.update({
-          where: { id: principal.clientId },
-          data: { lastSuccessfulIngestionAt: new Date() },
-        });
-        await this.audit.write(
-          {
-            actorKind: 'EXTERNAL_CLIENT',
-            supplierId: principal.supplierId,
-            action: 'EXTERNAL_INGEST_ACCEPTED',
-            resourceType: 'ExternalIngestionEvent',
-            resourceId: ingestion.id,
-            changeSummary: {
-              eventId: event.eventId,
-              sourceHenkatenId: event.sourceHenkatenId,
-              sourceVersion: event.sourceVersion,
-              eventType: event.eventType,
-            },
-            correlationId,
-            sourceIp: ip,
-            sourceMode: 'EXTERNAL',
-            sourceEpoch: principal.sourceEpoch,
-          },
-          tx,
-        );
-        await this.outbox.enqueue(
-          {
-            eventType: 'EXTERNAL_PROJECTION_UPDATED',
-            aggregateType: 'ExternalHenkatenProjection',
-            aggregateId: projection.id,
-            aggregateVersion: projection.sourceVersion,
-            supplierId: principal.supplierId,
-            actor: { kind: 'EXTERNAL_CLIENT', id: principal.clientId },
-            correlationId,
-            payload: {
-              eventType: event.eventType,
-              sourceHenkatenId: event.sourceHenkatenId,
-              status: event.status,
-            },
-          },
-          tx,
-        );
-        return result(ingestion.id, event.eventId, 'ACCEPTED', correlationId);
-      });
-    } catch (error) {
-      const duplicate = await this.prisma.externalIngestionEvent.findUnique({
+    return await runSerializable(this.prisma, async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Supplier" WHERE id = ${principal.supplierId}::uuid FOR UPDATE`;
+      await this.assertCurrentPrincipal(tx, principal, ip);
+      const supplier = await tx.supplier.findUnique({ where: { id: principal.supplierId } });
+      if (
+        !supplier?.active ||
+        supplier.sourceMode !== 'EXTERNAL' ||
+        supplier.sourceEpoch !== principal.sourceEpoch
+      ) {
+        throw sourceMismatch();
+      }
+      const duplicate = await tx.externalIngestionEvent.findUnique({
         where: {
           supplierId_sourceEpoch_eventId: {
             supplierId: principal.supplierId,
@@ -460,10 +345,135 @@ export class ExternalService {
         if (duplicate.payloadHash !== payloadHash) throw idempotencyConflict();
         await this.audit.write(
           duplicateAudit(principal, duplicate.id, event.eventId, correlationId, ip),
+          tx,
         );
         return result(duplicate.id, event.eventId, 'DUPLICATE', correlationId);
       }
-      throw error;
+      await tx.$queryRaw`
+          SELECT id FROM "ExternalHenkatenProjection"
+          WHERE "supplierId" = ${principal.supplierId}::uuid
+            AND "sourceEpoch" = ${principal.sourceEpoch}
+            AND "sourceHenkatenId" = ${event.sourceHenkatenId}
+          FOR UPDATE
+        `;
+      const current = await tx.externalHenkatenProjection.findUnique({
+        where: {
+          supplierId_sourceEpoch_sourceHenkatenId: {
+            supplierId: principal.supplierId,
+            sourceEpoch: principal.sourceEpoch,
+            sourceHenkatenId: event.sourceHenkatenId,
+          },
+        },
+      });
+      assertExternalOrdering(current, event);
+      const projection = current
+        ? await tx.externalHenkatenProjection.update({
+            where: { id: current.id },
+            data: projectionData(event),
+          })
+        : await tx.externalHenkatenProjection.create({
+            data: {
+              supplierId: principal.supplierId,
+              sourceEpoch: principal.sourceEpoch,
+              sourceHenkatenId: event.sourceHenkatenId,
+              ...projectionData(event),
+            },
+          });
+      await this.pcr.queueExternal(tx, projection.id, principal.supplierId, {
+        category: event.changePoint,
+        cause: event.change.cause,
+        detail: event.change.detail,
+        affectedObject: 'affectedObject' in event.change ? event.change.affectedObject : null,
+        replacementObject:
+          'replacementObject' in event.change ? event.change.replacementObject : null,
+      });
+      const ingestion = await tx.externalIngestionEvent.create({
+        data: {
+          supplierId: principal.supplierId,
+          clientId: principal.clientId,
+          sourceEpoch: principal.sourceEpoch,
+          eventId: event.eventId,
+          sourceHenkatenId: event.sourceHenkatenId,
+          sourceVersion: event.sourceVersion,
+          eventType: event.eventType,
+          payloadHash,
+          canonicalPayload: event,
+          correlationId,
+          projectionId: projection.id,
+        },
+      });
+      await this.applyWarning(tx, principal.supplierId, projection, event);
+      await tx.externalApiClient.update({
+        where: { id: principal.clientId },
+        data: { lastSuccessfulIngestionAt: new Date() },
+      });
+      await this.audit.write(
+        {
+          actorKind: 'EXTERNAL_CLIENT',
+          supplierId: principal.supplierId,
+          action: 'EXTERNAL_INGEST_ACCEPTED',
+          resourceType: 'ExternalIngestionEvent',
+          resourceId: ingestion.id,
+          changeSummary: {
+            eventId: event.eventId,
+            sourceHenkatenId: event.sourceHenkatenId,
+            sourceVersion: event.sourceVersion,
+            eventType: event.eventType,
+          },
+          correlationId,
+          sourceIp: ip,
+          sourceMode: 'EXTERNAL',
+          sourceEpoch: principal.sourceEpoch,
+        },
+        tx,
+      );
+      await this.outbox.enqueue(
+        {
+          eventType: 'EXTERNAL_PROJECTION_UPDATED',
+          aggregateType: 'ExternalHenkatenProjection',
+          aggregateId: projection.id,
+          aggregateVersion: projection.sourceVersion,
+          supplierId: principal.supplierId,
+          actor: { kind: 'EXTERNAL_CLIENT', id: principal.clientId },
+          correlationId,
+          payload: {
+            eventType: event.eventType,
+            sourceHenkatenId: event.sourceHenkatenId,
+            status: event.status,
+          },
+        },
+        tx,
+      );
+      return result(ingestion.id, event.eventId, 'ACCEPTED', correlationId);
+    });
+  }
+
+  private async assertCurrentPrincipal(
+    tx: Prisma.TransactionClient,
+    principal: ExternalPrincipal,
+    ip: string,
+  ) {
+    await tx.$queryRaw`SELECT id FROM "ExternalApiClient" WHERE id = ${principal.clientId}::uuid FOR UPDATE`;
+    const [client, token] = await Promise.all([
+      tx.externalApiClient.findUnique({ where: { id: principal.clientId } }),
+      tx.externalAccessToken.findUnique({ where: { id: principal.tokenId } }),
+    ]);
+    if (
+      !client ||
+      !token ||
+      client.status !== 'ACTIVE' ||
+      token.revokedAt ||
+      token.expiresAt <= new Date() ||
+      token.clientId !== client.id ||
+      token.supplierId !== principal.supplierId ||
+      client.supplierId !== principal.supplierId ||
+      token.sourceEpoch !== principal.sourceEpoch ||
+      client.sourceEpoch !== principal.sourceEpoch ||
+      !token.scopes.includes('henkaten:ingest') ||
+      !client.scopes.includes('henkaten:ingest') ||
+      !externalIpAllowed(client.ipAllowlist, ip)
+    ) {
+      throw authenticationFailed();
     }
   }
 

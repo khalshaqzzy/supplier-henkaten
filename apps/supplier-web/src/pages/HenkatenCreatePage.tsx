@@ -33,6 +33,10 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
   const [replacementObject, setReplacementObject] = useState('');
   const [answers, setAnswers] = useState<Record<string, 'YES' | 'NO'>>({});
   const [problem, setProblem] = useState<string | null>(null);
+  const [submittedIntent, setSubmittedIntent] = useState<{
+    body: CreateHenkatenRequest;
+    key: string;
+  } | null>(null);
   const [intentKey, setIntentKey] = useState(() => createIdempotencyKey());
   const context = useQuery({
     queryKey: scopedKey(scope, 'line-shift-operational-context'),
@@ -68,7 +72,11 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
     setAffectedObject(prefill.affectedObject ?? '');
     setReplacementObject(prefill.replacementObject ?? '');
   }, [clonePrefill.data]);
-  const selectedShift = context.data?.items.length === 1 ? context.data.items[0] : undefined;
+  const [shownContext, setShownContext] = useState<typeof context.data>();
+  useEffect(() => {
+    if (shownContext?.items.length !== 1 && context.data) setShownContext(context.data);
+  }, [shownContext, context.data]);
+  const selectedShift = shownContext?.items.length === 1 ? shownContext.items[0] : undefined;
   useEffect(() => {
     if (
       selectedShift &&
@@ -100,9 +108,12 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
   );
   const submit = useMutation({
     mutationFn: () => {
+      if (submittedIntent)
+        return supplierApi.createHenkaten(submittedIntent.body, submittedIntent.key);
       const base = {
         lineShiftId: selectedShift!.id,
         expectedEffectiveStartAt: selectedShift!.effectiveStartAt,
+        expectedLineShiftVersion: selectedShift!.version,
         jobId,
         ...(partId === 'OTHER' ? { otherPart: true as const } : { partId }),
         checklistVersionId: checklist!.id,
@@ -118,8 +129,10 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
               category,
               lineShiftJobAssignmentId: selectedAssignment!.id,
               replacementMpMemberId: replacementMpId,
+              expectedReplacedMpMemberId: selectedAssignment!.mpMemberId,
             }
           : { ...base, category, affectedObject, replacementObject };
+      setSubmittedIntent({ body, key: intentKey });
       return supplierApi.createHenkaten(body, intentKey);
     },
     onSuccess: (created) =>
@@ -131,14 +144,21 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
       setProblem(
         error instanceof ApiProblemError ? error.problem.detail : 'Henkaten tidak dapat disimpan.',
       );
-      setIntentKey(createIdempotencyKey());
-      void context.refetch();
+      if (
+        error instanceof ApiProblemError &&
+        error.problem.status < 500 &&
+        error.problem.code !== 'IDEMPOTENCY_CONFLICT'
+      ) {
+        setSubmittedIntent(null);
+        setIntentKey(createIdempotencyKey());
+        void context.refetch().then(({ data }) => setShownContext(data));
+      }
     },
   });
   const send = (event: FormEvent) => {
     event.preventDefault();
     setProblem(null);
-    if (valid) submit.mutate();
+    if (submittedIntent || valid) submit.mutate();
   };
 
   return (
@@ -161,7 +181,11 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
         </Alert>
       )}
       <form onSubmit={send} className="henkaten-form">
-        <div className="henkaten-form__main">
+        <fieldset
+          className="henkaten-form__main"
+          disabled={Boolean(submittedIntent)}
+          style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}
+        >
           <Panel title="Kategori">
             <HenkatenCategoryPicker value={category} onChange={setCategory} />
           </Panel>
@@ -320,7 +344,7 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
               </Alert>
             )}
           </Panel>
-        </div>
+        </fieldset>
         <aside className="henkaten-review" aria-label="Ringkasan Henkaten">
           <h2>Ringkasan</h2>
           <dl>
@@ -345,7 +369,7 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
               <dd>{partId === 'OTHER' ? 'Other' : (selectedPart?.partNumber ?? '—')}</dd>
             </div>
           </dl>
-          <Button type="submit" loading={submit.isPending} disabled={!valid}>
+          <Button type="submit" loading={submit.isPending} disabled={!submittedIntent && !valid}>
             Submit Henkaten
           </Button>
           <Button type="button" variant="ghost" onClick={() => void navigate(-1)}>
