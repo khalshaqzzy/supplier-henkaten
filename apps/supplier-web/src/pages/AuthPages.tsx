@@ -1,3 +1,4 @@
+import { SetupResetCard } from './SetupResetCard';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { KeyRound, LogOut, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
@@ -229,21 +230,7 @@ export function AccountPage() {
           items={[
             { label: 'Nama', value: principal.displayName },
             { label: 'Role', value: principal.role },
-            { label: 'Session purpose', value: principal.purpose },
-            {
-              label: 'Idle expiry',
-              value: new Intl.DateTimeFormat('id-ID', {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-              }).format(new Date(session!.idleExpiresAt)),
-            },
-            {
-              label: 'Absolute expiry',
-              value: new Intl.DateTimeFormat('id-ID', {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-              }).format(new Date(session!.absoluteExpiresAt)),
-            },
+            { label: 'Supplier', value: session!.supplier!.name },
           ]}
         />
         <div className="form-actions">
@@ -259,6 +246,7 @@ export function AccountPage() {
           </Button>
         </div>
       </Card>
+      {principal.role === 'SUPPLIER_ADMIN' && !principal.impersonatedBy && <SetupResetCard />}
       <PushSettings required={principal.role === 'LINE_LEADER' && principal.purpose === 'NORMAL'} />
     </div>
   );

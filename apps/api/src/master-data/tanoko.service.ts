@@ -1,3 +1,4 @@
+import { lockSetupMutation } from './setup-lock.js';
 import { Injectable } from '@nestjs/common';
 import type { TanokoHistoryQuery, TanokoSave, SkillCategory } from '@tmmin-henkaten/contracts';
 import type { RequestPrincipal } from '../common/request-context.js';
@@ -44,12 +45,12 @@ export class TanokoService {
     const [members, jobs, mappings] = await this.prisma.$transaction(
       [
         this.prisma.member.findMany({
-          where: { supplierId, role: 'MP' },
+          where: { supplierId, role: 'MP', resetArchivedAt: null },
           select: { id: true, fullName: true, active: true },
           orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
         }),
         this.prisma.job.findMany({
-          where: { supplierId },
+          where: { supplierId, resetArchivedAt: null, line: { resetArchivedAt: null } },
           include: { line: true },
           orderBy: [{ line: { displayOrder: 'asc' } }, { displayOrder: 'asc' }, { id: 'asc' }],
         }),
@@ -150,7 +151,7 @@ export class TanokoService {
       });
     const result = await runSerializable(this.prisma, async (tx) => {
       // Supplier lock also coordinates with source cutover and member creation/deactivation.
-      await tx.$queryRaw`SELECT id FROM "Supplier" WHERE id = ${supplierId}::uuid FOR UPDATE`;
+      await lockSetupMutation(tx, supplierId);
       const supplier = await tx.supplier.findFirst({
         where: {
           id: supplierId,

@@ -1076,7 +1076,7 @@ export class ShiftService {
         },
       }),
       tx.checklistVersion.findMany({
-        where: { supplierId, template: { active: true } },
+        where: { supplierId, currentFor: { some: { active: true } } },
         distinct: ['category'],
         select: { category: true },
       }),

@@ -1,3 +1,4 @@
+import { lockSetupMutation } from './setup-lock.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
 import { access, mkdir, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
@@ -108,6 +109,7 @@ export class PhotoService implements OnModuleInit {
       const fullChecksum = sha256(full.data);
       const thumbnailChecksum = sha256(thumbnail.data);
       await this.prisma.$transaction(async (tx) => {
+        await lockSetupMutation(tx, scope.supplierId);
         const members = await tx.$queryRaw<Array<{ id: string }>>`
           SELECT id
           FROM "Member"
@@ -175,6 +177,7 @@ export class PhotoService implements OnModuleInit {
     context: MutationContext,
   ) {
     await this.prisma.$transaction(async (tx) => {
+      await lockSetupMutation(tx, scope.supplierId);
       const members = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT id
         FROM "Member"

@@ -6,6 +6,12 @@ import {
   tanokoSaveSchema,
   tanokoHistoryQuerySchema,
   tanokoHistorySchema,
+  setupPreviewRequestSchema,
+  setupPreviewSchema,
+  setupCommitRequestSchema,
+  setupOperationSchema,
+  setupResetPreviewSchema,
+  setupResetRequestSchema,
 } from '@tmmin-henkaten/contracts';
 import { z } from 'zod';
 import { createDocument } from 'zod-openapi';
@@ -1041,6 +1047,57 @@ function masterDataPaths() {
       createPartRequestSchema,
       partSchema,
     ),
+    '/api/v1/supplier/master-data/setup-import/template': {
+      get: { responses: { '200': xlsx, '403': problem } },
+    },
+    '/api/v1/supplier/master-data/setup-import/preview': {
+      post: {
+        requestBody: body(setupPreviewRequestSchema),
+        responses: {
+          '201': json('Setup review', setupPreviewSchema),
+          '422': problem,
+          '403': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/master-data/setup-import/commit': {
+      post: {
+        requestParams: { header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }) },
+        requestBody: body(setupCommitRequestSchema),
+        responses: {
+          '201': json('Setup operation', setupOperationSchema),
+          '409': problem,
+          '422': problem,
+          '403': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/master-data/setup-import/operations/{id}': {
+      get: {
+        requestParams: idPath,
+        responses: {
+          '200': json('Setup operation', setupOperationSchema),
+          '404': problem,
+          '403': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/master-data/setup-reset/preview': {
+      get: { responses: { '200': json('Reset summary', setupResetPreviewSchema), '403': problem } },
+    },
+    '/api/v1/supplier/master-data/setup-reset': {
+      post: {
+        requestParams: { header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }) },
+        requestBody: body(setupResetRequestSchema),
+        responses: {
+          '201': json('Reset receipt', setupOperationSchema),
+          '409': problem,
+          '422': problem,
+          '429': problem,
+          '403': problem,
+        },
+      },
+    },
     '/api/v1/supplier/master-data/parts/import/preview': {
       post: {
         requestBody: body(partImportPreviewRequestSchema),

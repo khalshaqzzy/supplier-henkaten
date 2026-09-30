@@ -113,7 +113,7 @@ export class HenkatenService {
             id: input.checklistVersionId,
             supplierId: scope.supplierId,
             category: input.category,
-            template: { active: true },
+            currentFor: { some: { active: true } },
           },
           include: {
             items: { orderBy: { displayOrder: 'asc' } },
@@ -660,7 +660,7 @@ export class HenkatenService {
         where: {
           supplierId: scope.supplierId,
           category: query.category,
-          template: { active: true },
+          currentFor: { some: { active: true } },
         },
         include: { items: { orderBy: { displayOrder: 'asc' } } },
         orderBy: { versionNumber: 'desc' },
@@ -735,7 +735,11 @@ export class HenkatenService {
     if (!row) throw missing('Henkaten');
     const [checklist, operational, job, part] = await Promise.all([
       this.prisma.checklistVersion.findFirst({
-        where: { supplierId: scope.supplierId, category: row.category, template: { active: true } },
+        where: {
+          supplierId: scope.supplierId,
+          category: row.category,
+          currentFor: { some: { active: true } },
+        },
         include: { items: { orderBy: { displayOrder: 'asc' } } },
         orderBy: { versionNumber: 'desc' },
       }),

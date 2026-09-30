@@ -1,3 +1,4 @@
+import { lockSetupMutation } from './setup-lock.js';
 import { Injectable } from '@nestjs/common';
 
 import type { MasterListQuery, PartImportCommitRequest } from '@tmmin-henkaten/contracts';
@@ -102,6 +103,7 @@ export class CatalogService {
     context: MutationContext,
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
+      await lockSetupMutation(tx, scope.supplierId);
       const current = await tx.line.findFirst({ where: { id, supplierId: scope.supplierId } });
       if (!current) throw missing('Line');
       if (current.version !== input.expectedVersion) throw versionConflict();
@@ -154,7 +156,12 @@ export class CatalogService {
       }
       const updated = await tx.line.update({
         where: { id },
-        data: { active, version: { increment: 1 }, updatedById: context.actorUserId },
+        data: {
+          active,
+          ...(active ? { resetArchivedAt: null } : {}),
+          version: { increment: 1 },
+          updatedById: context.actorUserId,
+        },
       });
       await this.audit.write(
         masterAudit(
@@ -258,6 +265,7 @@ export class CatalogService {
     context: MutationContext,
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
+      await lockSetupMutation(tx, scope.supplierId);
       const current = await tx.job.findFirst({
         where: { id, lineId, supplierId: scope.supplierId },
       });
@@ -315,7 +323,12 @@ export class CatalogService {
       }
       const updated = await tx.job.update({
         where: { id },
-        data: { active, version: { increment: 1 }, updatedById: context.actorUserId },
+        data: {
+          active,
+          ...(active ? { resetArchivedAt: null } : {}),
+          version: { increment: 1 },
+          updatedById: context.actorUserId,
+        },
       });
       await this.audit.write(
         masterAudit(
@@ -430,6 +443,7 @@ export class CatalogService {
     assertDistinctPartNumbers(rows);
     return this.prisma.$transaction(
       async (tx) => {
+        await lockSetupMutation(tx, scope.supplierId);
         await lockSupplier(tx, scope.supplierId);
         const existing = [] as Awaited<ReturnType<typeof tx.part.findMany>>;
         for (const batch of chunks(rows, 1_000)) {
@@ -602,7 +616,12 @@ export class CatalogService {
       }
       const updated = await tx.part.update({
         where: { id },
-        data: { active, version: { increment: 1 }, updatedById: context.actorUserId },
+        data: {
+          active,
+          ...(active ? { resetArchivedAt: null } : {}),
+          version: { increment: 1 },
+          updatedById: context.actorUserId,
+        },
       });
       await this.audit.write(
         masterAudit(
@@ -641,6 +660,7 @@ export class CatalogService {
   ) {
     const times = parseShiftTimes(input.startTime, input.endTime, input.timezone);
     const row = await this.prisma.$transaction(async (tx) => {
+      await lockSetupMutation(tx, scope.supplierId);
       const displayOrder =
         (
           await tx.shiftTemplate.aggregate({
@@ -694,6 +714,7 @@ export class CatalogService {
     context: MutationContext,
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
+      await lockSetupMutation(tx, scope.supplierId);
       const current = await tx.shiftTemplate.findFirst({
         where: { id, supplierId: scope.supplierId },
       });
@@ -730,6 +751,7 @@ export class CatalogService {
     context: MutationContext,
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
+      await lockSetupMutation(tx, scope.supplierId);
       const current = await tx.shiftTemplate.findFirst({
         where: { id, supplierId: scope.supplierId },
       });
@@ -745,7 +767,12 @@ export class CatalogService {
       }
       const updated = await tx.shiftTemplate.update({
         where: { id },
-        data: { active, version: { increment: 1 }, updatedById: context.actorUserId },
+        data: {
+          active,
+          ...(active ? { resetArchivedAt: null } : {}),
+          version: { increment: 1 },
+          updatedById: context.actorUserId,
+        },
       });
       await this.audit.write(
         masterAudit(
@@ -770,6 +797,7 @@ export class CatalogService {
     lineId?: string,
   ) {
     return this.prisma.$transaction(async (tx) => {
+      await lockSetupMutation(tx, scope.supplierId);
       const ids = [...items.map(({ id }) => id)].sort();
       if (kind === 'line') {
         await tx.$queryRaw`SELECT id FROM "Line" WHERE id = ANY(${ids}::uuid[]) ORDER BY id FOR UPDATE`;
@@ -888,7 +916,7 @@ function page<T extends { id: string }>(rows: T[], limit: number, presenter: (ro
 }
 
 async function lockSupplier(tx: Prisma.TransactionClient, supplierId: string) {
-  await tx.$queryRaw`SELECT id FROM "Supplier" WHERE id = ${supplierId}::uuid FOR UPDATE`;
+  await lockSetupMutation(tx, supplierId);
 }
 
 function parseShiftTimes(startTime: string, endTime: string, timezone: string) {

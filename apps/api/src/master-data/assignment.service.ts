@@ -1,3 +1,4 @@
+import { lockSetupMutation } from './setup-lock.js';
 import { Injectable } from '@nestjs/common';
 
 import type { Prisma } from '../generated/prisma/client.js';
@@ -76,6 +77,7 @@ export class AssignmentService {
     context: MutationContext,
   ) {
     await this.prisma.$transaction(async (tx) => {
+      await lockSetupMutation(tx, scope.supplierId);
       await lockAssignmentSet(tx, scope.supplierId, context.actorUserId);
       const current = await findAssignment(tx, scope.supplierId, kind, resourceId);
       if (!current) throw missing('Default assignment');
@@ -119,6 +121,7 @@ export class AssignmentService {
       throw conflict('Source and target must be different.');
     }
     await this.prisma.$transaction(async (tx) => {
+      await lockSetupMutation(tx, scope.supplierId);
       await lockAssignmentSet(tx, scope.supplierId, context.actorUserId);
       await requireTargetAndMember(tx, scope.supplierId, kind, targetResourceId, input.memberId);
       const source = await findAssignment(tx, scope.supplierId, kind, input.fromResourceId);
@@ -177,6 +180,7 @@ export class AssignmentService {
     context: MutationContext,
   ) {
     await this.prisma.$transaction(async (tx) => {
+      await lockSetupMutation(tx, scope.supplierId);
       await lockAssignmentSet(tx, scope.supplierId, context.actorUserId);
       await requireTargetAndMember(tx, scope.supplierId, kind, resourceId, input.memberId);
       const current = await findAssignment(tx, scope.supplierId, kind, resourceId);

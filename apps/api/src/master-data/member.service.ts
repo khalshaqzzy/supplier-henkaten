@@ -1,3 +1,4 @@
+import { lockSetupMutation } from './setup-lock.js';
 import { Injectable } from '@nestjs/common';
 
 import type { CreateMemberRequest, MasterListQuery } from '@tmmin-henkaten/contracts';
@@ -144,6 +145,7 @@ export class MemberService {
     context: MutationContext,
   ) {
     await this.prisma.$transaction(async (transaction) => {
+      await lockSetupMutation(transaction, scope.supplierId);
       const current = await transaction.member.findFirst({
         where: { id, supplierId: scope.supplierId },
       });
@@ -246,7 +248,12 @@ export class MemberService {
       }
       await transaction.member.update({
         where: { id },
-        data: { active, version: { increment: 1 }, updatedById: context.actorUserId },
+        data: {
+          active,
+          ...(active ? { resetArchivedAt: null } : {}),
+          version: { increment: 1 },
+          updatedById: context.actorUserId,
+        },
       });
       if (!active) {
         const users = await transaction.user.findMany({
@@ -297,6 +304,7 @@ export class MemberService {
     context: MutationContext,
   ) {
     await this.prisma.$transaction(async (transaction) => {
+      await lockSetupMutation(transaction, scope.supplierId);
       const user = await requireOperationalUser(transaction, scope, memberId);
       if (user.version !== input.expectedVersion) throw versionConflict();
       await transaction.user.update({
@@ -332,6 +340,7 @@ export class MemberService {
       ? await this.passwords.hash(temporaryPassword)
       : undefined;
     const username = await this.prisma.$transaction(async (transaction) => {
+      await lockSetupMutation(transaction, scope.supplierId);
       const member = await transaction.member.findFirst({
         where: { id: memberId, supplierId: scope.supplierId },
       });
@@ -388,6 +397,7 @@ export class MemberService {
     const temporaryPassword = this.passwords.temporaryPassword();
     const passwordHash = await this.passwords.hash(temporaryPassword);
     const username = await this.prisma.$transaction(async (transaction) => {
+      await lockSetupMutation(transaction, scope.supplierId);
       const user = await requireOperationalUser(transaction, scope, memberId);
       if (user.version !== expectedVersion) throw versionConflict();
       await transaction.user.update({
@@ -417,7 +427,7 @@ export class MemberService {
 }
 
 async function lockSupplier(transaction: Prisma.TransactionClient, supplierId: string) {
-  await transaction.$queryRaw`SELECT id FROM "Supplier" WHERE id = ${supplierId}::uuid FOR UPDATE`;
+  await lockSetupMutation(transaction, supplierId);
 }
 
 async function requireOperationalUser(

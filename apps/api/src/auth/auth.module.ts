@@ -27,6 +27,7 @@ import { PushModule } from '../push/push.module.js';
     { provide: CLOCK, useClass: SystemClock },
   ],
   exports: [
+    RateLimiterService,
     AuthService,
     PasswordService,
     SessionService,

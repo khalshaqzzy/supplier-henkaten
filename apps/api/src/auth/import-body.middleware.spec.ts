@@ -25,12 +25,20 @@ function setup() {
     get: (key: unknown) => services.get(key),
     use: app.use.bind(app),
   } as never);
-  app.post('/api/v1/supplier/master-data/parts/import/preview', (req, res) =>
-    res.json({ length: req.body?.data?.length }),
+  app.post(
+    [
+      '/api/v1/supplier/master-data/parts/import/preview',
+      '/api/v1/supplier/master-data/setup-import/preview',
+    ],
+    (req, res) => res.json({ length: req.body?.data?.length }),
   );
   return { app, sessions, access };
 }
-const path = '/api/v1/supplier/master-data/parts/import/preview';
+const paths = [
+  '/api/v1/supplier/master-data/parts/import/preview',
+  '/api/v1/supplier/master-data/setup-import/preview',
+];
+const path = paths[0]!;
 const principal = {
   realm: 'SUPPLIER',
   role: 'SUPPLIER_ADMIN',
@@ -41,7 +49,7 @@ const principal = {
 };
 
 describe('import parser boundary', () => {
-  it('rejects anonymous malformed bodies before parsing and denies alternate routes', async () => {
+  it.each(paths)('rejects anonymous malformed bodies before parsing at %s', async (path) => {
     const { app } = setup();
     expect((await request(app).post(path).type('json').send('{invalid')).status).toBe(403);
     expect(
@@ -73,19 +81,22 @@ describe('import parser boundary', () => {
       ).toBe(403);
     }
   });
-  it('preserves authorized preparation imports above the general body limit', async () => {
-    const { app, sessions, access } = setup();
-    sessions.resolve.mockResolvedValue(principal);
-    const response = await request(app)
-      .post(path)
-      .set('Cookie', 'tmmin_henkaten_supplier_session=token')
-      .set('Origin', 'http://localhost:5173')
-      .set('X-CSRF-Token', 'csrf')
-      .send({ data: 'x'.repeat(6 * 1024 * 1024) });
-    expect(response.status).toBe(200);
-    expect(response.body.length).toBe(6 * 1024 * 1024);
-    expect(access.assertWritable).toHaveBeenCalledWith(principal);
-  });
+  it.each(paths)(
+    'preserves authorized preparation imports above the general body limit at %s',
+    async (path) => {
+      const { app, sessions, access } = setup();
+      sessions.resolve.mockResolvedValue(principal);
+      const response = await request(app)
+        .post(path)
+        .set('Cookie', 'tmmin_henkaten_supplier_session=token')
+        .set('Origin', 'http://localhost:5173')
+        .set('X-CSRF-Token', 'csrf')
+        .send({ data: 'x'.repeat(6 * 1024 * 1024) });
+      expect(response.status).toBe(200);
+      expect(response.body.length).toBe(6 * 1024 * 1024);
+      expect(access.assertWritable).toHaveBeenCalledWith(principal);
+    },
+  );
   it('caps pending imports before authentication and releases slots after rejection', async () => {
     const { app, sessions } = setup();
     let unblock!: (value: null) => void;

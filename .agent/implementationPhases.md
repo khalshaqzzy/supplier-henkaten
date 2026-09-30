@@ -55,6 +55,8 @@ The completion index is a navigation aid, not a substitute for the PRD or test e
 
 ## Cross-cutting gates
 
+Implemented locally, 2026-09-30: Supplier setup workbook import with reviewed merge, Excel initial account passwords, directly published checklist categories, Export Excel moved to Henkaten, and password-confirmed reset preserving history and blocking Open Henkaten. Tanoko remains manual. Durable import operations, stable codes, current checklist publications and reset archives are implemented in [ADR 0046](../docs/adr/0046-supplier-setup-workbook-import-and-reset.md). Local verification is recorded in the current handoff; Phase 15 and staging/device acceptance gates remain unchanged.
+
 - Tenant/object/role scoping stays server-side. Supplier frontends never access PostgreSQL directly. Protected resources need negative authorization tests; cross-tenant reads and writes must be denied.
 - Zod shared contracts and OpenAPI/client output must agree. API changes after backend freeze need additive compatibility or an explicit migration plan.
 - Local and automated persistence/concurrency tests use Docker-managed PostgreSQL with pgvector, not host PostgreSQL or in-memory substitutes. Schema changes require forward-only Prisma migrations and fresh/upgrade tests. Staging/production never run `prisma migrate reset`.
