@@ -125,6 +125,7 @@ export function MasterDataOverviewPage() {
                   downloadUrl={downloadUrl}
                   storageKey={`henkaten-export:supplier:${session.principal.userId}:${session.supplier?.id}`}
                   supplierLabel={session.supplier?.name}
+                  supplierTimezone={session.supplier!.timezone}
                 />
               )}
           </div>

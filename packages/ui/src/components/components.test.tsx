@@ -12,9 +12,37 @@ import {
   SourceModeBadge,
 } from './domain';
 import { ChartFrame } from './data-display';
+import { defaultExportPeriod, HenkatenExportSheet } from './henkaten-export';
 import { Button, Field, Input, Pagination, SegmentedControl, Switch } from './primitives';
 
 afterEach(cleanup);
+
+it('starts with a supplier-local month and can switch to all history', async () => {
+  const user = userEvent.setup();
+  const createExport = vi.fn().mockImplementation(() => new Promise(() => undefined));
+  render(
+    <HenkatenExportSheet
+      loadOptions={() => Promise.resolve({ lines: [], shifts: [] })}
+      createExport={createExport}
+      getExport={() => Promise.reject(new Error('unused'))}
+      downloadUrl={() => '/file'}
+      storageKey="test-export-month"
+      supplierTimezone="Asia/Jakarta"
+    />,
+  );
+  await user.click(screen.getByRole('button', { name: 'Export Excel' }));
+  const expected = defaultExportPeriod('Asia/Jakarta');
+  expect(screen.getByLabelText('Dari')).toHaveValue(expected.from);
+  expect(screen.getByLabelText('Sampai')).toHaveValue(expected.to);
+  await user.click(screen.getByRole('button', { name: 'Semua periode' }));
+  expect(screen.getByLabelText('Dari')).toHaveValue('');
+  expect(screen.getByLabelText('Sampai')).toHaveValue('');
+  await user.click(screen.getByRole('button', { name: 'Reset filter' }));
+  expect(screen.getByLabelText('Dari')).toHaveValue(expected.from);
+  await user.click(screen.getByRole('button', { name: 'Semua periode' }));
+  await user.click(screen.getByRole('button', { name: 'Buat workbook' }));
+  expect(createExport).toHaveBeenCalledWith({});
+});
 
 describe('loading and form contracts', () => {
   it('exposes aria-busy, preserves label, and blocks duplicate submit', async () => {
