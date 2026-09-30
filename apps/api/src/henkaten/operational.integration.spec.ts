@@ -769,7 +769,10 @@ describe('Line Shift Henkaten operations', () => {
         .reduce((sum, value) => Number(sum) + Number(value), 0),
     ).toBe(records.rowCount - 1);
     expect(summary.getCell('A85').value).toContain(record.lineCodeSnapshot);
-    expect(String(summary.getCell('G85').value).length).toBeLessThanOrEqual(20);
+    const shortLineLabel = summary.getCell('G85').value;
+    expect(typeof shortLineLabel).toBe('string');
+    if (typeof shortLineLabel !== 'string') throw new Error('Line chart label is missing');
+    expect(shortLineLabel.length).toBeLessThanOrEqual(20);
     expect(
       ['B', 'C', 'D', 'E'].reduce(
         (sum, column) => sum + Number(summary.getCell(`${column}85`).value),
