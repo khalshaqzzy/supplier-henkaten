@@ -187,6 +187,10 @@ describe('Line Shift Henkaten operations', () => {
       },
       include: { items: true },
     });
+    await prisma.checklistTemplate.update({
+      where: { id: checklistTemplate.id },
+      data: { currentVersionId: checklist.id },
+    });
     checklistVersionId = checklist.id;
     checklistItemId = checklist.items[0]!.id;
     const nowMinute = jakartaMinute(new Date());
@@ -914,6 +918,10 @@ describe('Line Shift Henkaten operations', () => {
         items: { create: { label: 'Checked', displayOrder: 1 } },
       },
       include: { items: true },
+    });
+    await prisma.checklistTemplate.update({
+      where: { id: template.id },
+      data: { currentVersionId: checklist.id },
     });
     const result = await request(app.getHttpServer())
       .post('/api/v1/supplier/henkatens')

@@ -58,6 +58,12 @@ import {
   type MasterListQuery,
   type NotificationListQuery,
   type SupplierLoginRequest,
+  setupPreviewSchema,
+  setupOperationSchema,
+  setupResetPreviewSchema,
+  type SetupRow,
+  type SetupDecision,
+  type SetupCommit,
 } from '@tmmin-henkaten/contracts';
 
 import { ApiClient } from './core';
@@ -66,6 +72,49 @@ const versionsSchema = z.object({ items: z.array(checklistVersionSchema) }).stri
 const transitionsSchema = z.array(henkatenTransitionSchema);
 export class SupplierApi {
   constructor(private readonly client: ApiClient) {}
+
+  setupTemplate() {
+    return this.client.request('/api/v1/supplier/master-data/setup-import/template', {
+      responseType: 'blob',
+    });
+  }
+  previewSetupImport(rows: SetupRow[], decisions?: SetupDecision[]) {
+    const safe = rows.map((row) => ({
+      ...row,
+      data: Object.fromEntries(Object.entries(row.data).filter(([key]) => key !== 'password')),
+    }));
+    return this.client.request('/api/v1/supplier/master-data/setup-import/preview', {
+      method: 'POST',
+      body: { rows: safe, ...(decisions ? { decisions } : {}) },
+      responseSchema: setupPreviewSchema,
+    });
+  }
+  commitSetupImport(body: SetupCommit, idempotencyKey: string) {
+    return this.client.request('/api/v1/supplier/master-data/setup-import/commit', {
+      method: 'POST',
+      body,
+      idempotencyKey,
+      responseSchema: setupOperationSchema,
+    });
+  }
+  setupOperation(id: string) {
+    return this.client.request(`/api/v1/supplier/master-data/setup-import/operations/${id}`, {
+      responseSchema: setupOperationSchema,
+    });
+  }
+  setupResetPreview() {
+    return this.client.request('/api/v1/supplier/master-data/setup-reset/preview', {
+      responseSchema: setupResetPreviewSchema,
+    });
+  }
+  resetSetup(body: { revision: number; password: string }, idempotencyKey: string) {
+    return this.client.request('/api/v1/supplier/master-data/setup-reset', {
+      method: 'POST',
+      body,
+      idempotencyKey,
+      responseSchema: setupOperationSchema,
+    });
+  }
 
   tanoko() {
     return this.client.request('/api/v1/supplier/tanoko', { responseSchema: tanokoMatrixSchema });

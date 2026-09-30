@@ -1,3 +1,4 @@
+import { lockSetupMutation } from './setup-lock.js';
 import { Temporal } from '@js-temporal/polyfill';
 import { Injectable } from '@nestjs/common';
 
@@ -197,6 +198,7 @@ export class LineShiftService {
     context: MutationContext,
   ) {
     const id = await this.prisma.$transaction(async (tx) => {
+      await lockSetupMutation(tx, scope.supplierId);
       const [line, shift, existing, source, jobs] = await Promise.all([
         tx.line.findFirst({ where: { id: lineId, supplierId: scope.supplierId, active: true } }),
         tx.shiftTemplate.findFirst({
@@ -273,6 +275,7 @@ export class LineShiftService {
   ) {
     try {
       await this.prisma.$transaction(async (tx) => {
+        await lockSetupMutation(tx, scope.supplierId);
         await tx.$queryRaw`SELECT id FROM "LineShift" WHERE id = ${id}::uuid FOR UPDATE`;
         const current = await tx.lineShift.findFirst({
           where: { id, supplierId: scope.supplierId },
@@ -387,6 +390,7 @@ export class LineShiftService {
   ) {
     try {
       await this.prisma.$transaction(async (tx) => {
+        await lockSetupMutation(tx, scope.supplierId);
         await tx.$queryRaw`SELECT id FROM "Supplier" WHERE id = ${scope.supplierId}::uuid FOR UPDATE`;
         await tx.$queryRaw`SELECT id FROM "LineShift" WHERE id = ${id}::uuid FOR UPDATE`;
         const current = await tx.lineShift.findFirst({
@@ -430,7 +434,12 @@ export class LineShiftService {
         }
         await tx.lineShift.update({
           where: { id },
-          data: { active, version: { increment: 1 }, updatedById: context.actorUserId },
+          data: {
+            active,
+            ...(active ? { resetArchivedAt: null } : {}),
+            version: { increment: 1 },
+            updatedById: context.actorUserId,
+          },
         });
         await this.audit.write(
           masterAudit(

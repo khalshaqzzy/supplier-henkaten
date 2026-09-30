@@ -17696,6 +17696,2196 @@
         }
       }
     },
+    "/api/v1/supplier/master-data/setup-import/template": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Henkaten Excel workbook",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/supplier/master-data/setup-import/preview": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rows": {
+                    "minItems": 1,
+                    "maxItems": 60000,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "sheet": {
+                          "type": "string",
+                          "enum": [
+                            "Member",
+                            "Line",
+                            "Job",
+                            "Part",
+                            "Shift",
+                            "Line Shift",
+                            "Assignment MP",
+                            "Checklist 4M"
+                          ]
+                        },
+                        "sourceRow": {
+                          "type": "integer",
+                          "minimum": 2,
+                          "maximum": 1048576
+                        },
+                        "data": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string",
+                            "maxLength": 30
+                          },
+                          "additionalProperties": {
+                            "type": "string",
+                            "maxLength": 500
+                          }
+                        },
+                        "targetId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        }
+                      },
+                      "required": [
+                        "sheet",
+                        "sourceRow",
+                        "data"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "decisions": {
+                    "maxItems": 60000,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "action": {
+                          "type": "string",
+                          "enum": [
+                            "UPDATE",
+                            "SKIP",
+                            "RESTORE"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "action"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "rows"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Setup review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "revision": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "sheet": {
+                            "type": "string",
+                            "enum": [
+                              "Member",
+                              "Line",
+                              "Job",
+                              "Part",
+                              "Shift",
+                              "Line Shift",
+                              "Assignment MP",
+                              "Checklist 4M"
+                            ]
+                          },
+                          "sourceRow": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "NEW",
+                              "CHANGED",
+                              "SAME",
+                              "INACTIVE"
+                            ]
+                          },
+                          "existingId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "version": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "linked": {
+                            "type": "boolean"
+                          },
+                          "changes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "field": {
+                                  "type": "string"
+                                },
+                                "before": {
+                                  "type": "string"
+                                },
+                                "after": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "field",
+                                "before",
+                                "after"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "sheet",
+                          "sourceRow",
+                          "label",
+                          "status",
+                          "existingId",
+                          "version",
+                          "linked",
+                          "changes"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "issues": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sheet": {
+                            "type": "string",
+                            "enum": [
+                              "Member",
+                              "Line",
+                              "Job",
+                              "Part",
+                              "Shift",
+                              "Line Shift",
+                              "Assignment MP",
+                              "Checklist 4M"
+                            ]
+                          },
+                          "sourceRow": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "column": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "sheet",
+                          "sourceRow",
+                          "column",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "candidates": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string"
+                          },
+                          "active": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "role",
+                          "active"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "revision",
+                    "rows",
+                    "issues",
+                    "warnings",
+                    "candidates"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/supplier/master-data/setup-import/commit": {
+      "post": {
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rows": {
+                    "minItems": 1,
+                    "maxItems": 60000,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "sheet": {
+                          "type": "string",
+                          "enum": [
+                            "Member",
+                            "Line",
+                            "Job",
+                            "Part",
+                            "Shift",
+                            "Line Shift",
+                            "Assignment MP",
+                            "Checklist 4M"
+                          ]
+                        },
+                        "sourceRow": {
+                          "type": "integer",
+                          "minimum": 2,
+                          "maximum": 1048576
+                        },
+                        "data": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string",
+                            "maxLength": 30
+                          },
+                          "additionalProperties": {
+                            "type": "string",
+                            "maxLength": 500
+                          }
+                        },
+                        "targetId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        }
+                      },
+                      "required": [
+                        "sheet",
+                        "sourceRow",
+                        "data"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "decisions": {
+                    "maxItems": 60000,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "action": {
+                          "type": "string",
+                          "enum": [
+                            "UPDATE",
+                            "SKIP",
+                            "RESTORE"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "action"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "rows",
+                  "decisions",
+                  "revision"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Setup operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "IMPORT",
+                        "RESET"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "QUEUED",
+                        "RUNNING",
+                        "COMPLETED",
+                        "FAILED"
+                      ]
+                    },
+                    "error": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "result": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sheet": {
+                            "type": "string"
+                          },
+                          "created": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "updated": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "skipped": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "sheet",
+                          "created",
+                          "updated",
+                          "skipped"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "finishedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "status",
+                    "error",
+                    "result",
+                    "createdAt",
+                    "finishedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/supplier/master-data/setup-import/operations/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Setup operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "IMPORT",
+                        "RESET"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "QUEUED",
+                        "RUNNING",
+                        "COMPLETED",
+                        "FAILED"
+                      ]
+                    },
+                    "error": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "result": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sheet": {
+                            "type": "string"
+                          },
+                          "created": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "updated": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "skipped": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "sheet",
+                          "created",
+                          "updated",
+                          "skipped"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "finishedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "status",
+                    "error",
+                    "result",
+                    "createdAt",
+                    "finishedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/supplier/master-data/setup-reset/preview": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Reset summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "revision": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "openCount": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "empty": {
+                      "type": "boolean"
+                    },
+                    "counts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "count"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "revision",
+                    "openCount",
+                    "empty",
+                    "counts"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/supplier/master-data/setup-reset": {
+      "post": {
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "revision": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                "required": [
+                  "revision",
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Reset receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "IMPORT",
+                        "RESET"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "QUEUED",
+                        "RUNNING",
+                        "COMPLETED",
+                        "FAILED"
+                      ]
+                    },
+                    "error": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "result": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sheet": {
+                            "type": "string"
+                          },
+                          "created": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "updated": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "skipped": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "sheet",
+                          "created",
+                          "updated",
+                          "skipped"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    "finishedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "status",
+                    "error",
+                    "result",
+                    "createdAt",
+                    "finishedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/supplier/master-data/parts/import/preview": {
       "post": {
         "requestBody": {

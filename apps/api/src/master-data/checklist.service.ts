@@ -1,3 +1,4 @@
+import { lockSetupMutation } from './setup-lock.js';
 import { Injectable } from '@nestjs/common';
 
 import type { HenkatenCategory } from '@tmmin-henkaten/contracts';
@@ -42,6 +43,7 @@ export class ChecklistService {
       throw validation('Checklist draft labels must be unique.');
     }
     const template = await this.prisma.$transaction(async (tx) => {
+      await lockSetupMutation(tx, scope.supplierId);
       const current = await this.ensureTemplate(scope.supplierId, category, tx);
       await tx.$queryRaw`SELECT id FROM "ChecklistTemplate" WHERE id = ${current.id}::uuid FOR UPDATE`;
       if (input.expectedVersion !== undefined && current.version !== input.expectedVersion) {
@@ -85,6 +87,7 @@ export class ChecklistService {
     context: MutationContext,
   ) {
     const version = await this.prisma.$transaction(async (tx) => {
+      await lockSetupMutation(tx, scope.supplierId);
       const template = await this.ensureTemplate(scope.supplierId, category, tx);
       await tx.$queryRaw`SELECT id FROM "ChecklistTemplate" WHERE id = ${template.id}::uuid FOR UPDATE`;
       const locked = await tx.checklistTemplate.findUnique({
@@ -124,7 +127,11 @@ export class ChecklistService {
       });
       await tx.checklistTemplate.update({
         where: { id: locked.id },
-        data: { version: { increment: 1 }, updatedById: context.actorUserId },
+        data: {
+          currentVersionId: created.id,
+          version: { increment: 1 },
+          updatedById: context.actorUserId,
+        },
       });
       await this.audit.write(
         masterAudit(
@@ -159,6 +166,7 @@ export class ChecklistService {
     context: MutationContext,
   ) {
     const updated = await this.prisma.$transaction(async (tx) => {
+      await lockSetupMutation(tx, scope.supplierId);
       const template = await this.ensureTemplate(scope.supplierId, category, tx);
       if (template.version !== expectedVersion) throw versionConflict();
       if (

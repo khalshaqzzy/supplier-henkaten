@@ -14,3 +14,4 @@ export * from './read-models.js';
 export * from './shifts.js';
 export * from './tmmin.js';
 export * from './tanoko.js';
+export * from './setup-import.js';

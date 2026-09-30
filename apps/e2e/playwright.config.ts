@@ -36,6 +36,7 @@ export default defineConfig({
       grep: /@edge/,
       use: {
         ...devices['Desktop Edge'],
+        channel: 'msedge',
         ...(edgeExecutablePath ? { channel: undefined, executablePath: edgeExecutablePath } : {}),
       },
     },

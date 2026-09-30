@@ -1,3 +1,4 @@
+import { SupplierHenkatenExport } from './SupplierHenkatenExport';
 import { ArrowRight, Check, Copy, ShieldCheck, XCircle } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -101,6 +102,10 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
             <Link className="hds-button hds-button--primary hds-button--md" to="/henkatens/new">
               Buat Henkaten
             </Link>
+          ) : !approvalQueue &&
+            session!.principal.role === 'SUPPLIER_ADMIN' &&
+            session!.principal.purpose === 'NORMAL' ? (
+            <SupplierHenkatenExport />
           ) : undefined
         }
       />

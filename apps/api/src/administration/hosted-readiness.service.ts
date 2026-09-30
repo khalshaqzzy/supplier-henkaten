@@ -55,7 +55,7 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
     client.part.count({ where: { supplierId, active: true } }),
     client.shiftTemplate.count({ where: { supplierId, active: true } }),
     client.checklistVersion.findMany({
-      where: { supplierId, template: { active: true } },
+      where: { supplierId, currentFor: { some: { active: true } } },
       distinct: ['category'],
       select: { category: true },
     }),

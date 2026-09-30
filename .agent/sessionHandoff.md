@@ -1,4 +1,43 @@
-# Session Handoff — Main audit fixes
+# Current Session Handoff — Supplier setup import and reset
+
+- Date: 2026-09-30
+- Branch: `feat/setup-import-reset`, created from `main` at `e540d97` following the explicit branch instruction; prior edits were preserved.
+- Objective: implement the approved setup workbook import, export relocation, polished loading/review/error states and password-confirmed reset.
+- Status: implemented locally; delivery to this branch and a PR to `main` were explicitly requested. Merge and deployment are not requested. Phase 15 remains `in_progress`; staging/device and production acceptance gates remain unchanged.
+
+## Implemented behavior
+
+Master Data offers Import Data; Supplier Admin Export Excel moved to the Henkaten list, and TMMIN export and standalone Part import remain available. The responsive dialog parses a bounded XLSX in a worker, reviews new/changed/archived data per sheet, provides explicit Update/Skip/Restore and MP linkage, masks passwords, reports sheet/row/column errors, offers error downloads and recovers durable operation status. Loading states use stable skeleton/button geometry, truthful reading/validation/matching/application labels and reduced motion; reset combines verification/application in one truthful label.
+
+The comprehensive template includes Panduan plus eight data sheets. It contains per-sheet/per-column instructions, conditional account fields, limits, reference rules and dropdowns, text identifiers, frozen headers and header notes. Valid examples cover 10 members (Supervisor, four LLs, QC, four MPs), two lines, four jobs with all skill categories, three parts including leading zeroes, two daytime/overnight shifts, four Line–Shifts, eight MP assignments and twelve checklist questions across four categories. The 45 source rows produce 37 setup records/category publications. Reference dropdowns allow typed existing codes absent from the file; validation lists and formatting can be copied to additional rows.
+
+Imports merge and preserve omitted data. New operational account usernames/passwords come from Excel, require first-login password change, and preserve existing password hashes. Tanoko, photos and Canvas are manual. Checklists publish complete new category versions after review. Stable import codes, setup revisions, a current checklist publication pointer and reset archive timestamps are additive schema changes.
+
+Import stores an idempotent durable operation with only hashed new credentials, validates selected references and authorization at the transaction boundary, serializes with ordinary setup writes, commits atomically and clears temporary payloads at completion/failure. The worker supports lease-based recovery after restart. Reset requires the directly signed-in Admin's password, blocks any Open Henkaten or pending import, archives all setup including ordinarily inactive records, clears mutable assignments/drafts/Tanoko/Canvas, deactivates operational users and revokes their sessions/push subscriptions. Admin and Henkaten/audit/publication/Tanoko histories remain retained. Reset-archived rows do not appear in Tanoko; checklist eligibility follows the current pointer.
+
+Changed areas: Prisma migration/schema, contracts/client/OpenAPI, master-data planning/service/controller/template/lock, existing mutation coordination, checklist/readiness/Henkaten eligibility, Supplier Account/Master Data/Henkaten pages and dialog styles, parser/unit/integration/E2E tests, PRD/roadmap and ADR 0046.
+
+## Local verification
+
+- Host Node 22.23.2 and pnpm 11.16.0; CI-pinned Node remains 22.23.1. No clean-artifact delivery parity or commit is claimed.
+- `pnpm db:up`, `pnpm db:wait`, `pnpm db:verify`, `pnpm db:test:reset`, `pnpm db:test:migrate`: Docker PostgreSQL 18.4/pgvector; all 19 migrations applied from empty.
+- Main-to-current upgrade in isolated `supplier_henkaten_setup_upgrade_test`: archived main migration directory, then current deploy; passed. `pnpm migrations:destructive-check main` passed.
+- `NODE_ENV=test DATABASE_URL=<Docker disposable test URL> RELEASE_SHA=ci SESSION_CSRF_SECRET=<test value> AUTH_THROTTLE_SECRET=<test value> OUTBOX_ENABLED=false pnpm test:integration`: 56 tests/9 files passed after a fresh test DB reset. The setup suite additionally passes with the expanded template and checks 37 records, credentials, repeat/merge, bad references, stale revision, Open blocking, Closed history, reset/restore and queued-session revocation.
+- `pnpm test:unit`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, API OpenAPI drift check and generated-client regeneration passed before the final template expansion; final-state suites passed: contracts 44, fixtures 6, client 9, UI 21, API 71, TMMIN 14 and Supplier 75.
+- `VITE_API_ORIGIN=https://api.example.invalid pnpm build`: production applications passed before template expansion; final expanded-template build passed.
+- Full Chromium harness: all five journeys passed. Setup journey separately passed on Chromium and Edge, with actual downloadable workbook import, checklist review, 1440/1280/768/390 px screenshots, axe checks, export relocation and Account password reset. Final expanded-template journey passed on both Chromium and Edge, including axe checks.
+- Seed compatibility: seed uses individual APIs and checklist publish, so no seed source change was needed. Fresh isolated seed smoke against the built API and all migrations completed with two Hosted suppliers and 240 Henkaten; temporary API, database, uploads and credentials were removed. The harness required enabled outbox and development-only larger request budgets. Initial harness attempts failed due overlapping build removal, default rate limits and disabled outbox; these were harness configuration failures, resolved before the successful smoke.
+- `docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.24.3 dir /repo --config=/repo/.gitleaks.toml --redact --verbose`: no leaks found. `git diff --check` passed.
+
+Intermediate issues corrected: Job skill categories now use HIGH/MEDIUM/LOW, relational sheets no longer assume a code column, nested checklist item create matches the Prisma schema, current publication fixture pointers are populated, malformed operation IDs are rejected, protected parser tests cover both import routes, contrast failures were corrected, result text/route test assertions follow the actual UI, and reference linking clears stale decisions.
+
+## Remaining acceptance and next action
+
+Review the diff and actual template. Production-scale maximum-row/hash concurrency, restart fault injection and live Microsoft Excel editing remain staging/UAT acceptance; browser/parser/real PostgreSQL tests cover local correctness. The original implementation checks did not claim delivery parity. The requested PR delivery adds exact-runtime clean-artifact checks and production container/security parity below. Merge and staging/production deployment remain outside this task. Session-started API/dev servers, seed/upgrade databases and credentials were removed. The local Compose PostgreSQL stack is stopped after verification.
+
+---
+
+# Previous Session Handoff — Main audit fixes
 
 - Date: 2026-09-30
 - Branch: `fix/main-audit-findings`, created from clean `main` at `035c41631405d01df4c78deb30c4892b00ea650a`
@@ -1162,3 +1201,21 @@ Local checks passed: pinned pnpm frozen install; format, lint, typecheck, reposi
 The browser screenshots showed cramped TMMIN filters at 390 px; the final two-column mobile layout was visually checked at 390 px and the three-column tablet layout at 768 px. The primary remaining gate is the PR's required CI jobs, followed by the existing Phase 15 staging/device acceptance. No local dev server or Compose container remains running after the checks. The agent-started OrbStack service should be stopped at task end.
 
 PR #26 first CI run exposed a timing assumption in the new Part return-navigation test: the list heading rendered before its asynchronous rows. The assertion now waits for the updated row, and the Supplier unit suite plus formatting passed again. Recheck all required PR jobs on the follow-up commit before reporting delivery complete.
+
+## Final verification
+
+Final expanded template: all 56 PostgreSQL integration tests/9 files passed after a fresh migration reset; the dedicated 7-test setup suite validates all examples and twelve published checklist items. Final typecheck/lint/format and production build passed. OpenAPI check passed and API-client regeneration was byte-stable; the HEAD-based wrapper gate is intentionally not used to disguise the intended uncommitted generated-client changes. Chromium and Edge setup journeys passed; the full five-journey Chromium run also passed earlier in the session. A generated review copy is available at `.local/artifacts/template-setup-supplier.xlsx` (ignored local artifact); the production download endpoint creates fresh valid example passwords. No actual supplier credentials enter this file.
+
+## PR delivery validation — 30 September 2026
+
+The repository-triggered CI workflows were inspected before preparing the commit. Exact runtime is Node 22.23.1 from the previously checksum-verified official archive and pnpm 11.16.0. Started with `pnpm clean`, removed only ignored generated/build directories, then ran `pnpm install --frozen-lockfile`. All application parity commands passed: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm openapi:check`, and `VITE_API_ORIGIN=https://api.example.invalid pnpm build`. The intended generated files were staged before the index-based drift check; no drift was hidden by committing unchecked artifacts.
+
+`docker compose config --quiet`, `pnpm db:up`, `pnpm db:wait`, `pnpm db:verify`, `pnpm db:test:reset`, `pnpm db:test:migrate`, then `NODE_ENV=test DATABASE_URL=<Docker disposable test URL> RELEASE_SHA=ci SESSION_CSRF_SECRET=<test value> AUTH_THROTTLE_SECRET=<test value> OUTBOX_ENABLED=false pnpm test:integration` passed all 56 tests/9 files. An isolated upgrade DB applied `git archive origin/main apps/api/prisma` through `PRISMA_MIGRATIONS_PATH`, then current migrate deploy/status: all 19 migrations are up to date. `pnpm db:down` stopped the stack.
+
+`pnpm migrations:destructive-check origin/main`, `pnpm deployment:validate`, `pnpm security:exceptions:check`, and `pnpm security:audit` passed (10 moderate findings and one existing exact ignored high). Workflow-pinned Actionlint 1.7.7, ShellCheck 0.11.0 and Hadolint 2.14.0 passed. The deployment harness ran under Linux with real flock via Docker 29 CLI, and both staging/production Ubuntu 22.04 bootstrap input checks passed.
+
+Production parity used the committed staging example env and remote Compose: all five production images rebuilt with `--pull`, migration/bootstrap, readiness wait, three-domain routing and release identity, deep links, unauthorized session/realtime behavior, security headers, non-root/no-public-Postgres checks, idempotent bootstrap, and restart/persistence assertions passed. The stack was stopped by the harness. Trivy 0.70.0 HIGH/CRITICAL source (clean staged-source export; vuln/secret/misconfig) and all five current runtime image scans passed using the committed exact ignore file.
+
+Review corrected imported MP assignment audit IDs to use the real upsert result, with an integration assertion. It also corrected the Edge project to select `channel: msedge` by default. The system Edge installer cannot run without sudo on this host; local Edge testing uses the existing signature-verified official Microsoft Edge 154.0.4258.48 package payload through `E2E_EDGE_EXECUTABLE_PATH`. Chromium is installed through Playwright. The full exact-runtime `pnpm test:e2e` run and final post-runtime Gitleaks scan are recorded below after completion.
+
+Final delivery browser result: `E2E_EDGE_EXECUTABLE_PATH=<signature-verified official Edge payload> pnpm test:e2e` passed all **10 isolated journeys: 5 Chromium and 5 actual Microsoft Edge**, using pinned Node/pnpm. The browser harness removed every test server/database/container. A Gitleaks scan performed while Playwright was running found six temporary synthetic credentials in live trace resources; no exception was added. Those transient files were removed by the successful harness, and the final directory scan after runtime cleanup passed with no leaks found. The complete final source/image/deployment/database checks are green; commit-scope scanning and remote PR CI are checked after commit/push.

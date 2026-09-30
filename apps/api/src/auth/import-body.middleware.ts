@@ -21,9 +21,12 @@ export function installJsonBodyParsers(app: INestApplication) {
   const parser = express.json({ limit: '80mb', type: 'application/json' });
   let active = 0;
   app.use(
-    '/api/v1/supplier/master-data/parts/import',
+    ['/api/v1/supplier/master-data/parts/import', '/api/v1/supplier/master-data/setup-import'],
     async (req: ContextRequest, res: Response, next: NextFunction) => {
       if (req.method === 'OPTIONS') return next();
+      // Template and operation reads use normal authenticated controllers, never the large parser.
+      if (req.method === 'GET' && /^\/(template|operations\/[0-9a-f-]{36})\/?$/i.test(req.path))
+        return next();
       const reject = (status: number, detail: string) =>
         res.status(status).json({
           status,

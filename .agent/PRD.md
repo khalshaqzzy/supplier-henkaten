@@ -1,3 +1,19 @@
+## Amendment — 30 September 2026: Supplier setup workbook import and reset
+
+Supplier Admin can import a multi-sheet `.xlsx` workbook from **Import Data** on Master Data. Export Excel moves to the Supplier Henkaten list; the TMMIN export remains available. The existing standalone Part CSV/Excel import remains available.
+
+The versioned template contains Panduan, Member, Line, Job, Part, Shift, Line Shift, Assignment MP and Checklist 4M sheets, with per-sheet/per-column guidance, conditional field rules, limits, header notes and reference dropdowns. Valid editable examples cover multiple lines/jobs, daytime and overnight shifts, linked assignments and three questions for each checklist category. Member, Job and Shift have stable import codes; Job codes are scoped to a line. MP can be explicitly linked to an uncoded existing member. New Supervisor/LL/QC accounts use the Excel username and initial password (12–128 characters), require a password change at first login, and preserve existing passwords on updates. MP has no account or registration. Tanoko values, member photos and Canvas layout are maintained manually.
+
+Import performs a reviewed merge: add new data, choose Update/Skip for changed matches, explicitly Restore archived matches, and preserve omitted data. Cross-sheet references and the final selected state are validated, including role, active references, duplicate identifiers, capacity and the one-active-Line–Shift-per-LL invariant. Imported checklists publish one complete category version; review includes existing content and any draft being replaced. Historical publications remain retained.
+
+File reading and ZIP expansion are bounded in a browser worker. The dialog shows staged reading/validation/matching, responsive sheet review, row/column errors and downloadable error details, explicit decisions, truthful save status and result counts. New-account passwords are masked in review, excluded from preview and audit, and retained only in browser memory until commit. The server hashes them with bounded concurrency and stores no plaintext operation payload. Import commits atomically through a durable operation with idempotent retry, restart recovery, stale-review checks and authorization revalidation at the write boundary. Loading geometry remains stable, includes reduced-motion support and preserves result recovery after a network interruption.
+
+Account includes **Reset setup**, available to a directly signed-in Supplier Admin with their password. Reset is blocked while any Henkaten is Open or an import is pending. It archives all previous setup, clears mutable assignments, drafts, Tanoko values and Canvas, deactivates operational accounts and revokes their sessions/push subscriptions. Supplier Admin, Henkaten, checklist versions, audit and Tanoko history remain retained. Reset-archived rows are excluded from Tanoko until explicitly restored, and checklist readiness uses an explicit current publication pointer so old publications do not reappear on reactivation. Reset and import are tenant scoped, audited and serialized with ordinary setup mutations.
+
+This amendment supersedes the earlier deferral of general master-data import. Desktop/mobile browser acceptance and staging release gates remain required.
+
+---
+
 # Product Requirements Document (PRD): Enterprise Digital Henkaten Management untuk TMMIN Suppliers
 
 | Atribut | Nilai |
@@ -590,7 +606,7 @@ Shift yang melewati tengah malam wajib didukung. Business date mengikuti tanggal
 ### 10.7 CRUD dan Deactivation
 
 - v1 menyediakan individual CRUD form; Part juga menyediakan reviewed CSV/Excel import sesuai amendment 26 September 2026.
-- Bulk import untuk resource selain Part dan bulk export tidak termasuk v1.
+- Import workbook setup mengikuti amendment 30 September 2026; impor Part tetap tersedia. Export Excel Henkaten mengikuti amendment export yang berlaku.
 - Seluruh master data permanen sejak dibuat dan tidak memiliki hard-delete API.
 - Koreksi dilakukan melalui update atau deactivation; reactivation tetap mempertahankan identity
   dan history yang sama.
@@ -2345,7 +2361,7 @@ Metrik adoption, cycle time approval, reject rate, dan aging dipantau melalui da
 - quality inspection execution di luar Henkaten checklist;
 - TMMIN QC × production integration;
 - email, SMS, native push, Slack, Teams, atau webhook notification;
-- bulk CSV/Excel import untuk resource selain Part, serta bulk export;
+- bulk CSV import untuk resource selain Part, serta bulk export master data; workbook setup Excel mengikuti amendment 30 September 2026;
 - document/photo attachment pada Henkaten selain member photo;
 - native mobile app;
 - AI/ML di luar penilaian indikasi PCR Henkaten; vector search;
@@ -2371,7 +2387,7 @@ Metrik adoption, cycle time approval, reject rate, dan aging dipantau melalui da
 | Vendor/OS Web Push terlambat atau tidak tampil | High | Mitigated | Persistent notification center authoritative, bounded retry, delivery metrics; push bukan guarantee. |
 | Permanent PII retention | High | Open governance dependency | Least privilege, no hard delete, legal/privacy approval sebelum go-live. |
 | Satu Supplier Admin menjadi operational bottleneck | Medium | Accepted | TMMIN reset/replacement capability; multi-admin deferred. |
-| CRUD-only onboarding lambat untuk 300 member/500 job | Medium | Accepted | Clear forms and progressive setup; Part has reviewed CSV/Excel import, while Member and Job bulk import remain deferred. |
+| CRUD-only onboarding lambat untuk 300 member/500 job | Medium | Accepted | Clear forms and progressive setup; Part has reviewed CSV/Excel import; setup workbook import covers Member and Job with explicit reviewed merge. |
 | Responsive dense workflow menyembunyikan konteks/action | High | Mitigated | Locked breakpoint patterns, no-overflow/action checks, role matrix, real-device rehearsal; desktop regression retained. |
 | Line Leader tidak dapat bekerja karena permission/browser push | High | Mitigated | Explicit activation guidance, supported-browser matrix, per-installation status/troubleshooting, backend exempt activation routes. |
 | Service worker lama menahan release atau mutation | High | Mitigated | Non-stale HTML/manifest/worker headers, prompted activation, network-only mutation/data, recovery runbook. |
@@ -2448,7 +2464,7 @@ Ringkasan keputusan yang tidak boleh ditafsirkan ulang saat implementasi:
 - tidak ada backup/recovery/RPO/RTO/HA;
 - staging dan production memakai VM terpisah;
 - baseline kapasitas Compact;
-- master data CRUD individual; impor CSV/Excel khusus Part mengikuti amendment 26 September 2026, tanpa bulk export;
+- master data CRUD individual; impor Part mengikuti amendment 26 September 2026 dan workbook setup mengikuti amendment 30 September 2026;
 - Supplier responsive mobile/tablet/desktop; TMMIN tetap desktop-only;
 - production deploy otomatis dari `main`;
 - supplier login memakai Supplier Code + Username;

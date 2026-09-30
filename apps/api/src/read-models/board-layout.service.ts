@@ -1,3 +1,4 @@
+import { lockSetupMutation } from '../master-data/setup-lock.js';
 import { Injectable } from '@nestjs/common';
 
 import {
@@ -72,6 +73,7 @@ export class BoardLayoutService {
     context: MutationContext,
   ): Promise<BoardLayoutResponse> {
     const result = await runSerializable(this.prisma, async (transaction) => {
+      await lockSetupMutation(transaction, scope.supplierId);
       const { jobs, canEdit } = await this.assertReadableLine(
         transaction,
         scope,
