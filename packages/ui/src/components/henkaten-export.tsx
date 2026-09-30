@@ -14,6 +14,31 @@ import { Sheet } from './advanced';
 
 type Option = { id: string; label: string };
 
+export function defaultExportPeriod(timezone: string, now = new Date()): HenkatenExportFilters {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((item) => item.type === type)?.value);
+  const year = part('year');
+  const month = part('month');
+  const day = part('day');
+  const previous = new Date(Date.UTC(year, month - 2, 1));
+  const lastDay = new Date(
+    Date.UTC(previous.getUTCFullYear(), previous.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  const from = new Date(
+    Date.UTC(previous.getUTCFullYear(), previous.getUTCMonth(), Math.min(day, lastDay)),
+  );
+  return {
+    from: from.toISOString().slice(0, 10),
+    to: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+  };
+}
+
 export function HenkatenExportSheet({
   loadOptions,
   createExport,
@@ -21,6 +46,7 @@ export function HenkatenExportSheet({
   downloadUrl,
   storageKey,
   supplierLabel,
+  supplierTimezone,
 }: {
   loadOptions: () => Promise<{ lines: Option[]; shifts: Option[] }>;
   createExport: (filters: HenkatenExportFilters) => Promise<HenkatenExportJob>;
@@ -28,11 +54,14 @@ export function HenkatenExportSheet({
   downloadUrl: (id: string) => string;
   storageKey: string;
   supplierLabel?: string | undefined;
+  supplierTimezone: string;
 }) {
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState<{ lines: Option[]; shifts: Option[] } | null>(null);
   const [optionsError, setOptionsError] = useState(false);
-  const [filters, setFilters] = useState<HenkatenExportFilters>({});
+  const [filters, setFilters] = useState<HenkatenExportFilters>(() =>
+    defaultExportPeriod(supplierTimezone),
+  );
   const [job, setJob] = useState<HenkatenExportJob | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -116,7 +145,11 @@ export function HenkatenExportSheet({
       }
       footer={
         <div className="hds-export-footer">
-          <Button variant="secondary" onClick={() => setFilters({})} leadingIcon={<RotateCcw />}>
+          <Button
+            variant="secondary"
+            onClick={() => setFilters(defaultExportPeriod(supplierTimezone))}
+            leadingIcon={<RotateCcw />}
+          >
             Reset filter
           </Button>
           <Button
@@ -174,6 +207,20 @@ export function HenkatenExportSheet({
             />
           </label>
         </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() =>
+            setFilters((current) => {
+              const next = { ...current };
+              delete next.from;
+              delete next.to;
+              return next;
+            })
+          }
+        >
+          Semua periode
+        </Button>
         {!validDateRange && (
           <p className="hds-export-field-error">Tanggal akhir harus setelah tanggal awal.</p>
         )}

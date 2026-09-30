@@ -76,6 +76,9 @@ importers:
       '@tmmin-henkaten/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      archiver:
+        specifier: 5.3.2
+        version: 5.3.2
       argon2:
         specifier: 0.45.1
         version: 0.45.1
@@ -121,6 +124,9 @@ importers:
       sharp:
         specifier: 0.35.4
         version: 0.35.4(@types/node@22.20.1)
+      unzipper:
+        specifier: 0.10.14
+        version: 0.10.14
       web-push:
         specifier: 3.6.7
         version: 3.6.7(supports-color@10.2.2)
@@ -143,6 +149,9 @@ importers:
       '@tmmin-henkaten/test-fixtures':
         specifier: workspace:*
         version: link:../../packages/test-fixtures
+      '@types/archiver':
+        specifier: ^5.3.4
+        version: 5.3.4
       '@types/cookie-parser':
         specifier: 1.4.10
         version: 1.4.10(@types/express@5.0.6)
@@ -158,6 +167,9 @@ importers:
       '@types/supertest':
         specifier: 7.2.1
         version: 7.2.1
+      '@types/unzipper':
+        specifier: ^0.10.11
+        version: 0.10.11
       '@types/web-push':
         specifier: 3.6.4
         version: 3.6.4
@@ -3052,6 +3064,9 @@ packages:
   '@tybys/wasm-util@0.10.3':
     resolution: {integrity: sha512-F3fo1MYrRJYL3zER0OUOmkutjr1Vp23m7OsSgp7nq4SP6OqX6C/56XFIPAl5bt3zaBRjmW7SGz3u/6LwFpYcOg==}
 
+  '@types/archiver@5.3.4':
+    resolution: {integrity: sha512-Lj7fLBIMwYFgViVVZHEdExZC3lVYsl+QL0VmdNdIzGZH544jHveYWij6qdnBgJQDnR7pMKliN9z2cPZFEbhyPw==}
+
   '@types/aria-query@5.0.4':
     resolution: {integrity: sha512-rfT93uj5s0PRL7EzccGMs3brplhcrghnDoV26NqKhCAS1hVo+WdNsPvE/yb6ilfr5hi2MEk6d5EWJTKdxg8jVw==}
 
@@ -3189,6 +3204,9 @@ packages:
   '@types/react@19.2.17':
     resolution: {integrity: sha512-MXfmqaVPEVgkBT/aY0aGCkRWWtByiYQXo3xdQ8r5RzuFrPiRn8Gar2tQdXSUQ2GKV3bkXckek89V8wQBY2Q/Aw==}
 
+  '@types/readdir-glob@1.1.5':
+    resolution: {integrity: sha512-raiuEPUYqXu+nvtY2Pe8s8FEmZ3x5yAH4VkLdihcPdalvsHltomrRC9BzuStrJ9yk06470hS0Crw0f1pXqD+Hg==}
+
   '@types/resolve@1.20.2':
     resolution: {integrity: sha512-60BCwRFOZCQhDncwQdxxeOEEkbc5dIMccYLwbxsS4TUNeVECQ/pBJ0j09mrHOl/JJvpRPGwO9SvE4nR2Nb/a4Q==}
 
@@ -3209,6 +3227,9 @@ packages:
 
   '@types/trusted-types@2.0.7':
     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
+
+  '@types/unzipper@0.10.11':
+    resolution: {integrity: sha512-D25im2zjyMCcgL9ag6N46+wbtJBnXIr7SI4zHf9eJD2Dw2tEB5e+p5MYkrxKIVRscs5QV0EhtU9rgXSPx90oJg==}
 
   '@types/use-sync-external-store@0.0.6':
     resolution: {integrity: sha512-zFDAD+tlpf2r4asuHEj0XH6pY6i0g5NeAHPn+15wk3BV6JA69eERFXC1gyGThDkVa1zCyKr5jox1+2LbV/AMLg==}
@@ -9447,6 +9468,10 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
+  '@types/archiver@5.3.4':
+    dependencies:
+      '@types/readdir-glob': 1.1.5
+
   '@types/aria-query@5.0.4': {}
 
   '@types/body-parser@1.19.6':
@@ -9591,6 +9616,10 @@ snapshots:
     dependencies:
       csstype: 3.2.3
 
+  '@types/readdir-glob@1.1.5':
+    dependencies:
+      '@types/node': 22.20.1
+
   '@types/resolve@1.20.2': {}
 
   '@types/send@1.2.1':
@@ -9617,6 +9646,10 @@ snapshots:
       '@types/superagent': 8.1.11
 
   '@types/trusted-types@2.0.7': {}
+
+  '@types/unzipper@0.10.11':
+    dependencies:
+      '@types/node': 22.20.1
 
   '@types/use-sync-external-store@0.0.6': {}
 

@@ -1,4 +1,22 @@
-# Current Session Handoff — Supplier Henkaten list and PCR guidance
+# Current Session Handoff — Editable Excel export summary
+
+- Date: 2026-09-29
+- Branch: `feat/excel-summary-charts`, based on `main`; user requested a pushed branch.
+- Phase: 15 remains `in_progress`; staging and device acceptance remain pending.
+
+The Hosted Henkaten Excel export now defaults to one rolling calendar month through the supplier-local business date in both Supplier and TMMIN filter sheets. A visible `Semua periode` action clears only the date range; Reset returns to the rolling month. The `Ringkasan` sheet replaces 12-cell color bars with KPI cards, six editable native Excel charts (status, 4M, Top 10 Line by status, up to 12 calendar months by 4M, Top 10 Part, and PCR distribution), visible source cells, and compact pending approval counts. Monthly zeroes within the selected range are explicit. Long-lived detail sheets still use the ExcelJS streaming writer. A bounded streaming ZIP pass adds chart OOXML parts before the private file is published; partial files are cleaned on failure. No database schema or API contract changed, so local seed fixtures require no edit.
+
+Changed files: export service and chart module, focused export integration/unit tests, shared filter sheet and date/component tests, Supplier/TMMIN callers, package manifests/lockfile, PRD, roadmap, and ADR 0043.
+
+Validation: clean-artifact frozen install; repository format, lint, typecheck, unit suites (API 61, Supplier 66, TMMIN 14, UI 21, contracts 38, fixtures 6, client 9), OpenAPI/client parity, and production application build passed. A fresh 18-migration disposable database and full API integration suite passed 41/41. The generated workbook was parsed by openpyxl: six native charts, including two four-series stacked charts, retained five traceability sheets and reconciled totals. LibreOffice PDF rendering was inspected to shorten long Line/Part chart labels while leaving complete names in source tables. An earlier four-chart workbook opened in Microsoft Excel without a repair prompt; the Mac installation requires a Microsoft 365 subscription to edit/save, so interactive chart editing remains a staging UAT check. The final four isolated Chromium browser journeys passed. Deployment env validation, destructive migration check against `main`, script harness, security exception check, dependency audit, Gitleaks directory scan, and Trivy HIGH/CRITICAL scan of the rebuilt API image passed. The API production image was rebuilt with the current chart code. Host Node is 22.23.2 versus CI-pinned 22.23.1; production Docker builds use the pinned version. No schema or API contract changed, so local seed fixtures require no edit. Edge installation on macOS still requires interactive privileges; Linux CI covers Edge.
+
+The staging-like Compose stack, local PostgreSQL, and isolated browser test containers were stopped after validation. `git diff --check` and the commit-scope Gitleaks scan passed. The implementation was pushed as `202aa7b`, and PR #35 targets `main`.
+
+PR #35 to `main` exposed one lint error in the new chart-label integration assertion: ExcelJS cell values have a wider type than `string`, so direct stringification triggered `@typescript-eslint/no-base-to-string`. The assertion now checks and narrows the value to a string before measuring its length. Repository format, lint, typecheck, unit tests, OpenAPI/client parity, and production build passed after the fix. The first local integration rerun reused accumulated test records and failed an unrelated top-10 Supplier overview assertion; resetting the disposable test database, applying all 18 migrations, and rerunning all 41 integration tests passed. No export behavior changed in this fix. PR CI is being rerun.
+
+---
+
+# Previous Session Handoff — Supplier Henkaten list and PCR guidance
 
 - Date: 2026-09-29
 - Branch: `feat/minor-ui-improvements`, based on `origin/main`; target PR to `main`.

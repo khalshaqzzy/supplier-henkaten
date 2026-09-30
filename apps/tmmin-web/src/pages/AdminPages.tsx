@@ -409,6 +409,7 @@ export function SupplierDetailPage() {
                 downloadUrl={downloadUrl}
                 storageKey={`henkaten-export:tmmin:${session!.principal.userId}:${supplierId}`}
                 supplierLabel={supplier.name}
+                supplierTimezone={supplier.timezone}
               />
               <Button onClick={() => void navigate(`/source-governance?supplierId=${supplierId}`)}>
                 Tata Kelola Sumber

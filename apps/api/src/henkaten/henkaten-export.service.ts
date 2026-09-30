@@ -15,6 +15,7 @@ import type { RequestPrincipal } from '../common/request-context.js';
 import { AuditWriter } from '../persistence/audit-writer.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 import type { MutationContext } from '../administration/mutation-context.js';
+import { addEditableCharts, type ExportChart } from './henkaten-export-charts.js';
 
 const EXPIRES_MS = 60 * 60 * 1_000;
 const BATCH_SIZE = 200;
@@ -26,6 +27,9 @@ const colors = {
   blue: 'FF4778D2',
   teal: 'FF20A694',
   orange: 'FFF59A45',
+  green: 'FF16A34A',
+  red: 'FFF04438',
+  amber: 'FFF59E0B',
   pale: 'FFEDF3FA',
   white: 'FFFFFFFF',
 };
@@ -277,9 +281,11 @@ export class HenkatenExportService implements OnModuleInit, BeforeApplicationShu
 
   private async generate(job: HenkatenExportJob): Promise<void> {
     const partial = join(this.config.exportStorageRoot, `${job.id}.part`);
+    const charted = join(this.config.exportStorageRoot, `${job.id}.charted.part`);
     try {
       await mkdir(this.config.exportStorageRoot, { recursive: true, mode: 0o700 });
       await rm(partial, { force: true });
+      await rm(charted, { force: true });
       const filters = henkatenExportFiltersSchema.parse(job.filters);
       const supplier = await this.prisma.supplier.findUniqueOrThrow({
         where: { id: job.supplierId },
@@ -293,7 +299,8 @@ export class HenkatenExportService implements OnModuleInit, BeforeApplicationShu
       writer.creator = 'Henkaten';
       writer.created = job.createdAt;
       const summary = writer.addWorksheet('Ringkasan', {
-        views: [{ state: 'frozen', ySplit: 5 }],
+        views: [{ state: 'frozen', ySplit: 7, showGridLines: false }],
+        pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 2 },
       });
       const records = sheetGroup(writer, 'Henkaten', [
         'Henkaten ID',
@@ -360,6 +367,25 @@ export class HenkatenExportService implements OnModuleInit, BeforeApplicationShu
       const categories = new Map<string, number>();
       const lines = new Map<string, number>();
       const months = new Map<string, number>();
+      const monthlyCategory = new Map<string, Map<string, number>>();
+      const lineStatus = new Map<string, Map<string, number>>();
+      const parts = new Map<string, number>();
+      const pending = new Map<string, number>();
+      const pcr = new Map<string, number>();
+      const filterLabels = {
+        line: filters.lineId
+          ? await this.prisma.line.findFirst({
+              where: { id: filters.lineId, supplierId: job.supplierId },
+              select: { code: true, name: true },
+            })
+          : null,
+        shift: filters.shiftTemplateId
+          ? await this.prisma.shiftTemplate.findFirst({
+              where: { id: filters.shiftTemplateId, supplierId: job.supplierId },
+              select: { name: true },
+            })
+          : null,
+      };
       let processed = 0;
       const where = exportWhere(job.supplierId, job.createdAt, filters);
       await this.prisma.$transaction(
@@ -380,8 +406,17 @@ export class HenkatenExportService implements OnModuleInit, BeforeApplicationShu
               writeRecord(row, supplier.timezone, records, approvals, checklist, history);
               increment(counts, row.status);
               increment(categories, row.category);
-              increment(lines, `${row.lineCodeSnapshot} · ${row.lineNameSnapshot}`);
-              increment(months, row.businessDate.toISOString().slice(0, 7));
+              const line = `${row.lineCodeSnapshot} · ${row.lineNameSnapshot}`;
+              const month = row.businessDate.toISOString().slice(0, 7);
+              increment(lines, line);
+              increment(months, month);
+              incrementNested(lineStatus, line, row.status);
+              incrementNested(monthlyCategory, month, row.category);
+              increment(parts, row.partNumberSnapshot || 'Other');
+              for (const route of row.approvalRoutes) {
+                if (route.status === 'PENDING') increment(pending, route.route);
+              }
+              increment(pcr, row.pcrAssessment?.status ?? 'BELUM ADA');
               processed++;
             }
             cursor = batch.at(-1)!.id;
@@ -393,27 +428,36 @@ export class HenkatenExportService implements OnModuleInit, BeforeApplicationShu
         },
         { isolationLevel: 'RepeatableRead', timeout: 900_000 },
       );
-      writeSummary(
+      const charts = writeSummary(
         summary,
         supplier,
         filters,
+        filterLabels,
         processed,
         counts,
         categories,
         lines,
         months,
+        monthlyCategory,
+        lineStatus,
+        parts,
+        pending,
+        pcr,
         job.createdAt,
       );
       for (const group of [records, approvals, checklist, history]) group.commit();
       summary.commit();
       await writer.commit();
-      await rename(partial, this.filePath(job.id));
+      await addEditableCharts(partial, charted, charts);
+      await rename(charted, this.filePath(job.id));
+      await rm(partial, { force: true });
       await this.prisma.henkatenExportJob.update({
         where: { id: job.id },
         data: { status: 'READY', total: processed, processed, finishedAt: new Date() },
       });
     } catch (error) {
       await rm(partial, { force: true }).catch(() => undefined);
+      await rm(charted, { force: true }).catch(() => undefined);
       this.logger.error({ jobId: job.id, error }, 'Henkaten export failed');
       await this.prisma.henkatenExportJob.update({
         where: { id: job.id },
@@ -685,105 +729,389 @@ function increment(map: Map<string, number>, key: string) {
   map.set(key, (map.get(key) ?? 0) + 1);
 }
 
+function incrementNested(map: Map<string, Map<string, number>>, outer: string, inner: string) {
+  const counts = map.get(outer) ?? new Map<string, number>();
+  increment(counts, inner);
+  map.set(outer, counts);
+}
+
+function shortChartLabel(value: string): string {
+  return value.length > 20 ? `${value.slice(0, 19)}…` : value;
+}
+
 function writeSummary(
   sheet: ExcelJS.Worksheet,
   supplier: { code: string; name: string; timezone: string },
   filters: HenkatenExportFilters,
+  filterLabels: { line: { code: string; name: string } | null; shift: { name: string } | null },
   total: number,
   statuses: Map<string, number>,
   categories: Map<string, number>,
   lines: Map<string, number>,
   months: Map<string, number>,
+  monthlyCategory: Map<string, Map<string, number>>,
+  lineStatus: Map<string, Map<string, number>>,
+  parts: Map<string, number>,
+  pending: Map<string, number>,
+  pcr: Map<string, number>,
   createdAt: Date,
-) {
-  sheet.columns = [
-    { width: 35 },
-    { width: 16 },
-    ...Array.from({ length: 12 }, () => ({ width: 5 })),
-  ];
-  sheet.mergeCells('A1:N2');
-  const title = sheet.getCell('A1');
-  title.value = 'HENKATEN · RINGKASAN';
-  title.font = { name: 'Aptos Display', size: 20, bold: true, color: { argb: colors.white } };
-  title.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.navy } };
-  title.alignment = { vertical: 'middle', indent: 1 };
-  sheet.getRow(1).height = 32;
-  sheet.getRow(2).height = 15;
-  for (const [label, value] of [
-    ['Supplier', `${supplier.code} · ${supplier.name}`],
-    ['Periode', `${filters.from ?? 'Awal'} — ${filters.to ?? 'Sekarang'}`],
-    [
-      'Filter',
-      [
-        filters.status && `Status ${filters.status}`,
-        filters.category && `4M ${filters.category}`,
-        filters.lineId && `Line ${filters.lineId}`,
-        filters.shiftTemplateId && `Shift ${filters.shiftTemplateId}`,
-        filters.part && `Part ${filters.part}`,
-        filters.approvalRoute && `Route ${filters.approvalRoute}`,
-        filters.approvalStatus && `Approval ${filters.approvalStatus}`,
-        filters.pcrStatus && `PCR ${filters.pcrStatus}`,
-      ]
-        .filter(Boolean)
-        .join(' · ') || 'Semua',
-    ],
-    ['Timezone', supplier.timezone],
-    ['Dibuat', local(createdAt, supplier.timezone)],
-    ['Henkaten', String(total)],
-  ]) {
-    const row = sheet.addRow([label, value]);
-    row.font = { name: 'Aptos', size: 11, color: { argb: colors.ink } };
-    row.getCell(1).font = { name: 'Aptos', size: 10, bold: true, color: { argb: colors.muted } };
-    row.height = 23;
-    row.commit();
+): ExportChart[] {
+  sheet.columns = Array.from({ length: 16 }, () => ({ width: 12 }));
+  sheet.pageSetup.printArea = 'A1:P71';
+  const merge = (range: string) => sheet.mergeCells(range);
+  merge('A1:P2');
+  for (const row of [4, 5, 6, 7]) {
+    merge(`A${row}:C${row}`);
+    merge(`D${row}:P${row}`);
   }
-  sheet.addRow([]).commit();
-  chartSection(sheet, 'STATUS', statuses, colors.blue);
-  sheet.addRow([]).commit();
-  chartSection(sheet, '4M', categories, colors.teal);
-  sheet.addRow([]).commit();
-  chartSection(
-    sheet,
-    'LINE · TOP 10',
-    new Map([...lines].sort((a, b) => b[1] - a[1]).slice(0, 10)),
-    colors.orange,
-  );
-  sheet.addRow([]).commit();
-  chartSection(
-    sheet,
-    'TREN BULANAN · 12 TERAKHIR',
-    new Map([...months].sort(([a], [b]) => a.localeCompare(b)).slice(-12)),
-    colors.blue,
-  );
-}
+  const cards = ['A:C', 'D:F', 'G:I', 'J:L', 'M:P'];
+  for (const range of cards) {
+    const [first, last] = range.split(':');
+    merge(`${first}9:${last}9`);
+    merge(`${first}10:${last}11`);
+  }
+  for (const row of [13, 31, 49]) {
+    merge(`A${row}:H${row}`);
+    merge(`I${row}:P${row}`);
+  }
+  merge('A67:P67');
+  merge('A70:P70');
+  merge('A74:P74');
 
-function chartSection(
-  sheet: ExcelJS.Worksheet,
-  label: string,
-  values: Map<string, number>,
-  color: string,
-) {
-  const heading = sheet.addRow([label]);
-  heading.height = 27;
-  heading.font = { name: 'Aptos Display', size: 11, bold: true, color: { argb: colors.navy } };
-  heading.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.pale } };
-  heading.commit();
-  const max = Math.max(1, ...values.values());
-  for (const [name, count] of values) {
-    const segments = Math.max(1, Math.round((count / max) * 12));
-    const row = sheet.addRow([name, count]);
-    row.height = 22;
-    row.font = { name: 'Aptos', size: 10, color: { argb: colors.ink } };
-    row.getCell(2).font = { name: 'Aptos', size: 10, bold: true, color: { argb: colors.ink } };
-    for (let index = 0; index < 12; index++) {
-      const cell = row.getCell(index + 3);
-      cell.value = ' ';
-      cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: index < segments ? color : colors.pale },
-      };
+  const statusEntries = ['OPEN', 'APPROVED', 'REJECTED', 'CANCELLED'].map(
+    (key) => [key, statuses.get(key) ?? 0] as const,
+  );
+  const categoryEntries = ['MAN', 'MACHINE', 'MATERIAL', 'METHOD'].map(
+    (key) => [key, categories.get(key) ?? 0] as const,
+  );
+  const rank = (items: Map<string, number>) =>
+    [...items].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 10);
+  const lineEntries = rank(lines);
+  const partEntries = rank(parts);
+  const pcrEntries = ['PCR', 'NO_PCR', 'REVIEW', 'PENDING', 'BELUM ADA'].map(
+    (key) => [key, pcr.get(key) ?? 0] as const,
+  );
+  const businessToday = local(createdAt, supplier.timezone).slice(0, 10);
+  const endMonth = (filters.to && filters.to < businessToday ? filters.to : businessToday).slice(
+    0,
+    7,
+  );
+  const firstMonth = filters.from?.slice(0, 7);
+  const monthEntries: Array<[string, number]> = [];
+  const end = new Date(`${endMonth}-01T00:00:00.000Z`);
+  for (let offset = 11; offset >= 0; offset--) {
+    const month = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - offset, 1))
+      .toISOString()
+      .slice(0, 7);
+    if (!firstMonth || month >= firstMonth) monthEntries.push([month, months.get(month) ?? 0]);
+  }
+  const filtersText =
+    [
+      filters.status && `Status ${filters.status}`,
+      filters.category && `4M ${filters.category}`,
+      filters.lineId &&
+        `Line ${filterLabels.line ? `${filterLabels.line.code} · ${filterLabels.line.name}` : filters.lineId}`,
+      filters.shiftTemplateId && `Shift ${filterLabels.shift?.name ?? filters.shiftTemplateId}`,
+      filters.part && `Part ${filters.part}`,
+      filters.approvalRoute && `Route ${filters.approvalRoute}`,
+      filters.approvalStatus && `Approval ${filters.approvalStatus}`,
+      filters.pcrStatus && `PCR ${filters.pcrStatus}`,
+    ]
+      .filter(Boolean)
+      .join(' · ') || 'Semua';
+
+  const content = new Map<string, string | number>();
+  const put = (address: string, value: string | number) => content.set(address, value);
+  put('A1', 'HENKATEN  /  RINGKASAN');
+  put('A4', 'SUPPLIER');
+  put('D4', `${supplier.code} · ${supplier.name}`);
+  put('A5', 'PERIODE');
+  put('D5', `${filters.from ?? 'Awal'} — ${filters.to ?? 'Sekarang'}`);
+  put('A6', 'FILTER');
+  put('D6', filtersText);
+  put('A7', 'DIBUAT');
+  put('D7', `${local(createdAt, supplier.timezone)} · ${supplier.timezone}`);
+  const metrics = [
+    ['TOTAL', total],
+    ['OPEN', statuses.get('OPEN') ?? 0],
+    ['APPROVED', statuses.get('APPROVED') ?? 0],
+    ['REJECTED', statuses.get('REJECTED') ?? 0],
+    ['CANCELLED', statuses.get('CANCELLED') ?? 0],
+  ] as const;
+  for (let index = 0; index < cards.length; index++) {
+    const first = cards[index]!.split(':')[0]!;
+    put(`${first}9`, metrics[index]![0]);
+    put(`${first}10`, metrics[index]![1]);
+  }
+  for (const [address, value] of [
+    ['A13', 'STATUS'],
+    ['I13', 'KATEGORI 4M'],
+    ['A31', 'LINE · TOP 10, KOMPOSISI STATUS'],
+    ['I31', 'TREN BULANAN · KOMPOSISI 4M'],
+    ['A49', 'PART · TOP 10'],
+    ['I49', 'KEPUTUSAN PCR'],
+    ['A67', 'PERSETUJUAN TERTUNDA'],
+    ['A74', 'DATA SUMBER GRAFIK · dapat diedit di Excel'],
+  ] as const)
+    put(address, value);
+  put('A69', 'Supervisor');
+  put('D69', pending.get('SUPERVISOR') ?? 0);
+  put('I69', 'QC');
+  put('L69', pending.get('QC') ?? 0);
+  put(
+    'A70',
+    'Jumlah status dan kategori 4M selalu sama dengan TOTAL. Komposisi Line dan Bulan memakai data yang sama.',
+  );
+
+  const simpleTable = (
+    labelColumn: string,
+    valueColumn: string,
+    headerRow: number,
+    title: string,
+    entries: readonly (readonly [string, number])[],
+  ) => {
+    put(`${labelColumn}${headerRow}`, title);
+    put(`${valueColumn}${headerRow}`, 'Jumlah');
+    (entries.length ? entries : [['Tidak ada data', 0] as const]).forEach(
+      ([label, count], index) => {
+        put(`${labelColumn}${headerRow + index + 1}`, label);
+        put(`${valueColumn}${headerRow + index + 1}`, count);
+      },
+    );
+  };
+  simpleTable('A', 'B', 76, 'Status', statusEntries);
+  simpleTable('E', 'F', 76, '4M', categoryEntries);
+  simpleTable('I', 'J', 76, 'PCR', pcrEntries);
+  simpleTable('O', 'P', 84, 'Part', partEntries);
+  statusEntries.forEach(([, count], index) => put(`C${77 + index}`, total ? count / total : 0));
+  categoryEntries.forEach(([, count], index) => put(`G${77 + index}`, total ? count / total : 0));
+  put('C76', '%');
+  put('G76', '%');
+  put('A84', 'Line');
+  ['OPEN', 'APPROVED', 'REJECTED', 'CANCELLED'].forEach((key, index) =>
+    put(`${['B', 'C', 'D', 'E'][index]}84`, key),
+  );
+  put('F84', 'Total');
+  put('G84', 'Label grafik');
+  (lineEntries.length ? lineEntries : [['Tidak ada data', 0] as const]).forEach(
+    ([label, count], index) => {
+      put(`A${85 + index}`, label);
+      put(`G${85 + index}`, shortChartLabel(label.split(' · ')[0] ?? label));
+      ['OPEN', 'APPROVED', 'REJECTED', 'CANCELLED'].forEach((key, statusIndex) =>
+        put(
+          `${['B', 'C', 'D', 'E'][statusIndex]}${85 + index}`,
+          lineStatus.get(label)?.get(key) ?? 0,
+        ),
+      );
+      put(`F${85 + index}`, count);
+    },
+  );
+  put('H84', 'Bulan');
+  ['MAN', 'MACHINE', 'MATERIAL', 'METHOD'].forEach((key, index) =>
+    put(`${['I', 'J', 'K', 'L'][index]}84`, key),
+  );
+  put('M84', 'Total');
+  put('N84', 'Label grafik');
+  (partEntries.length ? partEntries : [['Tidak ada data', 0] as const]).forEach(([label], index) =>
+    put(`N${85 + index}`, shortChartLabel(label)),
+  );
+  (monthEntries.length ? monthEntries : [['Tidak ada data', 0] as const]).forEach(
+    ([label, count], index) => {
+      put(`H${85 + index}`, label);
+      ['MAN', 'MACHINE', 'MATERIAL', 'METHOD'].forEach((key, categoryIndex) =>
+        put(
+          `${['I', 'J', 'K', 'L'][categoryIndex]}${85 + index}`,
+          monthlyCategory.get(label)?.get(key) ?? 0,
+        ),
+      );
+      put(`M${85 + index}`, count);
+    },
+  );
+
+  for (let number = 1; number <= 96; number++) {
+    const row = sheet.getRow(number);
+    row.height =
+      number === 1
+        ? 31
+        : number === 2
+          ? 14
+          : number === 6
+            ? 34
+            : number === 10 || number === 11
+              ? 27
+              : 22;
+    for (let column = 1; column <= 16; column++) {
+      const cell = row.getCell(column);
+      const address = cell.address;
+      if (content.has(address)) cell.value = content.get(address)!;
+      if (number >= 77 && number <= 80 && (column === 3 || column === 7)) cell.numFmt = '0.0%';
+      cell.font = { name: 'Aptos', size: 10, color: { argb: colors.ink } };
+      cell.alignment = { vertical: 'middle', wrapText: number === 6 || number >= 67 };
+      if (number <= 2)
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.navy } };
+      if (number === 9 || number === 10 || number === 11)
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.pale } };
+      if ([13, 31, 49, 67, 74, 76, 84].includes(number))
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors.pale } };
+      if (number >= 77 && number % 2 === 0)
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
     }
+    if (number === 1)
+      row.getCell(1).font = {
+        name: 'Aptos Display',
+        size: 20,
+        bold: true,
+        color: { argb: colors.white },
+      };
+    if ([4, 5, 6, 7].includes(number))
+      row.getCell(1).font = { name: 'Aptos', size: 10, bold: true, color: { argb: colors.muted } };
+    if ([13, 31, 49, 67, 74, 76, 84].includes(number))
+      for (const column of [1, 5, 8, 9, 15])
+        row.getCell(column).font = {
+          name: 'Aptos Display',
+          size: 11,
+          bold: true,
+          color: { argb: colors.navy },
+        };
+    if (number === 9)
+      for (const column of [1, 4, 7, 10, 13])
+        row.getCell(column).font = {
+          name: 'Aptos',
+          size: 10,
+          bold: true,
+          color: { argb: colors.muted },
+        };
+    if (number === 10)
+      for (const column of [1, 4, 7, 10, 13])
+        row.getCell(column).font = {
+          name: 'Aptos Display',
+          size: 21,
+          bold: true,
+          color: { argb: colors.navy },
+        };
+    if (number === 9 || number === 10)
+      for (const column of [1, 4, 7, 10, 13])
+        row.getCell(column).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
     row.commit();
   }
+  const chart = (
+    title: string,
+    direction: 'bar' | 'column',
+    entries: readonly (readonly [string, number])[],
+    labelColumn: string,
+    valueColumn: string,
+    from: ExportChart['from'],
+    to: ExportChart['to'],
+    color: string,
+    pointColors?: string[],
+  ): ExportChart => ({
+    title,
+    direction,
+    labels: entries.length ? entries.map(([label]) => label) : ['Tidak ada data'],
+    values: entries.length ? entries.map(([, count]) => count) : [0],
+    labelColumn,
+    valueColumn,
+    firstRow: 77,
+    from,
+    to,
+    color,
+    ...(pointColors ? { pointColors } : {}),
+  });
+  return [
+    chart(
+      'Status',
+      'bar',
+      statusEntries,
+      'A',
+      'B',
+      { column: 0, row: 13 },
+      { column: 8, row: 29 },
+      '4778D2',
+      ['F59E0B', '16A34A', 'F04438', '64748B'],
+    ),
+    chart(
+      'Kategori 4M',
+      'bar',
+      categoryEntries,
+      'E',
+      'F',
+      { column: 8, row: 13 },
+      { column: 16, row: 29 },
+      '20A694',
+    ),
+    {
+      ...chart(
+        'Line Top 10',
+        'bar',
+        lineEntries,
+        'G',
+        'F',
+        { column: 0, row: 31 },
+        { column: 8, row: 47 },
+        '4778D2',
+      ),
+      firstRow: 85,
+      labels: (lineEntries.length ? lineEntries : [['Tidak ada data', 0] as const]).map(([line]) =>
+        shortChartLabel(line.split(' · ')[0] ?? line),
+      ),
+      grouping: 'stacked',
+      series: ['OPEN', 'APPROVED', 'REJECTED', 'CANCELLED'].map((name, index) => ({
+        name,
+        valueColumn: ['B', 'C', 'D', 'E'][index]!,
+        values: (lineEntries.length ? lineEntries : [['Tidak ada data', 0] as const]).map(
+          ([line]) => lineStatus.get(line)?.get(name) ?? 0,
+        ),
+        color: ['F59E0B', '16A34A', 'F04438', '64748B'][index]!,
+      })),
+    },
+    {
+      ...chart(
+        'Tren bulanan',
+        'column',
+        monthEntries,
+        'H',
+        'M',
+        { column: 8, row: 31 },
+        { column: 16, row: 47 },
+        '4778D2',
+      ),
+      firstRow: 85,
+      grouping: 'stacked',
+      series: ['MAN', 'MACHINE', 'MATERIAL', 'METHOD'].map((name, index) => ({
+        name,
+        valueColumn: ['I', 'J', 'K', 'L'][index]!,
+        values: (monthEntries.length ? monthEntries : [['Tidak ada data', 0] as const]).map(
+          ([month]) => monthlyCategory.get(month)?.get(name) ?? 0,
+        ),
+        color: ['4778D2', '20A694', 'F59A45', 'A78BFA'][index]!,
+      })),
+    },
+    {
+      ...chart(
+        'Part Top 10',
+        'bar',
+        partEntries,
+        'N',
+        'P',
+        { column: 0, row: 49 },
+        { column: 8, row: 65 },
+        'F59A45',
+      ),
+      firstRow: 85,
+      labels: (partEntries.length ? partEntries : [['Tidak ada data', 0] as const]).map(([part]) =>
+        shortChartLabel(part),
+      ),
+    },
+    chart(
+      'Keputusan PCR',
+      'bar',
+      pcrEntries,
+      'I',
+      'J',
+      { column: 8, row: 49 },
+      { column: 16, row: 65 },
+      '20A694',
+      ['16A34A', '4778D2', 'F59E0B', 'F04438', '94A3B8'],
+    ),
+  ];
 }

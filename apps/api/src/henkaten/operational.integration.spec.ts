@@ -6,6 +6,7 @@ import ExcelJS from 'exceljs';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+import unzipper from 'unzipper';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { AppModule } from '../app.module.js';
@@ -759,9 +760,49 @@ describe('Line Shift Henkaten operations', () => {
     expect(workbook.getWorksheet('Checklist')!.rowCount).toBeGreaterThan(1);
     expect(workbook.getWorksheet('Approval')!.rowCount).toBeGreaterThan(1);
     const summary = workbook.getWorksheet('Ringkasan')!;
-    expect(summary.getCell('A1').value).toBe('HENKATEN · RINGKASAN');
+    expect(summary.getCell('A1').value).toBe('HENKATEN  /  RINGKASAN');
     expect(summary.getCell('A1').fill).toMatchObject({ fgColor: { argb: 'FF18365B' } });
-    expect(summary.rowCount).toBeGreaterThan(15);
+    expect(summary.getCell('A10').value).toBe(records.rowCount - 1);
+    expect(
+      ['OPEN', 'APPROVED', 'REJECTED', 'CANCELLED']
+        .map((_, index) => summary.getCell(`B${77 + index}`).value)
+        .reduce((sum, value) => Number(sum) + Number(value), 0),
+    ).toBe(records.rowCount - 1);
+    expect(summary.getCell('A85').value).toContain(record.lineCodeSnapshot);
+    const shortLineLabel = summary.getCell('G85').value;
+    expect(typeof shortLineLabel).toBe('string');
+    if (typeof shortLineLabel !== 'string') throw new Error('Line chart label is missing');
+    expect(shortLineLabel.length).toBeLessThanOrEqual(20);
+    expect(
+      ['B', 'C', 'D', 'E'].reduce(
+        (sum, column) => sum + Number(summary.getCell(`${column}85`).value),
+        0,
+      ),
+    ).toBe(Number(summary.getCell('F85').value));
+    for (let row = 85; row <= 96; row++) {
+      const month = summary.getCell(`H${row}`).value;
+      if (!month) continue;
+      expect(
+        ['I', 'J', 'K', 'L'].reduce(
+          (sum, column) => sum + Number(summary.getCell(`${column}${row}`).value),
+          0,
+        ),
+      ).toBe(Number(summary.getCell(`M${row}`).value));
+    }
+    const exported = await unzipper.Open.file(join(config.exportStorageRoot, `${exportId}.xlsx`));
+    expect(
+      exported.files.filter((entry) => /^xl\/charts\/chart\d+\.xml$/.test(entry.path)),
+    ).toHaveLength(6);
+    const monthlyChart = await exported.files
+      .find((entry) => entry.path === 'xl/charts/chart4.xml')!
+      .buffer();
+    expect(monthlyChart.toString()).toContain('Ringkasan!$I$85:');
+    expect(monthlyChart.toString()).toContain('<c:grouping val="stacked"/>');
+    expect(monthlyChart.toString().match(/<c:ser>/g) ?? []).toHaveLength(4);
+    const partChart = await exported.files
+      .find((entry) => entry.path === 'xl/charts/chart5.xml')!
+      .buffer();
+    expect(partChart.toString()).toContain('Ringkasan!$N$85:');
 
     const tmminUsername = `export-tmmin-${randomUUID()}`;
     await prisma.user.create({
