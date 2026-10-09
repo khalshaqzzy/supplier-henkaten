@@ -286,6 +286,7 @@ test('proves TMMIN read-only governance, source cutover, and External ingestion 
   await expect(sourceMetrics.getByText('External', { exact: true })).toBeVisible();
   await tmminPage.goto(`${runtime.tmminOrigin}/suppliers/${externalSupplier.supplier.id}`);
   const deactivateTrigger = tmminPage.getByRole('button', { name: 'Nonaktifkan', exact: true });
+  await tmminPage.bringToFront();
   await deactivateTrigger.click();
   const deactivateDialog = tmminPage.getByRole('dialog', {
     name: 'Nonaktifkan supplier?',
@@ -328,6 +329,77 @@ test('proves TMMIN read-only governance, source cutover, and External ingestion 
   ).toBeVisible();
   await expect(qualityPage.getByRole('button', { name: /rotate|revoke|issue/i })).toHaveCount(0);
   expect((await new AxeBuilder({ page: qualityPage }).analyze()).violations).toEqual([]);
+
+  // Admin removes an Approved record; Quality removes the remaining supplier history.
+  const visibleRecords = await get<{ items: Array<{ id: string; status: string }> }>(
+    tmminContext.request,
+    `/api/v1/tmmin/suppliers/${externalSupplier.supplier.id}/external-projections?limit=25`,
+  );
+  const approvedRecord = visibleRecords.items.find((row) => row.status === 'APPROVED')!;
+  await tmminPage.goto(
+    `${runtime.tmminOrigin}/henkatens/external/${externalSupplier.supplier.id}/${approvedRecord.id}`,
+  );
+  await tmminPage.getByRole('button', { name: 'Hapus Henkaten', exact: true }).click();
+  const individualDelete = tmminPage.getByRole('dialog', { name: 'Hapus Henkaten?' });
+  await expect(
+    individualDelete.getByRole('button', { name: 'Hapus Henkaten', exact: true }),
+  ).toBeDisabled();
+  await individualDelete.getByLabel('Alasan penghapusan').fill('Data approved duplikat');
+  expect(
+    (await new AxeBuilder({ page: tmminPage }).include('[role=dialog]').analyze()).violations,
+  ).toEqual([]);
+  await tmminPage.screenshot({ path: '/tmp/henkaten-deletion-individual.png', fullPage: true });
+  await individualDelete.getByRole('button', { name: 'Hapus Henkaten', exact: true }).click();
+  await expect(
+    tmminPage.getByRole('status').filter({ hasText: 'Henkaten dihapus.' }),
+  ).toBeVisible();
+  expect(
+    (
+      await tmminContext.request.get(
+        `${runtime.apiOrigin}/api/v1/tmmin/suppliers/${externalSupplier.supplier.id}/external-projections/${approvedRecord.id}`,
+      )
+    ).status(),
+  ).toBe(404);
+  await qualityPage.goto(`${runtime.tmminOrigin}/suppliers/${externalSupplier.supplier.id}`);
+  await qualityPage.bringToFront();
+  await qualityPage.getByRole('button', { name: 'Hapus semua Henkaten', exact: true }).click();
+  const bulkDelete = qualityPage.getByRole('dialog', { name: 'Hapus semua Henkaten?' });
+  await expect(bulkDelete.getByText('Henkaten akan dihapus', { exact: true })).toBeVisible();
+  await bulkDelete.getByLabel('Alasan penghapusan').fill('Bersihkan Henkaten supplier');
+  await bulkDelete.getByLabel(/Ketik E2E-EXTERNAL/).fill('WRONG');
+  await expect(bulkDelete.getByRole('button', { name: 'Hapus semua', exact: true })).toBeDisabled();
+  await bulkDelete.getByLabel(/Ketik E2E-EXTERNAL/).fill('E2E-EXTERNAL');
+  for (let step = 0; step < 7; step += 1) {
+    await qualityPage.keyboard.press('Tab');
+    expect(await bulkDelete.evaluate((dialog) => dialog.contains(document.activeElement))).toBe(
+      true,
+    );
+  }
+  expect(
+    (await new AxeBuilder({ page: qualityPage }).include('[role=dialog]').analyze()).violations,
+  ).toEqual([]);
+  await qualityPage.setViewportSize({ width: 390, height: 844 });
+  await qualityPage.screenshot({ path: '/tmp/henkaten-deletion-bulk-mobile.png', fullPage: true });
+  expect(
+    await qualityPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+  ).toBe(true);
+  await bulkDelete.getByRole('button', { name: 'Hapus semua', exact: true }).click();
+  await expect(bulkDelete).toBeHidden();
+  await expect(
+    qualityPage.getByRole('status').filter({ hasText: /Henkaten dihapus/ }),
+  ).toBeVisible();
+  const removedRecords = await get<{ items: unknown[] }>(
+    qualityContext.request,
+    `/api/v1/tmmin/suppliers/${externalSupplier.supplier.id}/external-projections?limit=25`,
+  );
+  expect(removedRecords.items).toEqual([]);
+  const removedReplay = await tmminContext.request.post(
+    `${runtime.apiOrigin}/api/v1/external/henkaten/events`,
+    { data: opened, headers: { Authorization: `Bearer ${token}` } },
+  );
+  expect(removedReplay.status()).toBe(422);
+  expect((await removedReplay.json()).code).toBe('HENKATEN_DELETED');
+  await qualityPage.setViewportSize({ width: 1280, height: 900 });
 
   const invalidIpClient = await post<{
     client: { clientId: string };

@@ -85,6 +85,8 @@ export class LineShiftService {
     const current = occurrences.filter((item) => item.current);
     const items = await Promise.all(
       occurrences.map(async (occurrence) => {
+        // Retained Man evidence continues to determine MP after visibility deletion.
+        // Board indicators use the separate visible-record query.
         const overrides = await this.prisma.henkaten.findMany({
           where: {
             supplierId: scope.supplierId,

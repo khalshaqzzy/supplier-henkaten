@@ -72,7 +72,7 @@ export class PushDeliveryWorker implements OnModuleInit, BeforeApplicationShutdo
         FROM "PushDelivery" AS delivery
         JOIN "PushSubscription" AS subscription ON subscription.id = delivery."subscriptionId"
         JOIN "Notification" AS notification ON notification.id = delivery."notificationId"
-        WHERE delivery.status = 'PENDING'
+        WHERE notification."hiddenAt" IS NULL AND delivery.status = 'PENDING'
           AND delivery."nextAttemptAt" <= clock_timestamp()
           AND (
             delivery."lockedAt" IS NULL
@@ -95,6 +95,11 @@ export class PushDeliveryWorker implements OnModuleInit, BeforeApplicationShutdo
   }
 
   private async process(delivery: ClaimedDelivery): Promise<void> {
+    const visible = await this.prisma.pushDelivery.findFirst({
+      where: { id: delivery.id, status: 'PENDING', notification: { hiddenAt: null } },
+      select: { id: true },
+    });
+    if (!visible) return;
     const now = new Date();
     if (delivery.expiresAt <= now) {
       await this.finish(delivery.id, 'EXPIRED', 'DeliveryTtlExpired');

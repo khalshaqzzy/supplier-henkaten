@@ -1,4 +1,8 @@
 import {
+  henkatenDeletionPreviewSchema,
+  henkatenDeletionResultSchema,
+  deleteHenkatenRequestSchema,
+  deleteSupplierHenkatensRequestSchema,
   pcrAssessmentSchema,
   pcrCorrectionRequestSchema,
   tanokoMatrixSchema,
@@ -615,6 +619,35 @@ function readModelPaths() {
         },
       },
     },
+
+    '/api/v1/tmmin/suppliers/{supplierId}/henkaten-deletion-preview': {
+      get: {
+        requestParams: { path: z.object({ supplierId: z.string().uuid() }) },
+        responses: {
+          '200': json(
+            'Visible supplier Henkaten counts and revision',
+            henkatenDeletionPreviewSchema,
+          ),
+        },
+      },
+    },
+    '/api/v1/tmmin/henkatens/{kind}/{supplierId}/{recordId}': {
+      delete: {
+        requestParams: {
+          path: z.object({
+            kind: z.enum(['HOSTED', 'EXTERNAL']),
+            supplierId: z.string().uuid(),
+            recordId: z.string().uuid(),
+          }),
+          header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }),
+        },
+        requestBody: body(deleteHenkatenRequestSchema),
+        responses: {
+          '200': json('Deleted Henkaten receipt', henkatenDeletionResultSchema),
+          '409': problem,
+        },
+      },
+    },
     '/api/v1/tmmin/henkatens': {
       get: {
         requestParams: { query: tmminHenkatenQuerySchema },
@@ -787,6 +820,17 @@ function operationalPaths() {
       },
     },
     '/api/v1/tmmin/suppliers/{supplierId}/henkatens': {
+      delete: {
+        requestParams: {
+          path: z.object({ supplierId: z.string().uuid() }),
+          header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }),
+        },
+        requestBody: body(deleteSupplierHenkatensRequestSchema),
+        responses: {
+          '200': json('Supplier Henkaten deletion receipt', henkatenDeletionResultSchema),
+          '409': problem,
+        },
+      },
       get: {
         requestParams: { ...supplierOnly, query: henkatenListQuerySchema },
         responses: { '200': json('Supplier Henkaten records', henkatenPageSchema) },

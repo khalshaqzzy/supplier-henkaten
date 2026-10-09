@@ -1,4 +1,8 @@
 import {
+  henkatenDeletionPreviewSchema,
+  henkatenDeletionResultSchema,
+  type DeleteHenkatenRequest,
+  type DeleteSupplierHenkatensRequest,
   affectedPartDetailSchema,
   affectedPartPageSchema,
   assignmentBoardSchema,
@@ -62,6 +66,37 @@ import {
 import { ApiClient, type QueryRecord } from './core';
 
 export class TmminApi {
+  henkatenDeletionPreview(supplierId: string) {
+    return this.client.request(`/api/v1/tmmin/suppliers/${supplierId}/henkaten-deletion-preview`, {
+      responseSchema: henkatenDeletionPreviewSchema,
+    });
+  }
+  deleteHenkaten(
+    kind: 'HOSTED' | 'EXTERNAL',
+    supplierId: string,
+    id: string,
+    body: DeleteHenkatenRequest,
+    idempotencyKey: string,
+  ) {
+    return this.client.request(`/api/v1/tmmin/henkatens/${kind}/${supplierId}/${id}`, {
+      method: 'DELETE',
+      body,
+      idempotencyKey,
+      responseSchema: henkatenDeletionResultSchema,
+    });
+  }
+  deleteSupplierHenkatens(
+    supplierId: string,
+    body: DeleteSupplierHenkatensRequest,
+    idempotencyKey: string,
+  ) {
+    return this.client.request(`/api/v1/tmmin/suppliers/${supplierId}/henkatens`, {
+      method: 'DELETE',
+      body,
+      idempotencyKey,
+      responseSchema: henkatenDeletionResultSchema,
+    });
+  }
   constructor(private readonly client: ApiClient) {}
 
   createHenkatenExport(supplierId: string, filters: HenkatenExportFilters) {

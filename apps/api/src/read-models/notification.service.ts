@@ -49,6 +49,7 @@ export class NotificationService implements OnModuleInit {
     const cursor = decodeCursor(query.cursor);
     const rows = await this.prisma.notification.findMany({
       where: {
+        hiddenAt: null,
         recipientUserId: principal.userId,
         ...(query.unreadOnly ? { readAt: null } : {}),
         ...(query.pcrTab === 'PCR' ? { kind: { in: ['PCR_FLAGGED', 'PCR_CORRECTED'] } } : {}),
@@ -72,7 +73,7 @@ export class NotificationService implements OnModuleInit {
   async unreadCount(principal: RequestPrincipal) {
     return {
       count: await this.prisma.notification.count({
-        where: { recipientUserId: principal.userId, readAt: null },
+        where: { hiddenAt: null, recipientUserId: principal.userId, readAt: null },
       }),
     };
   }
@@ -83,28 +84,38 @@ export class NotificationService implements OnModuleInit {
     input: NotificationReadRequest,
     correlationId: string,
   ) {
-    const current = await this.prisma.notification.findFirst({
-      where: { id, recipientUserId: principal.userId },
+    const reference = await this.prisma.notification.findFirst({
+      where: { hiddenAt: null, id, recipientUserId: principal.userId },
+      select: { supplierId: true },
     });
-    if (!current) throw missing('Notification');
-    if (current.version !== input.expectedVersion) throw versionConflict();
-    const updated = await this.prisma.notification.update({
-      where: { id },
-      data: { readAt: input.read ? new Date() : null, version: { increment: 1 } },
+    if (!reference) throw missing('Notification');
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Supplier" WHERE id = ${reference.supplierId}::uuid FOR UPDATE`;
+      const current = await tx.notification.findFirst({
+        where: { hiddenAt: null, id, recipientUserId: principal.userId },
+      });
+      if (!current) throw missing('Notification');
+      if (current.version !== input.expectedVersion) throw versionConflict();
+      const updated = await tx.notification.update({
+        where: { id },
+        data: { readAt: input.read ? new Date() : null, version: { increment: 1 } },
+      });
+      await this.audit.write(
+        {
+          actorKind: 'USER',
+          actorUserId: principal.userId,
+          actorRole: principal.role,
+          supplierId: current.supplierId,
+          ...(principal.supplierId ? { actorSupplierId: principal.supplierId } : {}),
+          action: input.read ? 'NOTIFICATION_READ' : 'NOTIFICATION_UNREAD',
+          resourceType: 'Notification',
+          resourceId: id,
+          correlationId,
+        },
+        tx,
+      );
+      return { ...presentNotification(updated), version: updated.version };
     });
-    await this.audit.write({
-      actorKind: 'USER',
-      actorUserId: principal.userId,
-      actorRole: principal.role,
-      ...(principal.supplierId
-        ? { actorSupplierId: principal.supplierId, supplierId: principal.supplierId }
-        : {}),
-      action: input.read ? 'NOTIFICATION_READ' : 'NOTIFICATION_UNREAD',
-      resourceType: 'Notification',
-      resourceId: id,
-      correlationId,
-    });
-    return { ...presentNotification(updated), version: updated.version };
   }
 
   async consume(event: ClaimedOutboxEvent): Promise<void> {
@@ -114,6 +125,13 @@ export class NotificationService implements OnModuleInit {
     const recipients = await this.recipients(event);
     if (!recipients.length) return;
     await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Supplier" WHERE id = ${event.supplierId}::uuid FOR UPDATE`;
+      const visibleEvent = await tx.outboxEvent.findFirst({
+        where: { id: event.id, suppressedAt: null },
+        select: { id: true },
+      });
+      if (!visibleEvent) return;
+
       for (const recipientUserId of recipients) {
         const recipient = await tx.user.findUnique({
           where: { id: recipientUserId },
@@ -173,7 +191,7 @@ export class NotificationService implements OnModuleInit {
       });
       if (reviewOnly || event.aggregateType !== 'Henkaten') return tmmin.map(({ id }) => id);
       const henkaten = await this.prisma.henkaten.findUnique({
-        where: { id: event.aggregateId },
+        where: { deletedAt: null, id: event.aggregateId },
         select: {
           createdById: true,
           approvalRoutes: { select: { route: true, currentResponsibleMemberId: true } },
@@ -217,7 +235,7 @@ export class NotificationService implements OnModuleInit {
     const common = { supplierId, status: 'ACTIVE' as const };
     if (event.aggregateType === 'Henkaten') {
       const henkaten = await this.prisma.henkaten.findFirst({
-        where: { id: event.aggregateId, supplierId },
+        where: { deletedAt: null, id: event.aggregateId, supplierId },
         select: {
           createdById: true,
           approvalRoutes: { select: { route: true, currentResponsibleMemberId: true } },

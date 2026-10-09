@@ -57,7 +57,7 @@ export class ApprovalService {
           return retry.henkatenId;
         }
         const target = await tx.henkaten.findFirst({
-          where: { id, supplierId: scope.supplierId },
+          where: { deletedAt: null, id, supplierId: scope.supplierId },
           select: {
             id: true,
             shiftRunId: true,
@@ -80,7 +80,7 @@ export class ApprovalService {
         ]);
         await tx.$queryRaw`SELECT id FROM "Henkaten" WHERE id = ${id}::uuid FOR UPDATE`;
         const current = await tx.henkaten.findFirst({
-          where: { id, supplierId: scope.supplierId },
+          where: { deletedAt: null, id, supplierId: scope.supplierId },
           include: {
             approvalRoutes: { include: { decision: true } },
             manDetail: true,
@@ -241,14 +241,14 @@ export class ApprovalService {
         return retry.henkatenId;
       }
       const target = await tx.henkaten.findFirst({
-        where: { id, supplierId: scope.supplierId },
+        where: { deletedAt: null, id, supplierId: scope.supplierId },
         select: { shiftRunId: true },
       });
       if (!target) throw notFound();
       await lockShiftRuns(tx, [target.shiftRunId]);
       await tx.$queryRaw`SELECT id FROM "Henkaten" WHERE id = ${id}::uuid FOR UPDATE`;
       const current = await tx.henkaten.findFirst({
-        where: { id, supplierId: scope.supplierId },
+        where: { deletedAt: null, id, supplierId: scope.supplierId },
         include: { approvalRoutes: true },
       });
       if (!current) throw notFound();

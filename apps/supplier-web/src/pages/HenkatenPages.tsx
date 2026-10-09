@@ -73,6 +73,8 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
       (params.get('status') as HenkatenListQuery['approvalStatus']) ?? 'PENDING';
   }
   const list = useQuery({
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
     queryKey: scopedKey(scope, approvalQueue ? 'approval-queue' : 'henkatens', query),
     queryFn: () => supplierApi.henkatens(query),
   });
@@ -351,6 +353,8 @@ export function HenkatenDetailPage() {
   const [problem, setProblem] = useState<string | null>(null);
   const [intentKey, setIntentKey] = useState(() => createIdempotencyKey());
   const record = useQuery({
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
     queryKey: scopedKey(scope, 'henkaten-detail', henkatenId),
     queryFn: () => supplierApi.henkaten(henkatenId),
   });

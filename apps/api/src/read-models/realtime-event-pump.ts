@@ -61,6 +61,7 @@ export class RealtimeEventPump implements OnModuleInit, BeforeApplicationShutdow
     for (;;) {
       const events = await this.prisma.outboxEvent.findMany({
         where: {
+          suppressedAt: null,
           supplierId: { not: null },
           ...(this.cursor
             ? {

@@ -131,7 +131,7 @@ export class PcrService implements OnModuleInit, BeforeApplicationShutdown {
   ) {
     const hash = pcrInputHash(input);
     const existing = await tx.pcrAssessment.findUnique({
-      where: { externalProjectionId: projectionId },
+      where: { hiddenAt: null, externalProjectionId: projectionId },
     });
     if (existing?.inputHash === hash) return;
     if (existing) {
@@ -171,8 +171,22 @@ export class PcrService implements OnModuleInit, BeforeApplicationShutdown {
     context: MutationContext,
   ) {
     return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Supplier" WHERE id = ${supplierId}::uuid FOR UPDATE`;
+      const visible =
+        kind === 'HOSTED'
+          ? await tx.henkaten.findFirst({
+              where: { id: recordId, supplierId, deletedAt: null },
+              select: { id: true },
+            })
+          : await tx.externalHenkatenProjection.findFirst({
+              where: { id: recordId, supplierId, deletedAt: null },
+              select: { id: true },
+            });
+      if (!visible) throw missing('Henkaten');
+
       const row = await tx.pcrAssessment.findFirst({
         where: {
+          hiddenAt: null,
           supplierId,
           ...(kind === 'HOSTED' ? { henkatenId: recordId } : { externalProjectionId: recordId }),
         },
@@ -182,9 +196,9 @@ export class PcrService implements OnModuleInit, BeforeApplicationShutdown {
         if (input.expectedVersion !== 0) throw versionConflict();
         const evidence =
           kind === 'HOSTED'
-            ? await tx.henkaten.findFirst({ where: { id: recordId, supplierId } })
+            ? await tx.henkaten.findFirst({ where: { deletedAt: null, id: recordId, supplierId } })
             : await tx.externalHenkatenProjection.findFirst({
-                where: { id: recordId, supplierId },
+                where: { deletedAt: null, id: recordId, supplierId },
               });
         if (!evidence) throw missing('Henkaten');
         const change =
@@ -242,6 +256,7 @@ export class PcrService implements OnModuleInit, BeforeApplicationShutdown {
         if (!inserted.count) throw versionConflict();
         updated = await tx.pcrAssessment.findFirstOrThrow({
           where: {
+            hiddenAt: null,
             supplierId,
             ...(kind === 'HOSTED' ? { henkatenId: recordId } : { externalProjectionId: recordId }),
           },
@@ -262,7 +277,9 @@ export class PcrService implements OnModuleInit, BeforeApplicationShutdown {
           },
         });
         if (!changed.count) throw versionConflict();
-        updated = await tx.pcrAssessment.findUniqueOrThrow({ where: { id: row.id } });
+        updated = await tx.pcrAssessment.findUniqueOrThrow({
+          where: { hiddenAt: null, id: row.id },
+        });
       }
       await this.audit.write(
         {
@@ -311,7 +328,7 @@ export class PcrService implements OnModuleInit, BeforeApplicationShutdown {
         Date.now() - Math.max(this.config.pcrInferenceTimeoutMs * 2, 120_000),
       );
       const rows = await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT id FROM "PcrAssessment" WHERE status = 'PENDING'
+        SELECT id FROM "PcrAssessment" WHERE "hiddenAt" IS NULL AND status = 'PENDING'
           AND ("leasedAt" IS NULL OR "leasedAt" < ${staleBefore})
         ORDER BY "createdAt", id FOR UPDATE SKIP LOCKED LIMIT 1
       `;
@@ -343,7 +360,9 @@ export class PcrService implements OnModuleInit, BeforeApplicationShutdown {
 
   private async loadInput(row: PcrAssessment): Promise<PcrInput | null> {
     if (row.henkatenId) {
-      const source = await this.prisma.henkaten.findUnique({ where: { id: row.henkatenId } });
+      const source = await this.prisma.henkaten.findUnique({
+        where: { deletedAt: null, id: row.henkatenId },
+      });
       return source
         ? {
             category: source.category,
@@ -355,7 +374,7 @@ export class PcrService implements OnModuleInit, BeforeApplicationShutdown {
         : null;
     }
     const source = await this.prisma.externalHenkatenProjection.findUnique({
-      where: { id: row.externalProjectionId! },
+      where: { deletedAt: null, id: row.externalProjectionId! },
     });
     if (
       !source ||
@@ -445,9 +464,12 @@ export class PcrService implements OnModuleInit, BeforeApplicationShutdown {
     },
   ) {
     await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Supplier" WHERE id = ${claim.supplierId}::uuid FOR UPDATE`;
+
       const changed = await tx.pcrAssessment.updateMany({
         where: {
           id: claim.id,
+          hiddenAt: null,
           status: 'PENDING',
           leaseToken: claim.leaseToken,
           inputHash: claim.inputHash,
@@ -468,7 +490,9 @@ export class PcrService implements OnModuleInit, BeforeApplicationShutdown {
         },
       });
       if (!changed.count) return;
-      const current = await tx.pcrAssessment.findUniqueOrThrow({ where: { id: claim.id } });
+      const current = await tx.pcrAssessment.findUniqueOrThrow({
+        where: { hiddenAt: null, id: claim.id },
+      });
       await this.enqueueDecision(
         tx,
         current,

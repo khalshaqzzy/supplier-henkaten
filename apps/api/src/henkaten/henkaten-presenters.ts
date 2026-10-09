@@ -51,6 +51,7 @@ export function presentHenkatenSummary(row: SummaryRow) {
 }
 
 type DetailRow = Henkaten & {
+  clonedFrom: { deletedAt: Date | null } | null;
   pcrAssessment: PcrAssessment | null;
   checklistSnapshot: (HenkatenChecklistSnapshot & { answers: HenkatenChecklistAnswer[] }) | null;
   manDetail: ManHenkatenDetail | null;
@@ -72,7 +73,7 @@ export function presentHenkatenDetail(row: DetailRow) {
     replacementObject: row.replacementObject,
     cancellationReason: row.cancellationReason,
     withdrawalReason: row.withdrawalReason,
-    clonedFromHenkatenId: row.clonedFromHenkatenId,
+    clonedFromHenkatenId: row.clonedFrom?.deletedAt ? null : row.clonedFromHenkatenId,
     checklist: {
       checklistVersionId: row.checklistSnapshot.checklistVersionId,
       versionNumber: row.checklistSnapshot.versionNumber,
@@ -131,6 +132,7 @@ export function presentHenkatenDetail(row: DetailRow) {
 }
 
 export const henkatenDetailInclude = {
+  clonedFrom: { select: { deletedAt: true } },
   pcrAssessment: true,
   checklistSnapshot: {
     include: { answers: { orderBy: { displayOrderSnapshot: 'asc' as const } } },

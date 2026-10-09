@@ -325,6 +325,7 @@ export class ShiftService {
       );
       const lockRelated = await tx.henkaten.findMany({
         where: {
+          deletedAt: null,
           supplierId: scope.supplierId,
           status: 'OPEN',
           OR: [
@@ -383,6 +384,7 @@ export class ShiftService {
       const assignmentIds = shift.workingAssignments.map(({ id: assignmentId }) => assignmentId);
       const related = await tx.henkaten.findMany({
         where: {
+          deletedAt: null,
           supplierId: scope.supplierId,
           status: 'OPEN',
           OR: [
@@ -1069,6 +1071,7 @@ export class ShiftService {
       tx.assignmentIssue.findFirst({ where: { supplierId, lineId, status: 'OPEN' } }),
       tx.henkaten.findFirst({
         where: {
+          deletedAt: null,
           supplierId,
           lineId,
           status: 'OPEN',

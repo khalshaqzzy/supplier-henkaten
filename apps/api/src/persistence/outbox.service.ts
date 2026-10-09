@@ -113,7 +113,7 @@ export class OutboxService implements OnModuleInit, BeforeApplicationShutdown {
         SELECT id, "eventType", "attemptCount", "aggregateType", "aggregateId",
                "aggregateVersion", "supplierId", "occurredAt", actor, "correlationId", payload
         FROM "OutboxEvent"
-        WHERE "processedAt" IS NULL
+        WHERE "suppressedAt" IS NULL AND "processedAt" IS NULL
           AND "failedAt" IS NULL
           AND "availableAt" <= now()
           AND ("lockedAt" IS NULL OR "lockedAt" < now() - (${this.config.outboxLockLeaseMs} * interval '1 millisecond'))

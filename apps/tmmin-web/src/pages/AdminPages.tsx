@@ -1,3 +1,4 @@
+import { HenkatenDeletion } from '../components/HenkatenDeletion';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, KeyRound, Plus, RefreshCw, UserRoundPlus } from 'lucide-react';
@@ -489,6 +490,11 @@ export function SupplierDetailPage() {
             onChanged={() => void result.refetch()}
           />
           {admin && <SupplierEditPanel supplier={supplier} onSaved={() => void result.refetch()} />}
+          <HenkatenDeletion
+            key={supplierId}
+            supplierId={supplierId}
+            supplierLabel={`${supplier.code} · ${supplier.name}`}
+          />
         </div>
         <aside className="tmmin-context-rail">
           <Alert

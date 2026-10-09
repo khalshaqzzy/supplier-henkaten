@@ -128,6 +128,7 @@ export class RealtimeService {
     }
     const events = await this.prisma.outboxEvent.findMany({
       where: {
+        suppressedAt: null,
         supplierId,
         ...(cursor
           ? {

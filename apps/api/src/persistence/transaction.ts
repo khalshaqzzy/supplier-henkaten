@@ -4,11 +4,12 @@ import type { PrismaService } from './prisma.service.js';
 export async function runSerializable<T>(
   prisma: PrismaService,
   operation: (transaction: Prisma.TransactionClient) => Promise<T>,
+  options: { timeout?: number; maxWait?: number } = {},
 ): Promise<T> {
   let lastError: unknown;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
-      return await prisma.$transaction(operation, { isolationLevel: 'Serializable' });
+      return await prisma.$transaction(operation, { ...options, isolationLevel: 'Serializable' });
     } catch (error) {
       lastError = error;
       if (!isRetryableTransactionError(error) || attempt === 3) throw error;

@@ -99,7 +99,7 @@ export class SourceGovernanceService {
       async check(transaction, supplier, targetMode) {
         if (targetMode !== 'EXTERNAL') return [];
         const openHenkaten = await transaction.henkaten.findFirst({
-          where: { supplierId: supplier.id, status: 'OPEN' },
+          where: { deletedAt: null, supplierId: supplier.id, status: 'OPEN' },
           select: { id: true },
         });
         const blockers: CutoverBlocker[] = [];

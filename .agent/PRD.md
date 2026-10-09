@@ -1,3 +1,19 @@
+## Amendment — 9 October 2026: TMMIN Henkaten deletion
+
+TMMIN Admin and TMMIN Quality can delete one Henkaten from its detail page or all Henkaten of one supplier from Supplier detail. Both actions apply to every status, Hosted and External data, all historical source epochs, and active or inactive suppliers. Supplier roles cannot delete Henkaten.
+
+Deletion removes records from application access, including deep links, lists/history, clone references, board indicators, warnings, PCR views, notifications, audit/recent activity, dashboards and ingestion diagnostics. Business status is retained internally; deletion does not create a Cancelled transition. Historical evidence stays in the database with one-way deletion metadata, with no application restore/archive view. A minimal command audit retains actor, reason, time and counts without exposing deleted record content.
+
+Deleting a Man Henkaten preserves the effective MP placement, including an Approved record. Internal assignment calculation may use retained evidence; visible Henkaten indicators disappear. Later ordinary changes and occurrence boundaries retain their established behavior.
+
+Individual deletion requires a reason and current version. Supplier-wide deletion previews Hosted/External counts across every epoch and requires the supplier code, reason and unchanged preview revision. Requests are atomic, tenant scoped, authority checked and idempotent. Retrying a successful bulk command must return its original result without deleting subsequently created records. Changed data requires a refreshed confirmation.
+
+Deleted External identities cannot be replayed or updated within the same source epoch. Pending derived work is suppressed and late worker completion cannot recreate user-visible evidence. Existing exports of the supplier become unavailable; new exports exclude deleted records. Already downloaded files and delivered OS notifications cannot be recalled, and their application links become unavailable. Mounted application queries refresh every 15 seconds while active and on focus; the deleting client invalidates immediately.
+
+This amendment supersedes application-wide visibility of permanently retained Henkaten. Physical historical deletion remains prohibited. See [ADR 0047](../docs/adr/0047-tmmin-henkaten-deletion.md).
+
+---
+
 ## Amendment — 30 September 2026: Supplier setup workbook import and reset
 
 Supplier Admin can import a multi-sheet `.xlsx` workbook from **Import Data** on Master Data. Export Excel moves to the Supplier Henkaten list; the TMMIN export remains available. The existing standalone Part CSV/Excel import remains available.

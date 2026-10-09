@@ -765,7 +765,7 @@ export class SetupService implements OnModuleInit, BeforeApplicationShutdown {
     const [supplier, openCount, member, line, job, part, shift, lineShift, checklist, account] =
       await Promise.all([
         tx.supplier.findUniqueOrThrow({ where: { id: supplierId } }),
-        tx.henkaten.count({ where: { supplierId, status: 'OPEN' } }),
+        tx.henkaten.count({ where: { deletedAt: null, supplierId, status: 'OPEN' } }),
         tx.member.count({ where: { supplierId, resetArchivedAt: null } }),
         tx.line.count({ where: { supplierId, resetArchivedAt: null } }),
         tx.job.count({ where: { supplierId, resetArchivedAt: null } }),

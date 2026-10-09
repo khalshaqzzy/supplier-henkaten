@@ -49,12 +49,6 @@
   },
   {
     "scanner": "trivy",
-    "id": "CVE-2026-14456",
-    "rationale": "Debian has deferred an OpenSSL fix and publishes no fixed package for the pinned distroless runtime; the reported denial of service requires an OpenSSL QUIC server, while this API serves HTTP over Node.js TCP behind Caddy and does not enable OpenSSL QUIC.",
-    "expiresOn": "2026-09-30"
-  },
-  {
-    "scanner": "trivy",
     "id": "CVE-2026-84782",
     "rationale": "The OpenSSL advisory requires suspended non-blocking DTLS handshake writes and DTLS retransmission. Debian bookworm has no fixed package yet, including the latest distroless cc-debian12 image. The API uses Node TCP HTTP/TLS and Prisma PostgreSQL TCP; PostgreSQL uses TCP TLS and Caddy uses Go TLS. No runtime config or application code enables OpenSSL DTLS. Reassess the image/package update before expiry; this exception covers only this CVE, not other OpenSSL findings. Sources: https://openssl-library.org/news/secadv/20260929.txt and https://security-tracker.debian.org/tracker/CVE-2026-84782",
     "expiresOn": "2026-10-14"
