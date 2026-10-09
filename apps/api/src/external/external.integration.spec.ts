@@ -397,6 +397,59 @@ describe('External API credential and ingestion boundary', () => {
     expect(denied.body.code).toBe('AUTHENTICATION_FAILED');
   });
 
+  it('hides deleted External evidence and rejects replay or new events for that identity', async () => {
+    const sourceHenkatenId = `remove-${randomUUID()}`;
+    const opened = event({
+      eventId: randomUUID(),
+      sourceHenkatenId,
+      sourceVersion: 1,
+      eventType: 'HENKATEN_OPENED',
+      status: 'OPEN',
+    });
+    expect((await ingest(opened)).status).toBe(202);
+    const projection = await prisma.externalHenkatenProjection.findFirstOrThrow({
+      where: { supplierId, sourceHenkatenId },
+    });
+    const removed = await request(app.getHttpServer())
+      .delete(`/api/v1/tmmin/henkatens/EXTERNAL/${supplierId}/${projection.id}`)
+      .set('Origin', tmminOrigin)
+      .set('Cookie', tmminCookie)
+      .set('X-CSRF-Token', tmminCsrf)
+      .set('Idempotency-Key', randomUUID())
+      .send({ expectedVersion: 1, reason: 'Remove external duplicate' });
+    expect(removed.status).toBe(200);
+    const detail = await request(app.getHttpServer())
+      .get(`/api/v1/tmmin/suppliers/${supplierId}/external-projections/${projection.id}`)
+      .set('Cookie', tmminCookie);
+    expect(detail.status).toBe(404);
+    expect((await ingest(opened)).status).toBe(422);
+    const update = event({
+      eventId: randomUUID(),
+      sourceHenkatenId,
+      sourceVersion: 2,
+      eventType: 'HENKATEN_OPEN_UPDATED',
+      status: 'OPEN',
+    });
+    expect((await ingest(update)).status).toBe(422);
+    const retained = await prisma.externalHenkatenProjection.findUniqueOrThrow({
+      where: { id: projection.id },
+    });
+    expect(retained.status).toBe('OPEN');
+    expect(retained.sourceVersion).toBe(1);
+    expect(retained.deletedAt).not.toBeNull();
+    const ingestion = await prisma.externalIngestionEvent.findFirstOrThrow({
+      where: { projectionId: projection.id },
+    });
+    expect(ingestion.canonicalPayload).toMatchObject({ sourceHenkatenId });
+    expect(ingestion.hiddenAt).not.toBeNull();
+    await expect(
+      prisma.externalIngestionEvent.update({
+        where: { id: ingestion.id },
+        data: { hiddenAt: null },
+      }),
+    ).rejects.toThrow();
+  });
+
   it('stops independently committed batch events after credential revocation', async () => {
     const service = app.get(ExternalService);
     const principal = await service.authenticate(`Bearer ${accessToken}`, '127.0.0.1');

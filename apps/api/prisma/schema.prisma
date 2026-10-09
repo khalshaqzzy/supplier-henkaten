@@ -187,6 +187,7 @@ enum PushDeliveryStatus {
 
 model Supplier {
   setupRevision           Int                          @default(1)
+  henkatenDeletionCommands HenkatenDeletionCommand[]
   setupOperations         SetupOperation[]
   id                      String                       @id @default(uuid()) @db.Uuid
   code                    String                       @db.VarChar(50)
@@ -360,6 +361,7 @@ model HostedPreparation {
 }
 
 model AuditEvent {
+  hiddenAt DateTime? @db.Timestamptz(3)
   id              String      @id @default(uuid()) @db.Uuid
   occurredAt      DateTime    @default(now()) @db.Timestamptz(3)
   actorKind       String      @db.VarChar(30)
@@ -389,6 +391,7 @@ model AuditEvent {
 }
 
 model OutboxEvent {
+  suppressedAt DateTime? @db.Timestamptz(3)
   id               String    @id @default(uuid()) @db.Uuid
   eventType        String    @db.VarChar(150)
   schemaVersion    Int
@@ -417,6 +420,7 @@ model OutboxEvent {
 }
 
 model Notification {
+  hiddenAt DateTime? @db.Timestamptz(3)
   id              String         @id @default(uuid()) @db.Uuid
   supplierId      String         @db.Uuid
   recipientUserId String         @db.Uuid
@@ -548,6 +552,7 @@ model ExternalAccessToken {
 }
 
 model ExternalIngestionEvent {
+  hiddenAt DateTime? @db.Timestamptz(3)
   id               String                      @id @default(uuid()) @db.Uuid
   supplierId       String                      @db.Uuid
   clientId         String                      @db.Uuid
@@ -572,6 +577,8 @@ model ExternalIngestionEvent {
 }
 
 model ExternalHenkatenProjection {
+  deletedAt DateTime? @db.Timestamptz(3)
+  deletedById String? @db.Uuid
   id                String                   @id @default(uuid()) @db.Uuid
   supplierId        String                   @db.Uuid
   sourceEpoch       Int
@@ -1139,6 +1146,7 @@ model HenkatenDailySequence {
 }
 
 model HenkatenExportJob {
+  invalidatedAt DateTime? @db.Timestamptz(3)
   id             String               @id @default(uuid()) @db.Uuid
   supplierId     String               @db.Uuid
   requestedById  String               @db.Uuid
@@ -1160,6 +1168,8 @@ model HenkatenExportJob {
 }
 
 model Henkaten {
+  deletedAt DateTime? @db.Timestamptz(3)
+  deletedById String? @db.Uuid
   id                           String                      @id @default(uuid()) @db.Uuid
   supplierId                   String                      @db.Uuid
   shiftRunId                   String                      @db.Uuid
@@ -1236,6 +1246,7 @@ model Henkaten {
 }
 
 model PcrAssessment {
+  hiddenAt DateTime? @db.Timestamptz(3)
   id                   String                      @id @default(uuid()) @db.Uuid
   supplierId           String                      @db.Uuid
   henkatenId           String?                     @unique @db.Uuid
@@ -1482,6 +1493,7 @@ model MPReservation {
 }
 
 model WarningInstance {
+  hiddenAt DateTime? @db.Timestamptz(3)
   id                           String                      @id @default(uuid()) @db.Uuid
   supplierId                   String                      @db.Uuid
   henkatenId                   String?                     @unique @db.Uuid
@@ -1578,4 +1590,17 @@ model SetupOperation {
 
   @@unique([supplierId, requestedById, key])
   @@index([status, createdAt])
+}
+
+model HenkatenDeletionCommand {
+  id String @id @default(uuid()) @db.Uuid
+  supplierId String @db.Uuid
+  actorUserId String @db.Uuid
+  key String @db.VarChar(128)
+  payloadHash String @db.Char(64)
+  result Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  @@unique([supplierId, actorUserId, key])
+  @@index([supplierId, createdAt])
 }

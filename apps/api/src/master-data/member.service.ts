@@ -228,6 +228,7 @@ export class MemberService {
           }),
           transaction.henkaten.count({
             where: {
+              deletedAt: null,
               supplierId: scope.supplierId,
               status: 'OPEN',
               OR: [

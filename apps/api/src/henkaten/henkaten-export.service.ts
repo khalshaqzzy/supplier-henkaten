@@ -53,7 +53,7 @@ const exportInclude = {
   manDetail: true,
   movement: { include: { sourceLine: true, sourceJob: true } },
   pcrAssessment: true,
-  clonedFrom: { select: { identifier: true } },
+  clonedFrom: { where: { deletedAt: null }, select: { identifier: true } },
 } satisfies Prisma.HenkatenInclude;
 
 @Injectable()
@@ -91,36 +91,40 @@ export class HenkatenExportService implements OnModuleInit, BeforeApplicationShu
     context: MutationContext,
   ) {
     this.assertRole(principal, supplierId);
-    const supplier = await this.prisma.supplier.findUnique({
-      where: { id: supplierId },
-      select: { id: true, active: true, sourceMode: true, sourceEpoch: true },
-    });
-    if (!supplier) throw notFound();
-    if (
-      principal.realm === 'SUPPLIER' &&
-      (!supplier.active ||
-        supplier.sourceMode !== 'HOSTED' ||
-        supplier.sourceEpoch !== principal.sourceEpoch)
-    ) {
-      throw forbidden();
-    }
-    const active = await this.prisma.henkatenExportJob.count({
-      where: {
-        requestedById: principal.userId,
-        requestedRealm: principal.realm,
-        status: { in: ['QUEUED', 'RUNNING'] },
-        expiresAt: { gt: new Date() },
-      },
-    });
-    if (active >= 2) {
-      throw new ProblemException({
-        status: 409,
-        code: 'STATE_CONFLICT',
-        title: 'Export sedang diproses',
-        detail: 'Tunggu ekspor sebelumnya selesai.',
-      });
-    }
     const job = await this.prisma.$transaction(async (tx) => {
+      // Export jobs must be created on the same supplier boundary as deletion;
+      // otherwise a concurrently created pre-deletion snapshot could escape invalidation.
+      await tx.$queryRaw`SELECT id FROM "Supplier" WHERE id = ${supplierId}::uuid FOR UPDATE`;
+      const supplier = await tx.supplier.findUnique({
+        where: { id: supplierId },
+        select: { id: true, active: true, sourceMode: true, sourceEpoch: true },
+      });
+      if (!supplier) throw notFound();
+      if (
+        principal.realm === 'SUPPLIER' &&
+        (!supplier.active ||
+          supplier.sourceMode !== 'HOSTED' ||
+          supplier.sourceEpoch !== principal.sourceEpoch)
+      ) {
+        throw forbidden();
+      }
+      const active = await tx.henkatenExportJob.count({
+        where: {
+          invalidatedAt: null,
+          requestedById: principal.userId,
+          requestedRealm: principal.realm,
+          status: { in: ['QUEUED', 'RUNNING'] },
+          expiresAt: { gt: new Date() },
+        },
+      });
+      if (active >= 2) {
+        throw new ProblemException({
+          status: 409,
+          code: 'STATE_CONFLICT',
+          title: 'Export sedang diproses',
+          detail: 'Tunggu ekspor sebelumnya selesai.',
+        });
+      }
       const created = await tx.henkatenExportJob.create({
         data: {
           supplierId,
@@ -231,6 +235,7 @@ export class HenkatenExportService implements OnModuleInit, BeforeApplicationShu
       where: {
         id,
         supplierId,
+        invalidatedAt: null,
         requestedById: principal.userId,
         requestedRealm: principal.realm,
       },
@@ -264,12 +269,12 @@ export class HenkatenExportService implements OnModuleInit, BeforeApplicationShu
     try {
       await this.expireFiles();
       const job = await this.prisma.henkatenExportJob.findFirst({
-        where: { status: 'QUEUED', expiresAt: { gt: new Date() } },
+        where: { invalidatedAt: null, status: 'QUEUED', expiresAt: { gt: new Date() } },
         orderBy: { createdAt: 'asc' },
       });
       if (!job) return;
       const claimed = await this.prisma.henkatenExportJob.updateMany({
-        where: { id: job.id, status: 'QUEUED' },
+        where: { id: job.id, status: 'QUEUED', invalidatedAt: null },
         data: { status: 'RUNNING', startedAt: new Date(), processed: 0 },
       });
       if (!claimed.count) return;
@@ -451,10 +456,11 @@ export class HenkatenExportService implements OnModuleInit, BeforeApplicationShu
       await addEditableCharts(partial, charted, charts);
       await rename(charted, this.filePath(job.id));
       await rm(partial, { force: true });
-      await this.prisma.henkatenExportJob.update({
-        where: { id: job.id },
+      const published = await this.prisma.henkatenExportJob.updateMany({
+        where: { id: job.id, invalidatedAt: null },
         data: { status: 'READY', total: processed, processed, finishedAt: new Date() },
       });
+      if (!published.count) await rm(this.filePath(job.id), { force: true });
     } catch (error) {
       await rm(partial, { force: true }).catch(() => undefined);
       await rm(charted, { force: true }).catch(() => undefined);
@@ -468,7 +474,10 @@ export class HenkatenExportService implements OnModuleInit, BeforeApplicationShu
 
   private async expireFiles(): Promise<void> {
     const expired = await this.prisma.henkatenExportJob.findMany({
-      where: { expiresAt: { lt: new Date() }, status: { not: 'RUNNING' } },
+      where: {
+        expiresAt: { lt: new Date() },
+        OR: [{ status: { not: 'RUNNING' } }, { invalidatedAt: { not: null } }],
+      },
       select: { id: true },
       take: 100,
     });
@@ -493,6 +502,7 @@ function exportWhere(
 ): Prisma.HenkatenWhereInput {
   return {
     supplierId,
+    deletedAt: null,
     sourceMode: 'HOSTED',
     createdAt: { lte: createdAt },
     ...(filter.from || filter.to

@@ -144,7 +144,7 @@ export class CatalogService {
           tx.job.count({ where: { lineId: id, active: true } }),
           tx.lineShift.count({ where: { supplierId: scope.supplierId, lineId: id, active: true } }),
           tx.henkaten.count({
-            where: { supplierId: scope.supplierId, lineId: id, status: 'OPEN' },
+            where: { deletedAt: null, supplierId: scope.supplierId, lineId: id, status: 'OPEN' },
           }),
         ]);
         if (jobs || lineShifts || openHenkaten)
@@ -308,7 +308,7 @@ export class CatalogService {
           await Promise.all([
             tx.lineShiftJobAssignment.count({ where: { supplierId: scope.supplierId, jobId: id } }),
             tx.henkaten.count({
-              where: { supplierId: scope.supplierId, jobId: id, status: 'OPEN' },
+              where: { deletedAt: null, supplierId: scope.supplierId, jobId: id, status: 'OPEN' },
             }),
           ])
         ).some(Boolean)
@@ -609,7 +609,7 @@ export class CatalogService {
       if (
         !active &&
         (await tx.henkaten.count({
-          where: { supplierId: scope.supplierId, partId: id, status: 'OPEN' },
+          where: { deletedAt: null, supplierId: scope.supplierId, partId: id, status: 'OPEN' },
         }))
       ) {
         throw resourceInUse('Part is required by an Open Henkaten.');

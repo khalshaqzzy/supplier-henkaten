@@ -6,11 +6,12 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 20_000,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
+      refetchInterval: 15_000,
       retry(failureCount, error) {
         if (
           error instanceof ApiProblemError &&
-          [401, 403, 409, 422, 429].includes(error.problem.status)
+          [401, 403, 404, 409, 422, 429].includes(error.problem.status)
         ) {
           return false;
         }

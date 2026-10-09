@@ -75,6 +75,7 @@ export class HenkatenService {
         },
       });
       if (retry) {
+        if (retry.deletedAt) throw missing('Henkaten');
         if (retry.submissionPayloadHash !== payloadHash) throw idempotencyConflict();
         return retry.id;
       }
@@ -219,7 +220,7 @@ export class HenkatenService {
 
       if (input.clonedFromHenkatenId) {
         const source = await tx.henkaten.findFirst({
-          where: { id: input.clonedFromHenkatenId, supplierId: scope.supplierId },
+          where: { deletedAt: null, id: input.clonedFromHenkatenId, supplierId: scope.supplierId },
         });
         if (!source) throw missing('Cloned Henkaten');
       }
@@ -441,7 +442,7 @@ export class HenkatenService {
     await runSerializable(this.prisma, async (tx) => {
       await lockSupplier(tx, scope.supplierId);
       const lockCandidate = await tx.henkaten.findFirst({
-        where: { id, supplierId: scope.supplierId },
+        where: { deletedAt: null, id, supplierId: scope.supplierId },
         select: {
           shiftRunId: true,
           reservation: {
@@ -461,6 +462,7 @@ export class HenkatenService {
       await tx.$queryRaw`SELECT id FROM "Henkaten" WHERE id = ${id}::uuid FOR UPDATE`;
       const current = await tx.henkaten.findFirst({
         where: {
+          deletedAt: null,
           id,
           supplierId: scope.supplierId,
           status: 'OPEN',
@@ -516,6 +518,7 @@ export class HenkatenService {
   async list(scope: TenantScope, query: HenkatenListQuery, principal?: RequestPrincipal) {
     const cursor = decodePriorityCursor(query.cursor);
     const baseWhere: Prisma.HenkatenWhereInput = {
+      deletedAt: null,
       supplierId: scope.supplierId,
       ...(query.status ? { status: query.status } : {}),
       ...(query.category ? { category: query.category } : {}),
@@ -561,6 +564,7 @@ export class HenkatenService {
       if (cursor && bucket < cursor.bucket) continue;
       const found = await this.prisma.henkaten.findMany({
         where: {
+          deletedAt: null,
           AND: [
             baseWhere,
             buckets[bucket]!,
@@ -596,7 +600,7 @@ export class HenkatenService {
 
   async get(scope: TenantScope, id: string, principal?: RequestPrincipal) {
     const row = await this.prisma.henkaten.findFirst({
-      where: { id, supplierId: scope.supplierId, ...roleWhere(principal) },
+      where: { deletedAt: null, id, supplierId: scope.supplierId, ...roleWhere(principal) },
       include: henkatenDetailInclude,
     });
     if (!row) throw missing('Henkaten');
@@ -610,7 +614,13 @@ export class HenkatenService {
     actorUserId: string,
   ) {
     const target = await tx.henkaten.findFirst({
-      where: { id: henkatenId, supplierId, lineShiftId: { not: null }, category: 'MAN' },
+      where: {
+        deletedAt: null,
+        id: henkatenId,
+        supplierId,
+        lineShiftId: { not: null },
+        category: 'MAN',
+      },
       include: {
         manDetail: {
           include: {
@@ -729,7 +739,7 @@ export class HenkatenService {
 
   async clonePrefill(scope: TenantScope, id: string, principal: RequestPrincipal) {
     const row = await this.prisma.henkaten.findFirst({
-      where: { id, supplierId: scope.supplierId, ...roleWhere(principal) },
+      where: { deletedAt: null, id, supplierId: scope.supplierId, ...roleWhere(principal) },
       include: { manDetail: true },
     });
     if (!row) throw missing('Henkaten');
@@ -803,7 +813,7 @@ export class HenkatenService {
 
   async warnings(scope: TenantScope) {
     const rows = await this.prisma.warningInstance.findMany({
-      where: { supplierId: scope.supplierId },
+      where: { hiddenAt: null, supplierId: scope.supplierId },
       orderBy: [{ openedAt: 'desc' }, { id: 'desc' }],
       take: 100,
     });
@@ -824,7 +834,7 @@ export class HenkatenService {
 
   async warning(scope: TenantScope, id: string) {
     const row = await this.prisma.warningInstance.findFirst({
-      where: { id, supplierId: scope.supplierId },
+      where: { hiddenAt: null, id, supplierId: scope.supplierId },
     });
     if (!row) throw missing('Warning Instance');
     return presentWarning(row);
@@ -833,7 +843,7 @@ export class HenkatenService {
   async affectedParts() {
     const groups = await this.prisma.warningInstance.groupBy({
       by: ['supplierId', 'normalizedPartNumberSnapshot'],
-      where: { status: 'OPEN' },
+      where: { hiddenAt: null, status: 'OPEN' },
       _count: { _all: true },
       _min: { openedAt: true },
       orderBy: { _min: { openedAt: 'asc' } },
@@ -849,6 +859,7 @@ export class HenkatenService {
     );
     const samples = await this.prisma.warningInstance.findMany({
       where: {
+        hiddenAt: null,
         status: 'OPEN',
         OR: groups.map((group) => ({
           supplierId: group.supplierId,
@@ -894,6 +905,7 @@ export class HenkatenService {
     const normalizedPartNumber = normalizeLookup(partNumber);
     const rows = await this.prisma.warningInstance.findMany({
       where: {
+        hiddenAt: null,
         supplierId,
         normalizedPartNumberSnapshot: normalizedPartNumber,
         status: 'OPEN',
@@ -903,11 +915,15 @@ export class HenkatenService {
     if (!rows.length) throw missing('Affected Part');
     const [hosted, external] = await Promise.all([
       this.prisma.henkaten.findMany({
-        where: { id: { in: rows.flatMap((row) => (row.henkatenId ? [row.henkatenId] : [])) } },
+        where: {
+          deletedAt: null,
+          id: { in: rows.flatMap((row) => (row.henkatenId ? [row.henkatenId] : [])) },
+        },
         select: { id: true, identifier: true },
       }),
       this.prisma.externalHenkatenProjection.findMany({
         where: {
+          deletedAt: null,
           id: {
             in: rows.flatMap((row) => (row.externalProjectionId ? [row.externalProjectionId] : [])),
           },
@@ -969,6 +985,7 @@ export class HenkatenService {
             ? Promise.resolve([])
             : this.prisma.henkaten.findMany({
                 where: {
+                  deletedAt: null,
                   ...commonDate,
                   AND: [bucketWhere, bucketCursorWhere],
                   ...(query.supplierId ? { supplierId: query.supplierId } : {}),
@@ -1009,6 +1026,7 @@ export class HenkatenService {
             ? Promise.resolve([])
             : this.prisma.externalHenkatenProjection.findMany({
                 where: {
+                  deletedAt: null,
                   ...commonDate,
                   AND: [bucketWhere, bucketCursorWhere],
                   ...(query.supplierId ? { supplierId: query.supplierId } : {}),

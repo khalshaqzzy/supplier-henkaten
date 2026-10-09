@@ -70,7 +70,7 @@ export class PushDeliveryService {
   ) {
     if (notification.resourceType === 'Henkaten') {
       const henkaten = await transaction.henkaten.findUnique({
-        where: { id: notification.resourceId },
+        where: { deletedAt: null, id: notification.resourceId },
         select: {
           identifier: true,
           category: true,

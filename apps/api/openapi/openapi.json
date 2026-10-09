@@ -355,6 +355,7 @@
                           "SUPPLIER_HENKATEN_DECIDE",
                           "SUPPLIER_APPROVAL_REROUTE",
                           "TMMIN_HENKATEN_READ",
+                          "TMMIN_HENKATEN_DELETE",
                           "TMMIN_PCR_CORRECT",
                           "SUPPLIER_NOTIFICATION_READ",
                           "SUPPLIER_BOARD_READ",
@@ -475,6 +476,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -684,6 +686,7 @@
                           "SUPPLIER_HENKATEN_DECIDE",
                           "SUPPLIER_APPROVAL_REROUTE",
                           "TMMIN_HENKATEN_READ",
+                          "TMMIN_HENKATEN_DELETE",
                           "TMMIN_PCR_CORRECT",
                           "SUPPLIER_NOTIFICATION_READ",
                           "SUPPLIER_BOARD_READ",
@@ -804,6 +807,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -1020,6 +1024,7 @@
                           "SUPPLIER_HENKATEN_DECIDE",
                           "SUPPLIER_APPROVAL_REROUTE",
                           "TMMIN_HENKATEN_READ",
+                          "TMMIN_HENKATEN_DELETE",
                           "TMMIN_PCR_CORRECT",
                           "SUPPLIER_NOTIFICATION_READ",
                           "SUPPLIER_BOARD_READ",
@@ -1140,6 +1145,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -1329,6 +1335,7 @@
                           "SUPPLIER_HENKATEN_DECIDE",
                           "SUPPLIER_APPROVAL_REROUTE",
                           "TMMIN_HENKATEN_READ",
+                          "TMMIN_HENKATEN_DELETE",
                           "TMMIN_PCR_CORRECT",
                           "SUPPLIER_NOTIFICATION_READ",
                           "SUPPLIER_BOARD_READ",
@@ -1449,6 +1456,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -1638,6 +1646,7 @@
                           "SUPPLIER_HENKATEN_DECIDE",
                           "SUPPLIER_APPROVAL_REROUTE",
                           "TMMIN_HENKATEN_READ",
+                          "TMMIN_HENKATEN_DELETE",
                           "TMMIN_PCR_CORRECT",
                           "SUPPLIER_NOTIFICATION_READ",
                           "SUPPLIER_BOARD_READ",
@@ -1758,6 +1767,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -1896,6 +1906,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -1998,6 +2009,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -2136,6 +2148,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -2238,6 +2251,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -2349,6 +2363,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -2460,6 +2475,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -2846,6 +2862,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -3071,6 +3088,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -3173,6 +3191,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -3727,6 +3746,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -3960,6 +3980,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -4193,6 +4214,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -4456,6 +4478,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -5035,6 +5058,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -5462,6 +5486,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -5687,6 +5712,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -5904,6 +5930,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -6006,6 +6033,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -6223,6 +6251,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -6325,6 +6354,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -6600,6 +6630,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -6702,6 +6733,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -6848,6 +6880,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -6950,6 +6983,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -7213,6 +7247,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -7315,6 +7350,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -7672,6 +7708,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -8221,6 +8258,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -8444,6 +8482,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -8546,6 +8585,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -8760,6 +8800,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -8996,6 +9037,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -9822,6 +9864,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -10125,6 +10168,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -10420,6 +10464,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -10715,6 +10760,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -11016,6 +11062,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -11340,6 +11387,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -11664,6 +11712,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -11988,6 +12037,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -12283,6 +12333,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -12427,6 +12478,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -12562,6 +12614,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -12904,6 +12957,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -13085,6 +13139,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -13295,6 +13350,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -13497,6 +13553,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -13699,6 +13756,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -14301,6 +14359,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -15228,6 +15287,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -15583,6 +15643,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -15938,6 +15999,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -16438,6 +16500,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -16677,6 +16740,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -16904,6 +16968,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -17131,6 +17196,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -17295,6 +17361,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -17625,6 +17692,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -17743,6 +17811,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -18145,6 +18214,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -18247,6 +18317,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -18569,6 +18640,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -18671,6 +18743,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -18773,6 +18846,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -18996,6 +19070,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -19098,6 +19173,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -19259,6 +19335,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -19509,6 +19586,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -19611,6 +19689,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -19713,6 +19792,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -19815,6 +19895,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -20035,6 +20116,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -20236,6 +20318,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -20411,6 +20494,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -20615,6 +20699,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -20811,6 +20896,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -21007,6 +21093,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -21387,6 +21474,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -21582,6 +21670,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -21814,6 +21903,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -22030,6 +22120,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -22246,6 +22337,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -22398,6 +22490,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -22723,6 +22816,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -22942,6 +23036,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -23266,6 +23361,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -23482,6 +23578,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -23892,6 +23989,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -24167,6 +24265,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -24442,6 +24541,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -24729,6 +24829,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -25016,6 +25117,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -25286,6 +25388,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -25639,6 +25742,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -25923,6 +26027,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -26068,6 +26173,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -26328,6 +26434,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -26613,6 +26720,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -26867,6 +26975,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -27141,6 +27250,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -27361,6 +27471,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -27610,6 +27721,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -28165,6 +28277,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -28763,6 +28876,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -31142,6 +31256,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -31682,6 +31797,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -31868,6 +31984,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -31998,6 +32115,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -33179,6 +33297,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -34503,6 +34622,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -35728,6 +35848,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -36946,6 +37067,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -37339,6 +37461,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -37411,6 +37534,212 @@
       }
     },
     "/api/v1/tmmin/suppliers/{supplierId}/henkatens": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "supplierId",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedRevision": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "supplierCode": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "expectedRevision",
+                  "supplierCode",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Supplier Henkaten deletion receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "commandId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "deletedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "hosted": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "external": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "commandId",
+                    "deletedAt",
+                    "hosted",
+                    "external",
+                    "total"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
       "get": {
         "parameters": [
           {
@@ -38368,6 +38697,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -38564,6 +38894,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -38704,6 +39035,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -39028,6 +39360,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -40219,6 +40552,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -40565,6 +40899,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -41040,6 +41375,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -41570,6 +41906,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -43925,6 +44262,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -46382,6 +46720,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -47146,6 +47485,292 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
+                        "VERSION_CONFLICT",
+                        "STATE_CONFLICT",
+                        "IDEMPOTENCY_CONFLICT",
+                        "RESERVATION_CONFLICT",
+                        "INVALID_TRANSITION",
+                        "SOURCE_VERSION_OUT_OF_ORDER",
+                        "SOURCE_MODE_MISMATCH",
+                        "PAYLOAD_TOO_LARGE",
+                        "RATE_LIMITED",
+                        "NOT_READY",
+                        "INTERNAL_ERROR",
+                        "CAPACITY_EXCEEDED",
+                        "RESOURCE_IN_USE",
+                        "IMMUTABLE_FIELD",
+                        "INVALID_IMAGE",
+                        "CHECKLIST_NOT_PUBLISHED",
+                        "PUSH_SUBSCRIPTION_REQUIRED"
+                      ]
+                    },
+                    "correlationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "fieldErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512
+                          },
+                          "code": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "message": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "detail",
+                    "code",
+                    "correlationId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tmmin/suppliers/{supplierId}/henkaten-deletion-preview": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "supplierId",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Visible supplier Henkaten counts and revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "supplierCode": {
+                      "type": "string"
+                    },
+                    "hosted": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "external": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "revision": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  },
+                  "required": [
+                    "supplierCode",
+                    "hosted",
+                    "external",
+                    "total",
+                    "revision"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tmmin/henkatens/{kind}/{supplierId}/{recordId}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "HOSTED",
+                "EXTERNAL"
+              ]
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "supplierId",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "recordId",
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "required": true
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedVersion": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "expectedVersion",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deleted Henkaten receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "commandId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "deletedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "hosted": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "external": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "commandId",
+                    "deletedAt",
+                    "hosted",
+                    "external",
+                    "total"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Problem Details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "AUTHENTICATION_FAILED",
+                        "SESSION_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -47913,6 +48538,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -48388,6 +49014,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -49131,6 +49758,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -49406,6 +50034,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -49667,6 +50296,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -50431,6 +51061,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -50981,6 +51612,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -51083,6 +51715,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -52662,6 +53295,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -52764,6 +53398,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -52866,6 +53501,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -53080,6 +53716,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -53182,6 +53819,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -53284,6 +53922,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",
@@ -53481,6 +54120,7 @@
                         "SESSION_EXPIRED",
                         "FORBIDDEN",
                         "RESOURCE_NOT_FOUND",
+                        "HENKATEN_DELETED",
                         "VERSION_CONFLICT",
                         "STATE_CONFLICT",
                         "IDEMPOTENCY_CONFLICT",

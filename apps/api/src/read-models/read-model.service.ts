@@ -59,6 +59,7 @@ export class ReadModelService {
       occurrences.length
         ? this.prisma.henkaten.findMany({
             where: {
+              deletedAt: null,
               supplierId: scope.supplierId,
               status: { in: ['OPEN', 'APPROVED'] },
               OR: occurrences.map((item) => ({
@@ -185,6 +186,7 @@ export class ReadModelService {
         : {}),
     };
     const where: Prisma.HenkatenWhereInput = {
+      deletedAt: null,
       supplierId: scope.supplierId,
       ...henkatenScope(principal),
       ...(query.from || query.to
@@ -274,7 +276,7 @@ export class ReadModelService {
         select: { createdAt: true },
       }),
       this.prisma.warningInstance.count({
-        where: { supplierId: scope.supplierId, status: 'OPEN', henkaten: where },
+        where: { hiddenAt: null, supplierId: scope.supplierId, status: 'OPEN', henkaten: where },
       }),
       this.prisma.assignmentIssue.groupBy({
         by: ['type'],
@@ -314,6 +316,7 @@ export class ReadModelService {
       }),
       this.prisma.auditEvent.findMany({
         where: {
+          hiddenAt: null,
           supplierId: scope.supplierId,
           ...(auditLineIds ? { lineId: { in: auditLineIds } } : {}),
         },
@@ -347,6 +350,7 @@ export class ReadModelService {
       activityHenkatenIds.length
         ? this.prisma.henkaten.findMany({
             where: {
+              deletedAt: null,
               id: { in: activityHenkatenIds },
               supplierId: scope.supplierId,
               ...henkatenScope(principal),
@@ -465,6 +469,7 @@ export class ReadModelService {
       ...(query.to ? { lte: new Date(query.to) } : {}),
     };
     const hostedWhere: Prisma.HenkatenWhereInput = {
+      deletedAt: null,
       supplier: supplierWhere,
       ...(query.from || query.to ? { occurredAt } : {}),
       ...(query.status ? { status: query.status } : {}),
@@ -480,6 +485,7 @@ export class ReadModelService {
         : {}),
     };
     const externalWhere: Prisma.ExternalHenkatenProjectionWhereInput = {
+      deletedAt: null,
       supplier: supplierWhere,
       ...(query.from || query.to ? { occurredAt } : {}),
       ...(query.status ? { status: query.status } : {}),
@@ -534,6 +540,7 @@ export class ReadModelService {
           }),
       this.prisma.warningInstance.findMany({
         where: {
+          hiddenAt: null,
           status: 'OPEN',
           supplier: supplierWhere,
           ...(query.from || query.to ? { openedAt: occurredAt } : {}),
@@ -570,6 +577,7 @@ export class ReadModelService {
           }),
       this.prisma.externalIngestionEvent.count({
         where: {
+          hiddenAt: null,
           supplier: supplierWhere,
           ...(query.from || query.to ? { receivedAt: occurredAt } : {}),
         },
@@ -577,6 +585,7 @@ export class ReadModelService {
       this.prisma.auditEvent.groupBy({
         by: ['action'],
         where: {
+          hiddenAt: null,
           action: { in: ['EXTERNAL_INGEST_DUPLICATE', 'EXTERNAL_INGEST_REJECTED'] },
           supplier: supplierWhere,
           ...(query.from || query.to ? { occurredAt } : {}),
@@ -590,8 +599,14 @@ export class ReadModelService {
           code: true,
           name: true,
           sourceMode: true,
-          henkatens: { orderBy: { updatedAt: 'desc' }, take: 1, select: { updatedAt: true } },
+          henkatens: {
+            where: { deletedAt: null },
+            orderBy: { updatedAt: 'desc' },
+            take: 1,
+            select: { updatedAt: true },
+          },
           externalProjections: {
+            where: { deletedAt: null },
             orderBy: { updatedAt: 'desc' },
             take: 1,
             select: { updatedAt: true },
@@ -601,7 +616,7 @@ export class ReadModelService {
             take: 1,
             select: { lastSuccessfulIngestionAt: true },
           },
-          warningInstances: { where: { status: 'OPEN' }, select: { id: true } },
+          warningInstances: { where: { hiddenAt: null, status: 'OPEN' }, select: { id: true } },
         },
         orderBy: { name: 'asc' },
       }),
@@ -810,6 +825,7 @@ export class ReadModelService {
     const cursor = decodeCursor(query.cursor);
     const rows = await this.prisma.auditEvent.findMany({
       where: {
+        hiddenAt: null,
         AND: [
           where,
           {

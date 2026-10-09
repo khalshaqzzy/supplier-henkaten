@@ -995,7 +995,423 @@ describe('Line Shift Henkaten operations', () => {
     expect(repaired.active).toBe(true);
   });
 
-  async function createManHenkaten(idempotencyKey = randomUUID(), otherPart = false) {
+  it('lets both TMMIN roles remove every lifecycle status while retaining evidence and effective MP', async () => {
+    for (const role of ['TMMIN_ADMIN', 'TMMIN_QUALITY'] as const) {
+      const auth = await deletionLogin(role);
+      for (const status of ['OPEN', 'APPROVED', 'REJECTED', 'CANCELLED'] as const) {
+        const created = await createManHenkaten();
+        expect(created.status).toBe(201);
+        const id = created.body.id as string;
+        if (status !== 'OPEN')
+          await prisma.henkaten.update({
+            where: { id },
+            data: {
+              status,
+              finalizedAt: new Date(),
+              finalizedById: auth.id,
+              ...(status === 'CANCELLED' ? { cancellationReason: 'WITHDRAWN' } : {}),
+              version: { increment: 1 },
+            },
+          });
+        const before = await prisma.henkaten.findUniqueOrThrow({ where: { id } });
+        const assignment = await prisma.workingAssignment.findFirstOrThrow({
+          where: { shiftRunId: before.shiftRunId, jobId: before.jobId },
+        });
+        const contextBefore = await request(app.getHttpServer())
+          .get('/api/v1/supplier/master-data/line-shifts/operational-context')
+          .set('Cookie', leaderCookie);
+        expect(contextBefore.status).toBe(200);
+        const body = {
+          expectedVersion: before.version,
+          reason: 'Remove duplicate operational record',
+        };
+        const key = randomUUID();
+        const path = `/api/v1/tmmin/henkatens/HOSTED/${supplierId}/${id}`;
+        const remove = () =>
+          request(app.getHttpServer())
+            .delete(path)
+            .set('Origin', 'http://localhost:5174')
+            .set('Cookie', auth.cookie)
+            .set('X-CSRF-Token', auth.csrf)
+            .set('Idempotency-Key', key)
+            .send(body);
+        const removed = await remove();
+        expect(removed.status).toBe(200);
+        expect(removed.body.total).toBe(1);
+        expect((await remove()).body).toEqual(removed.body);
+        const changedRetry = await request(app.getHttpServer())
+          .delete(path)
+          .set('Origin', 'http://localhost:5174')
+          .set('Cookie', auth.cookie)
+          .set('X-CSRF-Token', auth.csrf)
+          .set('Idempotency-Key', key)
+          .send({ ...body, reason: 'Different request' });
+        expect(changedRetry.status).toBe(409);
+        const retained = await prisma.henkaten.findUniqueOrThrow({ where: { id } });
+        expect(retained.deletedAt).not.toBeNull();
+        expect(retained.status).toBe(status);
+        expect(retained.cause).toBe(before.cause);
+        expect(retained.cancellationReason).toBe(before.cancellationReason);
+        expect(await prisma.henkatenChecklistSnapshot.count({ where: { henkatenId: id } })).toBe(1);
+        expect(
+          (await prisma.workingAssignment.findUniqueOrThrow({ where: { id: assignment.id } }))
+            .effectiveMpMemberId,
+        ).toBe(assignment.effectiveMpMemberId);
+        const contextAfter = await request(app.getHttpServer())
+          .get('/api/v1/supplier/master-data/line-shifts/operational-context')
+          .set('Cookie', leaderCookie);
+        expect(contextAfter.status).toBe(200);
+        expect(contextAfter.body.items).toEqual(contextBefore.body.items);
+        const visible = await request(app.getHttpServer())
+          .get(`/api/v1/tmmin/suppliers/${supplierId}/henkatens/${id}`)
+          .set('Cookie', auth.cookie);
+        expect(visible.status).toBe(404);
+        const supplierRead = await request(app.getHttpServer())
+          .get(`/api/v1/supplier/henkatens/${id}`)
+          .set('Cookie', leaderCookie);
+        expect(supplierRead.status).toBe(404);
+        expect(
+          (await prisma.warningInstance.findUniqueOrThrow({ where: { henkatenId: id } })).hiddenAt,
+        ).not.toBeNull();
+        expect(
+          (await prisma.pcrAssessment.findUniqueOrThrow({ where: { henkatenId: id } })).hiddenAt,
+        ).not.toBeNull();
+        await expect(
+          prisma.henkaten.update({ where: { id }, data: { deletedAt: null } }),
+        ).rejects.toThrow();
+        await expect(prisma.henkaten.delete({ where: { id } })).rejects.toThrow();
+        await expect(
+          prisma.henkatenChecklistSnapshot.deleteMany({ where: { henkatenId: id } }),
+        ).rejects.toThrow();
+      }
+    }
+  });
+
+  it('rejects Supplier deletion, stale versions and cross-supplier record IDs', async () => {
+    const auth = await deletionLogin('TMMIN_QUALITY');
+    const created = await createManHenkaten();
+    expect(created.status).toBe(201);
+    const body = { expectedVersion: created.body.version + 1, reason: 'Version check' };
+    const path = `/api/v1/tmmin/henkatens/HOSTED/${supplierId}/${created.body.id}`;
+    const forbidden = await request(app.getHttpServer())
+      .delete(path)
+      .set('Origin', 'http://localhost:5174')
+      .set('Cookie', leaderCookie)
+      .set('X-CSRF-Token', leaderCsrf)
+      .set('Idempotency-Key', randomUUID())
+      .send(body);
+    expect([401, 403]).toContain(forbidden.status);
+    const stale = await request(app.getHttpServer())
+      .delete(path)
+      .set('Origin', 'http://localhost:5174')
+      .set('Cookie', auth.cookie)
+      .set('X-CSRF-Token', auth.csrf)
+      .set('Idempotency-Key', randomUUID())
+      .send(body);
+    expect(stale.status).toBe(409);
+    const cross = await request(app.getHttpServer())
+      .delete(`/api/v1/tmmin/henkatens/HOSTED/${randomUUID()}/${created.body.id}`)
+      .set('Origin', 'http://localhost:5174')
+      .set('Cookie', auth.cookie)
+      .set('X-CSRF-Token', auth.csrf)
+      .set('Idempotency-Key', randomUUID())
+      .send({ ...body, expectedVersion: created.body.version });
+    expect(cross.status).toBe(404);
+    expect(
+      (await prisma.henkaten.findUniqueOrThrow({ where: { id: created.body.id } })).deletedAt,
+    ).toBeNull();
+  });
+
+  it('removes all supplier records across sources and epochs with a stale-preview check and safe bulk retry', async () => {
+    const auth = await deletionLogin('TMMIN_QUALITY');
+    const exportOwner = await deletionLogin('TMMIN_ADMIN');
+    const oldExport = await prisma.henkatenExportJob.create({
+      data: {
+        supplierId,
+        requestedById: exportOwner.id,
+        requestedRealm: 'TMMIN',
+        status: 'READY',
+        filters: {},
+        expiresAt: new Date(Date.now() + 3600000),
+      },
+    });
+    const exportPath = `/api/v1/tmmin/suppliers/${supplierId}/henkatens/exports/${oldExport.id}`;
+    expect(
+      (await request(app.getHttpServer()).get(exportPath).set('Cookie', exportOwner.cookie)).status,
+    ).toBe(200);
+    const previewPath = `/api/v1/tmmin/suppliers/${supplierId}/henkaten-deletion-preview`;
+    const preview = await request(app.getHttpServer()).get(previewPath).set('Cookie', auth.cookie);
+    expect(preview.status).toBe(200);
+    const added = await createManHenkaten();
+    expect(added.status).toBe(201);
+    const path = `/api/v1/tmmin/suppliers/${supplierId}/henkatens`;
+    const mutate = (body: object, key = randomUUID()) =>
+      request(app.getHttpServer())
+        .delete(path)
+        .set('Origin', 'http://localhost:5174')
+        .set('Cookie', auth.cookie)
+        .set('X-CSRF-Token', auth.csrf)
+        .set('Idempotency-Key', key)
+        .send(body);
+    expect(
+      (
+        await mutate({
+          expectedRevision: preview.body.revision,
+          supplierCode,
+          reason: 'Remove supplier records',
+        })
+      ).status,
+    ).toBe(409);
+    const snapshot = { externalId: 'history', name: 'Historical external context' };
+    const external = await prisma.externalHenkatenProjection.create({
+      data: {
+        supplierId,
+        sourceEpoch: 99,
+        sourceHenkatenId: randomUUID(),
+        sourceVersion: 1,
+        status: 'APPROVED',
+        category: 'MACHINE',
+        occurredAt: new Date(),
+        lineSnapshot: snapshot,
+        shiftSnapshot: snapshot,
+        jobSnapshot: snapshot,
+        partSnapshot: { number: 'History part', name: '' },
+        changeSnapshot: {},
+        checklistSnapshot: {},
+        decisionsSnapshot: [],
+        lastEventId: randomUUID(),
+      },
+    });
+    const sibling = await prisma.supplier.create({
+      data: {
+        code: `KEEP-${randomUUID()}`,
+        normalizedCode: randomUUID(),
+        name: 'Unrelated supplier',
+        timezone: 'Asia/Jakarta',
+        sourceMode: 'EXTERNAL',
+      },
+    });
+    const unrelated = await prisma.externalHenkatenProjection.create({
+      data: {
+        supplierId: sibling.id,
+        sourceEpoch: 1,
+        sourceHenkatenId: randomUUID(),
+        sourceVersion: 1,
+        status: 'OPEN',
+        category: 'MACHINE',
+        occurredAt: new Date(),
+        lineSnapshot: snapshot,
+        shiftSnapshot: snapshot,
+        jobSnapshot: snapshot,
+        partSnapshot: snapshot,
+        changeSnapshot: {},
+        checklistSnapshot: {},
+        decisionsSnapshot: [],
+        lastEventId: randomUUID(),
+      },
+    });
+    const current = await request(app.getHttpServer()).get(previewPath).set('Cookie', auth.cookie);
+    expect(current.body.external).toBe(1);
+    const body = {
+        expectedRevision: current.body.revision,
+        supplierCode,
+        reason: 'Remove supplier records',
+      },
+      key = randomUUID();
+    const removed = await mutate(body, key);
+    expect(removed.status).toBe(200);
+    expect(removed.body.total).toBe(current.body.total);
+    expect(
+      (await prisma.externalHenkatenProjection.findUniqueOrThrow({ where: { id: external.id } }))
+        .deletedAt,
+    ).not.toBeNull();
+    expect(
+      (await prisma.externalHenkatenProjection.findUniqueOrThrow({ where: { id: unrelated.id } }))
+        .deletedAt,
+    ).toBeNull();
+    const empty = await request(app.getHttpServer()).get(previewPath).set('Cookie', auth.cookie);
+    expect(empty.body.total).toBe(0);
+    const newRecord = await createManHenkaten();
+    expect(newRecord.status).toBe(201);
+    expect((await mutate(body, key)).body).toEqual(removed.body);
+    expect(
+      (await prisma.henkaten.findUniqueOrThrow({ where: { id: newRecord.body.id } })).deletedAt,
+    ).toBeNull();
+    expect(
+      await prisma.henkatenExportJob.count({ where: { supplierId, invalidatedAt: null } }),
+    ).toBe(0);
+    expect(
+      (await request(app.getHttpServer()).get(exportPath).set('Cookie', exportOwner.cookie)).status,
+    ).toBe(404);
+    expect(
+      (
+        await request(app.getHttpServer())
+          .get(`${exportPath}/file`)
+          .set('Cookie', exportOwner.cookie)
+      ).status,
+    ).toBe(404);
+    for (const surface of [
+      `/api/v1/tmmin/henkatens?supplierId=${supplierId}`,
+      `/api/v1/tmmin/dashboard?supplierId=${supplierId}`,
+      `/api/v1/tmmin/audit?supplierId=${supplierId}`,
+      `/api/v1/tmmin/suppliers/${supplierId}`,
+      `/api/v1/tmmin/suppliers/${supplierId}/henkatens/warnings`,
+      '/api/v1/supplier/dashboard',
+      '/api/v1/supplier/audit',
+      '/api/v1/supplier/assignment-board',
+    ]) {
+      const response = await request(app.getHttpServer())
+        .get(surface)
+        .set('Cookie', surface.includes('/tmmin/') ? auth.cookie : leaderCookie);
+      expect(response.status, surface).toBe(200);
+      expect(JSON.stringify(response.body)).not.toContain(added.body.id as string);
+      expect(JSON.stringify(response.body)).not.toContain(external.id);
+    }
+    const staleEvents = await prisma.outboxEvent.findMany({
+      where: { supplierId, suppressedAt: { not: null } },
+    });
+    for (const event of staleEvents) await app.get(NotificationService).consume(event);
+    expect(
+      await prisma.notification.count({
+        where: {
+          supplierId,
+          hiddenAt: null,
+          resourceId: { in: staleEvents.map((row) => row.aggregateId) },
+        },
+      }),
+    ).toBe(0);
+  });
+
+  it('serializes duplicate deletion and concurrent submission without removing unconfirmed new data', async () => {
+    const auth = await deletionLogin('TMMIN_ADMIN');
+    const target = await createManHenkaten();
+    expect(target.status).toBe(201);
+    const key = randomUUID();
+    const remove = () =>
+      request(app.getHttpServer())
+        .delete(`/api/v1/tmmin/henkatens/HOSTED/${supplierId}/${target.body.id}`)
+        .set('Origin', 'http://localhost:5174')
+        .set('Cookie', auth.cookie)
+        .set('X-CSRF-Token', auth.csrf)
+        .set('Idempotency-Key', key)
+        .send({ expectedVersion: target.body.version, reason: 'Concurrent retry' });
+    const [first, second] = await Promise.all([remove(), remove()]);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(second.body).toEqual(first.body);
+    expect(await prisma.henkatenDeletionCommand.count({ where: { supplierId, key } })).toBe(1);
+    const preview = await request(app.getHttpServer())
+      .get(`/api/v1/tmmin/suppliers/${supplierId}/henkaten-deletion-preview`)
+      .set('Cookie', auth.cookie);
+    const [bulk, created] = await Promise.all([
+      request(app.getHttpServer())
+        .delete(`/api/v1/tmmin/suppliers/${supplierId}/henkatens`)
+        .set('Origin', 'http://localhost:5174')
+        .set('Cookie', auth.cookie)
+        .set('X-CSRF-Token', auth.csrf)
+        .set('Idempotency-Key', randomUUID())
+        .send({
+          expectedRevision: preview.body.revision,
+          supplierCode,
+          reason: 'Concurrent submission',
+        }),
+      createManHenkaten(),
+    ]);
+    expect([200, 409]).toContain(bulk.status);
+    expect(created.status).toBe(201);
+    expect(
+      (await prisma.henkaten.findUniqueOrThrow({ where: { id: created.body.id } })).deletedAt,
+    ).toBeNull();
+  });
+
+  it('keeps a surviving clone and discards a PCR result leased before its source was removed', async () => {
+    const auth = await deletionLogin('TMMIN_ADMIN');
+    const source = await createManHenkaten();
+    expect(source.status).toBe(201);
+    const sourceId = source.body.id as string;
+    const claim = await prisma.pcrAssessment.update({
+      where: { henkatenId: sourceId },
+      data: { leaseToken: randomUUID(), leasedAt: new Date() },
+    });
+    const terminal = await prisma.henkaten.update({
+      where: { id: sourceId },
+      data: {
+        status: 'CANCELLED',
+        cancellationReason: 'WITHDRAWN',
+        finalizedAt: new Date(),
+        finalizedById: auth.id,
+        version: { increment: 1 },
+      },
+    });
+    const clone = await createManHenkaten(randomUUID(), false, sourceId);
+    expect(clone.status).toBe(201);
+    expect(clone.body.clonedFromHenkatenId).toBe(sourceId);
+    const removed = await request(app.getHttpServer())
+      .delete(`/api/v1/tmmin/henkatens/HOSTED/${supplierId}/${sourceId}`)
+      .set('Origin', 'http://localhost:5174')
+      .set('Cookie', auth.cookie)
+      .set('X-CSRF-Token', auth.csrf)
+      .set('Idempotency-Key', randomUUID())
+      .send({ expectedVersion: terminal.version, reason: 'Duplicate source' });
+    expect(removed.status).toBe(200);
+    // Deliver the completed inference to the real persistence boundary after its lease was invalidated.
+    const service = app.get(PcrService);
+    const finish = Reflect.get(service, 'finish') as (
+      leased: typeof claim,
+      result: { status: 'REVIEW'; model: null; output: null },
+    ) => Promise<void>;
+    await finish.call(service, claim, { status: 'REVIEW', model: null, output: null });
+    const retained = await prisma.pcrAssessment.findUniqueOrThrow({ where: { id: claim.id } });
+    expect(retained.status).toBe(claim.status);
+    expect(retained.version).toBe(claim.version);
+    expect(retained.hiddenAt).not.toBeNull();
+    expect(retained.leaseToken).toBeNull();
+    expect(
+      await prisma.outboxEvent.count({
+        where: { aggregateId: sourceId, eventType: 'PCR_REVIEW_REQUIRED', suppressedAt: null },
+      }),
+    ).toBe(0);
+    const surviving = await request(app.getHttpServer())
+      .get(`/api/v1/supplier/henkatens/${clone.body.id}`)
+      .set('Cookie', leaderCookie);
+    expect(surviving.status).toBe(200);
+    expect(surviving.body.clonedFromHenkatenId).toBeNull();
+    const hiddenPrefill = await request(app.getHttpServer())
+      .get(`/api/v1/supplier/henkatens/${sourceId}/clone-prefill`)
+      .set('Cookie', leaderCookie);
+    expect(hiddenPrefill.status).toBe(404);
+  });
+
+  async function deletionLogin(role: 'TMMIN_ADMIN' | 'TMMIN_QUALITY') {
+    const username = `delete-${role.toLowerCase()}-${randomUUID()}`;
+    const user = await prisma.user.create({
+      data: {
+        realm: 'TMMIN',
+        role,
+        username,
+        normalizedUsername: username,
+        displayName: 'Deletion reviewer',
+        passwordHash: await app.get(PasswordService).hash(password),
+        mustChangePassword: false,
+      },
+    });
+    const login = await request(app.getHttpServer())
+      .post('/api/v1/auth/tmmin/login')
+      .set('Origin', 'http://localhost:5174')
+      .send({ username, password });
+    expect(login.status).toBe(200);
+    return {
+      id: user.id,
+      cookie: login.headers['set-cookie'] as unknown as string[],
+      csrf: login.body.csrfToken as string,
+    };
+  }
+
+  async function createManHenkaten(
+    idempotencyKey = randomUUID(),
+    otherPart = false,
+    clonedFromHenkatenId?: string,
+  ) {
     return request(app.getHttpServer())
       .post('/api/v1/supplier/henkatens')
       .set('Origin', supplierOrigin)
@@ -1004,6 +1420,7 @@ describe('Line Shift Henkaten operations', () => {
       .set('Idempotency-Key', idempotencyKey)
       .send({
         category: 'MAN',
+        ...(clonedFromHenkatenId ? { clonedFromHenkatenId } : {}),
         lineShiftId,
         lineShiftJobAssignmentId: job1AssignmentId,
         jobId: job1Id,

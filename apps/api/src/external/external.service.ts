@@ -332,8 +332,24 @@ export class ExternalService {
       ) {
         throw sourceMismatch();
       }
+      const removed = await tx.externalHenkatenProjection.findFirst({
+        where: {
+          supplierId: principal.supplierId,
+          sourceEpoch: principal.sourceEpoch,
+          sourceHenkatenId: event.sourceHenkatenId,
+          deletedAt: { not: null },
+        },
+      });
+      if (removed)
+        throw new ProblemException({
+          status: 422,
+          code: 'HENKATEN_DELETED',
+          title: 'Henkaten telah dihapus',
+          detail: 'Identitas Henkaten ini tidak dapat diperbarui.',
+        });
       const duplicate = await tx.externalIngestionEvent.findUnique({
         where: {
+          hiddenAt: null,
           supplierId_sourceEpoch_eventId: {
             supplierId: principal.supplierId,
             sourceEpoch: principal.sourceEpoch,
@@ -358,6 +374,7 @@ export class ExternalService {
         `;
       const current = await tx.externalHenkatenProjection.findUnique({
         where: {
+          deletedAt: null,
           supplierId_sourceEpoch_sourceHenkatenId: {
             supplierId: principal.supplierId,
             sourceEpoch: principal.sourceEpoch,
@@ -480,6 +497,7 @@ export class ExternalService {
   async ingestionStatus(principal: ExternalPrincipal, eventId: string) {
     const row = await this.prisma.externalIngestionEvent.findUnique({
       where: {
+        hiddenAt: null,
         supplierId_sourceEpoch_eventId: {
           supplierId: principal.supplierId,
           sourceEpoch: principal.sourceEpoch,
@@ -503,7 +521,7 @@ export class ExternalService {
   async listProjections(supplierId: string, limit: number, cursor?: string) {
     const id = decodeCursor(cursor);
     const rows = await this.prisma.externalHenkatenProjection.findMany({
-      where: { supplierId },
+      where: { deletedAt: null, supplierId },
       include: { pcrAssessment: true },
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
@@ -522,7 +540,7 @@ export class ExternalService {
 
   async projection(supplierId: string, id: string) {
     const row = await this.prisma.externalHenkatenProjection.findFirst({
-      where: { id, supplierId },
+      where: { deletedAt: null, id, supplierId },
       include: {
         pcrAssessment: true,
         ingestionEvents: { orderBy: { sourceVersion: 'asc' } },
@@ -554,6 +572,7 @@ export class ExternalService {
     correlationId: string,
     ip: string,
   ) {
+    if (code === 'HENKATEN_DELETED') return;
     await this.prisma.$transaction(async (tx) => {
       await this.audit.write(
         {
@@ -593,6 +612,7 @@ export class ExternalService {
       ...(query.to ? { lte: new Date(query.to) } : {}),
     };
     const acceptedWhere: Prisma.ExternalIngestionEventWhereInput = {
+      hiddenAt: null,
       ...(query.supplierId ? { supplierId: query.supplierId } : {}),
       ...(query.sourceEpoch ? { sourceEpoch: query.sourceEpoch } : {}),
       ...(query.from || query.to ? { receivedAt: range } : {}),
@@ -607,6 +627,7 @@ export class ExternalService {
         : {}),
     };
     const diagnosticWhere: Prisma.AuditEventWhereInput = {
+      hiddenAt: null,
       action: { in: ['EXTERNAL_INGEST_DUPLICATE', 'EXTERNAL_INGEST_REJECTED'] },
       ...(query.supplierId ? { supplierId: query.supplierId } : {}),
       ...(query.sourceEpoch ? { sourceEpoch: query.sourceEpoch } : {}),
@@ -652,6 +673,7 @@ export class ExternalService {
           ? Promise.resolve([])
           : this.prisma.auditEvent.findMany({
               where: {
+                hiddenAt: null,
                 ...diagnosticWhere,
                 ...(query.outcome
                   ? {

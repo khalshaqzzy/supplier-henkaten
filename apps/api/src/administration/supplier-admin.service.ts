@@ -80,8 +80,13 @@ export class SupplierAdminService {
           orderBy: { startedAt: 'desc' },
           take: 1,
         },
-        warningInstances: { where: { status: 'OPEN' }, select: { id: true } },
-        henkatens: { orderBy: { updatedAt: 'desc' }, take: 1, select: { updatedAt: true } },
+        warningInstances: { where: { hiddenAt: null, status: 'OPEN' }, select: { id: true } },
+        henkatens: {
+          where: { deletedAt: null },
+          orderBy: { updatedAt: 'desc' },
+          take: 1,
+          select: { updatedAt: true },
+        },
         externalApiClients: {
           orderBy: { lastSuccessfulIngestionAt: 'desc' },
           take: 1,

@@ -1,3 +1,4 @@
+import { HenkatenDeletion } from '../components/HenkatenDeletion';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
@@ -11,8 +12,8 @@ import {
   ShieldAlert,
   TriangleAlert,
 } from 'lucide-react';
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import {
   Alert,
@@ -457,6 +458,15 @@ export function WarningDetailPage() {
 }
 
 export function HenkatenExplorerPage() {
+  const location = useLocation();
+  const [deletionSuccess, setDeletionSuccess] = useState(
+    (location.state as { deletionSuccess?: string } | null)?.deletionSuccess,
+  );
+  useEffect(() => {
+    if (!deletionSuccess) return;
+    const timer = window.setTimeout(() => setDeletionSuccess(undefined), 6000);
+    return () => window.clearTimeout(timer);
+  }, [deletionSuccess]);
   const { session } = useTmminSession();
   const [params, setParams] = useSearchParams();
   const query = queryObject(params, [
@@ -473,10 +483,17 @@ export function HenkatenExplorerPage() {
   ]);
   const result = useQuery({
     queryKey: tmminKey(session!.principal.userId, 'henkatens', query),
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
     queryFn: () => tmminApi.henkatens({ ...query, limit: 25 }),
   });
   return (
     <>
+      {deletionSuccess && (
+        <p className="henkaten-delete-success" role="status">
+          {deletionSuccess}
+        </p>
+      )}
       <PageHeader
         eyebrow="Penelusuran"
         title="Henkaten"
@@ -597,6 +614,7 @@ export function HenkatenExplorerPage() {
 }
 
 export function HenkatenDetailPage() {
+  const navigate = useNavigate();
   const { kind = 'hosted', supplierId = '', recordId = '' } = useParams();
   const { session, hasCapability } = useTmminSession();
   const queryClient = useQueryClient();
@@ -609,6 +627,8 @@ export function HenkatenDetailPage() {
       supplierId,
       recordId,
     }),
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
     queryFn: async () =>
       external
         ? await tmminApi.externalProjection(supplierId, recordId)
@@ -641,6 +661,26 @@ export function HenkatenDetailPage() {
       <PageHeader
         eyebrow={`${external ? 'External snapshot' : 'Hosted operational record'} · Epoch ${stringValue(data.sourceEpoch)}`}
         title={stringValue(data.sourceHenkatenId) || stringValue(data.identifier) || recordId}
+        actions={
+          <HenkatenDeletion
+            key={`${supplierId}:${recordId}`}
+            supplierId={supplierId}
+            target={{
+              kind: external ? 'EXTERNAL' : 'HOSTED',
+              id: recordId,
+              label: stringValue(data.sourceHenkatenId) || stringValue(data.identifier) || recordId,
+              version: Number(external ? data.sourceVersion : data.version),
+            }}
+            onStale={() => void result.refetch()}
+            onDeleted={() => {
+              void navigate(`/henkatens?supplierId=${supplierId}`, {
+                replace: true,
+                state: { deletionSuccess: 'Henkaten dihapus.' },
+              });
+            }}
+          />
+        }
+
         description=""
       />
       <div className="tmmin-detail-layout">

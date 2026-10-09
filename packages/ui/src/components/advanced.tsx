@@ -317,6 +317,7 @@ export interface DialogProps {
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   size?: 'sm' | 'md' | 'lg';
+  dismissible?: boolean;
 }
 
 export function Dialog({
@@ -332,6 +333,7 @@ export function Dialog({
   defaultOpen,
   onOpenChange,
   size = 'md',
+  dismissible = true,
 }: DialogProps) {
   return (
     <RadixDialog.Root
@@ -342,7 +344,15 @@ export function Dialog({
       {trigger && <RadixDialog.Trigger asChild>{trigger}</RadixDialog.Trigger>}
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="hds-dialog__overlay" />
-        <RadixDialog.Content className={cn('hds-dialog', `hds-dialog--${size}`, className)}>
+        <RadixDialog.Content
+          className={cn('hds-dialog', `hds-dialog--${size}`, className)}
+          onEscapeKeyDown={(event) => {
+            if (!dismissible) event.preventDefault();
+          }}
+          onPointerDownOutside={(event) => {
+            if (!dismissible) event.preventDefault();
+          }}
+        >
           <div className="hds-dialog__header">
             {headerAdornment && <div className="hds-dialog__adornment">{headerAdornment}</div>}
             <div>
@@ -351,7 +361,7 @@ export function Dialog({
               {description && <RadixDialog.Description>{description}</RadixDialog.Description>}
             </div>
             <RadixDialog.Close asChild>
-              <IconButton label="Tutup dialog" size="sm">
+              <IconButton label="Tutup dialog" size="sm" disabled={!dismissible}>
                 <X />
               </IconButton>
             </RadixDialog.Close>

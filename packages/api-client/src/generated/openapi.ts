@@ -229,6 +229,7 @@ export interface paths {
                 | 'SUPPLIER_HENKATEN_DECIDE'
                 | 'SUPPLIER_APPROVAL_REROUTE'
                 | 'TMMIN_HENKATEN_READ'
+                | 'TMMIN_HENKATEN_DELETE'
                 | 'TMMIN_PCR_CORRECT'
                 | 'SUPPLIER_NOTIFICATION_READ'
                 | 'SUPPLIER_BOARD_READ'
@@ -276,6 +277,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -390,6 +392,7 @@ export interface paths {
                 | 'SUPPLIER_HENKATEN_DECIDE'
                 | 'SUPPLIER_APPROVAL_REROUTE'
                 | 'TMMIN_HENKATEN_READ'
+                | 'TMMIN_HENKATEN_DELETE'
                 | 'TMMIN_PCR_CORRECT'
                 | 'SUPPLIER_NOTIFICATION_READ'
                 | 'SUPPLIER_BOARD_READ'
@@ -437,6 +440,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -552,6 +556,7 @@ export interface paths {
                 | 'SUPPLIER_HENKATEN_DECIDE'
                 | 'SUPPLIER_APPROVAL_REROUTE'
                 | 'TMMIN_HENKATEN_READ'
+                | 'TMMIN_HENKATEN_DELETE'
                 | 'TMMIN_PCR_CORRECT'
                 | 'SUPPLIER_NOTIFICATION_READ'
                 | 'SUPPLIER_BOARD_READ'
@@ -599,6 +604,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -705,6 +711,7 @@ export interface paths {
                 | 'SUPPLIER_HENKATEN_DECIDE'
                 | 'SUPPLIER_APPROVAL_REROUTE'
                 | 'TMMIN_HENKATEN_READ'
+                | 'TMMIN_HENKATEN_DELETE'
                 | 'TMMIN_PCR_CORRECT'
                 | 'SUPPLIER_NOTIFICATION_READ'
                 | 'SUPPLIER_BOARD_READ'
@@ -752,6 +759,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -860,6 +868,7 @@ export interface paths {
                 | 'SUPPLIER_HENKATEN_DECIDE'
                 | 'SUPPLIER_APPROVAL_REROUTE'
                 | 'TMMIN_HENKATEN_READ'
+                | 'TMMIN_HENKATEN_DELETE'
                 | 'TMMIN_PCR_CORRECT'
                 | 'SUPPLIER_NOTIFICATION_READ'
                 | 'SUPPLIER_BOARD_READ'
@@ -907,6 +916,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -994,6 +1004,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -1039,6 +1050,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -1124,6 +1136,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -1169,6 +1182,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -1247,6 +1261,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -1325,6 +1340,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -1489,6 +1505,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -1592,6 +1609,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -1637,6 +1655,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -1864,6 +1883,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -1977,6 +1997,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -2088,6 +2109,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -2205,6 +2227,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -2399,6 +2422,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -2538,6 +2562,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -2633,6 +2658,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -2732,6 +2758,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -2777,6 +2804,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -2880,6 +2908,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -2925,6 +2954,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -3044,6 +3074,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -3089,6 +3120,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -3176,6 +3208,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -3221,6 +3254,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -3338,6 +3372,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -3383,6 +3418,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -3524,6 +3560,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -3693,6 +3730,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -3799,6 +3837,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -3844,6 +3883,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -3946,6 +3986,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -4054,6 +4095,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -4325,6 +4367,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -4435,6 +4478,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -4549,6 +4593,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -4667,6 +4712,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -4790,6 +4836,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -4910,6 +4957,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -5034,6 +5082,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -5158,6 +5207,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -5277,6 +5327,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -5363,6 +5414,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -5442,6 +5494,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -5585,6 +5638,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -5677,6 +5731,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -5769,6 +5824,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -5865,6 +5921,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -5965,6 +6022,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -6143,6 +6201,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -6423,6 +6482,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -6539,6 +6599,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -6659,6 +6720,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -6859,6 +6921,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -6955,6 +7018,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -7054,6 +7118,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -7157,6 +7222,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -7247,6 +7313,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -7386,6 +7453,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -7464,6 +7532,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -7624,6 +7693,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -7669,6 +7739,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -7797,6 +7868,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -7842,6 +7914,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -7887,6 +7960,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -7984,6 +8058,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -8029,6 +8104,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -8117,6 +8193,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -8225,6 +8302,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -8270,6 +8348,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -8315,6 +8394,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -8360,6 +8440,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -8461,6 +8542,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -8559,6 +8641,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -8650,6 +8733,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -8741,6 +8825,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -8836,6 +8921,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -8935,6 +9021,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -9084,6 +9171,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -9179,6 +9267,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -9276,6 +9365,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -9375,6 +9465,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -9478,6 +9569,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -9566,6 +9658,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -9708,6 +9801,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -9806,6 +9900,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -9960,6 +10055,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -10061,6 +10157,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -10244,6 +10341,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -10363,6 +10461,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -10482,6 +10581,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -10604,6 +10704,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -10726,6 +10827,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -10843,6 +10945,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -10964,6 +11067,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -11077,6 +11181,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -11159,6 +11264,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -11264,6 +11370,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -11372,6 +11479,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -11476,6 +11584,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -11584,6 +11693,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -11683,6 +11793,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -11794,6 +11905,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -11968,6 +12080,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -12151,6 +12264,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -12665,6 +12779,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -12868,6 +12983,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -12960,6 +13076,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -13042,6 +13159,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -13296,6 +13414,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -13611,6 +13730,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -13876,6 +13996,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -14140,6 +14261,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -14267,6 +14389,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -14450,7 +14573,92 @@ export interface paths {
     };
     put?: never;
     post?: never;
-    delete?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header: {
+          'Idempotency-Key': string;
+        };
+        path: {
+          supplierId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedRevision: string;
+            supplierCode: string;
+            reason: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Supplier Henkaten deletion receipt */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: uuid */
+              commandId: string;
+              /** Format: date-time */
+              deletedAt: string;
+              hosted: number;
+              external: number;
+              total: number;
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
     options?: never;
     head?: never;
     patch?: never;
@@ -14540,6 +14748,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -14633,6 +14842,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -14716,6 +14926,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -14870,6 +15081,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -15125,6 +15337,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -15285,6 +15498,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -15521,6 +15735,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -15737,6 +15952,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -16387,6 +16603,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -17062,6 +17279,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -17295,6 +17513,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -17326,6 +17545,151 @@ export interface paths {
     put?: never;
     post?: never;
     delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tmmin/suppliers/{supplierId}/henkaten-deletion-preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          supplierId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Visible supplier Henkaten counts and revision */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              supplierCode: string;
+              hosted: number;
+              external: number;
+              total: number;
+              revision: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tmmin/henkatens/{kind}/{supplierId}/{recordId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header: {
+          'Idempotency-Key': string;
+        };
+        path: {
+          kind: 'HOSTED' | 'EXTERNAL';
+          supplierId: string;
+          recordId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number;
+            reason: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Deleted Henkaten receipt */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: uuid */
+              commandId: string;
+              /** Format: date-time */
+              deletedAt: string;
+              hosted: number;
+              external: number;
+              total: number;
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
     options?: never;
     head?: never;
     patch?: never;
@@ -17527,6 +17891,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -17761,6 +18126,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -17986,6 +18352,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -18096,6 +18463,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -18203,6 +18571,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -18447,6 +18816,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -18635,6 +19005,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -18680,6 +19051,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -19087,6 +19459,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -19132,6 +19505,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -19177,6 +19551,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -19274,6 +19649,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -19319,6 +19695,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -19364,6 +19741,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
@@ -19464,6 +19842,7 @@ export interface paths {
                 | 'SESSION_EXPIRED'
                 | 'FORBIDDEN'
                 | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
                 | 'VERSION_CONFLICT'
                 | 'STATE_CONFLICT'
                 | 'IDEMPOTENCY_CONFLICT'
