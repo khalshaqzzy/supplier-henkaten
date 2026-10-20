@@ -1,4 +1,80 @@
-# Current Session Handoff — TMMIN Henkaten visibility deletion
+# Current Session Handoff — Persistent browser sessions
+
+- Date: 2026-10-20
+- Branch: `feat/session-duration`.
+- Objective: implement the confirmed 30-day fixed lifetime for eligible direct logins across all six TMMIN/Supplier roles, including restricted Hosted Preparation, while retaining short delegated/forced-change sessions.
+- Status: implementation complete; subsequent delivery authorization covers commit/push on `feat/session-duration`, a comprehensive PR, checks monitored every two minutes, and merge into `main` after successful required checks. Local pre-commit delivery evidence is recorded below. Phase 15 remains `in_progress`; device/UAT gates are not waived.
+
+## Implementation and decisions
+
+`SessionService` now uses one classifier for creation and active touches. A completed-password direct login receives equal idle/absolute deadlines exactly 30 days from the injected clock. Delegated sessions (either actor identifier) and sessions requiring password change retain a 30-minute sliding idle deadline capped at their original 12-hour absolute deadline. Active requests never move the absolute deadline. Passive resolution remains read-only. Conditional touches preserve optimistic version checks and add unrevoked/unexpired predicates; existing request/write-boundary authorization remains necessary for concurrent revocation.
+
+Cookie issuance already uses the stored absolute deadline and required attributes, so no cookie/client/provider rewrite was needed. Existing password/authorization/source epochs, active-account/supplier checks, CSRF/Origin, hash-only token storage, realm isolation, passive SSE revalidation, and delegated-parent checks remain intact. TMMIN Account now shows one effective `Sesi berakhir` value with concise header copy. The session feature required no schema migration, API-shape, generated-client, runtime-env or application dependency change. Delivery additionally updates runtime-image packages and Go build dependencies as recorded below.
+
+Existing expired/revoked sessions are never revived or mass-extended. Still-valid legacy direct sessions can normalize idle to their original absolute bound on a throttled request, retaining their original 12-hour deadline/cookie. Full persistence begins at the next eligible login. Code-only rollback remains compatible but does not immediately revoke already-issued long sessions; older code may shorten idle on a later touch.
+
+Changed files: API session service; new session unit, production-cookie facade unit and clock-overridden HTTP/PostgreSQL integration tests; TMMIN Account and app test; new Chromium/Edge cookie-restoration journey; PRD section 9.3/amendment, roadmap, implementation plan, ADR 0009 and this handoff. Ordinary login/magic-link create callers pass full Prisma users with the required password-change flag. Local seed uses the existing HTTP payloads, so no seed or fixture source edit was required.
+
+## Local verification — 2026-10-20
+
+- Runtime: official Node 22.23.1 Darwin arm64 archive was SHA-256 verified against its official manifest in a task-specific temporary runtime directory; pnpm 11.16.0. Initial focused development checks used installed Node 22.23.2; final verification uses the pinned runtime. `pnpm install --frozen-lockfile` passed. Initial implementation acceptance did not claim clean-artifact pre-commit parity; the subsequent delivery rerun is recorded below.
+- `pnpm format:check`, `pnpm lint`, `pnpm typecheck`: passed after correcting a new browser-test import. The final extra short-boundary unit cases also passed focused ESLint.
+- `pnpm test:unit`: passed all workspace suites (contracts 44, fixtures 6, API client 9, UI 21, API 95, Supplier 75, TMMIN 16), plus repository script tests. The initial Account fixture lacked the route capability; it was corrected and the full suite rerun successfully.
+- Docker PostgreSQL: `pnpm db:up`, `pnpm db:wait`, `pnpm db:verify`, `pnpm db:test:reset`, `pnpm db:test:migrate`: passed on disposable `supplier_henkaten_test`, all 20 existing migrations. No migration was added.
+- `NODE_ENV=test DATABASE_URL=<Docker disposable test URL> RELEASE_SHA=ci SESSION_CSRF_SECRET=<safe-test-value> AUTH_THROTTLE_SECRET=<safe-test-value> OUTBOX_ENABLED=false PCR_WORKER_ENABLED=false LOG_LEVEL=error pnpm test:integration`: all 81 tests/10 files passed. The new 19-test suite covers all six roles, multi-day inactivity, exact day-30 cutoff, unchanged fixed deadlines, CSRF-backed mutation and negative Origin/token/realm cases, forced-change relogin, preparation restrictions, epochs/deactivation/logout/reset, legacy transition, passive resolution and short delegated-parent expiry. The initial preparation assertion expected a capability not present in the existing role grants; it was corrected to assert the actual restricted master-data capabilities without changing product authorization.
+- `pnpm openapi:check`: passed; generated client regeneration has no diff. `VITE_API_ORIGIN=https://api.example.invalid pnpm build`: passed for API and both portals. Existing build warnings do not fail the build.
+- `pnpm deployment:validate`: passed staging env validation and remote Compose config. This is configuration validation, not deployment.
+- Fresh isolated seed smoke: a dedicated `supplier_henkaten_session_seed` database applied all migrations, bootstrapped a temporary protected admin and ran built API plus `LOCAL_SEED_CONFIRM=supplier-henkaten-local-seed ... pnpm --filter @tmmin-henkaten/api run local:seed`: passed with two Hosted suppliers and 240 Henkaten; independent supplier count returned 2. The first extra count query targeted the maintenance database after successful seed; the harness was corrected and the full fresh smoke rerun. Temporary API, database, photos/exports and credentials were removed in the harness finally block. Main development data was not seeded or reset.
+- `pnpm test:e2e`: passed all 12 isolated journeys, six Chromium and six actual Microsoft Edge, including the new session-restoration journey in both browsers. The standard installed Microsoft Edge application was used; no executable override was required. The new journey restores both portals from only persistent cookie state in a fresh context, reopens tabs, verifies 30-day cookie timestamps/session response, performs UI logout and denies later protected access. This is not a physical OS/browser restart claim. The TMMIN Account screenshot was visually inspected at 1280px and has one clear expiry entry.
+
+## Remaining release work and cleanup
+
+Complete cross-domain HTTPS/persistent-profile restart, device/PWA acceptance and existing release gates on staging. The delivery validation below supplies the local workflow checks for the requested commit. Remote checks and deployment outcomes must be verified against the actual PR/merge SHA; local evidence alone does not imply those outcomes. No new policy question remains.
+
+All E2E-owned API/web processes, databases, Compose networks/volumes and temporary photo roots were removed by the successful harness. `pnpm db:down` removed the session-started local database container/network while preserving its volume. Fresh seed processes/database/credentials were removed. Documentation link/code-fence and `git diff --check` validation passed. `docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.24.3 dir /repo --config=/repo/.gitleaks.toml --redact --verbose` passed with no leaks (334.53 MB scanned). No broad scanner exception was added. The final API-only typecheck also passed after the additional short-boundary unit tests. OrbStack was started only for verification and restored to its initial stopped state after task-container cleanup; pre-existing unrelated container definitions/volumes were not changed. No task-owned runtime remains.
+
+
+## PR delivery validation — 2026-10-20
+
+Both workflows were inspected before delivery. `main` is still the PR base at `139a03d0074676b2ae7504e3b94d5ab894f80b72`; it has no new migration beyond the existing 20. A merge to `main` triggers the existing Production deployment caller after Release CI passes. The delivery plan is to push the current feature branch, create a comprehensive PR, monitor checks every two minutes, and use a normal merge commit only after required checks pass; branch protection must not be bypassed.
+
+Clean-artifact parity uses checksum-verified Node 22.23.1 and pnpm 11.16.0: `pnpm clean`, remove only Git-ignored generated/build roots, `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm openapi:check`, and `VITE_API_ORIGIN=https://api.example.invalid pnpm build`: passed. Generated OpenAPI/client files have no diff.
+
+`docker compose config --quiet`; `pnpm db:up`; `pnpm db:wait`; `pnpm db:verify`; `pnpm db:test:reset`; `pnpm db:test:migrate`; exact CI `NODE_ENV=test DATABASE_URL=<Docker disposable test URL> RELEASE_SHA=ci SESSION_CSRF_SECRET=<safe-test-value> AUTH_THROTTLE_SECRET=<safe-test-value> OUTBOX_ENABLED=false pnpm test:integration`: all 81 tests/10 files passed. `pnpm migrations:destructive-check origin/main` passed. A dedicated `supplier_henkaten_upgrade_test` applied `git archive origin/main apps/api/prisma` using `PRISMA_MIGRATIONS_PATH`, then current migrate deploy/status; all 20 migrations are up to date. Upgrade DB was dropped and `pnpm db:down` stopped the local database stack.
+
+`pnpm --filter @tmmin-henkaten/e2e exec playwright install chromium msedge` succeeded using the installed standard Edge application; `pnpm test:e2e` passed all 12 isolated journeys (six Chromium, six actual Edge) again after the clean-artifact rebuild. The harness removed its processes, containers, networks, volumes and photo roots.
+
+Workflow-pinned Actionlint 1.7.7, ShellCheck 0.11.0 and Hadolint 2.14.0 passed. Both staging and production Ubuntu 22.04 bootstrap input checks passed. The deployment-script harness passed inside Linux Docker 29 CLI with bash/jq/util-linux/git/coreutils and real `flock`; this is not the weaker macOS no-flock result. `pnpm deployment:validate` and `pnpm security:audit` passed; audit retains the existing exact high React Router exception and 11 moderate findings.
+
+Security delivery prerequisites discovered during the expanded checks:
+
+- `.agent/securityExceptions.json` had an expired existing `CVE-2026-84782` exception. Revalidated on 2026-10-20 using the [Debian tracker](https://security-tracker.debian.org/tracker/CVE-2026-84782) and unchanged TCP/Go TLS paths: Debian bookworm still has no fixed OpenSSL 3.0 package and the application does not enable the required OpenSSL DTLS path. Only that existing exact exception is renewed through 2026-10-31 with updated rationale; no new broad ignore is added. The exception registry check passes.
+- Both frontend runtime Dockerfiles now require `libexpat>=2.9.0-r0` and `libx11>=1.8.14-r0`, alongside the prior pcre2/tiff floors. This forces the patched distribution packages instead of reusing an old cached upgrade layer. Fresh image scans confirm `CVE-2026-77214` and `CVE-2026-88806` are absent. The [Alpine tracker](https://security.alpinelinux.org/vuln/CVE-2026-77214) confirms the expat fixed version.
+- The Caddy build moves from Go 1.25.13 to digest-pinned Go 1.26.10, pins `golang.org/x/net` 0.60.0, and aligns its required x/crypto 0.57.0 and x/text 0.42.0. Existing post-tidy version assertions are retained and extended for x/net. Caddy remains 2.11.4 and grpc remains 1.83.2. These address scan findings `CVE-2026-78667`, `CVE-2026-78669`, and `CVE-2026-97031`; the current [Go release history](https://go.dev/doc/devel/release#go1.26.10) also records the 19 October x509 fix. Module requirements were checked from the official Go proxy before finalizing compatible pins.
+
+Trivy 0.70.0 was downloaded from the official release and checksum verified, with a freshly downloaded vulnerability database. Complete source export scanning uses every tracked and non-ignored untracked source file, no broad source exclusions, and the committed exact ignore file. Final delivery gate: all five final runtime images passed Trivy 0.70.0 `image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed=false --ignorefile .trivyignore --exit-code 1`; the complete clean source export passed `fs --scanners vuln,secret,misconfig` with the same severity/ignore settings. No high/critical finding remains outside the exact registered exceptions. The final rebuilt stack passed the workflow routing/release-identity, deep-link, 401 API/SSE, HSTS/CSP/no-server-header, non-root/private-database, idempotent bootstrap and restart/persistence assertions. It used an isolated Compose project and task-owned bind path; all task containers/networks were stopped. Hadolint and source scans were repeated after the runtime security patches. Final format/exception/diff checks passed; directory Gitleaks is run immediately before commit and commit-mode Gitleaks before push. Remote PR/check/merge evidence is reported against the published head and is not inferred from local acceptance.
+
+---
+
+# Previous Session Handoff — Persistent session analysis and implementation plan
+
+- Date: 2026-10-20
+- Branch inspected: `feat/session-duration`.
+- Objective: analyze longer inactive-browser sessions for TMMIN and Supplier and prepare a complete implementation plan.
+- Status: planning complete; application implementation remains planned. Phase 15 remains `in_progress`; no acceptance/release gate advances.
+- Confirmed product choices: 30 fixed days from successful login for all six TMMIN/Supplier roles, including direct restricted Hosted Preparation; no earlier idle limit. Delegated magic-link access and any session still requiring password change retain 30-minute idle/12-hour absolute limits.
+- Findings: server deadlines, not absent persistent cookies, cause frequent relogin. Ordinary cookies already expire at the absolute deadline and both portals restore through the session endpoint. Mounted query polling cannot preserve a session while the browser is suspended/closed. Magic-link redemption and delegated-parent validation must retain the short exception and independent parent checks.
+- Plan: shared server lifetime classification; equal 30-day deadlines for eligible direct sessions; capped short idle touches; passive validation unchanged; existing cookie/CSRF/epoch/revocation boundaries; one effective TMMIN Account expiry. No schema, API-shape, runtime-config or refresh-token addition is required.
+- Legacy behavior: no mass extension or revival. A still-valid old direct session can normalize idle to its original absolute bound on activity, but retains that original 12-hour deadline/cookie; full persistence starts at next eligible login. Code rollback does not immediately revoke already issued long sessions.
+- Files changed: `.agent/sessionPersistencePlan.md`, PRD amendment, implementation roadmap, this handoff and lifetime amendment in ADR 0009. Application source, generated artifacts and runtime configuration were not changed.
+- Validation: static source/contract/schema/ADR/test-harness inspection; documentation whitespace and relative-link checks passed. All three clarification questions were answered. No unit, integration, browser or deployment verification is claimed for the planned implementation.
+- Open questions: none required for the agreed scope. Existing sessions' transitional behavior is documented explicitly; no zero-login migration is promised.
+- Next action: implement the ordered work in `sessionPersistencePlan.md`, run clock-based unit and PostgreSQL HTTP/revocation tests, Chromium/Edge restoration checks, fresh isolated seed smoke, then the required delivery/staging checks before any completion claim.
+- Cleanup: no server, worker, watcher or Docker container was started; no database/session was changed. No commit, push or deployment was performed.
+
+---
+
+# Previous Session Handoff — TMMIN Henkaten visibility deletion
 
 - Date: 2026-10-09
 - Objective: implement individual and supplier-wide Henkaten deletion for TMMIN Admin and Quality with polished confirmation flows, internal historical retention, unchanged MP, and delivery by PR to main.

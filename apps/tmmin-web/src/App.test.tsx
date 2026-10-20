@@ -360,6 +360,20 @@ describe('TMMIN application boundary', () => {
     expect(screen.getAllByRole('button', { name: 'Keluar' }).length).toBeGreaterThan(0);
   });
 
+  it('shows one effective session deadline on Account', async () => {
+    const current = session('TMMIN_QUALITY', ['TMMIN_SUPPLIER_READ']);
+    vi.spyOn(tmminApi, 'session').mockResolvedValue(current);
+    render(
+      <MemoryRouter initialEntries={['/account']}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('Sesi berakhir')).toBeTruthy();
+    expect(screen.getByText(new Date(current.idleExpiresAt).toLocaleString('id-ID'))).toBeTruthy();
+    expect(screen.queryByText('Idle expiry')).toBeNull();
+    expect(screen.queryByText('Absolute expiry')).toBeNull();
+  });
+
   it('stores only safe same-origin intended destinations', () => {
     rememberIntendedPath('//evil.example/steal');
     expect(consumeIntendedPath()).toBe('/');

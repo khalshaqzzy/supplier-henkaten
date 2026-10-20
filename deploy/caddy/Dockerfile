@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 
-ARG GO_IMAGE=golang:1.25.13-alpine@sha256:1e0126852075c9c60731c8ba49088448b91f63e2aed97ca9d1a9791622a05946
+ARG GO_IMAGE=golang:1.26.10-alpine@sha256:9ce231b28998b32e116927c61aa5c406183061d4f3f2d61b292c88e7f6bdf7ca
 ARG RUNTIME_IMAGE=gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35
 
 FROM ${GO_IMAGE} AS build
@@ -24,12 +24,14 @@ RUN --mount=type=cache,id=supplier-henkaten-go-mod,target=/go/pkg/mod \
   && go mod init supplier-henkaten/caddy \
   && go get github.com/caddyserver/caddy/v2@v2.11.4 \
   && go get google.golang.org/grpc@v1.83.2 \
-  && go get golang.org/x/text@v0.41.0 \
-  && go get golang.org/x/crypto@v0.55.0 \
+  && go get golang.org/x/net@v0.60.0 \
+  && go get golang.org/x/text@v0.42.0 \
+  && go get golang.org/x/crypto@v0.57.0 \
   && go mod tidy \
   && test "$(go list -m -f '{{.Version}}' google.golang.org/grpc)" = v1.83.2 \
-  && test "$(go list -m -f '{{.Version}}' golang.org/x/crypto)" = v0.55.0 \
-  && test "$(go list -m -f '{{.Version}}' golang.org/x/text)" = v0.41.0 \
+  && test "$(go list -m -f '{{.Version}}' golang.org/x/net)" = v0.60.0 \
+  && test "$(go list -m -f '{{.Version}}' golang.org/x/crypto)" = v0.57.0 \
+  && test "$(go list -m -f '{{.Version}}' golang.org/x/text)" = v0.42.0 \
   && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/caddy .
 
 FROM ${RUNTIME_IMAGE} AS runtime

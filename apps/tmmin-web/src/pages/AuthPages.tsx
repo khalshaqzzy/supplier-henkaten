@@ -169,11 +169,7 @@ export function AccountPage() {
   const navigate = useNavigate();
   return (
     <>
-      <PageHeader
-        eyebrow="Identitas dan session"
-        title="Akun"
-        description="Tinjau identitas dan batas waktu session aktif."
-      />
+      <PageHeader eyebrow="Identitas dan keamanan" title="Akun" description="" />
       <Card className="tmmin-detail-card">
         <KeyValueGrid
           columns={2}
@@ -184,12 +180,13 @@ export function AccountPage() {
               value: session!.principal.role === 'TMMIN_ADMIN' ? 'TMMIN Admin' : 'TMMIN Quality',
             },
             {
-              label: 'Idle expiry',
-              value: new Date(session!.idleExpiresAt).toLocaleString('id-ID'),
-            },
-            {
-              label: 'Absolute expiry',
-              value: new Date(session!.absoluteExpiresAt).toLocaleString('id-ID'),
+              label: 'Sesi berakhir',
+              value: new Date(
+                Math.min(
+                  Date.parse(session!.idleExpiresAt),
+                  Date.parse(session!.absoluteExpiresAt),
+                ),
+              ).toLocaleString('id-ID'),
             },
           ]}
         />

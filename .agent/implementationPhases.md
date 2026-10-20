@@ -1,6 +1,6 @@
 # Enterprise Digital Henkaten Management — Implementation Roadmap
 
-Status: active · Updated: 2026-09-30 · Approach: backend first, dependency driven
+Status: active · Updated: 2026-10-20 · Approach: backend first, dependency driven
 
 This file tracks sequence, current state, dependencies, and remaining acceptance gates. The [PRD](PRD.md) defines product behavior; [rules](rules.md) define agent and engineering process; [session handoff](sessionHandoff.md) records recent changes and checks; [ADRs](../docs/adr/) explain durable decisions. Detailed local browser evidence and unresolved checks live in the [QA report](../docs/audits/local-browser-qa-2026-09-24.md) and [scenario plan](../docs/qa/browser-local-end-to-end-verification-plan.md). Do not copy their histories into this roadmap.
 
@@ -55,6 +55,26 @@ The completion index is a navigation aid, not a substitute for the PRD or test e
 - **Part import mapping and scale refinement, 2026-09-26:** CSV/Excel files up to 50 MB and 50,000 data rows can use arbitrary source headers and additional columns. Supplier Admin maps the two required fields with a ten-row preview; the paginated review displays only conflicting names and shows processing states. The API contract limit and import transaction changed without a database schema or seed edit. See [ADR 0040](../docs/adr/0040-supplier-master-data-import-and-navigation.md). Phase 15 staging/device acceptance remains in progress.
 - **Supplier dashboard filter, 2026-09-29:** The desktop Overview filter is one compact row with period, status, 4M category, and line visible; the remaining filter fields use an anchored popover. Existing URL-backed Apply/Reset semantics and query scope remain intact. See [ADR 0041](../docs/adr/0041-compact-supplier-dashboard-filter.md). Desktop browser checks cover 1280, 1440, and 1672 px; staging/device acceptance remains part of Phase 15.
 - **TMMIN Supplier Admin access, 2026-09-29:** An active TMMIN Admin can open the Supplier web as the active admin of an active Hosted supplier through a two-minute, single-use link. The token is hash-stored and exchanged into a distinct Supplier session, with operator identity retained and no supplier notification. See [ADR 0042](../docs/adr/0042-tmmin-supplier-admin-magic-link.md). Local auth and browser acceptance is required before delivery; staging acceptance remains part of Phase 15.
+
+## Session persistence amendment — 2026-10-20
+
+Implemented locally on `feat/session-duration`; verification is recorded in the current handoff.
+Eligible direct logins for all six TMMIN/Supplier roles, including restricted Hosted Preparation,
+last 30 fixed days without earlier idle expiry. Delegated magic-link access and logins still
+requiring password change retain 30-minute idle/12-hour absolute limits. Existing revocation
+boundaries remain effective. No schema/API-shape change was required; existing sessions are not
+mass-extended. See [implementation plan](sessionPersistencePlan.md) and
+[ADR 0009](../docs/adr/0009-identity-password-session-and-bootstrap-security.md).
+
+Delivered scope: centralized issuance/resolution policy, fixed/capped activity deadlines,
+clock-driven unit and PostgreSQL HTTP/revocation tests, concise TMMIN Account expiry, and browser
+restoration/logout coverage. Legacy transition and code-only rollback semantics are explicit.
+Existing cookie/CSRF/epoch/revocation checks remain. Seed and automated-check results are recorded
+in the handoff. Workflow-pinned pre-commit delivery validation also covers runtime package/Go
+patches and the narrowly revalidated OpenSSL exception. Remote PR checks, the normal merge to main,
+and its automatic production workflow are tracked against their actual SHAs. HTTPS persistent-profile
+restart and device/UAT acceptance remain separate release work. Phase 15 stays `in_progress`; no staging/device/production
+gate was advanced by local implementation.
 
 ## Cross-cutting gates
 

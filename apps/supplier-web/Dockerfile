@@ -35,7 +35,7 @@ USER root
 # Require the patched distribution packages without freezing future security revisions.
 # hadolint ignore=DL3018
 RUN apk upgrade --no-cache \
-  && apk add --no-cache 'pcre2>=10.49-r0' 'tiff>=4.7.2-r0'
+  && apk add --no-cache 'pcre2>=10.49-r0' 'tiff>=4.7.2-r0' 'libexpat>=2.9.0-r0' 'libx11>=1.8.14-r0'
 LABEL org.opencontainers.image.title="supplier-henkaten-supplier-web" \
   org.opencontainers.image.revision="${RELEASE_SHA}" \
   org.opencontainers.image.source="https://github.com/khalshaqzzy/supplier-henkaten"
