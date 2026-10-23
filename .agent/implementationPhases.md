@@ -146,3 +146,8 @@ External prerequisites: staging/production DNS and TLS, VMs/SSH, GitHub and runt
 Explicit v1 exclusions remain in [PRD §§34–36](PRD.md): backup/recovery/PITR, HA, MFA/SSO, native mobile, integrations outside the External API, and other listed scope. The PCR amendment is an approved exception to the older “AI/ML out of scope” roadmap text; it is implemented as advisory screening with the production gate above. Update the PRD and roadmap together for any future scope change.
 
 **Next action:** inspect current branch/remote/CI and staging configuration, reproduce or resolve F-06 and the other QA findings as separate tracked work, then run 15.11 staging rehearsal. Record the exact checks and outcomes in [sessionHandoff.md](sessionHandoff.md). Before a commit, run the workflow-equivalent local checks required by [rules.md](rules.md); before reporting delivery after a push, verify required GitHub jobs are green.
+
+
+## Main CI dependency repair — 2026-10-23
+
+Release CI on main `de43aff` rejected Vite 8.1.5 in the pnpm audit and Trivy filesystem gates. Both portals and shared test/plugin resolutions are upgraded to patched Vite 8.1.6. Fresh runtime scans also require Caddy compress v1.18.7 with a post-tidy version assertion for CVE-2026-63209. Security thresholds and exact exception policy remain unchanged. Local audit, quality, PostgreSQL, Chromium/Edge, deployment and rebuilt image checks pass. Remote repair CI remains to be verified; Phase 15 remains the current phase.

@@ -236,3 +236,31 @@ Validation requires source and all runtime image HIGH/CRITICAL scans plus rebuil
 routing, headers, non-root, bootstrap idempotence and restart/persistence checks. Exact delivery
 results are recorded in the session handoff. No topology, migration or secret-rendering change is
 introduced by these package/toolchain updates.
+
+
+## Vite security patch — 2026-10-23
+
+Main Release CI run `39905812974` failed after the advisory databases identified Vite 8.1.5
+as affected by [GHSA-587h-7wmj-h5pm](https://github.com/advisories/GHSA-587h-7wmj-h5pm)
+(CVE-2026-112942). The development editor endpoint's Windows path validation can be bypassed;
+static production hosting does not require that endpoint. The complete lockfile remains subject
+to the security gate regardless of production reachability.
+
+Both portal manifests are pinned to Vite 8.1.6, the patched release on the existing minor line,
+and the shared lockfile is regenerated so Vitest and Vite plugins resolve the same patched copy.
+Ignoring the finding is rejected because a compatible patch exists. A minor/major upgrade is
+unnecessary for this repair and would increase regression scope. No application, database,
+seed, deployment setting or scanner exception changes are needed.
+
+Validation covers clean-artifact frozen install, formatting, lint, typecheck, unit and database
+tests, generated contract drift, production builds, browser journeys and the security scans.
+Remote CI must pass for the repair commit before delivery is considered successful. Future
+advisory database changes can still reject an unchanged lockfile; exact-SHA checks remain required.
+
+The expanded runtime scans also detect Caddy's `github.com/klauspost/compress` v1.18.6 as
+affected by [GHSA-259r-337f-4rfw](https://github.com/klauspost/compress/security/advisories/GHSA-259r-337f-4rfw)
+(CVE-2026-63209). The builder explicitly upgrades that module to v1.18.7 and asserts it after
+`go mod tidy`, matching the existing dependency-floor policy. Updating the dependency avoids a
+reachability exception and preserves the complete binary scan. The public Caddy version and
+configuration stay compatible; rebuilt routing, headers, restart persistence and image scans
+verify the resulting binary.

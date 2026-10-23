@@ -1,3 +1,22 @@
+# Current Session Handoff — Main CI dependency repair
+
+- Date: 2026-10-23.
+- Branch: `fix/main-ci-vite`, based on main merge `de43aff37e088eece18e3b7cc23db8e282f9c940`.
+- Objective: restore Release CI after run `39905812974` failed the complete-lockfile audit and Trivy filesystem scan.
+- Cause: Vite 8.1.5 is affected by GHSA-587h-7wmj-h5pm / CVE-2026-112942. The advisory was added to the scanner databases after the feature PR checks passed.
+- Change: pin both portal dependencies to Vite 8.1.6 and regenerate the shared lockfile, including Vitest/plugin peer references. The fresh runtime scans additionally found Caddy compress v1.18.6 affected by CVE-2026-63209; its Dockerfile now floors and asserts v1.18.7 after module tidy. No ignore, audit threshold, workflow, application contract, seed, schema or migration change is required.
+- Decision: use the patched release on the existing 8.1 line; preserve all security gates and existing exact exceptions. See ADR 0008.
+- Phase: 15 remains `in_progress`; deployment and device/UAT acceptance are separate gates.
+- Delivery: PR #39 has merged; its completed heartbeat monitor was deleted. This repair is validated separately against the new main base.
+- Verification: official SHA-256-verified Node 22.23.1 and pnpm 11.16.0; clean-artifact frozen install, formatting, lint, typecheck, 266 workspace unit tests plus script tests, OpenAPI/client drift and production builds; `pnpm security:audit` passes with 12 moderate and the pre-existing exact ignored high advisory. The final rerun removed ignored API/generated/portal/shared build roots first, repeated the workflow quality commands in order, and passed with no generated contract drift.
+- PostgreSQL: `docker compose config --quiet`, `pnpm db:up`, `db:wait`, `db:verify`, `db:test:reset`, `db:test:migrate`, then the exact CI `NODE_ENV=test DATABASE_URL=<Docker disposable test URL> RELEASE_SHA=ci SESSION_CSRF_SECRET=<CI test value> AUTH_THROTTLE_SECRET=<CI test value> OUTBOX_ENABLED=false pnpm test:integration` passed all 81 tests/10 files. `pnpm migrations:destructive-check origin/main` passed. Previous-main archive migrations followed by current migration deploy/status passed all 20 migrations on a separate upgrade database. Both databases/stacks were cleaned up.
+- Browsers: pinned Playwright Chromium/standard Microsoft Edge install and `pnpm test:e2e` passed all 12 isolated journeys (six per browser), including cookie restoration/logout. Harness-owned servers, volumes, networks and databases were removed.
+- Deployment: workflow-pinned Actionlint, ShellCheck and Hadolint; `pnpm deployment:validate`, `pnpm security:exceptions:check`, Linux Docker 29 deployment harness with real flock; Ubuntu 22.04 staging/production bootstrap checks passed. An initial helper download failed on local container DNS; the helper-only retry used `--dns 1.1.1.1` and passed, without changing repository or engine DNS configuration.
+- Containers: exact workflow build/start/routing/header/release-identity/non-root/private-database/idempotent-bootstrap/restart-persistence steps passed after the compression patch. Trivy 0.70.0 (checksum verified, fresh DB) filesystem and all five rebuilt production images passed HIGH/CRITICAL with existing exact ignores. The first expanded scan found the compression issue and was rerun after patching; no new exception was added.
+- Secrets: Gitleaks 8.24.3 directory scan passed after removing only ignored browser artifacts. An earlier scan during active E2E found generated test credentials in traces; those transient artifacts were removed, without changing scanner rules. Commit-mode scan is required before push.
+
+---
+
 # Current Session Handoff — Persistent browser sessions
 
 - Date: 2026-10-20
