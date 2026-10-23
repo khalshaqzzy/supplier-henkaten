@@ -210,3 +210,29 @@ measurements and a schema/worker/routing review. This avoids multiplying databas
 PCR and outbox work without evidence. Production launch still depends on SSH host identity,
 public HTTPS reachability, capacity/UAT/security gates, and explicit acceptance of the unchanged
 data-loss and automatic-release risks. Validation is defined in the production deployment plan.
+
+
+## Runtime patch-floor review — 2026-10-20
+
+Production image builds retain pinned upstream bases and require patched distribution packages.
+The frontend Alpine runtime floor now includes libexpat 2.9.0-r0 and libx11 1.8.14-r0 in addition
+to existing pcre2/tiff requirements. This avoids an unchanged cached upgrade layer preserving
+packages affected by newly published advisories. No distribution-wide scanning exception is used.
+
+Caddy remains 2.11.4 with grpc 1.83.2. Its digest-pinned Go builder is updated to 1.26.10, and
+x/net 0.60.0 is paired with the required x/crypto 0.57.0 and x/text 0.42.0. Exact module assertions
+after `go mod tidy` protect these floors against implicit dependency downgrades. The supported
+[Go patch release](https://go.dev/doc/devel/release#go1.26.10) includes the October security fixes.
+Routing configuration and the non-root runtime contract are retained.
+
+The existing exact OpenSSL DTLS exception CVE-2026-84782 is revalidated through 2026-10-31.
+The [Debian tracker](https://security-tracker.debian.org/tracker/CVE-2026-84782) still lists
+bookworm as vulnerable without a fixed 3.0 package. The application/deployment paths use TCP
+HTTP/TLS and PostgreSQL TCP, and Caddy uses Go TLS; OpenSSL DTLS is not enabled. This is a bounded
+non-reachability exception, not a claim that the installed library is fixed. Other findings remain
+scanned, and the expiry must be reassessed against patched packages before renewal.
+
+Validation requires source and all runtime image HIGH/CRITICAL scans plus rebuilt production-like
+routing, headers, non-root, bootstrap idempotence and restart/persistence checks. Exact delivery
+results are recorded in the session handoff. No topology, migration or secret-rendering change is
+introduced by these package/toolchain updates.

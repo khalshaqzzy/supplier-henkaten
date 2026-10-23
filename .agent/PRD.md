@@ -1,3 +1,27 @@
+## Amendment — 20 October 2026: Persistent direct-login sessions
+
+Implemented locally; automated verification is recorded in the current handoff. HTTPS staging/device acceptance remains pending.
+Direct login for TMMIN Admin, TMMIN Quality, Supplier Admin, Supervisor, Line Leader and QC,
+after the required password change is completed, must remain valid for exactly 30 days from
+successful login without an earlier inactivity timeout. Direct Hosted Preparation login follows
+the same lifetime while retaining its restricted capabilities. Activity does not extend the
+fixed deadline. The persistent cookie supports reopening the browser while retained by that
+browser; cookie removal, private-browser closure or storage eviction can still require login.
+
+Delegated Supplier Admin access through the TMMIN magic link and any login still requiring a
+password change retain the 30-minute sliding idle limit and 12-hour absolute limit. Delegated
+access also remains bounded by validity of the initiating TMMIN session. The magic link itself
+remains valid for two minutes and single use. Logout, password/account/authorization/source
+changes and other existing revocation boundaries remain effective for all session lifetimes.
+
+This supersedes section 9.3's former uniform lifetime for eligible direct sessions.
+Expired/revoked sessions are not revived, and existing sessions/cookies are not mass-extended;
+the full duration is obtained at the next successful eligible login. Implementation, legacy-session
+transition, compatibility and acceptance details are recorded in
+[the implementation plan](sessionPersistencePlan.md) and [ADR 0009](../docs/adr/0009-identity-password-session-and-bootstrap-security.md).
+
+---
+
 ## Amendment — 9 October 2026: TMMIN Henkaten deletion
 
 TMMIN Admin and TMMIN Quality can delete one Henkaten from its detail page or all Henkaten of one supplier from Supplier detail. Both actions apply to every status, Hosted and External data, all historical source epochs, and active or inactive suppliers. Supplier roles cannot delete Henkaten.
@@ -514,8 +538,9 @@ TMMIN user berada pada identity realm terpisah dan tidak memasukkan Supplier Cod
 - Lima kegagalan login dalam 15 menit memicu lockout 15 menit.
 - Rate limit login berlaku per account key dan IP.
 - Session menggunakan secure, HttpOnly, SameSite cookie.
-- Idle timeout: 30 menit.
-- Absolute session timeout: 12 jam.
+- Login langsung setelah kewajiban ganti password selesai: 30 hari tetap sejak login, tanpa idle timeout yang lebih pendek; berlaku untuk seluruh peran TMMIN/Supplier dan Hosted Preparation.
+- Sesi wajib ganti password dan akses Supplier melalui magic link TMMIN: idle timeout 30 menit, absolute timeout 12 jam; akses delegasi juga dibatasi validitas sesi TMMIN pembuatnya.
+- Aktivitas tidak memperpanjang batas absolut. Sesi lama tidak diperpanjang massal; durasi penuh berlaku setelah login berikutnya yang memenuhi syarat.
 - Password reset, deactivation, role change, atau source cutover mencabut seluruh session terkait.
 - MFA dan SSO tidak termasuk v1.
 

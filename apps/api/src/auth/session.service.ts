@@ -17,8 +17,9 @@ export type CreatedSession = {
 
 @Injectable()
 export class SessionService {
-  static readonly IDLE_MS = 30 * 60 * 1_000;
-  static readonly ABSOLUTE_MS = 12 * 60 * 60 * 1_000;
+  static readonly PERSISTENT_MS = 30 * 24 * 60 * 60 * 1_000;
+  static readonly SHORT_IDLE_MS = 30 * 60 * 1_000;
+  static readonly SHORT_ABSOLUTE_MS = 12 * 60 * 60 * 1_000;
   static readonly TOUCH_INTERVAL_MS = 60 * 1_000;
 
   constructor(
@@ -34,6 +35,7 @@ export class SessionService {
       supplierId: string | null;
       passwordEpoch: number;
       authorizationEpoch: number;
+      mustChangePassword: boolean;
     },
     sourceEpoch: number | null,
     purpose: SessionPurpose,
@@ -43,8 +45,11 @@ export class SessionService {
   ): Promise<CreatedSession> {
     const rawToken = randomBytes(32).toString('base64url');
     const now = this.clock.now();
-    const idleExpiresAt = new Date(now.getTime() + SessionService.IDLE_MS);
-    const absoluteExpiresAt = new Date(now.getTime() + SessionService.ABSOLUTE_MS);
+    const short = isShortSession(user, { impersonatedByUserId, impersonatedBySessionId });
+    const absoluteExpiresAt = new Date(
+      now.getTime() + (short ? SessionService.SHORT_ABSOLUTE_MS : SessionService.PERSISTENT_MS),
+    );
+    const idleExpiresAt = activityExpiry(now, absoluteExpiresAt, short);
     const session = await this.prisma.userSession.create({
       data: {
         userId: user.id,
@@ -122,10 +127,20 @@ export class SessionService {
       now.getTime() - session.lastActivityAt.getTime() >= SessionService.TOUCH_INTERVAL_MS
     ) {
       await this.prisma.userSession.updateMany({
-        where: { id: session.id, version: session.version },
+        where: {
+          id: session.id,
+          version: session.version,
+          revokedAt: null,
+          idleExpiresAt: { gt: now },
+          absoluteExpiresAt: { gt: now },
+        },
         data: {
           lastActivityAt: now,
-          idleExpiresAt: new Date(now.getTime() + SessionService.IDLE_MS),
+          idleExpiresAt: activityExpiry(
+            now,
+            session.absoluteExpiresAt,
+            isShortSession(user, session),
+          ),
           version: { increment: 1 },
         },
       });
@@ -202,4 +217,22 @@ export class SessionService {
   private hashToken(rawToken: string): Uint8Array<ArrayBuffer> {
     return Uint8Array.from(createHash('sha256').update(rawToken).digest());
   }
+}
+
+function isShortSession(
+  user: { mustChangePassword: boolean },
+  session: {
+    impersonatedByUserId?: string | null | undefined;
+    impersonatedBySessionId?: string | null | undefined;
+  },
+): boolean {
+  return Boolean(
+    user.mustChangePassword || session.impersonatedByUserId || session.impersonatedBySessionId,
+  );
+}
+
+function activityExpiry(now: Date, absoluteExpiresAt: Date, short: boolean): Date {
+  return short
+    ? new Date(Math.min(now.getTime() + SessionService.SHORT_IDLE_MS, absoluteExpiresAt.getTime()))
+    : absoluteExpiresAt;
 }
