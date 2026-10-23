@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { henkatenDetailSchema } from '@tmmin-henkaten/contracts';
 import { join } from 'node:path';
 
 import cookieParser from 'cookie-parser';
@@ -253,6 +254,165 @@ describe('Line Shift Henkaten operations', () => {
   });
 
   afterAll(async () => app.close());
+
+  it('submits every 4M category without checklist configuration and retains retry, detail and clone behavior', async () => {
+    for (const category of ['MAN', 'MACHINE', 'MATERIAL', 'METHOD']) {
+      const payload = {
+        category,
+        jobId: job1Id,
+        partId,
+        cause: 'Supplementary checklist',
+        detail: 'No checklist answers',
+        ...(category === 'MAN'
+          ? { lineShiftJobAssignmentId: job1AssignmentId, replacementMpMemberId: replacementMpId }
+          : { affectedObject: 'Before', replacementObject: 'After' }),
+      };
+      const key = randomUUID();
+      const send = () =>
+        request(app.getHttpServer())
+          .post('/api/v1/supplier/henkatens')
+          .set('Origin', supplierOrigin)
+          .set('Cookie', leaderCookie)
+          .set('X-CSRF-Token', leaderCsrf)
+          .set('Idempotency-Key', key)
+          .send(payload);
+      const created = await send();
+      expect(created.status).toBe(201);
+      expect(created.body.checklist).toBeNull();
+      expect(created.body.pcr.status).toBe('PENDING');
+      expect((await send()).body.id).toBe(created.body.id);
+      const detail = await request(app.getHttpServer())
+        .get(`/api/v1/supplier/henkatens/${created.body.id}`)
+        .set('Cookie', leaderCookie);
+      expect(detail.status).toBe(200);
+      expect(detail.body.checklist).toBeNull();
+      const clone = await request(app.getHttpServer())
+        .get(`/api/v1/supplier/henkatens/${created.body.id}/clone-prefill`)
+        .set('Cookie', leaderCookie);
+      expect(clone.status).toBe(200);
+      if (category !== 'MAN')
+        expect(clone.body).toMatchObject({ checklistVersionId: null, checklistItems: [] });
+      const withdrawn = await request(app.getHttpServer())
+        .post(`/api/v1/supplier/henkatens/${created.body.id}/withdraw`)
+        .set('Origin', supplierOrigin)
+        .set('Cookie', leaderCookie)
+        .set('X-CSRF-Token', leaderCsrf)
+        .set('Idempotency-Key', randomUUID())
+        .send({ expectedVersion: created.body.version, reason: 'Cleanup supplementary test' });
+      expect(withdrawn.status).toBe(201);
+    }
+  });
+
+  it('preserves No and unanswered labels against the displayed immutable checklist version', async () => {
+    const template = await prisma.checklistTemplate.create({
+      data: { supplierId, category: 'METHOD' },
+    });
+    const version = await prisma.checklistVersion.create({
+      data: {
+        supplierId,
+        templateId: template.id,
+        category: 'METHOD',
+        versionNumber: 1,
+        items: {
+          create: ['Yes question', 'No question', 'Untouched question'].map((label, index) => ({
+            label,
+            displayOrder: index + 1,
+          })),
+        },
+      },
+      include: { items: { orderBy: { displayOrder: 'asc' } } },
+    });
+    // A newer publication or deactivation must not invalidate evidence already shown to the LL.
+    const newer = await prisma.checklistVersion.create({
+      data: { supplierId, templateId: template.id, category: 'METHOD', versionNumber: 2 },
+    });
+    await prisma.checklistTemplate.update({
+      where: { id: template.id },
+      data: { currentVersionId: newer.id, active: false },
+    });
+    const payload = {
+      category: 'METHOD',
+      jobId: job1Id,
+      partId,
+      cause: 'Supplementary',
+      detail: 'Partial answers',
+      affectedObject: 'Before',
+      replacementObject: 'After',
+      checklistVersionId: version.id,
+    };
+    const submit = (body: object) =>
+      request(app.getHttpServer())
+        .post('/api/v1/supplier/henkatens')
+        .set('Origin', supplierOrigin)
+        .set('Cookie', leaderCookie)
+        .set('X-CSRF-Token', leaderCsrf)
+        .set('Idempotency-Key', randomUUID())
+        .send(body);
+    for (const answers of [
+      [],
+      [{ itemId: version.items[1]!.id, answer: 'NO' }],
+      [
+        { itemId: version.items[0]!.id, answer: 'YES' },
+        { itemId: version.items[1]!.id, answer: 'NO' },
+      ],
+    ]) {
+      const created = await submit({ ...payload, checklistAnswers: answers });
+      expect(created.status).toBe(201);
+      const evidence = henkatenDetailSchema.parse(created.body).checklist;
+      expect(evidence?.versionNumber).toBe(1);
+      expect(evidence?.answers.map((a) => a.answer)).toEqual(
+        version.items.map((item) => answers.find((a) => a.itemId === item.id)?.answer ?? null),
+      );
+      expect(evidence?.answers.map((a) => a.label)).toEqual([
+        'Yes question',
+        'No question',
+        'Untouched question',
+      ]);
+      const snapshot = await prisma.henkatenChecklistSnapshot.findUniqueOrThrow({
+        where: { henkatenId: created.body.id },
+      });
+      await expect(
+        prisma.henkatenChecklistAnswer.updateMany({
+          where: { snapshotId: snapshot.id },
+          data: { answer: 'YES' },
+        }),
+      ).rejects.toThrow();
+    }
+    expect(
+      (await submit({ ...payload, checklistAnswers: [{ itemId: randomUUID(), answer: 'NO' }] }))
+        .status,
+    ).toBe(409);
+    expect((await submit({ ...payload, checklistVersionId, checklistAnswers: [] })).status).toBe(
+      409,
+    ); // Wrong category.
+    expect(
+      (await submit({ ...payload, checklistVersionId: randomUUID(), checklistAnswers: [] })).status,
+    ).toBe(409);
+    const foreign = await prisma.supplier.create({
+      data: {
+        code: randomUUID(),
+        normalizedCode: randomUUID(),
+        name: 'Foreign checklist',
+        sourceMode: 'HOSTED',
+        timezone: 'Asia/Jakarta',
+      },
+    });
+    const foreignTemplate = await prisma.checklistTemplate.create({
+      data: { supplierId: foreign.id, category: 'METHOD' },
+    });
+    const foreignVersion = await prisma.checklistVersion.create({
+      data: {
+        supplierId: foreign.id,
+        templateId: foreignTemplate.id,
+        category: 'METHOD',
+        versionNumber: 1,
+      },
+    });
+    expect(
+      (await submit({ ...payload, checklistVersionId: foreignVersion.id, checklistAnswers: [] }))
+        .status,
+    ).toBe(409);
+  });
 
   it('removes supplier Shift Run lifecycle endpoints', async () => {
     const list = await request(app.getHttpServer())
@@ -764,7 +924,15 @@ describe('Line Shift Henkaten operations', () => {
       (_, index) => records.getCell(index + 2, 1).value,
     );
     expect(identifiers).toContain(record.identifier);
-    expect(workbook.getWorksheet('Checklist')!.rowCount).toBeGreaterThan(1);
+    const checklistSheet = workbook.getWorksheet('Checklist')!;
+    expect(checklistSheet.rowCount).toBeGreaterThan(1);
+    const exportedAnswers = Array.from(
+      { length: checklistSheet.rowCount - 1 },
+      (_, index) => checklistSheet.getCell(index + 2, 5).value,
+    );
+    expect(exportedAnswers).toContain('NO');
+    expect(exportedAnswers).toContain('Belum dijawab');
+    expect(exportedAnswers).toContain('YES');
     expect(workbook.getWorksheet('Approval')!.rowCount).toBeGreaterThan(1);
     const summary = workbook.getWorksheet('Ringkasan')!;
     expect(summary.getCell('A1').value).toBe('HENKATEN  /  RINGKASAN');

@@ -566,13 +566,17 @@ export function HenkatenDetailPage() {
             />
           </Panel>
           <div className="detail-panels">
-            <Panel title="Checklist snapshot" description={`Versi ${item.checklist.versionNumber}`}>
+            <Panel
+              title="Checklist 4M"
+              description={item.checklist ? `Versi ${item.checklist.versionNumber}` : ''}
+            >
+              {!item.checklist?.answers.length && <p>Belum ada item checklist.</p>}
               <ol className="snapshot-list">
-                {item.checklist.answers.map((answer) => (
+                {item.checklist?.answers.map((answer) => (
                   <li key={answer.sourceItemId}>
                     <span>{answer.displayOrder}</span>
                     <strong>{answer.label}</strong>
-                    <em>{answer.answer}</em>
+                    <em>{answer.answer ?? 'Belum dijawab'}</em>
                   </li>
                 ))}
               </ol>

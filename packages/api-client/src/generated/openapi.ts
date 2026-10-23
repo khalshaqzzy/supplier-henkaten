@@ -12470,8 +12470,8 @@ export interface paths {
                 /** @constant */
                 otherPart?: true;
                 /** Format: uuid */
-                checklistVersionId: string;
-                checklistAnswers: {
+                checklistVersionId?: string;
+                checklistAnswers?: {
                   /** Format: uuid */
                   itemId: string;
                   /** @enum {string} */
@@ -12502,8 +12502,8 @@ export interface paths {
                 /** @constant */
                 otherPart?: true;
                 /** Format: uuid */
-                checklistVersionId: string;
-                checklistAnswers: {
+                checklistVersionId?: string;
+                checklistAnswers?: {
                   /** Format: uuid */
                   itemId: string;
                   /** @enum {string} */
@@ -12531,8 +12531,8 @@ export interface paths {
                 /** @constant */
                 otherPart?: true;
                 /** Format: uuid */
-                checklistVersionId: string;
-                checklistAnswers: {
+                checklistVersionId?: string;
+                checklistAnswers?: {
                   /** Format: uuid */
                   itemId: string;
                   /** @enum {string} */
@@ -12560,8 +12560,8 @@ export interface paths {
                 /** @constant */
                 otherPart?: true;
                 /** Format: uuid */
-                checklistVersionId: string;
-                checklistAnswers: {
+                checklistVersionId?: string;
+                checklistAnswers?: {
                   /** Format: uuid */
                   itemId: string;
                   /** @enum {string} */
@@ -12702,10 +12702,9 @@ export interface paths {
                   sourceItemId: string;
                   label: string;
                   displayOrder: number;
-                  /** @enum {string} */
-                  answer: 'YES' | 'NO';
+                  answer: ('YES' | 'NO') | null;
                 }[];
-              };
+              } | null;
               man: {
                 /** Format: uuid */
                 targetWorkingAssignmentId: string;
@@ -13337,10 +13336,9 @@ export interface paths {
                   sourceItemId: string;
                   label: string;
                   displayOrder: number;
-                  /** @enum {string} */
-                  answer: 'YES' | 'NO';
+                  answer: ('YES' | 'NO') | null;
                 }[];
-              };
+              } | null;
               man: {
                 /** Format: uuid */
                 targetWorkingAssignmentId: string;
@@ -13653,10 +13651,9 @@ export interface paths {
                   sourceItemId: string;
                   label: string;
                   displayOrder: number;
-                  /** @enum {string} */
-                  answer: 'YES' | 'NO';
+                  answer: ('YES' | 'NO') | null;
                 }[];
-              };
+              } | null;
               man: {
                 /** Format: uuid */
                 targetWorkingAssignmentId: string;
@@ -13919,10 +13916,9 @@ export interface paths {
                   sourceItemId: string;
                   label: string;
                   displayOrder: number;
-                  /** @enum {string} */
-                  answer: 'YES' | 'NO';
+                  answer: ('YES' | 'NO') | null;
                 }[];
-              };
+              } | null;
               man: {
                 /** Format: uuid */
                 targetWorkingAssignmentId: string;
@@ -14184,10 +14180,9 @@ export interface paths {
                   sourceItemId: string;
                   label: string;
                   displayOrder: number;
-                  /** @enum {string} */
-                  answer: 'YES' | 'NO';
+                  answer: ('YES' | 'NO') | null;
                 }[];
-              };
+              } | null;
               man: {
                 /** Format: uuid */
                 targetWorkingAssignmentId: string;
@@ -14335,8 +14330,7 @@ export interface paths {
               detail: string;
               affectedObject: string | null;
               replacementObject: string | null;
-              /** Format: uuid */
-              checklistVersionId: string;
+              checklistVersionId: string | null;
               checklistItems: {
                 /** Format: uuid */
                 itemId: string;
@@ -15260,10 +15254,9 @@ export interface paths {
                   sourceItemId: string;
                   label: string;
                   displayOrder: number;
-                  /** @enum {string} */
-                  answer: 'YES' | 'NO';
+                  answer: ('YES' | 'NO') | null;
                 }[];
-              };
+              } | null;
               man: {
                 /** Format: uuid */
                 targetWorkingAssignmentId: string;
@@ -19143,17 +19136,15 @@ export interface paths {
                   number: string;
                   name: string;
                 };
-                checklist: {
-                  templateVersion: string;
-                  /** @constant */
-                  allPassed: true;
+                checklist?: {
+                  templateVersion?: string;
+                  allPassed?: boolean;
                   items: {
                     externalId: string;
                     label: string;
-                    /** @constant */
-                    answer: 'YES';
+                    answer?: ('YES' | 'NO') | null;
                   }[];
-                };
+                } | null;
                 decisions: {
                   /** @enum {string} */
                   route: 'SUPERVISOR' | 'QC';
@@ -19225,17 +19216,15 @@ export interface paths {
                   number: string;
                   name: string;
                 };
-                checklist: {
-                  templateVersion: string;
-                  /** @constant */
-                  allPassed: true;
+                checklist?: {
+                  templateVersion?: string;
+                  allPassed?: boolean;
                   items: {
                     externalId: string;
                     label: string;
-                    /** @constant */
-                    answer: 'YES';
+                    answer?: ('YES' | 'NO') | null;
                   }[];
-                };
+                } | null;
                 decisions: {
                   /** @enum {string} */
                   route: 'SUPERVISOR' | 'QC';
@@ -19297,17 +19286,15 @@ export interface paths {
                   number: string;
                   name: string;
                 };
-                checklist: {
-                  templateVersion: string;
-                  /** @constant */
-                  allPassed: true;
+                checklist?: {
+                  templateVersion?: string;
+                  allPassed?: boolean;
                   items: {
                     externalId: string;
                     label: string;
-                    /** @constant */
-                    answer: 'YES';
+                    answer?: ('YES' | 'NO') | null;
                   }[];
-                };
+                } | null;
                 decisions: {
                   /** @enum {string} */
                   route: 'SUPERVISOR' | 'QC';
@@ -19369,17 +19356,15 @@ export interface paths {
                   number: string;
                   name: string;
                 };
-                checklist: {
-                  templateVersion: string;
-                  /** @constant */
-                  allPassed: true;
+                checklist?: {
+                  templateVersion?: string;
+                  allPassed?: boolean;
                   items: {
                     externalId: string;
                     label: string;
-                    /** @constant */
-                    answer: 'YES';
+                    answer?: ('YES' | 'NO') | null;
                   }[];
-                };
+                } | null;
                 decisions: {
                   /** @enum {string} */
                   route: 'SUPERVISOR' | 'QC';

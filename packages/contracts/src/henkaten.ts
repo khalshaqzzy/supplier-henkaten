@@ -35,8 +35,8 @@ const submissionBase = {
   jobId: opaqueIdSchema,
   partId: opaqueIdSchema.optional(),
   otherPart: z.literal(true).optional(),
-  checklistVersionId: opaqueIdSchema,
-  checklistAnswers: z.array(checklistSubmissionAnswerSchema).min(1).max(100),
+  checklistVersionId: opaqueIdSchema.optional(),
+  checklistAnswers: z.array(checklistSubmissionAnswerSchema).max(100).optional(),
   cause: requiredText,
   detail: requiredText,
   clonedFromHenkatenId: opaqueIdSchema.optional(),
@@ -65,6 +65,23 @@ export const createHenkatenRequestSchema = z
     ),
   ])
   .superRefine((value, context) => {
+    if (value.checklistAnswers?.length && !value.checklistVersionId) {
+      context.addIssue({
+        code: 'custom',
+        path: ['checklistVersionId'],
+        message: 'Versi checklist diperlukan untuk jawaban yang dikirim.',
+      });
+    }
+    if (
+      new Set(value.checklistAnswers?.map(({ itemId }) => itemId)).size !==
+      (value.checklistAnswers?.length ?? 0)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['checklistAnswers'],
+        message: 'Item checklist tidak boleh duplikat.',
+      });
+    }
     if (Boolean(value.partId) === Boolean(value.otherPart)) {
       context.addIssue({ code: 'custom', path: ['partId'], message: 'Pilih part atau Other.' });
     }
@@ -142,7 +159,7 @@ export const henkatenChecklistSnapshotSchema = z
           sourceItemId: opaqueIdSchema,
           label: z.string().min(1).max(500),
           displayOrder: z.number().int().positive(),
-          answer: checklistAnswerSchema,
+          answer: checklistAnswerSchema.nullable(),
         })
         .strict(),
     ),
@@ -172,7 +189,7 @@ export const henkatenDetailSchema = henkatenSummarySchema
     cancellationReason: z.enum(['WITHDRAWN', 'SHIFT_ENDED']).nullable(),
     withdrawalReason: z.string().nullable(),
     clonedFromHenkatenId: opaqueIdSchema.nullable(),
-    checklist: henkatenChecklistSnapshotSchema,
+    checklist: henkatenChecklistSnapshotSchema.nullable(),
     man: z
       .object({
         targetWorkingAssignmentId: opaqueIdSchema,
@@ -374,7 +391,7 @@ export const clonePrefillSchema = z
     detail: z.string(),
     affectedObject: z.string().nullable(),
     replacementObject: z.string().nullable(),
-    checklistVersionId: opaqueIdSchema,
+    checklistVersionId: opaqueIdSchema.nullable(),
     checklistItems: z.array(
       z
         .object({ itemId: opaqueIdSchema, label: z.string(), displayOrder: z.number().int() })

@@ -842,7 +842,7 @@ function projectionData(event: ExternalHenkatenEvent) {
     jobSnapshot: event.job as Prisma.InputJsonValue,
     partSnapshot: event.part as Prisma.InputJsonValue,
     changeSnapshot: event.change as Prisma.InputJsonValue,
-    checklistSnapshot: event.checklist as Prisma.InputJsonValue,
+    checklistSnapshot: (event.checklist ?? {}) as Prisma.InputJsonValue,
     decisionsSnapshot: event.decisions as Prisma.InputJsonValue,
     lastEventId: event.eventId,
   };

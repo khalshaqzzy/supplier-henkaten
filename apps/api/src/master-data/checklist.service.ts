@@ -97,14 +97,6 @@ export class ChecklistService {
       if (!locked) throw validation('Checklist template is unavailable.');
       if (locked.version !== expectedVersion) throw versionConflict();
       if (!locked.active) throw validation('Inactive checklist cannot be published.');
-      if (!locked.draftItems.length) {
-        throw new ProblemException({
-          status: 409,
-          code: 'CHECKLIST_NOT_PUBLISHED',
-          title: 'Checklist cannot be published',
-          detail: 'At least one checklist item is required.',
-        });
-      }
       const latest = await tx.checklistVersion.aggregate({
         where: { templateId: locked.id },
         _max: { versionNumber: true },
@@ -169,19 +161,6 @@ export class ChecklistService {
       await lockSetupMutation(tx, scope.supplierId);
       const template = await this.ensureTemplate(scope.supplierId, category, tx);
       if (template.version !== expectedVersion) throw versionConflict();
-      if (
-        !active &&
-        (await tx.shiftRun.count({
-          where: { supplierId: scope.supplierId, status: 'ACTIVE' },
-        }))
-      ) {
-        throw new ProblemException({
-          status: 409,
-          code: 'RESOURCE_IN_USE',
-          title: 'Resource is in use',
-          detail: 'Checklist configuration is required by an active Shift Run.',
-        });
-      }
       const row = await tx.checklistTemplate.update({
         where: { id: template.id },
         data: { active, version: { increment: 1 }, updatedById: context.actorUserId },

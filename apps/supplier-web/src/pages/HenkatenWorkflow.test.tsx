@@ -74,7 +74,7 @@ describe('Henkaten workflow presentation', () => {
       </>,
     );
 
-    expect(screen.getByText('Memenuhi persyaratan')).toBeTruthy();
+    expect(screen.getByText('Yes', { selector: 'small' })).toBeTruthy();
     expect(screen.getByText('Belum dijawab')).toBeTruthy();
     expect(screen.getByText('1 item belum dijawab')).toBeTruthy();
     await user.click(screen.getAllByRole('button', { name: 'No' })[0]!);
@@ -87,7 +87,9 @@ describe('Henkaten workflow presentation', () => {
         onChange={onChange}
       />,
     );
-    expect(screen.getByText('Jawaban No memblokir submission')).toBeTruthy();
+    expect(screen.getByText('No', { selector: 'small' })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'No' }));
+    expect(onChange).toHaveBeenLastCalledWith('safety', null);
   });
 
   it('renders actual movement, object transition, and parallel route evidence', () => {

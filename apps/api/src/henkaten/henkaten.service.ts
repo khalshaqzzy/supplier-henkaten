@@ -109,18 +109,18 @@ export class HenkatenService {
               where: { id: input.partId, supplierId: scope.supplierId, active: true },
             })
           : Promise.resolve(null),
-        tx.checklistVersion.findFirst({
-          where: {
-            id: input.checklistVersionId,
-            supplierId: scope.supplierId,
-            category: input.category,
-            currentFor: { some: { active: true } },
-          },
-          include: {
-            items: { orderBy: { displayOrder: 'asc' } },
-            template: { include: { versions: { orderBy: { versionNumber: 'desc' }, take: 1 } } },
-          },
-        }),
+        input.checklistVersionId
+          ? tx.checklistVersion.findFirst({
+              where: {
+                id: input.checklistVersionId,
+                supplierId: scope.supplierId,
+                category: input.category,
+              },
+              include: {
+                items: { orderBy: { displayOrder: 'asc' } },
+              },
+            })
+          : Promise.resolve(null),
       ]);
       if (
         !supplier ||
@@ -137,14 +137,13 @@ export class HenkatenService {
         ? normalizeLookup(selectedPart.partNumber)
         : `other:${henkatenId}`;
       const answers = new Map(
-        input.checklistAnswers.map((answer) => [answer.itemId, answer.answer]),
+        (input.checklistAnswers ?? []).map((answer) => [answer.itemId, answer.answer]),
       );
       if (
-        !checklist ||
-        checklist.template.versions[0]?.id !== checklist.id ||
-        checklist.items.length !== input.checklistAnswers.length ||
-        answers.size !== checklist.items.length ||
-        checklist.items.some(({ id: itemId }) => answers.get(itemId) !== 'YES')
+        (input.checklistVersionId && !checklist) ||
+        (!checklist && answers.size > 0) ||
+        answers.size !== (input.checklistAnswers?.length ?? 0) ||
+        [...answers.keys()].some((itemId) => !checklist?.items.some(({ id }) => id === itemId))
       )
         throw checklistInvalid();
 
@@ -272,21 +271,25 @@ export class HenkatenService {
           submissionKey: idempotencyKey,
           submissionPayloadHash: payloadHash,
           createdById: principal.userId,
-          checklistSnapshot: {
-            create: {
-              checklistVersionId: checklist.id,
-              category: checklist.category,
-              versionNumber: checklist.versionNumber,
-              answers: {
-                create: checklist.items.map((item) => ({
-                  sourceItemId: item.id,
-                  labelSnapshot: item.label,
-                  displayOrderSnapshot: item.displayOrder,
-                  answer: 'YES',
-                })),
-              },
-            },
-          },
+          ...(checklist
+            ? {
+                checklistSnapshot: {
+                  create: {
+                    checklistVersionId: checklist.id,
+                    category: checklist.category,
+                    versionNumber: checklist.versionNumber,
+                    answers: {
+                      create: checklist.items.map((item) => ({
+                        sourceItemId: item.id,
+                        labelSnapshot: item.label,
+                        displayOrderSnapshot: item.displayOrder,
+                        answer: answers.get(item.id) ?? null,
+                      })),
+                    },
+                  },
+                },
+              }
+            : {}),
           transitions: {
             create: {
               toStatus: 'OPEN',
@@ -763,7 +766,6 @@ export class HenkatenService {
           })
         : Promise.resolve(null),
     ]);
-    if (!checklist) throw checklistInvalid();
     const selectable = operational.currentLineShiftIds.length
       ? operational.items.filter(({ id }) => operational.currentLineShiftIds.includes(id))
       : operational.items;
@@ -790,8 +792,8 @@ export class HenkatenService {
       detail: row.detail,
       affectedObject: row.affectedObject,
       replacementObject: row.replacementObject,
-      checklistVersionId: checklist.id,
-      checklistItems: checklist.items.map((item) => ({
+      checklistVersionId: checklist?.id ?? null,
+      checklistItems: (checklist?.items ?? []).map((item) => ({
         itemId: item.id,
         label: item.label,
         displayOrder: item.displayOrder,
@@ -1367,7 +1369,8 @@ function checklistInvalid() {
     status: 409,
     code: 'CHECKLIST_NOT_PUBLISHED',
     title: 'Checklist invalid',
-    detail: 'The latest active checklist must be answered YES in full.',
+    detail:
+      'Checklist evidence must reference a published version and its items in this supplier and category.',
   });
 }
 function idempotencyConflict() {

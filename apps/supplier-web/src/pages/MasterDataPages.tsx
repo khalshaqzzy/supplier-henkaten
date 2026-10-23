@@ -1388,7 +1388,7 @@ export function ChecklistDetailPage() {
           </Panel>
           <Panel title="Publikasi" description="" className="checklist-editor__side">
             <Button
-              disabled={dirty || invalid || !items.length || publish.isPending}
+              disabled={dirty || invalid || publish.isPending}
               loading={publish.isPending}
               onClick={() => {
                 setProblem(null);

@@ -125,6 +125,40 @@ describe('External API credential and ingestion boundary', () => {
     expect(accessToken).toMatch(/^eat_/);
   });
 
+  it('ingests absent and non-green supplemental evidence without affecting workflow', async () => {
+    for (const checklist of [
+      undefined,
+      null,
+      { items: [] },
+      {
+        allPassed: false,
+        items: [
+          { externalId: 'no', label: 'No evidence', answer: 'NO' },
+          { externalId: 'pending', label: 'Unanswered', answer: null },
+        ],
+      },
+    ]) {
+      const sourceHenkatenId = `optional-${randomUUID()}`;
+      const opened = {
+        ...event({
+          eventId: randomUUID(),
+          sourceHenkatenId,
+          sourceVersion: 1,
+          eventType: 'HENKATEN_OPENED',
+          status: 'OPEN',
+        }),
+        checklist,
+      };
+      expect((await ingest(opened)).status).toBe(202);
+      expect((await ingest(opened)).body.status).toBe('DUPLICATE');
+      const stored = await prisma.externalHenkatenProjection.findFirstOrThrow({
+        where: { supplierId, sourceHenkatenId },
+      });
+      expect(stored.checklistSnapshot).toEqual(checklist ?? {});
+      expect(stored.status).toBe('OPEN');
+    }
+  });
+
   it('ingests sequential immutable events with exact retry and warning projection', async () => {
     const opened = event({
       eventId: 'external-event-1',

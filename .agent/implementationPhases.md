@@ -1,6 +1,6 @@
 # Enterprise Digital Henkaten Management — Implementation Roadmap
 
-Status: active · Updated: 2026-10-20 · Approach: backend first, dependency driven
+Status: active · Updated: 2026-10-23 · Approach: backend first, dependency driven
 
 This file tracks sequence, current state, dependencies, and remaining acceptance gates. The [PRD](PRD.md) defines product behavior; [rules](rules.md) define agent and engineering process; [session handoff](sessionHandoff.md) records recent changes and checks; [ADRs](../docs/adr/) explain durable decisions. Detailed local browser evidence and unresolved checks live in the [QA report](../docs/audits/local-browser-qa-2026-09-24.md) and [scenario plan](../docs/qa/browser-local-end-to-end-verification-plan.md). Do not copy their histories into this roadmap.
 
@@ -75,6 +75,17 @@ patches and the narrowly revalidated OpenSSL exception. Remote PR checks, the no
 and its automatic production workflow are tracked against their actual SHAs. HTTPS persistent-profile
 restart and device/UAT acceptance remain separate release work. Phase 15 stays `in_progress`; no staging/device/production
 gate was advanced by local implementation.
+
+## Supplemental checklist amendment — 2026-10-23
+
+Implementation on `feat/optional-4m-checklist` makes all 4M checklists optional, including zero
+items/categories, incomplete answers and No, without submission confirmations. Shared readiness,
+publication/deactivation, Hosted/External contracts, nullable evidence readers, clone and export
+are included. Historical evidence remains immutable; stored unanswered items use nullable answers
+through migration 0021. The displayed publication remains valid evidence after a later publication
+or deactivation. See [implementation plan](optionalChecklistPlan.md),
+[ADR 0048](../docs/adr/0048-supplemental-4m-checklists.md) and the handoff for current verification.
+Phase 15 remains `in_progress`; staging/device acceptance and remote PR checks are separate gates.
 
 ## Cross-cutting gates
 

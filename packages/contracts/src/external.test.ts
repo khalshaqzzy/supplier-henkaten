@@ -46,6 +46,31 @@ describe('external API contracts', () => {
     ).toBe(false);
   });
 
+  it('accepts missing, empty, negative and unanswered supplemental evidence', () => {
+    for (const checklist of [
+      undefined,
+      null,
+      { items: [] },
+      {
+        templateVersion: 'v1',
+        allPassed: false,
+        items: [
+          { externalId: 'Q1', label: 'Checked', answer: 'NO' },
+          { externalId: 'Q2', label: 'Pending', answer: null },
+          { externalId: 'Q3', label: 'Untouched' },
+        ],
+      },
+    ]) {
+      expect(externalHenkatenEventSchema.safeParse({ ...opened, checklist }).success).toBe(true);
+    }
+    expect(
+      externalHenkatenEventSchema.safeParse({
+        ...opened,
+        checklist: { items: [{ externalId: 'Q1', label: 'Checked', answer: 'INVALID' }] },
+      }).success,
+    ).toBe(false);
+  });
+
   it('enforces terminal decision evidence and keeps batch item validation independent', () => {
     expect(
       externalHenkatenEventSchema.safeParse({
