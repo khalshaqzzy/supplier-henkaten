@@ -330,7 +330,7 @@ export const checklistVersionSchema = z
     category: henkatenCategorySchema,
     versionNumber: optimisticVersionSchema,
     publishedAt: utcTimestampSchema,
-    items: z.array(checklistItemSchema).min(1),
+    items: z.array(checklistItemSchema),
   })
   .strict();
 

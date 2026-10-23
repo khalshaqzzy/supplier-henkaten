@@ -115,7 +115,7 @@ export function SetupPage() {
                     title={`${index + 1}. ${meta.label}`}
                     description={
                       area.requiredCount === 0
-                        ? `${area.activeCount} part · opsional`
+                        ? `${area.activeCount} ${area.area === 'CHECKLISTS' ? 'kategori' : 'part'} · opsional`
                         : area.ready
                           ? `${area.activeCount} data aktif · lengkap`
                           : `${area.activeCount}/${area.requiredCount} minimum · ${area.blockerCount} blocker`
@@ -134,7 +134,9 @@ export function SetupPage() {
                     </div>
                     <Link to={meta.to}>
                       {area.requiredCount === 0
-                        ? 'Kelola part'
+                        ? area.area === 'CHECKLISTS'
+                          ? 'Kelola checklist'
+                          : 'Kelola part'
                         : area.ready
                           ? 'Tinjau konfigurasi'
                           : 'Lengkapi sekarang'}

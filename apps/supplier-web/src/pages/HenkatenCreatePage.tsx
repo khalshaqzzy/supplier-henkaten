@@ -57,6 +57,15 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
         ...(partSearch.trim() ? { part: partSearch.trim() } : {}),
       }),
   });
+  const [displayedChecklist, setDisplayedChecklist] = useState<{
+    category: HenkatenCategory;
+    checklist: NonNullable<typeof options.data>['checklist'];
+  }>();
+  useEffect(() => {
+    if (options.data && displayedChecklist?.category !== category) {
+      setDisplayedChecklist({ category, checklist: options.data.checklist });
+    }
+  }, [category, options.data, displayedChecklist]);
   useEffect(() => {
     setAnswers({});
     setReplacementMpId('');
@@ -90,9 +99,8 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
   const selectedPart = options.data?.parts.find(({ id }) => id === partId);
   const replacement = options.data?.replacementMembers.find(({ id }) => id === replacementMpId);
   const tanoko = replacement?.skillLevels?.find(({ jobId: id }) => id === jobId)?.level ?? 0;
-  const checklist = options.data?.checklist;
-  const checklistComplete =
-    Boolean(checklist?.items.length) && checklist!.items.every(({ id }) => answers[id] === 'YES');
+  const checklist =
+    displayedChecklist?.category === category ? displayedChecklist.checklist : undefined;
   const categoryComplete =
     category === 'MAN'
       ? Boolean(selectedAssignment && replacement && tanoko >= 3)
@@ -104,7 +112,8 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
     cause.trim() &&
     detail.trim() &&
     categoryComplete &&
-    checklistComplete,
+    options.isSuccess &&
+    displayedChecklist?.category === category,
   );
   const submit = useMutation({
     mutationFn: () => {
@@ -116,8 +125,14 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
         expectedLineShiftVersion: selectedShift!.version,
         jobId,
         ...(partId === 'OTHER' ? { otherPart: true as const } : { partId }),
-        checklistVersionId: checklist!.id,
-        checklistAnswers: checklist!.items.map(({ id }) => ({ itemId: id, answer: answers[id]! })),
+        ...(checklist
+          ? {
+              checklistVersionId: checklist.id,
+              checklistAnswers: checklist.items.flatMap(({ id }) =>
+                answers[id] ? [{ itemId: id, answer: answers[id] }] : [],
+              ),
+            }
+          : {}),
         cause,
         detail,
         ...(clone && henkatenId ? { clonedFromHenkatenId: henkatenId } : {}),
@@ -329,19 +344,22 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
               />
             </Field>
           </Panel>
-          <Panel title="Checklist">
+          <Panel title="Checklist 4M (opsional)">
             {checklist?.items.length ? (
               <ChecklistResponseList
                 items={checklist.items}
                 answers={answers}
                 onChange={(itemId, answer) =>
-                  setAnswers((current) => ({ ...current, [itemId]: answer }))
+                  setAnswers((current) => {
+                    const next = { ...current };
+                    if (answer) next[itemId] = answer;
+                    else delete next[itemId];
+                    return next;
+                  })
                 }
               />
             ) : (
-              <Alert tone="danger" title="Checklist belum tersedia">
-                Hubungi Supplier Admin.
-              </Alert>
+              <p>Belum ada item checklist.</p>
             )}
           </Panel>
         </fieldset>

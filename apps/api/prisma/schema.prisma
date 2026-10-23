@@ -1300,7 +1300,7 @@ model HenkatenChecklistAnswer {
   sourceItemId         String                    @db.Uuid
   labelSnapshot        String                    @db.VarChar(500)
   displayOrderSnapshot Int
-  answer               ChecklistAnswer
+  answer               ChecklistAnswer?
   snapshot             HenkatenChecklistSnapshot @relation(fields: [snapshotId, supplierId], references: [id, supplierId], onDelete: Restrict)
 
   @@unique([snapshotId, sourceItemId])

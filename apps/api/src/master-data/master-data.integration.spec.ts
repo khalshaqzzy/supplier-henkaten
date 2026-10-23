@@ -132,6 +132,12 @@ describe('supplier master data', () => {
     expect(response.status).toBe(200);
     const readiness = supplierSetupReadinessSchema.parse(response.body);
     expect(readiness.ready).toBe(false);
+    expect(readiness.areas.find(({ area }) => area === 'CHECKLISTS')).toMatchObject({
+      ready: true,
+      requiredCount: 0,
+      blockerCount: 0,
+    });
+    expect(readiness.blockers.some(({ area }) => area === 'CHECKLISTS')).toBe(false);
     expect(readiness.blockers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ code: 'ACTIVE_SHIFT_TEMPLATE_MISSING' }),
@@ -198,6 +204,19 @@ describe('supplier master data', () => {
     ).rejects.toThrow();
   });
 
+  it('publishes an empty optional category and preserves its immutable history', async () => {
+    const draft = await supplierPatch('/api/v1/supplier/master-data/checklists/MACHINE/draft', {
+      items: [],
+    });
+    expect(draft.status).toBe(200);
+    const published = await supplierPost(
+      '/api/v1/supplier/master-data/checklists/MACHINE/publish',
+      { expectedVersion: draft.body.version },
+    );
+    expect(published.status).toBe(201);
+    expect(published.body.items).toEqual([]);
+  });
+
   it('configures catalog, immutable checklists, assignments, and source preflight', async () => {
     const line = await supplierPost('/api/v1/supplier/master-data/lines', {
       code: `LINE-${randomUUID()}`,
@@ -241,7 +260,7 @@ describe('supplier master data', () => {
         { expectedVersion: draft.body.version },
       );
       expect(published.status).toBe(201);
-      expect(published.body.versionNumber).toBe(1);
+      expect(published.body.versionNumber).toBe(category === 'MACHINE' ? 2 : 1);
       await expect(
         prisma.checklistVersion.update({
           where: { id: published.body.id },

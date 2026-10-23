@@ -62,7 +62,6 @@ type DetailRow = Henkaten & {
 };
 
 export function presentHenkatenDetail(row: DetailRow) {
-  if (!row.checklistSnapshot) throw new Error('MissingHenkatenChecklistSnapshot');
   return {
     ...presentHenkatenSummary(row),
     timezone: row.timezoneSnapshot,
@@ -74,17 +73,19 @@ export function presentHenkatenDetail(row: DetailRow) {
     cancellationReason: row.cancellationReason,
     withdrawalReason: row.withdrawalReason,
     clonedFromHenkatenId: row.clonedFrom?.deletedAt ? null : row.clonedFromHenkatenId,
-    checklist: {
-      checklistVersionId: row.checklistSnapshot.checklistVersionId,
-      versionNumber: row.checklistSnapshot.versionNumber,
-      category: row.checklistSnapshot.category,
-      answers: row.checklistSnapshot.answers.map((answer) => ({
-        sourceItemId: answer.sourceItemId,
-        label: answer.labelSnapshot,
-        displayOrder: answer.displayOrderSnapshot,
-        answer: answer.answer,
-      })),
-    },
+    checklist: row.checklistSnapshot
+      ? {
+          checklistVersionId: row.checklistSnapshot.checklistVersionId,
+          versionNumber: row.checklistSnapshot.versionNumber,
+          category: row.checklistSnapshot.category,
+          answers: row.checklistSnapshot.answers.map((answer) => ({
+            sourceItemId: answer.sourceItemId,
+            label: answer.labelSnapshot,
+            displayOrder: answer.displayOrderSnapshot,
+            answer: answer.answer,
+          })),
+        }
+      : null,
     man: row.manDetail
       ? {
           targetWorkingAssignmentId: row.manDetail.targetWorkingAssignmentId,

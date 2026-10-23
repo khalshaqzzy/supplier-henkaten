@@ -176,7 +176,7 @@ export function ChecklistResponseList({
 }: {
   items: Array<{ id: string; label: string }>;
   answers: Record<string, 'YES' | 'NO'>;
-  onChange: (itemId: string, answer: 'YES' | 'NO') => void;
+  onChange: (itemId: string, answer: 'YES' | 'NO' | null) => void;
 }) {
   return (
     <ol className="checklist-answers">
@@ -190,13 +190,7 @@ export function ChecklistResponseList({
             <span className="checklist-answers__number">{index + 1}</span>
             <span className="checklist-answers__question">
               <strong>{item.label}</strong>
-              <small>
-                {answer === 'YES'
-                  ? 'Memenuhi persyaratan'
-                  : answer === 'NO'
-                    ? 'Jawaban No memblokir submission'
-                    : 'Belum dijawab'}
-              </small>
+              <small>{answer === 'YES' ? 'Yes' : answer === 'NO' ? 'No' : 'Belum dijawab'}</small>
             </span>
             <span
               className="checklist-answers__choices"
@@ -207,7 +201,7 @@ export function ChecklistResponseList({
                 type="button"
                 aria-pressed={answer === 'YES'}
                 className={answer === 'YES' ? 'is-selected is-yes' : undefined}
-                onClick={() => onChange(item.id, 'YES')}
+                onClick={() => onChange(item.id, answer === 'YES' ? null : 'YES')}
               >
                 <Check aria-hidden="true" /> Yes
               </button>
@@ -215,7 +209,7 @@ export function ChecklistResponseList({
                 type="button"
                 aria-pressed={answer === 'NO'}
                 className={answer === 'NO' ? 'is-selected is-no' : undefined}
-                onClick={() => onChange(item.id, 'NO')}
+                onClick={() => onChange(item.id, answer === 'NO' ? null : 'NO')}
               >
                 <X aria-hidden="true" /> No
               </button>

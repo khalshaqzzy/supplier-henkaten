@@ -708,7 +708,7 @@ function writeRecord(
       row.checklistSnapshot?.versionNumber ?? '',
       answer.displayOrderSnapshot,
       answer.labelSnapshot,
-      answer.answer,
+      answer.answer ?? 'Belum dijawab',
     ]);
   }
   for (const transition of row.transitions) {

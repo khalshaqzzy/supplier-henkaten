@@ -33,6 +33,40 @@ describe('operational contracts', () => {
     ).toThrow();
   });
 
+  it('accepts supplemental checklists and rejects orphan or duplicate answers', () => {
+    const base = {
+      category: 'MACHINE',
+      jobId: id(),
+      otherPart: true,
+      cause: 'Replacement',
+      detail: 'Routine replacement',
+      affectedObject: 'Old',
+      replacementObject: 'New',
+    };
+    expect(createHenkatenRequestSchema.safeParse(base).success).toBe(true);
+    expect(createHenkatenRequestSchema.safeParse({ ...base, checklistAnswers: [] }).success).toBe(
+      true,
+    );
+    const answer = { itemId: id(), answer: 'NO' };
+    expect(
+      createHenkatenRequestSchema.safeParse({
+        ...base,
+        checklistVersionId: id(),
+        checklistAnswers: [answer],
+      }).success,
+    ).toBe(true);
+    expect(
+      createHenkatenRequestSchema.safeParse({ ...base, checklistAnswers: [answer] }).success,
+    ).toBe(false);
+    expect(
+      createHenkatenRequestSchema.safeParse({
+        ...base,
+        checklistVersionId: id(),
+        checklistAnswers: [answer, answer],
+      }).success,
+    ).toBe(false);
+  });
+
   it('discriminates Man references from non-Man freeform replacements', () => {
     const base = {
       lineShiftId: id(),

@@ -1059,7 +1059,7 @@ export class ShiftService {
     currentPlanId?: string,
   ) {
     const checks: ShiftPreflightCheck[] = [];
-    const [active, issue, carryOver, categories] = await Promise.all([
+    const [active, issue, carryOver] = await Promise.all([
       tx.shiftRun.findFirst({
         where: {
           supplierId,
@@ -1077,11 +1077,6 @@ export class ShiftService {
           status: 'OPEN',
           ...(currentPlanId ? { shiftRunId: { not: currentPlanId } } : {}),
         },
-      }),
-      tx.checklistVersion.findMany({
-        where: { supplierId, currentFor: { some: { active: true } } },
-        distinct: ['category'],
-        select: { category: true },
       }),
     ]);
     if (active)
@@ -1111,15 +1106,6 @@ export class ShiftService {
           carryOver.id,
         ),
       );
-    const published = new Set(categories.map(({ category }) => category));
-    for (const category of ['MAN', 'MACHINE', 'MATERIAL', 'METHOD'] as const) {
-      if (!published.has(category)) {
-        checks.push({
-          ...check('CHECKLIST_INVALID', `Published ${category} checklist is required.`),
-          category,
-        });
-      }
-    }
     return checks;
   }
 

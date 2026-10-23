@@ -22960,7 +22960,6 @@
                       "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
                     },
                     "items": {
-                      "minItems": 1,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -23164,7 +23163,6 @@
                             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
                           },
                           "items": {
-                            "minItems": 1,
                             "type": "array",
                             "items": {
                               "type": "object",
@@ -27388,7 +27386,6 @@
                             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
                           },
                           "items": {
-                            "minItems": 1,
                             "type": "array",
                             "items": {
                               "type": "object",
@@ -29756,7 +29753,6 @@
                         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                       },
                       "checklistAnswers": {
-                        "minItems": 1,
                         "maxItems": 100,
                         "type": "array",
                         "items": {
@@ -29826,8 +29822,6 @@
                     },
                     "required": [
                       "jobId",
-                      "checklistVersionId",
-                      "checklistAnswers",
                       "cause",
                       "detail",
                       "category",
@@ -29874,7 +29868,6 @@
                         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                       },
                       "checklistAnswers": {
-                        "minItems": 1,
                         "maxItems": 100,
                         "type": "array",
                         "items": {
@@ -29932,8 +29925,6 @@
                     },
                     "required": [
                       "jobId",
-                      "checklistVersionId",
-                      "checklistAnswers",
                       "cause",
                       "detail",
                       "category",
@@ -29980,7 +29971,6 @@
                         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                       },
                       "checklistAnswers": {
-                        "minItems": 1,
                         "maxItems": 100,
                         "type": "array",
                         "items": {
@@ -30038,8 +30028,6 @@
                     },
                     "required": [
                       "jobId",
-                      "checklistVersionId",
-                      "checklistAnswers",
                       "cause",
                       "detail",
                       "category",
@@ -30086,7 +30074,6 @@
                         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                       },
                       "checklistAnswers": {
-                        "minItems": 1,
                         "maxItems": 100,
                         "type": "array",
                         "items": {
@@ -30144,8 +30131,6 @@
                     },
                     "required": [
                       "jobId",
-                      "checklistVersionId",
-                      "checklistAnswers",
                       "cause",
                       "detail",
                       "category",
@@ -30779,72 +30764,86 @@
                       ]
                     },
                     "checklist": {
-                      "type": "object",
-                      "properties": {
-                        "checklistVersionId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        "versionNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": 0,
-                          "maximum": 9007199254740991
-                        },
-                        "category": {
-                          "type": "string",
-                          "enum": [
-                            "MAN",
-                            "MACHINE",
-                            "MATERIAL",
-                            "METHOD"
-                          ]
-                        },
-                        "answers": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "sourceItemId": {
-                                "type": "string",
-                                "format": "uuid",
-                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                              },
-                              "label": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 500
-                              },
-                              "displayOrder": {
-                                "type": "integer",
-                                "exclusiveMinimum": 0,
-                                "maximum": 9007199254740991
-                              },
-                              "answer": {
-                                "type": "string",
-                                "enum": [
-                                  "YES",
-                                  "NO"
-                                ]
-                              }
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "checklistVersionId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                             },
-                            "required": [
-                              "sourceItemId",
-                              "label",
-                              "displayOrder",
-                              "answer"
-                            ],
-                            "additionalProperties": false
-                          }
+                            "versionNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "category": {
+                              "type": "string",
+                              "enum": [
+                                "MAN",
+                                "MACHINE",
+                                "MATERIAL",
+                                "METHOD"
+                              ]
+                            },
+                            "answers": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "sourceItemId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "displayOrder": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "answer": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "YES",
+                                          "NO"
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "sourceItemId",
+                                  "label",
+                                  "displayOrder",
+                                  "answer"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "checklistVersionId",
+                            "versionNumber",
+                            "category",
+                            "answers"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
                         }
-                      },
-                      "required": [
-                        "checklistVersionId",
-                        "versionNumber",
-                        "category",
-                        "answers"
-                      ],
-                      "additionalProperties": false
+                      ]
                     },
                     "man": {
                       "anyOf": [
@@ -32820,72 +32819,86 @@
                       ]
                     },
                     "checklist": {
-                      "type": "object",
-                      "properties": {
-                        "checklistVersionId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        "versionNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": 0,
-                          "maximum": 9007199254740991
-                        },
-                        "category": {
-                          "type": "string",
-                          "enum": [
-                            "MAN",
-                            "MACHINE",
-                            "MATERIAL",
-                            "METHOD"
-                          ]
-                        },
-                        "answers": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "sourceItemId": {
-                                "type": "string",
-                                "format": "uuid",
-                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                              },
-                              "label": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 500
-                              },
-                              "displayOrder": {
-                                "type": "integer",
-                                "exclusiveMinimum": 0,
-                                "maximum": 9007199254740991
-                              },
-                              "answer": {
-                                "type": "string",
-                                "enum": [
-                                  "YES",
-                                  "NO"
-                                ]
-                              }
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "checklistVersionId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                             },
-                            "required": [
-                              "sourceItemId",
-                              "label",
-                              "displayOrder",
-                              "answer"
-                            ],
-                            "additionalProperties": false
-                          }
+                            "versionNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "category": {
+                              "type": "string",
+                              "enum": [
+                                "MAN",
+                                "MACHINE",
+                                "MATERIAL",
+                                "METHOD"
+                              ]
+                            },
+                            "answers": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "sourceItemId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "displayOrder": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "answer": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "YES",
+                                          "NO"
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "sourceItemId",
+                                  "label",
+                                  "displayOrder",
+                                  "answer"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "checklistVersionId",
+                            "versionNumber",
+                            "category",
+                            "answers"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
                         }
-                      },
-                      "required": [
-                        "checklistVersionId",
-                        "versionNumber",
-                        "category",
-                        "answers"
-                      ],
-                      "additionalProperties": false
+                      ]
                     },
                     "man": {
                       "anyOf": [
@@ -34145,72 +34158,86 @@
                       ]
                     },
                     "checklist": {
-                      "type": "object",
-                      "properties": {
-                        "checklistVersionId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        "versionNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": 0,
-                          "maximum": 9007199254740991
-                        },
-                        "category": {
-                          "type": "string",
-                          "enum": [
-                            "MAN",
-                            "MACHINE",
-                            "MATERIAL",
-                            "METHOD"
-                          ]
-                        },
-                        "answers": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "sourceItemId": {
-                                "type": "string",
-                                "format": "uuid",
-                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                              },
-                              "label": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 500
-                              },
-                              "displayOrder": {
-                                "type": "integer",
-                                "exclusiveMinimum": 0,
-                                "maximum": 9007199254740991
-                              },
-                              "answer": {
-                                "type": "string",
-                                "enum": [
-                                  "YES",
-                                  "NO"
-                                ]
-                              }
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "checklistVersionId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                             },
-                            "required": [
-                              "sourceItemId",
-                              "label",
-                              "displayOrder",
-                              "answer"
-                            ],
-                            "additionalProperties": false
-                          }
+                            "versionNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "category": {
+                              "type": "string",
+                              "enum": [
+                                "MAN",
+                                "MACHINE",
+                                "MATERIAL",
+                                "METHOD"
+                              ]
+                            },
+                            "answers": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "sourceItemId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "displayOrder": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "answer": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "YES",
+                                          "NO"
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "sourceItemId",
+                                  "label",
+                                  "displayOrder",
+                                  "answer"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "checklistVersionId",
+                            "versionNumber",
+                            "category",
+                            "answers"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
                         }
-                      },
-                      "required": [
-                        "checklistVersionId",
-                        "versionNumber",
-                        "category",
-                        "answers"
-                      ],
-                      "additionalProperties": false
+                      ]
                     },
                     "man": {
                       "anyOf": [
@@ -35371,72 +35398,86 @@
                       ]
                     },
                     "checklist": {
-                      "type": "object",
-                      "properties": {
-                        "checklistVersionId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        "versionNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": 0,
-                          "maximum": 9007199254740991
-                        },
-                        "category": {
-                          "type": "string",
-                          "enum": [
-                            "MAN",
-                            "MACHINE",
-                            "MATERIAL",
-                            "METHOD"
-                          ]
-                        },
-                        "answers": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "sourceItemId": {
-                                "type": "string",
-                                "format": "uuid",
-                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                              },
-                              "label": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 500
-                              },
-                              "displayOrder": {
-                                "type": "integer",
-                                "exclusiveMinimum": 0,
-                                "maximum": 9007199254740991
-                              },
-                              "answer": {
-                                "type": "string",
-                                "enum": [
-                                  "YES",
-                                  "NO"
-                                ]
-                              }
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "checklistVersionId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                             },
-                            "required": [
-                              "sourceItemId",
-                              "label",
-                              "displayOrder",
-                              "answer"
-                            ],
-                            "additionalProperties": false
-                          }
+                            "versionNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "category": {
+                              "type": "string",
+                              "enum": [
+                                "MAN",
+                                "MACHINE",
+                                "MATERIAL",
+                                "METHOD"
+                              ]
+                            },
+                            "answers": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "sourceItemId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "displayOrder": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "answer": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "YES",
+                                          "NO"
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "sourceItemId",
+                                  "label",
+                                  "displayOrder",
+                                  "answer"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "checklistVersionId",
+                            "versionNumber",
+                            "category",
+                            "answers"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
                         }
-                      },
-                      "required": [
-                        "checklistVersionId",
-                        "versionNumber",
-                        "category",
-                        "answers"
-                      ],
-                      "additionalProperties": false
+                      ]
                     },
                     "man": {
                       "anyOf": [
@@ -36590,72 +36631,86 @@
                       ]
                     },
                     "checklist": {
-                      "type": "object",
-                      "properties": {
-                        "checklistVersionId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        "versionNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": 0,
-                          "maximum": 9007199254740991
-                        },
-                        "category": {
-                          "type": "string",
-                          "enum": [
-                            "MAN",
-                            "MACHINE",
-                            "MATERIAL",
-                            "METHOD"
-                          ]
-                        },
-                        "answers": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "sourceItemId": {
-                                "type": "string",
-                                "format": "uuid",
-                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                              },
-                              "label": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 500
-                              },
-                              "displayOrder": {
-                                "type": "integer",
-                                "exclusiveMinimum": 0,
-                                "maximum": 9007199254740991
-                              },
-                              "answer": {
-                                "type": "string",
-                                "enum": [
-                                  "YES",
-                                  "NO"
-                                ]
-                              }
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "checklistVersionId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                             },
-                            "required": [
-                              "sourceItemId",
-                              "label",
-                              "displayOrder",
-                              "answer"
-                            ],
-                            "additionalProperties": false
-                          }
+                            "versionNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "category": {
+                              "type": "string",
+                              "enum": [
+                                "MAN",
+                                "MACHINE",
+                                "MATERIAL",
+                                "METHOD"
+                              ]
+                            },
+                            "answers": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "sourceItemId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "displayOrder": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "answer": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "YES",
+                                          "NO"
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "sourceItemId",
+                                  "label",
+                                  "displayOrder",
+                                  "answer"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "checklistVersionId",
+                            "versionNumber",
+                            "category",
+                            "answers"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
                         }
-                      },
-                      "required": [
-                        "checklistVersionId",
-                        "versionNumber",
-                        "category",
-                        "answers"
-                      ],
-                      "additionalProperties": false
+                      ]
                     },
                     "man": {
                       "anyOf": [
@@ -37236,9 +37291,16 @@
                       ]
                     },
                     "checklistVersionId": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "checklistItems": {
                       "type": "array",
@@ -40075,72 +40137,86 @@
                       ]
                     },
                     "checklist": {
-                      "type": "object",
-                      "properties": {
-                        "checklistVersionId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        "versionNumber": {
-                          "type": "integer",
-                          "exclusiveMinimum": 0,
-                          "maximum": 9007199254740991
-                        },
-                        "category": {
-                          "type": "string",
-                          "enum": [
-                            "MAN",
-                            "MACHINE",
-                            "MATERIAL",
-                            "METHOD"
-                          ]
-                        },
-                        "answers": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "sourceItemId": {
-                                "type": "string",
-                                "format": "uuid",
-                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                              },
-                              "label": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 500
-                              },
-                              "displayOrder": {
-                                "type": "integer",
-                                "exclusiveMinimum": 0,
-                                "maximum": 9007199254740991
-                              },
-                              "answer": {
-                                "type": "string",
-                                "enum": [
-                                  "YES",
-                                  "NO"
-                                ]
-                              }
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "checklistVersionId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                             },
-                            "required": [
-                              "sourceItemId",
-                              "label",
-                              "displayOrder",
-                              "answer"
-                            ],
-                            "additionalProperties": false
-                          }
+                            "versionNumber": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "category": {
+                              "type": "string",
+                              "enum": [
+                                "MAN",
+                                "MACHINE",
+                                "MATERIAL",
+                                "METHOD"
+                              ]
+                            },
+                            "answers": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "sourceItemId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 500
+                                  },
+                                  "displayOrder": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "answer": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "YES",
+                                          "NO"
+                                        ]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "sourceItemId",
+                                  "label",
+                                  "displayOrder",
+                                  "answer"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "checklistVersionId",
+                            "versionNumber",
+                            "category",
+                            "answers"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
                         }
-                      },
-                      "required": [
-                        "checklistVersionId",
-                        "versionNumber",
-                        "category",
-                        "answers"
-                      ],
-                      "additionalProperties": false
+                      ]
                     },
                     "man": {
                       "anyOf": [
@@ -51945,54 +52021,66 @@
                         "additionalProperties": false
                       },
                       "checklist": {
-                        "type": "object",
-                        "properties": {
-                          "templateVersion": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 200
-                          },
-                          "allPassed": {
-                            "type": "boolean",
-                            "const": true
-                          },
-                          "items": {
-                            "minItems": 1,
-                            "maxItems": 200,
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "externalId": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 200
-                                },
-                                "label": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 500
-                                },
-                                "answer": {
-                                  "type": "string",
-                                  "const": "YES"
-                                }
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "templateVersion": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
                               },
-                              "required": [
-                                "externalId",
-                                "label",
-                                "answer"
-                              ],
-                              "additionalProperties": false
-                            }
+                              "allPassed": {
+                                "type": "boolean"
+                              },
+                              "items": {
+                                "maxItems": 200,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "externalId": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 200
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 500
+                                    },
+                                    "answer": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "YES",
+                                            "NO"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "externalId",
+                                    "label"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "items"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
                           }
-                        },
-                        "required": [
-                          "templateVersion",
-                          "allPassed",
-                          "items"
-                        ],
-                        "additionalProperties": false
+                        ]
                       },
                       "decisions": {
                         "maxItems": 2,
@@ -52167,7 +52255,6 @@
                       "shift",
                       "job",
                       "part",
-                      "checklist",
                       "decisions",
                       "metadata",
                       "changePoint",
@@ -52314,54 +52401,66 @@
                         "additionalProperties": false
                       },
                       "checklist": {
-                        "type": "object",
-                        "properties": {
-                          "templateVersion": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 200
-                          },
-                          "allPassed": {
-                            "type": "boolean",
-                            "const": true
-                          },
-                          "items": {
-                            "minItems": 1,
-                            "maxItems": 200,
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "externalId": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 200
-                                },
-                                "label": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 500
-                                },
-                                "answer": {
-                                  "type": "string",
-                                  "const": "YES"
-                                }
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "templateVersion": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
                               },
-                              "required": [
-                                "externalId",
-                                "label",
-                                "answer"
-                              ],
-                              "additionalProperties": false
-                            }
+                              "allPassed": {
+                                "type": "boolean"
+                              },
+                              "items": {
+                                "maxItems": 200,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "externalId": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 200
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 500
+                                    },
+                                    "answer": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "YES",
+                                            "NO"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "externalId",
+                                    "label"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "items"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
                           }
-                        },
-                        "required": [
-                          "templateVersion",
-                          "allPassed",
-                          "items"
-                        ],
-                        "additionalProperties": false
+                        ]
                       },
                       "decisions": {
                         "maxItems": 2,
@@ -52486,7 +52585,6 @@
                       "shift",
                       "job",
                       "part",
-                      "checklist",
                       "decisions",
                       "metadata",
                       "changePoint",
@@ -52633,54 +52731,66 @@
                         "additionalProperties": false
                       },
                       "checklist": {
-                        "type": "object",
-                        "properties": {
-                          "templateVersion": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 200
-                          },
-                          "allPassed": {
-                            "type": "boolean",
-                            "const": true
-                          },
-                          "items": {
-                            "minItems": 1,
-                            "maxItems": 200,
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "externalId": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 200
-                                },
-                                "label": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 500
-                                },
-                                "answer": {
-                                  "type": "string",
-                                  "const": "YES"
-                                }
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "templateVersion": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
                               },
-                              "required": [
-                                "externalId",
-                                "label",
-                                "answer"
-                              ],
-                              "additionalProperties": false
-                            }
+                              "allPassed": {
+                                "type": "boolean"
+                              },
+                              "items": {
+                                "maxItems": 200,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "externalId": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 200
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 500
+                                    },
+                                    "answer": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "YES",
+                                            "NO"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "externalId",
+                                    "label"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "items"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
                           }
-                        },
-                        "required": [
-                          "templateVersion",
-                          "allPassed",
-                          "items"
-                        ],
-                        "additionalProperties": false
+                        ]
                       },
                       "decisions": {
                         "maxItems": 2,
@@ -52805,7 +52915,6 @@
                       "shift",
                       "job",
                       "part",
-                      "checklist",
                       "decisions",
                       "metadata",
                       "changePoint",
@@ -52952,54 +53061,66 @@
                         "additionalProperties": false
                       },
                       "checklist": {
-                        "type": "object",
-                        "properties": {
-                          "templateVersion": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 200
-                          },
-                          "allPassed": {
-                            "type": "boolean",
-                            "const": true
-                          },
-                          "items": {
-                            "minItems": 1,
-                            "maxItems": 200,
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "externalId": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 200
-                                },
-                                "label": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 500
-                                },
-                                "answer": {
-                                  "type": "string",
-                                  "const": "YES"
-                                }
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "templateVersion": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 200
                               },
-                              "required": [
-                                "externalId",
-                                "label",
-                                "answer"
-                              ],
-                              "additionalProperties": false
-                            }
+                              "allPassed": {
+                                "type": "boolean"
+                              },
+                              "items": {
+                                "maxItems": 200,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "externalId": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 200
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 500
+                                    },
+                                    "answer": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "YES",
+                                            "NO"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "externalId",
+                                    "label"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "items"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
                           }
-                        },
-                        "required": [
-                          "templateVersion",
-                          "allPassed",
-                          "items"
-                        ],
-                        "additionalProperties": false
+                        ]
                       },
                       "decisions": {
                         "maxItems": 2,
@@ -53124,7 +53245,6 @@
                       "shift",
                       "job",
                       "part",
-                      "checklist",
                       "decisions",
                       "metadata",
                       "changePoint",

@@ -1,3 +1,25 @@
+## Amendment — 23 October 2026: Supplemental 4M checklists
+
+Checklist 4M adalah suplemen opsional. Supplier tidak wajib mengonfigurasi checklist atau
+menyediakan minimum satu item per kategori; kategori tanpa item boleh dipublikasikan. Kategori
+Henkaten tetap wajib. Readiness, aktivasi/cutover Hosted, clone, submission dan approval tidak
+mensyaratkan checklist, jawaban lengkap atau seluruh jawaban Yes. Submission langsung berjalan
+tanpa dialog konfirmasi, acknowledgement, alasan override atau langkah tambahan karena checklist
+kosong, belum lengkap atau memiliki jawaban No.
+
+Bukti yang diisi tetap menyimpan Yes/No apa adanya. Item yang belum dijawab disimpan sebagai null
+beserta snapshot label/urutan; tanpa versi checklist tidak dibuat snapshot buatan. Versi publikasi
+yang ditampilkan tetap boleh menjadi acuan bukti walaupun kemudian terbit versi baru atau template
+dinonaktifkan. Identitas versi/item, kategori dan tenant tetap divalidasi. Clone menggunakan
+publikasi aktif saat ini jika tersedia, tanpa menyalin jawaban. Riwayat tetap immutable.
+
+Integrasi External menerima checklist tidak tersedia/null, item kosong, No dan item belum dijawab;
+`allPassed` opsional dan hanya metadata sumber. Aturan operasional lain, Tanoko, otorisasi,
+approval dan screening PCR tetap berlaku. Lihat [rencana implementasi](optionalChecklistPlan.md)
+dan [ADR 0048](../docs/adr/0048-supplemental-4m-checklists.md).
+
+---
+
 ## Amendment — 20 October 2026: Persistent direct-login sessions
 
 Implemented locally; automated verification is recorded in the current handoff. HTTPS staging/device acceptance remains pending.
@@ -307,7 +329,7 @@ Cutover mode wajib:
 5. membuat source baru aktif hanya setelah preflight berhasil;
 6. tidak menggabungkan ID sequence dari dua source tanpa namespace.
 
-Untuk cutover ke EXTERNAL, client credential wajib tersedia sebelum aktivasi. Untuk cutover ke HOSTED, minimum master data, Supplier Admin, shift, line, job, checklist, dan default assignment wajib lulus validasi.
+Untuk cutover ke EXTERNAL, client credential wajib tersedia sebelum aktivasi. Untuk cutover ke HOSTED, minimum master data, Supplier Admin, shift, line, job, dan default assignment wajib lulus validasi; checklist opsional.
 
 ### 5.3 Hosted Preparation
 
@@ -639,9 +661,9 @@ Shift yang melewati tengah malam wajib didukung. Business date mengikuti tanggal
 - Publish membuat immutable version baru.
 - Version yang pernah dipakai tidak dapat diedit atau dihapus.
 - Item dapat dinonaktifkan hanya melalui version baru.
-- Minimum satu active checklist item per kategori diperlukan sebelum kategori dapat dipakai.
+- Tidak ada minimum item atau kategori checklist; publikasi kosong diperbolehkan.
 - Henkaten menyimpan snapshot label, urutan, version, dan jawaban.
-- Semua jawaban wajib `YES` saat submit; `NO` atau unanswered menolak submission.
+- Jawaban `YES`, `NO`, parsial atau seluruhnya unanswered diperbolehkan saat submit tanpa konfirmasi tambahan.
 - Admin-defined checklist boleh berisi pertanyaan terkait tindakan operasional, dan terpisah dari penilaian Tanoko pada section 16.7.
 
 ### 10.7 CRUD dan Deactivation
@@ -734,7 +756,7 @@ Start Shift wajib:
 7. memastikan setiap default MP tidak sedang digunakan/reserved oleh shift lain secara konflik;
 8. memeriksa open Assignment Issue;
 9. memeriksa carry-over Open Henkaten;
-10. memeriksa checklist version aktif;
+10. checklist tidak menjadi syarat preflight;
 11. menampilkan preflight result sebelum commit.
 
 Hard gate memblokir Start Shift bila:
@@ -744,7 +766,6 @@ Hard gate memblokir Start Shift bila:
 - MP conflicted atau reserved;
 - terdapat unresolved Assignment Issue;
 - terdapat Open Henkaten carry-over;
-- checklist configuration tidak valid;
 - Shift Run line masih Active.
 
 ### 12.3 Pre-start Resolution Wizard
@@ -844,7 +865,7 @@ Aturan:
 - Job harus aktif pada line tersebut.
 - Part spesifik harus aktif pada supplier tersebut; pilihan `Other` tidak merujuk master part.
 - Cause dan detail change wajib, masing-masing maksimum 2.000 karakter.
-- Semua checklist answer wajib Yes.
+- Checklist opsional; jawaban tidak harus lengkap atau Yes dan tidak memerlukan dialog konfirmasi.
 - Server menggunakan timestamp authoritative; client timestamp hanya menjadi context bila diperlukan.
 - Semua waktu disimpan UTC dan ditampilkan pada timezone supplier.
 
@@ -894,7 +915,7 @@ Identifier bersifat unik, immutable, dan bukan authorization boundary. Internal 
 - Withdrawal reason wajib dan maksimum 1.000 karakter.
 - Withdraw mengubah status menjadi Cancelled, melepas reservation, menutup warning, dan menginvalidasi pending decision.
 - Clone membuka form baru dengan data yang masih relevan.
-- Checklist menggunakan active version terbaru dan wajib dijawab ulang.
+- Checklist menggunakan publikasi aktif saat ini bila tersedia; jawaban lama tidak disalin dan pengisian tetap opsional.
 - Assignment reference wajib divalidasi ulang.
 - Record baru menyimpan `clonedFromHenkatenId`.
 - Record lama tetap immutable dan dapat ditelusuri.
@@ -2167,7 +2188,7 @@ Wajib mencakup:
 - Supervisor/QC parallel decision;
 - reject-fast behavior;
 - duplicate/stale decision;
-- checklist version/snapshot/all-Yes validation;
+- checklist opsional, integritas version/item, snapshot Yes/No/unanswered dan tanpa dialog konfirmasi;
 - MP reservation uniqueness;
 - Man assignment apply/release;
 - cascade vacancy;
@@ -2212,7 +2233,7 @@ Scenario minimum:
    hanya diperlukan bila part spesifik akan dipilih.
 4. LL login dan Start Shift valid.
 5. LL menginput setiap kategori 4M.
-6. Submission gagal bila satu checklist bukan Yes.
+6. Submission berhasil tanpa checklist, dengan jawaban parsial atau No, tanpa dialog konfirmasi tambahan.
 7. Supervisor approve lalu QC approve.
 8. QC approve lalu Supervisor approve.
 9. Supervisor reject cepat.
@@ -2296,7 +2317,7 @@ Scenario minimum:
 - [ ] LL hanya dapat input untuk line sendiri.
 - [ ] Part dapat dicari dengan number/name.
 - [ ] Keempat kategori 4M didukung.
-- [ ] Semua checklist wajib Yes.
+- [ ] Checklist opsional, tanpa minimum item/kategori atau syarat all-Yes dan tanpa dialog konfirmasi.
 - [ ] Snapshot checklist immutable.
 - [ ] Status hanya mengikuti transition yang diizinkan.
 - [ ] Withdraw + Clone menjaga relationship dan audit.

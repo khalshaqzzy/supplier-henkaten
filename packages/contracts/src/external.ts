@@ -108,19 +108,18 @@ export const externalDecisionSchema = z
 
 const checklistSchema = z
   .object({
-    templateVersion: externalRefSchema,
-    allPassed: z.literal(true),
+    templateVersion: externalRefSchema.optional(),
+    allPassed: z.boolean().optional(),
     items: z
       .array(
         z
           .object({
             externalId: externalRefSchema,
             label: safeText(500),
-            answer: z.literal('YES'),
+            answer: z.enum(['YES', 'NO']).nullable().optional(),
           })
           .strict(),
       )
-      .min(1)
       .max(200),
   })
   .strict();
@@ -160,7 +159,7 @@ const externalEventBaseSchema = z
     shift: shiftSnapshotSchema,
     job: snapshotSchema,
     part: partSnapshotSchema,
-    checklist: checklistSchema,
+    checklist: checklistSchema.nullable().optional(),
     decisions: z.array(externalDecisionSchema).max(2),
     cancellationReason: safeText(1_000).optional(),
     metadata: z

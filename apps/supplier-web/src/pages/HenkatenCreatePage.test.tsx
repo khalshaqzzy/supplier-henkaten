@@ -144,3 +144,90 @@ it('recovers an unusable shift context when the assignment is corrected', async 
   expect(screen.queryByText('Line shift tidak tersedia')).toBeNull();
   client.clear();
 });
+
+it.each(['absent', 'empty', 'unanswered', 'partial', 'no'] as const)(
+  'submits an optional %s checklist immediately without confirmation',
+  async (state) => {
+    vi.mocked(useSession).mockReturnValue({
+      session: {
+        principal: { userId: 'user', role: 'LINE_LEADER', purpose: 'NORMAL' },
+        supplier: { id: 'supplier' },
+      },
+    } as ReturnType<typeof useSession>);
+    vi.spyOn(supplierApi, 'lineShiftOperationalContext').mockResolvedValue({
+      items: [
+        {
+          id: 'shift',
+          version: 1,
+          lineName: 'Line',
+          effectiveStartAt: '2026-09-30T00:00:00Z',
+          effectiveEndAt: '2026-09-30T23:59:00Z',
+          assignments: [{ id: 'assignment', jobId: 'job', jobName: 'Job', mpMemberId: 'mp' }],
+        },
+      ],
+    } as never);
+    vi.spyOn(supplierApi, 'henkatenFormOptions').mockResolvedValue({
+      parts: [],
+      replacementMembers: [],
+      checklist:
+        state === 'absent'
+          ? null
+          : {
+              id: 'checklist',
+              items:
+                state === 'empty'
+                  ? []
+                  : [
+                      { id: 'one', label: 'First question' },
+                      { id: 'two', label: 'Second question' },
+                    ],
+            },
+    } as never);
+    const submit = vi
+      .spyOn(supplierApi, 'createHenkaten')
+      .mockRejectedValue(new ApiMutationUncertainError());
+    const confirm = vi.spyOn(window, 'confirm');
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <HenkatenCreatePage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const user = userEvent.setup();
+    await screen.findByRole('option', { name: /^Job/ });
+    await user.click(screen.getByRole('radio', { name: 'Machine' }));
+    await user.selectOptions(screen.getByLabelText(/Job/), 'job');
+    await user.selectOptions(screen.getByLabelText(/^Part/), 'OTHER');
+    await user.type(screen.getByLabelText(/Objek terdampak/), 'Before');
+    await user.type(screen.getByLabelText(/Kondisi baru/), 'After');
+    await user.type(screen.getByLabelText(/Penyebab/), 'Cause');
+    await user.type(screen.getByLabelText(/Detail kejadian/), 'Detail');
+    if (state === 'partial') await user.click(screen.getAllByRole('button', { name: 'Yes' })[0]!);
+    if (state === 'no') await user.click(screen.getAllByRole('button', { name: 'No' })[0]!);
+    await waitFor(() =>
+      expect(
+        screen.getByRole<HTMLButtonElement>('button', { name: 'Submit Henkaten' }).disabled,
+      ).toBe(false),
+    );
+    await user.click(screen.getByRole('button', { name: 'Submit Henkaten' }));
+    await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
+    expect(confirm).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    const payload = submit.mock.calls[0]![0];
+    expect(payload.checklistAnswers).toEqual(
+      state === 'absent'
+        ? undefined
+        : state === 'partial'
+          ? [{ itemId: 'one', answer: 'YES' }]
+          : state === 'no'
+            ? [{ itemId: 'one', answer: 'NO' }]
+            : [],
+    );
+    expect(payload.checklistVersionId).toBe(state === 'absent' ? undefined : 'checklist');
+    client.clear();
+  },
+);
