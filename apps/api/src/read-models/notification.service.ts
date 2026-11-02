@@ -194,6 +194,7 @@ export class NotificationService implements OnModuleInit {
         where: { deletedAt: null, id: event.aggregateId },
         select: {
           createdById: true,
+          lineLeaderResponsibility: { select: { memberId: true } },
           approvalRoutes: { select: { route: true, currentResponsibleMemberId: true } },
         },
       });
@@ -206,7 +207,16 @@ export class NotificationService implements OnModuleInit {
           status: 'ACTIVE',
           OR: [
             { role: { in: ['SUPPLIER_ADMIN', 'QC'] } },
-            ...(henkaten ? [{ id: henkaten.createdById }] : []),
+            ...(henkaten
+              ? [
+                  henkaten.lineLeaderResponsibility
+                    ? {
+                        memberId: henkaten.lineLeaderResponsibility.memberId,
+                        role: 'LINE_LEADER' as const,
+                      }
+                    : { id: henkaten.createdById },
+                ]
+              : []),
             ...(supervisorId ? [{ memberId: supervisorId }] : []),
           ],
         },
@@ -238,6 +248,7 @@ export class NotificationService implements OnModuleInit {
         where: { deletedAt: null, id: event.aggregateId, supplierId },
         select: {
           createdById: true,
+          lineLeaderResponsibility: { select: { memberId: true } },
           approvalRoutes: { select: { route: true, currentResponsibleMemberId: true } },
         },
       });
@@ -261,7 +272,12 @@ export class NotificationService implements OnModuleInit {
       const users = await this.prisma.user.findMany({
         where: {
           ...common,
-          OR: [{ id: henkaten.createdById }, { role: 'SUPPLIER_ADMIN' }],
+          OR: [
+            henkaten.lineLeaderResponsibility
+              ? { memberId: henkaten.lineLeaderResponsibility.memberId, role: 'LINE_LEADER' }
+              : { id: henkaten.createdById },
+            { role: 'SUPPLIER_ADMIN' },
+          ],
         },
         select: { id: true },
       });

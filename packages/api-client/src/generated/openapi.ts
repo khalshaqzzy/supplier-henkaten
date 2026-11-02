@@ -4509,6 +4509,287 @@ export interface paths {
     };
     trace?: never;
   };
+  '/api/v1/supplier/master-data/members/{id}/role/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @enum {string} */
+            role: 'LINE_LEADER' | 'SUPERVISOR' | 'QC';
+          };
+        };
+      };
+      responses: {
+        /** @description Role impact review */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              member: {
+                /** Format: uuid */
+                id: string;
+                fullName: string;
+                registrationNumber: string | null;
+                /** @enum {string} */
+                role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
+                active: boolean;
+                initials: string;
+                photo: {
+                  /** Format: uuid */
+                  id: string;
+                  fullUrl: string;
+                  thumbnailUrl: string;
+                  version: number;
+                } | null;
+                account?: {
+                  /** Format: uuid */
+                  id: string;
+                  username: string;
+                  /** @enum {string} */
+                  status: 'ACTIVE' | 'INACTIVE';
+                  mustChangePassword: boolean;
+                  version: number;
+                };
+                version: number;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+              };
+              /** @enum {string} */
+              role: 'LINE_LEADER' | 'SUPERVISOR' | 'QC';
+              revision: string;
+              dependencies: {
+                /** @enum {string} */
+                kind: 'LINE_SHIFT' | 'DEFAULT_LINE' | 'HENKATEN';
+                /** Format: uuid */
+                id: string;
+                label: string;
+                detail: string;
+                version: number;
+                active: boolean;
+              }[];
+              candidates: {
+                /** Format: uuid */
+                id: string;
+                fullName: string;
+                registrationNumber: string | null;
+                available: boolean;
+                unavailableReason: string | null;
+              }[];
+              pendingQcCount: number;
+              blockers: string[];
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/members/{id}/role': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header: {
+          'Idempotency-Key': string;
+        };
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @enum {string} */
+            role: 'LINE_LEADER' | 'SUPERVISOR' | 'QC';
+            revision: string;
+            reason: string;
+            handovers: {
+              /** @enum {string} */
+              kind: 'LINE_SHIFT' | 'DEFAULT_LINE' | 'HENKATEN';
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              replacementMemberId: string;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Changed member role */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              member: {
+                /** Format: uuid */
+                id: string;
+                fullName: string;
+                registrationNumber: string | null;
+                /** @enum {string} */
+                role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
+                active: boolean;
+                initials: string;
+                photo: {
+                  /** Format: uuid */
+                  id: string;
+                  fullUrl: string;
+                  thumbnailUrl: string;
+                  version: number;
+                } | null;
+                account?: {
+                  /** Format: uuid */
+                  id: string;
+                  username: string;
+                  /** @enum {string} */
+                  status: 'ACTIVE' | 'INACTIVE';
+                  mustChangePassword: boolean;
+                  version: number;
+                };
+                version: number;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+              };
+              /** Format: uuid */
+              commandId: string;
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/supplier/master-data/members/{id}/activate': {
     parameters: {
       query?: never;

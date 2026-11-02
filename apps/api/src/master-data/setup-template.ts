@@ -174,7 +174,7 @@ export async function createSetupTemplate(timezone: string) {
             ? 'Kode tetap, unik dalam satu line; simpan sebagai teks.'
             : 'Kode tetap dan unik pada sheet ini; gunakan kode yang sama pada import berikutnya.',
       name: 'Nama yang akan ditampilkan di aplikasi.',
-      role: 'SUPERVISOR, LINE_LEADER, QC atau MP. Role member existing tidak dapat diubah.',
+      role: 'SUPERVISOR, LINE_LEADER, QC atau MP. Role member existing diubah melalui Member & Akun, bukan import.',
       registration: 'Wajib untuk Supervisor/LL/QC, unik per supplier. Kosong untuk MP.',
       username: 'Wajib untuk Supervisor/LL/QC, unik per supplier. Kosong untuk MP.',
       password:

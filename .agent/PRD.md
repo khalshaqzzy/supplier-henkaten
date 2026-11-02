@@ -1,3 +1,35 @@
+## Amendment — 2 November 2026: Supplier Admin role changes and account activation
+
+Supplier Admin can change an existing Line Leader, Supervisor or QC to either of the other two
+operational roles through a dedicated reviewed command. MP, Supplier Admin and TMMIN roles are
+excluded. Member and account identity, registration, username, password, photo, import code and
+active/inactive state are retained. Ordinary profile edits and workbook import cannot change role.
+This supersedes section 10.1's immutable-role/deactivate-and-recreate rule for these transitions.
+
+The command previews all affected Line–Shift and retained default assignments, LL responsibilities
+on Open Henkaten, and pending Supervisor routes. Supplier Admin selects one eligible replacement of
+the old role for all affected responsibilities and provides a reason. The UI presents one combined
+handover row; the command retains exact coverage of every underlying reference. Handovers and role/account changes commit atomically, with
+current authorization, tenant/source checks, stale-review validation, durable idempotency and audit.
+LL replacements must preserve the one-active-Line–Shift invariant. QC is a pooled role; leaving the
+last active QC while QC approvals are pending is blocked until other active QC coverage exists.
+More than 1,000 dependencies require prior reassignment through existing operational controls.
+
+Original Henkaten creators, occurrence snapshots and completed approval decisions remain unchanged.
+Current LL responsibility is tracked independently of historical occurrence ownership. A former LL
+may approve their own earlier submission when their current role and assignment authorize it.
+Sessions and push subscriptions of the changed account are revoked. No new-role assignments are
+created automatically. Archived members and inactive accounts remain in their existing states.
+
+Member restoration and account activation remain separate actions. Member & Akun exposes activation
+for a nonactive account only after its member is active. Activation issues one temporary password
+and requires a password change; stale or repeated activation cannot rotate credentials twice.
+Existing direct Hosted, Hosted Preparation and delegated Supplier Admin access boundaries remain.
+See [implementation plan](memberRoleChangePlan.md) and [ADR 0011](../docs/adr/0011-permanent-master-data-and-member-account-lifecycle.md).
+Local implementation and automated verification are recorded in the current handoff; staging/device/UAT acceptance remains pending.
+
+---
+
 ## Amendment — 23 October 2026: Supplemental 4M checklists
 
 Checklist 4M adalah suplemen opsional. Supplier tidak wajib mengonfigurasi checklist atau
@@ -598,8 +630,8 @@ Field minimum:
 Aturan:
 
 - satu member hanya memiliki satu role aktif;
-- role member immutable setelah dibuat; koreksi role dilakukan dengan menonaktifkan member lama dan
-  membuat member baru;
+- perubahan role Supervisor, Line Leader dan QC mengikuti amendment 2 November 2026; role MP tetap
+  tidak dapat diubah; identitas member dan akun dipertahankan;
 - approval history menyimpan role snapshot saat keputusan;
 - foto menerima JPG, PNG, atau WebP maksimum 2 MB;
 - server wajib memvalidasi MIME dan signature, menghapus metadata, serta membuat thumbnail;

@@ -1,3 +1,4 @@
+import { MemberRoleDialog } from './MemberRoleDialog';
 import { SetupImportDialog } from './SetupImportDialog';
 import {
   ArrowLeft,
@@ -725,7 +726,14 @@ export function MemberLifecycle({
     ]);
   };
   const action = useMutation({
-    mutationFn: async (kind: 'status' | 'reset') => {
+    mutationFn: async (kind: 'status' | 'reset' | 'account') => {
+      if (kind === 'account') {
+        const result = await supplierApi.memberAccountAction(member.id, 'activate', {
+          expectedVersion: member.account!.version,
+        });
+        setSecret(result.credential ?? null);
+        return;
+      }
       if (kind === 'reset') {
         const result = await supplierApi.resetMemberPassword(member.id, {
           expectedVersion: member.account!.version,
@@ -747,7 +755,12 @@ export function MemberLifecycle({
         });
         toast.success(member.active ? 'Member dipindahkan ke arsip' : 'Member diaktifkan');
         if (member.active) void navigate('/master-data/members', { replace: true });
-      } else toast.success('Password berhasil direset');
+      } else {
+        await queryClient.invalidateQueries({
+          queryKey: scopedKey(scope, 'master-members').slice(0, -1),
+        });
+        toast.success(kind === 'account' ? 'Akun diaktifkan' : 'Password berhasil direset');
+      }
     },
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
@@ -842,7 +855,38 @@ export function MemberLifecycle({
           </div>
         </div>
       </div>
+      {member.account && (
+        <div className="member-account-state">
+          <div>
+            <strong>Akun {member.account.status === 'ACTIVE' ? 'aktif' : 'nonaktif'}</strong>
+            <p>
+              {member.account.status === 'ACTIVE'
+                ? `Username ${member.account.username}`
+                : member.active
+                  ? 'Aktifkan akun agar member dapat login.'
+                  : 'Pulihkan member sebelum mengaktifkan akun.'}
+            </p>
+          </div>
+          {member.account.status !== 'ACTIVE' && (
+            <AlertDialog
+              title="Aktifkan akun member?"
+              description="Password sementara baru akan ditampilkan. Member perlu mengganti password saat login."
+              confirmLabel="Aktifkan akun"
+              onConfirm={() => {
+                setProblem(null);
+                action.mutate('account');
+              }}
+              trigger={
+                <Button variant="secondary" disabled={!member.active || action.isPending}>
+                  Aktifkan akun
+                </Button>
+              }
+            />
+          )}
+        </div>
+      )}
       <div className="lifecycle-actions">
+        <MemberRoleDialog member={member} scope={scope} />
         {member.account && (
           <p className="member-account-identity">
             <span>Username</span>
@@ -868,7 +912,7 @@ export function MemberLifecycle({
             </Button>
           }
         />
-        {member.account && (
+        {member.account?.status === 'ACTIVE' && (
           <AlertDialog
             title="Reset password member?"
             description="Password sementara yang baru akan ditampilkan satu kali."

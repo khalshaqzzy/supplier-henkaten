@@ -26,6 +26,7 @@ LABEL org.opencontainers.image.title="supplier-henkaten-postgres" \
 # Compose always starts this image as the PostgreSQL uid.
 # hadolint ignore=DL3018
 RUN apk upgrade --no-cache \
+  && apk add --no-cache 'brotli-libs>=1.2.1-r0' 'libcurl>=8.23.0-r0' \
   && rm -f /usr/local/bin/gosu
 COPY --from=pgvector-build /install/ /
 

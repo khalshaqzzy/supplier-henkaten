@@ -2,55 +2,43 @@
   {
     "scanner": "gitleaks",
     "id": "4137545a70f91adc0be6a3856e0742fe7436b89d:docs/adr/0007-hosted-member-photo-storage.md:generic-api-key:76",
-    "rationale": "Exact historical finding is documentation text describing an intentionally fake object-key example, not a credential.",
-    "expiresOn": "2026-10-31"
+    "rationale": "Revalidated 2026-11-02: Exact historical finding is documentation text describing an intentionally fake object-key example, not a credential.",
+    "expiresOn": "2026-11-30"
   },
   {
     "scanner": "gitleaks",
     "id": "integration-test-csrf-secret-at-least-32",
-    "rationale": "Exact fixed value is restricted to the disposable CI integration database and is not accepted by hosted environment validation.",
-    "expiresOn": "2026-10-31"
+    "rationale": "Revalidated 2026-11-02: Exact fixed value is restricted to the disposable CI integration database and is not accepted by hosted environment validation.",
+    "expiresOn": "2026-11-30"
   },
   {
     "scanner": "gitleaks",
     "id": "integration-test-throttle-secret-32",
-    "rationale": "Exact fixed value is restricted to the disposable CI integration database and is not accepted by hosted environment validation.",
-    "expiresOn": "2026-10-31"
+    "rationale": "Revalidated 2026-11-02: Exact fixed value is restricted to the disposable CI integration database and is not accepted by hosted environment validation.",
+    "expiresOn": "2026-11-30"
   },
   {
     "scanner": "gitleaks",
     "id": "replace_me_with_32_safe_characters",
-    "rationale": "Exact documented placeholder is used only by the local production-like example env and cannot be rendered by the hosted deployment workflow.",
-    "expiresOn": "2026-10-31"
+    "rationale": "Revalidated 2026-11-02: Exact documented placeholder is used only by the local production-like example env and cannot be rendered by the hosted deployment workflow.",
+    "expiresOn": "2026-11-30"
   },
   {
     "scanner": "gitleaks",
     "id": "0123456789abcdef0123456789abcdef",
-    "rationale": "Exact deterministic value is scoped to the deployment-script temporary-directory harness and is never rendered into a hosted runtime environment.",
-    "expiresOn": "2026-10-31"
-  },
-  {
-    "scanner": "pnpm-audit",
-    "id": "GHSA-qwww-vcr4-c8h2",
-    "rationale": "React Router DOM has no compatible patched 7.x release; both frontends use declarative SPA mode and do not enable the advisory's React Server Components action mode.",
-    "expiresOn": "2026-10-31"
-  },
-  {
-    "scanner": "trivy",
-    "id": "GHSA-qwww-vcr4-c8h2",
-    "rationale": "React Router DOM has no compatible patched 7.x release; both frontends use declarative SPA mode and do not enable the advisory's React Server Components action mode.",
-    "expiresOn": "2026-10-31"
+    "rationale": "Revalidated 2026-11-02: Exact deterministic value is scoped to the deployment-script temporary-directory harness and is never rendered into a hosted runtime environment.",
+    "expiresOn": "2026-11-30"
   },
   {
     "scanner": "trivy",
     "id": "DS-0002",
-    "rationale": "Dockerfile.local is an explicitly development-only bind-mount image; every production runtime Dockerfile declares and is tested with a non-root user.",
-    "expiresOn": "2026-10-31"
+    "rationale": "Revalidated 2026-11-02: Dockerfile.local is an explicitly development-only bind-mount image; every production runtime Dockerfile declares and is tested with a non-root user.",
+    "expiresOn": "2026-11-30"
   },
   {
     "scanner": "trivy",
-    "id": "CVE-2026-84782",
-    "rationale": "Revalidated 2026-10-20 against the Debian tracker and the unchanged runtime paths: bookworm remains listed as vulnerable without a fixed 3.0 package. This advisory requires suspended OpenSSL DTLS handshake writes and DTLS retransmission. The API exposes Node TCP HTTP/TLS and Prisma PostgreSQL TCP, PostgreSQL uses TCP TLS, and Caddy uses Go TLS; no application or deployment path enables OpenSSL DTLS. Retain only this exact CVE exception through 2026-10-31 and reassess patched bookworm/distroless availability before expiry. Other OpenSSL findings remain scanned. Sources: https://openssl-library.org/news/secadv/20260929.txt and https://security-tracker.debian.org/tracker/CVE-2026-84782",
-    "expiresOn": "2026-10-31"
+    "id": "CVE-2026-116587",
+    "rationale": "Reviewed 2026-11-02: the remaining finding is go-jose/v3 v3.0.5, which has no upstream patch. The exact Caddy build dependency chain is modules/standard -> modules/caddypki -> smallstep/certificates/authority -> go.step.sm/crypto/jose -> go-jose/v3. The committed Caddyfile exposes only reverse proxies for the three validated public domains, disables the admin API, and configures neither the internal PKI/ACME server nor untrusted JWK provisioning. Thus the vulnerable private-RSA JWK parser is outside the configured request path. The separately linked go-jose/v4 is patched and asserted at v4.1.6. This exception must be removed or re-reviewed before enabling internal PKI, ACME-server/provisioner/JWK features or expiry. Upstream: https://github.com/go-jose/go-jose/security/advisories/GHSA-mgcc-cww5-fp2q",
+    "expiresOn": "2026-11-16"
   }
 ]

@@ -1,3 +1,4 @@
+import { operationalLineScope } from './operational-line-scope.js';
 import { Injectable } from '@nestjs/common';
 import {
   defer,
@@ -203,17 +204,6 @@ export class RealtimeService {
         })
       ).map(({ id }) => id);
     }
-    if (!principal.memberId) return [];
-    const shifts = await this.prisma.shiftRun.findMany({
-      where: {
-        supplierId: scope.supplierId,
-        ...(principal.role === 'SUPERVISOR'
-          ? { supervisorMemberId: principal.memberId }
-          : { lineLeaderMemberId: principal.memberId }),
-      },
-      distinct: ['lineId'],
-      select: { lineId: true },
-    });
-    return shifts.map(({ lineId }) => lineId);
+    return operationalLineScope(this.prisma, scope.supplierId, principal);
   }
 }

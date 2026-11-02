@@ -1,3 +1,4 @@
+import { operationalLineScope } from './operational-line-scope.js';
 import { createHash } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
@@ -883,18 +884,7 @@ export class ReadModelService {
     principal: RequestPrincipal,
   ): Promise<string[] | null> {
     if (['SUPPLIER_ADMIN', 'QC'].includes(principal.role)) return null;
-    if (!principal.memberId) return [];
-    const shifts = await this.prisma.shiftRun.findMany({
-      where: {
-        supplierId: scope.supplierId,
-        ...(principal.role === 'SUPERVISOR'
-          ? { supervisorMemberId: principal.memberId }
-          : { lineLeaderMemberId: principal.memberId }),
-      },
-      distinct: ['lineId'],
-      select: { lineId: true },
-    });
-    return shifts.map(({ lineId }) => lineId);
+    return operationalLineScope(this.prisma, scope.supplierId, principal);
   }
 }
 
@@ -1045,8 +1035,25 @@ function shiftScope(principal: RequestPrincipal): Prisma.ShiftRunWhereInput {
 }
 
 function henkatenScope(principal: RequestPrincipal): Prisma.HenkatenWhereInput {
-  const shift = shiftScope(principal);
-  return Object.keys(shift).length ? { shiftRun: shift } : {};
+  if (principal.realm === 'TMMIN' || ['SUPPLIER_ADMIN', 'QC'].includes(principal.role)) return {};
+  if (!principal.memberId) return { id: '00000000-0000-0000-0000-000000000000' };
+  return principal.role === 'SUPERVISOR'
+    ? {
+        OR: [
+          { shiftRun: { supervisorMemberId: principal.memberId } },
+          {
+            approvalRoutes: {
+              some: { route: 'SUPERVISOR', currentResponsibleMemberId: principal.memberId },
+            },
+          },
+        ],
+      }
+    : {
+        OR: [
+          { lineLeaderResponsibility: { memberId: principal.memberId } },
+          { lineLeaderResponsibility: null, shiftRun: { lineLeaderMemberId: principal.memberId } },
+        ],
+      };
 }
 
 function initials(name: string | null): string | null {

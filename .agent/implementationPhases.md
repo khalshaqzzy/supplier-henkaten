@@ -1,10 +1,12 @@
 # Enterprise Digital Henkaten Management — Implementation Roadmap
 
-Status: active · Updated: 2026-10-23 · Approach: backend first, dependency driven
+Status: active · Updated: 2026-11-02 · Approach: backend first, dependency driven
 
 This file tracks sequence, current state, dependencies, and remaining acceptance gates. The [PRD](PRD.md) defines product behavior; [rules](rules.md) define agent and engineering process; [session handoff](sessionHandoff.md) records recent changes and checks; [ADRs](../docs/adr/) explain durable decisions. Detailed local browser evidence and unresolved checks live in the [QA report](../docs/audits/local-browser-qa-2026-09-24.md) and [scenario plan](../docs/qa/browser-local-end-to-end-verification-plan.md). Do not copy their histories into this roadmap.
 
 ## Current position
+
+- **Member role changes, 2026-11-02:** dedicated Supplier Admin preview/commit transitions among LL, Supervisor and QC retain identity and atomically hand over configuration/Open responsibilities. Includes role ledger, current LL responsibility, stale/idempotent commands, session revocation and separate restored-account activation UI. The handover UI uses one replacement for all reviewed assignment and Open Henkaten references. Implementation and clean local parity are complete on `feat/member-role-handover`; delivery targets a PR to main. Minimal security dependency/runtime patches and a scoped, expiring Caddy internal-PKI exception are recorded in the handoff. Remote CI remains a delivery gate. Phase 15 and all staging/device/UAT gates remain unchanged. See [plan](memberRoleChangePlan.md) and [ADR 0011](../docs/adr/0011-permanent-master-data-and-member-account-lifecycle.md).
 
 - Phases **0–14: done** for their original implementation and local acceptance scope. Later defects and amendments are tracked below; “done” does not imply production acceptance.
 - Phase **15: in_progress**. **15.9 Automatic Staging Deployment** is done: staging push run `35977992005` completed successfully and independent three-domain smoke returned release SHA `dfc2aa2428b1db5fce407ec2033a1da87b0632bd`. Staging rehearsal and device gates remain.

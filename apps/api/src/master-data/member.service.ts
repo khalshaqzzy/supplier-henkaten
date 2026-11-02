@@ -1,3 +1,5 @@
+import { assertCurrentPrincipal } from '../auth/current-principal.js';
+import type { RequestPrincipal } from '../common/request-context.js';
 import { lockSetupMutation } from './setup-lock.js';
 import { Injectable } from '@nestjs/common';
 
@@ -232,7 +234,17 @@ export class MemberService {
               supplierId: scope.supplierId,
               status: 'OPEN',
               OR: [
-                { creatorMemberId: id },
+                { lineLeaderResponsibility: { memberId: id } },
+                { lineLeaderResponsibility: null, shiftRun: { lineLeaderMemberId: id } },
+                {
+                  approvalRoutes: {
+                    some: {
+                      route: 'SUPERVISOR',
+                      status: 'PENDING',
+                      currentResponsibleMemberId: id,
+                    },
+                  },
+                },
                 { manDetail: { replacedMpMemberId: id } },
                 { manDetail: { replacementMpMemberId: id } },
               ],
@@ -335,6 +347,7 @@ export class MemberService {
     expectedVersion: number,
     active: boolean,
     context: MutationContext,
+    principal: RequestPrincipal,
   ) {
     const temporaryPassword = active ? this.passwords.temporaryPassword() : undefined;
     const passwordHash = temporaryPassword
@@ -342,6 +355,7 @@ export class MemberService {
       : undefined;
     const username = await this.prisma.$transaction(async (transaction) => {
       await lockSetupMutation(transaction, scope.supplierId);
+      await assertCurrentPrincipal(transaction, principal);
       const member = await transaction.member.findFirst({
         where: { id: memberId, supplierId: scope.supplierId },
       });
@@ -350,6 +364,8 @@ export class MemberService {
         throw resourceInUse('Inactive member cannot have an active account.');
       const user = await requireOperationalUser(transaction, scope, memberId);
       if (user.version !== expectedVersion) throw versionConflict();
+      if ((user.status === 'ACTIVE') === active)
+        throw resourceInUse(active ? 'Akun sudah aktif.' : 'Akun sudah nonaktif.');
       await transaction.user.update({
         where: { id: user.id },
         data: {
@@ -358,6 +374,9 @@ export class MemberService {
             ? {
                 passwordHash,
                 mustChangePassword: true,
+                failedLoginCount: 0,
+                failedLoginWindowStartedAt: null,
+                lockedUntil: null,
                 passwordEpoch: { increment: 1 },
               }
             : {}),

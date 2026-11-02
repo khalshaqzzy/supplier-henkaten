@@ -1,7 +1,20 @@
 # syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 
 ARG NODE_IMAGE=node:22.23.1-bookworm-slim@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3
-ARG RUNTIME_IMAGE=gcr.io/distroless/cc-debian12:nonroot@sha256:fccdbb0a547c14e23fcf4ce8ad62ca5d43b4faae8d22cd292f490fef9946c96e
+ARG RUNTIME_IMAGE=gcr.io/distroless/cc-debian12:nonroot@sha256:9dac0a79194e45a7da0158a9c6da57b217585af0786db3845d1f0ec1a0dd182f
+
+# The pinned distroless base still contains vulnerable libssl3. Overlay the complete
+# vendor security package, including its package records, until upstream refreshes it.
+FROM ${NODE_IMAGE} AS openssl-runtime
+WORKDIR /tmp
+RUN apt-get update \
+  && apt-get install --yes --no-install-recommends --download-only --reinstall libssl3=3.0.22-1~deb12u2 \
+  && mkdir -p /opt/openssl-runtime/var/lib/dpkg/status.d \
+  && dpkg-deb --extract /var/cache/apt/archives/libssl3_*.deb /opt/openssl-runtime \
+  && dpkg-deb --field /var/cache/apt/archives/libssl3_*.deb > /opt/openssl-runtime/var/lib/dpkg/status.d/libssl3 \
+  && dpkg-deb --control /var/cache/apt/archives/libssl3_*.deb /tmp/libssl3-control \
+  && cp /tmp/libssl3-control/md5sums /opt/openssl-runtime/var/lib/dpkg/status.d/libssl3.md5sums \
+  && rm -rf /var/lib/apt/lists/*
 
 FROM ${NODE_IMAGE} AS build
 ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x,linux-arm64-openssl-3.0.x
@@ -49,6 +62,7 @@ ENV NODE_ENV=production \
   PATH=/nodejs/bin
 WORKDIR /app
 
+COPY --from=openssl-runtime /opt/openssl-runtime/ /
 COPY --from=build /usr/local/bin/node /nodejs/bin/node
 COPY --from=build --chown=65532:65532 /opt/api/ ./
 

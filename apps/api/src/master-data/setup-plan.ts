@@ -279,7 +279,7 @@ export async function prepareSetupPlan(
       add(row, 'Identitas', 'Dua baris merujuk data existing yang sama.');
     if (current) used.add(current.id);
     if (current && row.sheet === 'Member' && current.data['role'] !== row.data['role'])
-      add(row, 'Role', 'Role member existing tidak dapat diubah.');
+      add(row, 'Role', 'Ubah role member existing melalui aksi Ubah role pada Member & Akun.');
     const items =
       row.sheet === 'Checklist 4M'
         ? rows
