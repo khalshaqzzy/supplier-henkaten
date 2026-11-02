@@ -1,3 +1,41 @@
+## Amendment — 2 November 2026: Member & Akun CSV/Excel import
+
+Supplier Admin can import Member and operational accounts from **Import CSV / Excel** on
+Master Data → Member & Akun. This dedicated import accepts `.csv` and `.xlsx`, up to 50 MB
+and 300 member rows, subject to the existing 300-active-member supplier capacity. It cannot
+write Line, Job, Part, Shift, assignments, checklists, Tanoko or photos. The existing general
+setup workbook and Part import remain available.
+
+Downloadable CSV headers and a styled Excel Member/Panduan template use Kode member, Nama,
+Role, Nomor registrasi, Username and Password awal. Stable member code, name and role are
+required. CSV supports BOM, quoted values and comma/semicolon separators; Excel uses Member
+or one unambiguous non-guide sheet. Reordered recognized headers and extra columns are supported;
+other worksheets are explicitly reported as ignored. Existing identifier precision and leading-zero
+text must be preserved. Arbitrary column mapping and legacy `.xls` are outside this addition.
+
+Roles are MP, Supervisor, Line Leader and QC only. MP has no account or registration. New
+operational accounts use the file username and initial 12–128 character password, requiring a
+first-login password change. Existing identities match by stable code or unambiguous operational
+registration/username; uncoded MP may be linked explicitly. Changed rows require Update/Skip and
+archived rows require explicit Restore/Skip. Omitted data, existing passwords, roles and photos
+remain unchanged. Member restoration does not activate its account, including through the general
+setup workbook; account activation remains a separate reviewed lifecycle action. Dependent assignment
+restoration must wait for eligible active accounts. Imported username changes revoke that account's
+sessions and push subscriptions, following ordinary username edits.
+
+The focused responsive dialog provides file reading/matching states, row/column errors, safe error
+download, explicit review, masked passwords, stable actions and confirmed operation results. Credentials
+are excluded from previews and persistent browser storage. Dedicated Member-only API schemas enforce
+scope; a preauthorized 2 MB JSON budget covers normalized member requests. Commits reuse the atomic,
+durable, idempotent setup engine with stale-review and transaction-bound authorization checks. Existing
+Hosted, Hosted Preparation and delegated Supplier Admin boundaries remain effective.
+
+This supersedes the general CSV exclusion only for Member & Akun. See
+[implementation plan](memberImportPlan.md) and
+[ADR 0046](../docs/adr/0046-supplier-setup-workbook-import-and-reset.md).
+
+---
+
 ## Amendment — 2 November 2026: Supplier Admin role changes and account activation
 
 Supplier Admin can change an existing Line Leader, Supervisor or QC to either of the other two
@@ -2455,7 +2493,7 @@ Metrik adoption, cycle time approval, reject rate, dan aging dipantau melalui da
 - quality inspection execution di luar Henkaten checklist;
 - TMMIN QC × production integration;
 - email, SMS, native push, Slack, Teams, atau webhook notification;
-- bulk CSV import untuk resource selain Part, serta bulk export master data; workbook setup Excel mengikuti amendment 30 September 2026;
+- bulk CSV import untuk resource selain Part dan Member & Akun, serta bulk export master data; workbook setup Excel mengikuti amendment 30 September 2026;
 - document/photo attachment pada Henkaten selain member photo;
 - native mobile app;
 - AI/ML di luar penilaian indikasi PCR Henkaten; vector search;

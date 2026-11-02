@@ -19,9 +19,14 @@ export function installJsonBodyParsers(app: INestApplication) {
   const limiter = app.get(RateLimiterService);
   const config = app.get<AppConfig>(APP_CONFIG);
   const parser = express.json({ limit: '80mb', type: 'application/json' });
+  const memberParser = express.json({ limit: '2mb', type: 'application/json' });
   let active = 0;
   app.use(
-    ['/api/v1/supplier/master-data/parts/import', '/api/v1/supplier/master-data/setup-import'],
+    [
+      '/api/v1/supplier/master-data/parts/import',
+      '/api/v1/supplier/master-data/setup-import',
+      '/api/v1/supplier/master-data/members/import',
+    ],
     async (req: ContextRequest, res: Response, next: NextFunction) => {
       if (req.method === 'OPTIONS') return next();
       // Template and operation reads use normal authenticated controllers, never the large parser.
@@ -76,7 +81,7 @@ export function installJsonBodyParsers(app: INestApplication) {
         }
         await access.assertWritable(principal);
         if (released || res.destroyed) return;
-        parser(req, res, next);
+        (/\/members\/import\/?$/i.test(req.baseUrl) ? memberParser : parser)(req, res, next);
       } catch (error) {
         if (error instanceof ProblemException)
           return res.status(error.problem.status).json(error.problem);

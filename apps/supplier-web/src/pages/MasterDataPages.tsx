@@ -164,6 +164,9 @@ export function MasterListPage({ kind }: { kind: ResourceKind }) {
         description={meta.description}
         actions={
           <div className="master-header-actions">
+            {kind === 'members' && session?.principal.role === 'SUPPLIER_ADMIN' && (
+              <SetupImportDialog memberOnly />
+            )}
             {kind === 'parts' && (
               <Link
                 className="hds-button hds-button--secondary hds-button--md"
@@ -222,7 +225,9 @@ export function MasterListPage({ kind }: { kind: ResourceKind }) {
                 Reset filter
               </Button>
             ) : (
-              <Link to={`/master-data/${kind}/new`}>{meta.createLabel}</Link>
+              <div className="master-header-actions">
+                <Link to={`/master-data/${kind}/new`}>{meta.createLabel}</Link>
+              </div>
             )
           }
         />

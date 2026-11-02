@@ -56,7 +56,10 @@ export async function createSetupTemplate(timezone: string) {
       'Urutan',
       'Bilangan bulat positif. Checklist diurutkan per kategori; line, job dan shift mengikuti urutan tampil.',
     ],
-    ['Data arsip', 'Pilih Restore dan update pada review jika data lama ingin diaktifkan kembali.'],
+    [
+      'Data arsip',
+      'Pilih Restore dan update untuk memulihkan member. Akun nonaktif diaktifkan terpisah sebelum memulihkan assignment terkait.',
+    ],
     [
       'MP existing',
       'Jika belum memiliki kode import, hubungkan MP secara eksplisit di dialog; nama saja tidak menentukan identitas.',

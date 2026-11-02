@@ -309,3 +309,33 @@ export function validateSetupRows(rows: SetupRow[], checkPasswords = false): Set
       });
   return issues;
 }
+
+/** Dedicated import accepts members and operational accounts only. */
+export const memberImportRowSchema = setupRowSchema.extend({ sheet: z.literal('Member') });
+const memberImportRowsSchema = z
+  .array(memberImportRowSchema)
+  .min(1)
+  .max(300)
+  .refine(
+    (rows) => new Set(rows.map((row) => row.sourceRow)).size === rows.length,
+    'Nomor baris sumber harus unik.',
+  );
+const memberImportDecisionsSchema = z
+  .array(
+    setupDecisionSchema.extend({
+      key: z.string().regex(/^Member:[0-9]+$/),
+    }),
+  )
+  .max(300);
+export const memberImportPreviewRequestSchema = setupPreviewRequestSchema
+  .extend({
+    rows: memberImportRowsSchema,
+    decisions: memberImportDecisionsSchema.optional(),
+  })
+  .strict();
+export const memberImportCommitRequestSchema = setupCommitRequestSchema
+  .extend({
+    rows: memberImportRowsSchema,
+    decisions: memberImportDecisionsSchema,
+  })
+  .strict();

@@ -76,6 +76,30 @@ const transitionsSchema = z.array(henkatenTransitionSchema);
 export class SupplierApi {
   constructor(private readonly client: ApiClient) {}
 
+  memberImportTemplate() {
+    return this.client.request('/api/v1/supplier/master-data/members/import/template', {
+      responseType: 'blob',
+    });
+  }
+  previewMemberImport(rows: SetupRow[], decisions?: SetupDecision[]) {
+    const safe = rows.map((row) => ({
+      ...row,
+      data: Object.fromEntries(Object.entries(row.data).filter(([key]) => key !== 'password')),
+    }));
+    return this.client.request('/api/v1/supplier/master-data/members/import/preview', {
+      method: 'POST',
+      body: { rows: safe, ...(decisions ? { decisions } : {}) },
+      responseSchema: setupPreviewSchema,
+    });
+  }
+  commitMemberImport(body: SetupCommit, idempotencyKey: string) {
+    return this.client.request('/api/v1/supplier/master-data/members/import/commit', {
+      method: 'POST',
+      body,
+      idempotencyKey,
+      responseSchema: setupOperationSchema,
+    });
+  }
   setupTemplate() {
     return this.client.request('/api/v1/supplier/master-data/setup-import/template', {
       responseType: 'blob',

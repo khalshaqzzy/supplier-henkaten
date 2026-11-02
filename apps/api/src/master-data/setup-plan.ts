@@ -399,7 +399,7 @@ export async function prepareSetupPlan(
               }
             : p.row.data,
           ...(p.current?.userId
-            ? { userId: p.current.userId, userActive: p.restore ? true : p.current.userActive }
+            ? { userId: p.current.userId, userActive: p.current.userActive }
             : {}),
         }
       : final.get(p.id)!;

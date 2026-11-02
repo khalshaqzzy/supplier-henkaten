@@ -29,6 +29,7 @@ import type { MutationContext } from '../administration/mutation-context.js';
 import { MasterDataAccessService } from './master-data-access.service.js';
 import { masterAudit } from './master-data-audit.js';
 import { prepareSetupPlan, type PlannedRow } from './setup-plan.js';
+import { revokeSessions } from './member.service.js';
 
 const json = (value: unknown) => value as Prisma.InputJsonValue;
 const fail = (detail: string, status = 409) =>
@@ -544,17 +545,20 @@ export class SetupService implements OnModuleInit, BeforeApplicationShutdown {
             where: { id: p.id },
             data: { ...fields, ...restored, ...updateMeta },
           });
-          if (p.current.userId)
+          if (p.current.userId) {
+            const usernameChanged = p.current.data['username'] !== d['username'];
             await tx.user.update({
               where: { id: p.current.userId },
               data: {
                 username: d['username']!,
                 normalizedUsername: norm(d['username']!),
                 displayName: d['name']!,
-                ...(p.restore ? { status: 'ACTIVE', authorizationEpoch: { increment: 1 } } : {}),
+                ...(usernameChanged ? { authorizationEpoch: { increment: 1 } } : {}),
                 ...updateMeta,
               },
             });
+            if (usernameChanged) await revokeSessions(tx, p.current.userId, 'ROLE_CHANGED');
+          }
         } else {
           await tx.member.create({
             data: {

@@ -190,3 +190,80 @@ The final template includes a complete column dictionary in Panduan, conditional
 ## Delivery review — 30 September 2026
 
 Assignment audit identity is taken from the upsert result so newly seeded Line–Shift assignment rows remain traceable. The PostgreSQL suite verifies every imported MP assignment audit references a real persisted row. The browser suite explicitly selects Microsoft Edge unless an executable override is supplied; the previous device-only default could run Chromium under an Edge device profile. Production container and workflow parity are rerun for delivery, with exact commands and results in the handoff.
+
+
+## Dedicated Member and account import — 2 November 2026
+
+Status: implemented locally; staging/device acceptance remains pending.
+
+### Context and decision
+
+The Member & Akun list requires a focused CSV/Excel entry without exposing unrelated setup changes.
+The existing setup planner and operation engine already provide stable identifiers, atomic merge,
+requester-scoped receipts, stale-review protection and authorization recovery. Those internals are reused;
+Member-only request schemas are enforced by dedicated `/members/import/preview` and `/members/import/commit`
+controllers. Template download is `/members/import/template`; operation polling retains the shared,
+requester/tenant-scoped `/setup-import/operations/:id` endpoint. No schema migration is necessary.
+
+A separate preauthorized 2 MB JSON parser is used for normalized Member requests. Session, role,
+password-change state, source/purpose, Origin/CSRF, pending-capacity and timeout checks precede parsing,
+using the existing boundary with the smaller budget. Budget selection follows the same case-insensitive routing rules as Express. Both Member schemas permit only the Member sheet,
+unique source-row identifiers, at most 300 rows and Member decision keys. Cross-resource payloads are
+rejected before reaching the shared writer. The unchanged durable operation format contains sanitized
+rows and password hashes, with terminal payload cleanup; plaintext credentials never enter durable jobs.
+
+### File and identity contract
+
+The dedicated worker accepts CSV and `.xlsx` up to 50 MB. CSV supports BOM, comma/semicolon detection,
+quoted multiline records, physical source-line reporting and early row/column limits. Excel preserves
+existing ZIP expansion limits and selects Member, or the sole unambiguous non-guide worksheet. Other
+worksheets are reported as ignored. Template headers/field keys may be reordered; arbitrary manual
+column mapping and `.xls` are excluded. The CSV template is header-only, avoiding accidental example
+account creation. Excel includes conditional field guidance, frozen headers, text identifiers, role
+validation and editable examples for all four operational member roles.
+
+Stable member codes remain required. Existing code or unambiguous operational registration/username
+identifies a person; names never link identities automatically. An uncoded MP can be linked explicitly.
+MP has neither account nor registration. New Supervisor/LL/QC accounts require a 12–128 character initial
+password and a first-login change. Existing passwords, IDs, photo and roles are retained. Ordinary
+Member import cannot create Supplier Admin/TMMIN accounts or perform role handover.
+
+### Lifecycle compatibility correction
+
+The old setup writer activated accounts when restoring archived members. The current account lifecycle
+contract separates those actions. Both the planner's final-state model and writer now preserve inactive
+account status. Existing operational accounts must be explicitly activated before dependent assignments
+can be restored. A general workbook restoring all resources may therefore require a Member restoration,
+separate account activation and then remaining resource restoration. This is an intentional correction
+of earlier behavior, rather than an automatic credential or assignment workaround.
+
+Username updates through either import path now use the ordinary username-edit revocation behavior:
+authorization epoch increment plus session and push-subscription revocation. Profile-only changes do
+not rotate credentials. Passwords remain unchanged until an explicit activation/reset action.
+
+### Interface, alternatives and consequences
+
+The shared import dialog has a focused Member mode: secondary list action, compact single-resource
+review, Excel/CSV templates, source rows, before/after values, masked passwords, Update/Skip/Restore
+choices, explicit MP linkage and confirmed receipts. It preserves HDS/Inter/orange, uses a 920 px desktop
+width and full-height phone layout, with persistent actions, safe-area padding, readable values and
+44 px actions. File replacement cancels old workers and ignores late responses. Matching failure or
+stale commit requires fresh preview. Unknown commit results retain the exact original request/key;
+operation-ID recovery never stores credentials. Error summaries are focusable and stage text is live.
+
+A client-only filter was rejected because forged requests could otherwise include other setup sheets.
+Repeated individual CRUD was rejected because it permits partial batches and repeated credential creation.
+A separate operation table/worker would duplicate existing locking and recovery behavior. Reusing the
+shared dialog avoids diverging retry/credential UX, at the cost of regression testing the general setup
+and Part flows. The visible member import action remains available above empty and filtered lists.
+
+### Validation and follow-up
+
+Validation covers strict request scope/capacity, CSV quoting/physical lines, worksheet ambiguity,
+identifier precision, template validity, credential redaction, stale and exact-payload retry, replaced
+worker results, account restoration and imported username session revocation. PostgreSQL tests exercise
+the real atomic writer and full workbook restore sequence. Chromium/actual Edge use the downloaded
+Excel template and CSV, check scoped-route rejection, uncertain-response recovery, update and restoration,
+axe and screenshots at 1440/768/390 px. A fresh isolated seed verifies compatibility without changing seed
+fixtures. Exact final commands and outcomes are retained in the session handoff. Staging, real mobile
+and desktop Excel acceptance are subsequent release gates; no deployment is included.
