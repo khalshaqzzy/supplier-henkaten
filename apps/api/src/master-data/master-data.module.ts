@@ -1,3 +1,4 @@
+import { MemberRoleService } from './member-role.service.js';
 import { TanokoController } from './tanoko.controller.js';
 import { SetupController } from './setup.controller.js';
 import { SetupService } from './setup.service.js';
@@ -34,6 +35,7 @@ import { TmminMasterDataController } from './tmmin-master-data.controller.js';
     TanokoService,
     MasterDataAccessService,
     MemberService,
+    MemberRoleService,
     CatalogService,
     ChecklistService,
     AssignmentService,

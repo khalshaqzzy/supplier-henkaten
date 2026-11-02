@@ -1,3 +1,4 @@
+import { assertCurrentPrincipal } from '../auth/current-principal.js';
 import { createHash } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
@@ -45,6 +46,7 @@ export class ApprovalService {
     try {
       const henkatenId = await runSerializable(this.prisma, async (tx) => {
         await lockSupplier(tx, scope.supplierId);
+        await assertCurrentPrincipal(tx, principal);
         const retry = await tx.approvalDecision.findFirst({
           where: {
             supplierId: scope.supplierId,
@@ -229,6 +231,7 @@ export class ApprovalService {
     const payloadHash = commandHash({ id, ...input });
     const henkatenId = await runSerializable(this.prisma, async (tx) => {
       await lockSupplier(tx, scope.supplierId);
+      await assertCurrentPrincipal(tx, principal);
       const retry = await tx.approvalRouteRouting.findFirst({
         where: {
           supplierId: scope.supplierId,

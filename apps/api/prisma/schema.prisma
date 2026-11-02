@@ -1168,6 +1168,7 @@ model HenkatenExportJob {
 }
 
 model Henkaten {
+  lineLeaderResponsibility HenkatenLineLeaderResponsibility?
   deletedAt DateTime? @db.Timestamptz(3)
   deletedById String? @db.Uuid
   id                           String                      @id @default(uuid()) @db.Uuid
@@ -1603,4 +1604,35 @@ model HenkatenDeletionCommand {
   supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   @@unique([supplierId, actorUserId, key])
   @@index([supplierId, createdAt])
+}
+
+model MemberRoleChange {
+  id             String     @id @default(uuid()) @db.Uuid
+  supplierId     String     @db.Uuid
+  memberId       String     @db.Uuid
+  actorUserId    String     @db.Uuid
+  fromRole       MemberRole
+  toRole         MemberRole
+  memberVersion  Int
+  reason         String     @db.VarChar(500)
+  idempotencyKey String     @db.VarChar(128)
+  payloadHash    String     @db.Char(64)
+  handovers      Json
+  createdAt      DateTime   @default(now()) @db.Timestamptz(3)
+
+  @@unique([supplierId, actorUserId, idempotencyKey])
+  @@unique([memberId, memberVersion])
+  @@index([supplierId, memberId, createdAt])
+}
+
+model HenkatenLineLeaderResponsibility {
+  henkatenId String   @id @db.Uuid
+  supplierId String   @db.Uuid
+  memberId   String   @db.Uuid
+  version    Int      @default(1)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+  henkaten   Henkaten @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
+
+  @@unique([henkatenId, supplierId])
+  @@index([supplierId, memberId])
 }

@@ -71,6 +71,10 @@ import {
   lineShiftSchema,
   masterListQuerySchema,
   memberCredentialResponseSchema,
+  memberRolePreviewRequestSchema,
+  memberRolePreviewSchema,
+  changeMemberRoleRequestSchema,
+  changeMemberRoleResponseSchema,
   memberPageSchema,
   memberSchema,
   partPageSchema,
@@ -958,6 +962,26 @@ function masterDataPaths() {
         requestParams: memberPath,
         requestBody: body(updateMemberRequestSchema),
         responses: { '200': json('Updated member', memberSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/members/{id}/role/preview': {
+      post: {
+        requestParams: memberPath,
+        requestBody: body(memberRolePreviewRequestSchema),
+        responses: { '200': json('Role impact review', memberRolePreviewSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/members/{id}/role': {
+      post: {
+        requestParams: {
+          ...memberPath,
+          header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }),
+        },
+        requestBody: body(changeMemberRoleRequestSchema),
+        responses: {
+          '200': json('Changed member role', changeMemberRoleResponseSchema),
+          '409': problem,
+        },
       },
     },
     '/api/v1/supplier/master-data/members/{id}/activate': action(memberSchema),

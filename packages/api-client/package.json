@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@tmmin-henkaten/contracts": "workspace:*",
-    "zod": "4.4.3"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "typescript": "6.0.3",

@@ -28,6 +28,9 @@ import {
   lineShiftSchema,
   lineSchema,
   memberCredentialResponseSchema,
+  memberRolePreviewSchema,
+  changeMemberRoleResponseSchema,
+  type ChangeMemberRoleRequest,
   memberPageSchema,
   memberSchema,
   notificationPageSchema,
@@ -290,6 +293,31 @@ export class SupplierApi {
       method: 'POST',
       body,
       responseSchema: memberSchema,
+    });
+  }
+
+  previewMemberRole(id: string, role: ChangeMemberRoleRequest['role']) {
+    return this.client.request(`/api/v1/supplier/master-data/members/${id}/role/preview`, {
+      method: 'POST',
+      body: { role },
+      responseSchema: memberRolePreviewSchema,
+    });
+  }
+
+  changeMemberRole(id: string, body: ChangeMemberRoleRequest, key: string) {
+    return this.client.request(`/api/v1/supplier/master-data/members/${id}/role`, {
+      method: 'POST',
+      body,
+      idempotencyKey: key,
+      responseSchema: changeMemberRoleResponseSchema,
+    });
+  }
+
+  memberAccountAction(id: string, action: 'activate' | 'deactivate', body: unknown) {
+    return this.client.request(`/api/v1/supplier/master-data/members/${id}/account/${action}`, {
+      method: 'POST',
+      body,
+      responseSchema: memberCredentialResponseSchema,
     });
   }
 

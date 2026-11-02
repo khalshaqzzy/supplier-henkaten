@@ -28,12 +28,14 @@ RUN --mount=type=cache,id=supplier-henkaten-go-mod,target=/go/pkg/mod \
   && go get golang.org/x/text@v0.42.0 \
   && go get golang.org/x/crypto@v0.57.0 \
   && go get github.com/klauspost/compress@v1.18.7 \
+  && go get github.com/go-jose/go-jose/v4@v4.1.6 \
   && go mod tidy \
   && test "$(go list -m -f '{{.Version}}' google.golang.org/grpc)" = v1.83.2 \
   && test "$(go list -m -f '{{.Version}}' golang.org/x/net)" = v0.60.0 \
   && test "$(go list -m -f '{{.Version}}' golang.org/x/crypto)" = v0.57.0 \
   && test "$(go list -m -f '{{.Version}}' golang.org/x/text)" = v0.42.0 \
   && test "$(go list -m -f '{{.Version}}' github.com/klauspost/compress)" = v1.18.7 \
+  && test "$(go list -m -f '{{.Version}}' github.com/go-jose/go-jose/v4)" = v4.1.6 \
   && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/caddy .
 
 FROM ${RUNTIME_IMAGE} AS runtime

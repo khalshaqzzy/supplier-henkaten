@@ -1,3 +1,10 @@
+import { MemberRoleService } from './member-role.service.js';
+import { requiredIdempotencyKey } from '../common/idempotency.js';
+import {
+  memberRolePreviewRequestSchema,
+  changeMemberRoleRequestSchema,
+  type ChangeMemberRoleRequest,
+} from '@tmmin-henkaten/contracts';
 import { createReadStream } from 'node:fs';
 
 import {
@@ -67,6 +74,7 @@ export class SupplierMemberController {
     private readonly access: MasterDataAccessService,
     private readonly members: MemberService,
     private readonly photos: PhotoService,
+    private readonly roles: MemberRoleService,
   ) {}
 
   @RequireCapabilities('SUPPLIER_MASTER_DATA_READ')
@@ -111,6 +119,39 @@ export class SupplierMemberController {
       await this.access.assertWritable(principal(request)),
       parseWithSchema(opaqueIdSchema, id),
       body,
+      mutationContext(request),
+    );
+  }
+
+  @RequireCapabilities('SUPPLIER_MASTER_DATA_MANAGE')
+  @Post('/:id/role/preview')
+  @HttpCode(200)
+  async rolePreview(
+    @Param('id') id: string,
+    @ValidatedBody(memberRolePreviewRequestSchema) body: { role: ChangeMemberRoleRequest['role'] },
+    @Req() request: ContextRequest,
+  ) {
+    return this.roles.preview(
+      await this.access.assertWritable(principal(request)),
+      parseWithSchema(opaqueIdSchema, id),
+      body.role,
+    );
+  }
+
+  @RequireCapabilities('SUPPLIER_MASTER_DATA_MANAGE')
+  @Post('/:id/role')
+  @HttpCode(200)
+  async changeRole(
+    @Param('id') id: string,
+    @ValidatedBody(changeMemberRoleRequestSchema) body: ChangeMemberRoleRequest,
+    @Req() request: ContextRequest,
+  ) {
+    return this.roles.change(
+      await this.access.assertWritable(principal(request)),
+      parseWithSchema(opaqueIdSchema, id),
+      body,
+      requiredIdempotencyKey(request),
+      principal(request),
       mutationContext(request),
     );
   }
@@ -290,6 +331,7 @@ export class SupplierMemberController {
       version,
       active,
       mutationContext(request),
+      principal(request),
     );
   }
 }

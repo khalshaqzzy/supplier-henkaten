@@ -1,3 +1,4 @@
+import { assertCurrentPrincipal } from '../auth/current-principal.js';
 import { assertTanokoEligible } from '../master-data/tanoko-eligibility.js';
 import { LineShiftService } from '../master-data/line-shift.service.js';
 import { createHash, randomUUID } from 'node:crypto';
@@ -67,6 +68,7 @@ export class HenkatenService {
     const payloadHash = createHash('sha256').update(canonicalJson(input)).digest('hex');
     const id = await runSerializable(this.prisma, async (tx) => {
       await lockSupplier(tx, scope.supplierId);
+      await assertCurrentPrincipal(tx, principal);
       const retry = await tx.henkaten.findFirst({
         where: {
           supplierId: scope.supplierId,
@@ -341,6 +343,14 @@ export class HenkatenService {
         },
       });
 
+      // An occurrence keeps its original LL snapshot after an assignment handover.
+      // New submissions belong to the authenticated LL even within that same occurrence.
+      if (legacyShift.lineLeaderMemberId !== memberId) {
+        await tx.henkatenLineLeaderResponsibility.create({
+          data: { henkatenId: created.id, supplierId: scope.supplierId, memberId },
+        });
+      }
+
       await this.pcr.queueHosted(tx, created.id, scope.supplierId, {
         category: created.category,
         cause: created.cause,
@@ -444,6 +454,7 @@ export class HenkatenService {
     const memberId = principal.memberId;
     await runSerializable(this.prisma, async (tx) => {
       await lockSupplier(tx, scope.supplierId);
+      await assertCurrentPrincipal(tx, principal);
       const lockCandidate = await tx.henkaten.findFirst({
         where: { deletedAt: null, id, supplierId: scope.supplierId },
         select: {
@@ -469,7 +480,10 @@ export class HenkatenService {
           id,
           supplierId: scope.supplierId,
           status: 'OPEN',
-          shiftRun: { lineLeaderMemberId: memberId },
+          OR: [
+            { lineLeaderResponsibility: { memberId } },
+            { lineLeaderResponsibility: null, shiftRun: { lineLeaderMemberId: memberId } },
+          ],
         },
       });
       if (!current) throw missing('Open owned Henkaten');
@@ -1174,7 +1188,12 @@ function roleWhere(principal?: RequestPrincipal): Prisma.HenkatenWhereInput {
           },
         ],
       }
-    : { shiftRun: { lineLeaderMemberId: principal.memberId } };
+    : {
+        OR: [
+          { lineLeaderResponsibility: { memberId: principal.memberId } },
+          { lineLeaderResponsibility: null, shiftRun: { lineLeaderMemberId: principal.memberId } },
+        ],
+      };
 }
 
 async function ensureAutomaticOccurrence(
