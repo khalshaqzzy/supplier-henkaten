@@ -1,6 +1,8 @@
 import { Controller, Get, Param, Post, Req, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import {
+  memberImportPreviewRequestSchema,
+  memberImportCommitRequestSchema,
   setupCommitRequestSchema,
   setupPreviewRequestSchema,
   setupResetRequestSchema,
@@ -17,6 +19,7 @@ import { mutationContext } from '../administration/mutation-context.js';
 import { MasterDataAccessService } from './master-data-access.service.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 import { SetupService } from './setup.service.js';
+import { createMemberTemplate } from './member-template.js';
 import { createSetupTemplate } from './setup-template.js';
 
 @Controller('/api/v1/supplier/master-data')
@@ -27,6 +30,34 @@ export class SetupController {
     private readonly access: MasterDataAccessService,
     private readonly prisma: PrismaService,
   ) {}
+  @Get('/members/import/template')
+  async memberTemplate(@Req() request: ContextRequest, @Res() response: Response) {
+    await this.access.assertWritable(principal(request));
+    response.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    response.setHeader('Content-Disposition', 'attachment; filename="template-member-akun.xlsx"');
+    response.setHeader('Cache-Control', 'no-store');
+    response.send(await createMemberTemplate());
+  }
+  @Post('/members/import/preview')
+  memberPreview(
+    @Req() request: ContextRequest,
+    @ValidatedBody(memberImportPreviewRequestSchema)
+    body: { rows: SetupRow[]; decisions?: SetupDecision[] },
+  ) {
+    return this.service.preview(principal(request), body.rows, body.decisions);
+  }
+  @Post('/members/import/commit')
+  memberCommit(
+    @Req() request: ContextRequest,
+    @ValidatedBody(memberImportCommitRequestSchema) body: SetupCommit,
+  ) {
+    return this.service.commit(
+      principal(request),
+      body,
+      requiredIdempotencyKey(request),
+      mutationContext(request),
+    );
+  }
   @Get('/setup-import/template')
   async template(@Req() request: ContextRequest, @Res() response: Response) {
     const scope = await this.access.assertWritable(principal(request));

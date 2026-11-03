@@ -10,6 +10,8 @@ import { PasswordService } from '../auth/password.service.js';
 import type { RequestPrincipal } from '../common/request-context.js';
 import type { MutationContext } from '../administration/mutation-context.js';
 import { SetupService } from './setup.service.js';
+import { MemberService } from './member.service.js';
+import { TenantScope } from '../common/scope.js';
 import { createSetupTemplate } from './setup-template.js';
 
 const password = 'Setup-Integration-Password-2026';
@@ -231,6 +233,37 @@ describe('Supplier workbook import and reset', () => {
     ).toBe(true);
     expect(await prisma.part.count({ where: { supplierId } })).toBe(3);
   });
+  it('revokes the previous sessions when import changes an existing username', async () => {
+    const user = await prisma.user.findFirstOrThrow({ where: { memberId: originalMemberId } });
+    const oldSession = await prisma.userSession.create({
+      data: {
+        userId: user.id,
+        supplierId,
+        realm: 'SUPPLIER',
+        sourceEpoch: principal.sourceEpoch!,
+        passwordEpoch: user.passwordEpoch,
+        authorizationEpoch: user.authorizationEpoch,
+        tokenHash: randomBytes(32),
+        lastActivityAt: new Date(),
+        idleExpiresAt: new Date(Date.now() + 3600000),
+        absoluteExpiresAt: new Date(Date.now() + 3600000),
+      },
+    });
+    const changed = [
+      {
+        ...rows[0]!,
+        data: { ...rows[0]!.data, name: 'Supervisor revised', username: 'spv.updated' },
+      },
+    ];
+    const preview = await service.preview(principal, changed);
+    await commit(changed, [{ key: preview.rows[0]!.key, action: 'UPDATE' }]);
+    const updated = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(updated.passwordHash).toBe(user.passwordHash);
+    expect(updated.authorizationEpoch).toBe(user.authorizationEpoch + 1);
+    expect(
+      (await prisma.userSession.findUniqueOrThrow({ where: { id: oldSession.id } })).revokedAt,
+    ).not.toBeNull();
+  });
   it('rejects invalid references, duplicate active leaders, and stale review revisions', async () => {
     const broken = rows
       .filter((r) => r.sheet === 'Line Shift')
@@ -369,9 +402,36 @@ describe('Supplier workbook import and reset', () => {
     const restore = await service.preview(principal, rows);
     expect(restore.issues).toEqual([]);
     expect(restore.rows.every((r) => r.status === 'INACTIVE')).toBe(true);
+    const memberRows = rows.filter((row) => row.sheet === 'Member');
+    const inactiveUsers = await prisma.user.findMany({
+      where: { supplierId, memberId: { not: null } },
+    });
+    const choices = restore.rows.map((r) => ({ key: r.key, action: 'RESTORE' as const }));
+    const blocked = await service.preview(principal, rows, choices);
+    expect(blocked.issues.some((issue) => issue.sheet === 'Line Shift')).toBe(true);
     await commit(
-      rows,
-      restore.rows.map((r) => ({ key: r.key, action: 'RESTORE' })),
+      memberRows,
+      choices.filter((choice) => choice.key.startsWith('Member:')),
+    );
+    for (const user of inactiveUsers) {
+      const restoredUser = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+      expect(restoredUser.status).toBe('INACTIVE');
+      expect(restoredUser.passwordHash).toBe(user.passwordHash);
+      await app
+        .get(MemberService)
+        .setAccountActive(
+          new TenantScope(supplierId),
+          user.memberId!,
+          restoredUser.version,
+          true,
+          context,
+          principal,
+        );
+    }
+    const otherRows = rows.filter((row) => row.sheet !== 'Member');
+    await commit(
+      otherRows,
+      choices.filter((choice) => !choice.key.startsWith('Member:')),
     );
     expect(
       (await prisma.member.findFirstOrThrow({ where: { supplierId, importCode: 'GL-01' } })).id,

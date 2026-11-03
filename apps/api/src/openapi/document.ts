@@ -10,6 +10,8 @@ import {
   tanokoSaveSchema,
   tanokoHistoryQuerySchema,
   tanokoHistorySchema,
+  memberImportPreviewRequestSchema,
+  memberImportCommitRequestSchema,
   setupPreviewRequestSchema,
   setupPreviewSchema,
   setupCommitRequestSchema,
@@ -1115,6 +1117,33 @@ function masterDataPaths() {
       createPartRequestSchema,
       partSchema,
     ),
+    '/api/v1/supplier/master-data/members/import/template': {
+      get: { responses: { '200': xlsx, '400': problem, '403': problem } },
+    },
+    '/api/v1/supplier/master-data/members/import/preview': {
+      post: {
+        requestBody: body(memberImportPreviewRequestSchema),
+        responses: {
+          '201': json('Member review', setupPreviewSchema),
+          '422': problem,
+          '400': problem,
+          '403': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/master-data/members/import/commit': {
+      post: {
+        requestParams: { header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }) },
+        requestBody: body(memberImportCommitRequestSchema),
+        responses: {
+          '201': json('Member import operation', setupOperationSchema),
+          '409': problem,
+          '422': problem,
+          '400': problem,
+          '403': problem,
+        },
+      },
+    },
     '/api/v1/supplier/master-data/setup-import/template': {
       get: { responses: { '200': xlsx, '403': problem } },
     },

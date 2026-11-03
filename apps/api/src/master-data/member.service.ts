@@ -462,7 +462,7 @@ async function requireOperationalUser(
   return user;
 }
 
-async function revokeSessions(
+export async function revokeSessions(
   transaction: Prisma.TransactionClient,
   userId: string,
   reason: 'ROLE_CHANGED' | 'USER_REACTIVATED' | 'USER_DEACTIVATED' | 'PASSWORD_RESET',

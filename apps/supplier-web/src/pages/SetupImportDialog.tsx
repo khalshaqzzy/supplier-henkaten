@@ -33,6 +33,7 @@ import { Alert, Button, Dialog, NativeSelect, Skeleton, toast } from '@tmmin-hen
 import { supplierApi } from '../app/api';
 import { useSession } from '../app/session';
 import type { ParsedSetupWorkbook } from './setupWorkbook';
+import { memberCsvTemplate } from './memberImport';
 import './setup-import.css';
 
 export const setupErrorMessage = (error: unknown) =>
@@ -54,10 +55,10 @@ export function saveDownload(blob: Blob, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function SetupImportDialog() {
+export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean }) {
   const { session } = useSession();
   const client = useQueryClient();
-  const storageKey = `setup-import:${session!.supplier!.id}:${session!.principal.userId}`;
+  const storageKey = `${memberOnly ? 'member-import' : 'setup-import'}:${session!.supplier!.id}:${session!.principal.userId}`;
   const [open, setOpen] = useState(false);
   const [discard, setDiscard] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -79,12 +80,14 @@ export function SetupImportDialog() {
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [highlight, setHighlight] = useState<number | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const errorSummary = useRef<HTMLDivElement>(null);
   const worker = useRef<Worker | null>(null);
   const sequence = useRef(0);
   const retry = useRef<{ body: SetupCommit; key: string } | null>(null);
   const reported = useRef<string | null>(null);
   const processing = operation?.status === 'QUEUED' || operation?.status === 'RUNNING';
   const locked = Boolean(stage || processing || uncertain);
+  const canReplaceFile = !processing && !uncertain && stage !== 'SUBMITTING';
   const available = SETUP_SHEETS.filter((spec) => rows.some((r) => r.sheet === spec.name));
   const accountIssues: SetupIssue[] = (preview?.rows ?? []).flatMap((diff) => {
     if (diff.sheet !== 'Member' || diff.status !== 'NEW') return [];
@@ -102,6 +105,9 @@ export function SetupImportDialog() {
       : [];
   });
   const allIssues = [...localIssues, ...(preview?.issues ?? []), ...accountIssues];
+  useEffect(() => {
+    if (allIssues.length) errorSummary.current?.focus();
+  }, [allIssues.length]);
   const diffs = preview?.rows.filter((r) => r.sheet === sheet) ?? [];
   const interesting = diffs.filter((r) => r.status !== 'SAME');
   const shown = interesting.slice(page * 50, (page + 1) * 50);
@@ -113,7 +119,10 @@ export function SetupImportDialog() {
       (r) => r.status === 'NEW' || choices[r.key] === 'UPDATE' || choices[r.key] === 'RESTORE',
     ).length ?? 0;
   const metrics = [
-    ['Baru', preview?.rows.filter((r) => r.status === 'NEW').length ?? rows.length],
+    [
+      preview ? 'Baru' : 'Baris',
+      preview?.rows.filter((r) => r.status === 'NEW').length ?? rows.length,
+    ],
     [
       'Berubah',
       preview?.rows.filter((r) => r.status === 'CHANGED' || r.status === 'INACTIVE').length ?? 0,
@@ -215,7 +224,11 @@ export function SetupImportDialog() {
     setStage('MATCHING');
     setProblem(null);
     try {
-      const next = await supplierApi.previewSetupImport(
+      const next = await (
+        memberOnly
+          ? supplierApi.previewMemberImport.bind(supplierApi)
+          : supplierApi.previewSetupImport.bind(supplierApi)
+      )(
         source,
         Object.entries(decisions).map(([key, action]) => ({ key, action })),
       );
@@ -226,19 +239,20 @@ export function SetupImportDialog() {
     } catch (error) {
       if (token === sequence.current) {
         setProblem(setupErrorMessage(error));
+        setPreview(null);
         setStage(null);
       }
     }
   };
   const selectFile = (selected: File | undefined) => {
-    if (!selected || locked) return;
+    if (!selected || !canReplaceFile) return;
     clearFile();
     setFile({ name: selected.name, size: selected.size });
     setStage('READING');
     const token = sequence.current;
-    const reader = new Worker(new URL('./setupWorkbook.worker.ts', import.meta.url), {
-      type: 'module',
-    });
+    const reader = memberOnly
+      ? new Worker(new URL('./memberImport.worker.ts', import.meta.url), { type: 'module' })
+      : new Worker(new URL('./setupWorkbook.worker.ts', import.meta.url), { type: 'module' });
     worker.current = reader;
     reader.onmessage = (
       event: MessageEvent<{
@@ -267,7 +281,11 @@ export function SetupImportDialog() {
     reader.onerror = () => {
       if (token === sequence.current) {
         setStage(null);
-        setProblem('File tidak dapat dibaca. Simpan ulang sebagai .xlsx.');
+        setProblem(
+          memberOnly
+            ? 'File tidak dapat dibaca. Simpan ulang sebagai CSV atau .xlsx.'
+            : 'File tidak dapat dibaca. Simpan ulang sebagai .xlsx.',
+        );
       }
       reader.terminate();
     };
@@ -316,7 +334,11 @@ export function SetupImportDialog() {
     setStage('SUBMITTING');
     setProblem(null);
     try {
-      const next = await supplierApi.commitSetupImport(retry.current.body, retry.current.key);
+      const next = await (
+        memberOnly
+          ? supplierApi.commitMemberImport.bind(supplierApi)
+          : supplierApi.commitSetupImport.bind(supplierApi)
+      )(retry.current.body, retry.current.key);
       retry.current = null;
       setUncertain(false);
       setOperation(next);
@@ -332,6 +354,10 @@ export function SetupImportDialog() {
       else {
         setUncertain(false);
         retry.current = null;
+        if (error instanceof ApiProblemError && error.problem.status === 409) {
+          setPreview(null);
+          setChoices({});
+        }
       }
     } finally {
       setStage(null);
@@ -341,7 +367,10 @@ export function SetupImportDialog() {
     setTemplateBusy(true);
     setProblem(null);
     try {
-      saveDownload(await supplierApi.setupTemplate(), 'template-setup-supplier.xlsx');
+      saveDownload(
+        await (memberOnly ? supplierApi.memberImportTemplate() : supplierApi.setupTemplate()),
+        memberOnly ? 'template-member-akun.xlsx' : 'template-setup-supplier.xlsx',
+      );
     } catch (error) {
       setProblem(setupErrorMessage(error));
     } finally {
@@ -385,13 +414,13 @@ export function SetupImportDialog() {
         open={open}
         onOpenChange={changeOpen}
         size="lg"
-        className="setup-import-dialog"
-        title="Import Data"
+        className={`setup-import-dialog ${memberOnly ? 'member-import-dialog' : ''}`}
+        title={memberOnly ? 'Import Member & Akun' : 'Import Data'}
         eyebrow="Master Data"
         description=""
         trigger={
-          <Button variant="primary" leadingIcon={<UploadCloud />}>
-            Import Data
+          <Button variant={memberOnly ? 'secondary' : 'primary'} leadingIcon={<UploadCloud />}>
+            {memberOnly ? 'Import CSV / Excel' : 'Import Data'}
           </Button>
         }
         footer={
@@ -404,6 +433,8 @@ export function SetupImportDialog() {
                 </>
               ) : preview ? (
                 `${changeCount.toLocaleString('id-ID')} data akan disimpan`
+              ) : memberOnly ? (
+                '.csv / .xlsx · Maks. 50 MB · 300 baris'
               ) : (
                 '.xlsx · Maks. 50 MB'
               )}
@@ -419,10 +450,10 @@ export function SetupImportDialog() {
               {operation?.status === 'COMPLETED' ? (
                 <Link
                   className="hds-button hds-button--primary hds-button--md"
-                  to="/setup"
-                  onClick={() => setOpen(false)}
+                  to={memberOnly ? '/master-data/members' : '/setup'}
+                  onClick={() => changeOpen(false)}
                 >
-                  Lihat readiness <ChevronRight size={16} />
+                  {memberOnly ? 'Lihat member' : 'Lihat readiness'} <ChevronRight size={16} />
                 </Link>
               ) : uncertain ? (
                 <Button
@@ -534,7 +565,11 @@ export function SetupImportDialog() {
                       </tbody>
                     </table>
                   </div>
-                  <p>Periksa readiness. Nilai Tanoko diatur melalui halaman Tanoko.</p>
+                  <p>
+                    {memberOnly
+                      ? 'Periksa hasil pada daftar member.'
+                      : 'Periksa readiness. Nilai Tanoko diatur melalui halaman Tanoko.'}
+                  </p>
                 </>
               )}
             </div>
@@ -543,11 +578,11 @@ export function SetupImportDialog() {
               <input
                 ref={input}
                 type="file"
-                accept=".xlsx"
+                accept={memberOnly ? '.csv,.xlsx' : '.xlsx'}
                 className="setup-file-input"
-                aria-label="Pilih workbook setup"
+                aria-label={memberOnly ? 'Pilih file member' : 'Pilih workbook setup'}
                 onChange={(e) => selectFile(e.target.files?.[0])}
-                disabled={locked}
+                disabled={!canReplaceFile}
               />
               {!file ? (
                 <div
@@ -566,29 +601,59 @@ export function SetupImportDialog() {
                   <span className="setup-import-dropzone__icon">
                     <FileSpreadsheet />
                   </span>
-                  <h3>Mulai dari workbook supplier</h3>
-                  <p>Tarik file Excel ke sini atau pilih dari perangkat.</p>
+                  <h3>
+                    {memberOnly ? 'Tambahkan member dari file' : 'Mulai dari workbook supplier'}
+                  </h3>
+                  <p>
+                    {memberOnly
+                      ? 'Tarik CSV atau Excel ke sini, atau pilih dari perangkat.'
+                      : 'Tarik file Excel ke sini atau pilih dari perangkat.'}
+                  </p>
                   <Button
                     variant="primary"
                     leadingIcon={<UploadCloud />}
                     onClick={() => input.current?.click()}
                   >
-                    Pilih file Excel
+                    {memberOnly ? 'Pilih file' : 'Pilih file Excel'}
                   </Button>
-                  <span className="setup-import-file-hint">.xlsx · Maksimal 50 MB</span>
+                  <span className="setup-import-file-hint">
+                    {memberOnly
+                      ? '.csv / .xlsx · Maksimal 50 MB · 300 baris'
+                      : '.xlsx · Maksimal 50 MB'}
+                  </span>
                   <div className="setup-import-template">
-                    <span>Belum punya workbook?</span>
+                    <span>{memberOnly ? 'Gunakan template:' : 'Belum punya workbook?'}</span>
                     <Button
                       variant="ghost"
                       loading={templateBusy}
                       leadingIcon={<Download />}
                       onClick={() => void template()}
                     >
-                      Download template
+                      {memberOnly ? 'Excel' : 'Download template'}
                     </Button>
+                    {memberOnly && (
+                      <Button
+                        variant="ghost"
+                        leadingIcon={<Download />}
+                        onClick={() =>
+                          saveDownload(
+                            new Blob([memberCsvTemplate()], { type: 'text/csv;charset=utf-8' }),
+                            'template-member-akun.csv',
+                          )
+                        }
+                      >
+                        CSV
+                      </Button>
+                    )}
                   </div>
+                  {memberOnly && (
+                    <p className="member-import-guidance">
+                      Kode member, nama dan role wajib diisi. MP tanpa akun; akun baru memerlukan
+                      registrasi, username dan password awal.
+                    </p>
+                  )}
                   <div className="setup-import-covered">
-                    {SETUP_SHEETS.map((s) => (
+                    {SETUP_SHEETS.filter((s) => !memberOnly || s.name === 'Member').map((s) => (
                       <span key={s.name}>{s.name}</span>
                     ))}
                   </div>
@@ -611,7 +676,7 @@ export function SetupImportDialog() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      disabled={locked}
+                      disabled={!canReplaceFile}
                       leadingIcon={<RefreshCw />}
                       onClick={() => input.current?.click()}
                     >
@@ -655,7 +720,12 @@ export function SetupImportDialog() {
                         ))}
                       </div>
                       {allIssues.length > 0 && (
-                        <div className="setup-import-issue-summary">
+                        <div
+                          className="setup-import-issue-summary"
+                          ref={errorSummary}
+                          tabIndex={-1}
+                          role="alert"
+                        >
                           <span>{allIssues.length} error perlu diperbaiki</span>
                           <Button
                             size="sm"
@@ -861,6 +931,11 @@ export function SetupImportDialog() {
                                         ))}
                                       </dl>
                                     )}
+                                    {memberOnly && diff.status === 'INACTIVE' && (
+                                      <p className="member-import-restore-note">
+                                        Akun nonaktif diaktifkan terpisah pada detail member.
+                                      </p>
+                                    )}
                                     {diff.status !== 'NEW' && (
                                       <label className="setup-import-choice">
                                         <span>Aksi</span>
@@ -884,7 +959,9 @@ export function SetupImportDialog() {
                                             }
                                           >
                                             {diff.status === 'INACTIVE'
-                                              ? 'Restore dan update'
+                                              ? memberOnly
+                                                ? 'Pulihkan dan update'
+                                                : 'Restore dan update'
                                               : 'Update'}
                                           </option>
                                         </NativeSelect>

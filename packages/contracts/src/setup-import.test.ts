@@ -76,3 +76,35 @@ describe('setup workbook rules', () => {
     ).toContainEqual(expect.objectContaining({ column: 'supplierId' }));
   });
 });
+
+describe('Member-only import boundaries', () => {
+  it('rejects other setup sheets, extra properties and batches above 300 rows', async () => {
+    const { memberImportPreviewRequestSchema, memberImportCommitRequestSchema } =
+      await import('./setup-import.js');
+    const row = {
+      sheet: 'Member',
+      sourceRow: 2,
+      data: { code: 'M1', name: 'Operator', role: 'MP' },
+    };
+    expect(memberImportPreviewRequestSchema.safeParse({ rows: [row] }).success).toBe(true);
+    expect(
+      memberImportPreviewRequestSchema.safeParse({ rows: [{ ...row, sheet: 'Part' }] }).success,
+    ).toBe(false);
+    expect(memberImportPreviewRequestSchema.safeParse({ rows: [row], reset: true }).success).toBe(
+      false,
+    );
+    expect(memberImportPreviewRequestSchema.safeParse({ rows: [row, row] }).success).toBe(false);
+    expect(
+      memberImportPreviewRequestSchema.safeParse({
+        rows: Array.from({ length: 301 }, (_, i) => ({ ...row, sourceRow: i + 2 })),
+      }).success,
+    ).toBe(false);
+    expect(
+      memberImportCommitRequestSchema.safeParse({
+        rows: [row],
+        revision: 1,
+        decisions: [{ key: 'Part:2', action: 'UPDATE' }],
+      }).success,
+    ).toBe(false);
+  });
+});

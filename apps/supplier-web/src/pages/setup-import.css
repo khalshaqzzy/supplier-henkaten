@@ -817,3 +817,130 @@
 .setup-import-file .hds-button {
   color: #526174;
 }
+
+.member-import-dialog .setup-import-workspace,
+.member-import-dialog .setup-import-loading__body {
+  grid-template-columns: minmax(0, 1fr);
+}
+.member-import-dialog .setup-import-sheet-rail,
+.member-import-dialog .setup-import-sheet-select,
+.member-import-dialog .setup-import-loading__body > .hds-skeleton,
+.member-import-dialog .setup-import-covered {
+  display: none;
+}
+.member-import-dialog .setup-import-dropzone {
+  min-height: 360px;
+}
+.member-import-dialog .setup-import-dropzone .member-import-guidance {
+  max-width: 480px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.member-import-restore-note {
+  margin: 12px 0;
+  color: var(--hds-text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.member-import-dialog .setup-import-file strong,
+.member-import-dialog .setup-import-changes dd strong {
+  overflow-wrap: anywhere;
+}
+.member-import-dialog .setup-import-file {
+  min-width: 0;
+}
+.member-import-dialog .setup-import-template .hds-button,
+.member-import-dialog .setup-import-issue-summary .hds-button {
+  min-height: 44px;
+}
+.member-import-dialog .setup-import-steps > span,
+.member-import-dialog .setup-import-footer__status,
+.member-import-dialog .setup-import-review__header span,
+.member-import-dialog .setup-import-diff__identity span,
+.member-import-dialog .setup-import-changes,
+.member-import-dialog .setup-import-choice,
+.member-import-dialog .setup-import-file span {
+  font-size: 13px;
+}
+@media (max-width: 767px) {
+  .member-import-dialog .setup-import-steps {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .member-import-dialog .setup-import-file {
+    flex-wrap: wrap;
+  }
+  .member-import-dialog .setup-import-file > div {
+    min-width: 0;
+    flex: 1;
+  }
+  .member-import-dialog .setup-import-dropzone {
+    min-height: 320px;
+  }
+  .member-import-dialog > .hds-dialog__footer {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}
+
+.member-import-dialog.hds-dialog {
+  width: min(920px, calc(100vw - 32px));
+  max-width: 920px;
+}
+.member-import-dialog .setup-import-dropzone {
+  background: var(--hds-surface-inset);
+}
+.member-import-dialog .hds-button {
+  min-height: 44px;
+}
+.member-import-dialog .setup-import-changes dt {
+  font-size: 12px;
+}
+.member-import-dialog .setup-import-changes dd {
+  font-size: 14px;
+}
+.member-import-dialog .setup-import-diff__identity strong,
+.member-import-dialog .setup-import-file strong {
+  font-size: 14px;
+}
+.member-import-dialog .setup-import-changes > div {
+  grid-template-columns: 130px minmax(0, 1fr);
+}
+.member-import-dialog .setup-import-changes dd:has(> strong:only-child) {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (max-width: 767px) {
+  .member-import-dialog.hds-dialog {
+    width: 100vw;
+    max-width: 100vw;
+  }
+  .member-import-dialog .setup-import-changes > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Keep the dialog's centering transform stable throughout its entrance. */
+.member-import-dialog.hds-dialog {
+  animation-name: member-import-enter;
+}
+@keyframes member-import-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .member-import-dialog.hds-dialog {
+    animation: none;
+  }
+}
+
+.member-import-dialog .hds-button {
+  box-shadow: none;
+}
+.member-import-dialog .setup-import-changes dt,
+.member-import-dialog .setup-import-metrics span,
+.member-import-dialog .setup-status {
+  font-size: 13px;
+}

@@ -29,6 +29,7 @@ function setup() {
     [
       '/api/v1/supplier/master-data/parts/import/preview',
       '/api/v1/supplier/master-data/setup-import/preview',
+      '/api/v1/supplier/master-data/members/import/preview',
     ],
     (req, res) => res.json({ length: req.body?.data?.length }),
   );
@@ -49,19 +50,22 @@ const principal = {
 };
 
 describe('import parser boundary', () => {
-  it.each(paths)('rejects anonymous malformed bodies before parsing at %s', async (path) => {
-    const { app } = setup();
-    expect((await request(app).post(path).type('json').send('{invalid')).status).toBe(403);
-    expect(
-      (
-        await request(app)
-          .post(path + '/extra')
-          .type('json')
-          .send('{invalid')
-      ).status,
-    ).toBe(403);
-    expect((await request(app).get(path).type('json').send('{invalid')).status).toBe(403);
-  });
+  it.each([...paths, '/api/v1/supplier/master-data/members/import/preview'])(
+    'rejects anonymous malformed bodies before parsing at %s',
+    async (path) => {
+      const { app } = setup();
+      expect((await request(app).post(path).type('json').send('{invalid')).status).toBe(403);
+      expect(
+        (
+          await request(app)
+            .post(path + '/extra')
+            .type('json')
+            .send('{invalid')
+        ).status,
+      ).toBe(403);
+      expect((await request(app).get(path).type('json').send('{invalid')).status).toBe(403);
+    },
+  );
   it('checks role, password state and CSRF before parsing', async () => {
     const { app, sessions } = setup();
     for (const value of [
@@ -97,6 +101,28 @@ describe('import parser boundary', () => {
       expect(access.assertWritable).toHaveBeenCalledWith(principal);
     },
   );
+  it('uses the smaller member budget after authorization', async () => {
+    const { app, sessions, access } = setup();
+    sessions.resolve.mockResolvedValue(principal);
+    const post = (data: string, path = '/api/v1/supplier/master-data/members/import/preview') =>
+      request(app)
+        .post(path)
+        .set('Cookie', 'tmmin_henkaten_supplier_session=token')
+        .set('Origin', 'http://localhost:5173')
+        .set('X-CSRF-Token', 'csrf')
+        .send({ data });
+    expect((await post('small')).status).toBe(200);
+    expect((await post('x'.repeat(3 * 1024 * 1024))).status).toBe(413);
+    expect(
+      (
+        await post(
+          'x'.repeat(3 * 1024 * 1024),
+          '/api/v1/supplier/master-data/MEMBERS/IMPORT/preview',
+        )
+      ).status,
+    ).toBe(413);
+    expect(access.assertWritable).toHaveBeenCalledWith(principal);
+  });
   it('caps pending imports before authentication and releases slots after rejection', async () => {
     const { app, sessions } = setup();
     let unblock!: (value: null) => void;
