@@ -29,6 +29,7 @@ Member restore and account activation must remain separate in both import entry 
   and keys: Kode member/code, Nama/name, Role/role, Nomor registrasi/registration, Username/username,
   Password awal/password. Mandatory headers: code, name, role. This is template-based import; arbitrary
   column mapping and `.xls` are outside this change.
+- Excel and CSV templates share 20 editable synthetic examples (seven operational accounts and thirteen MPs). The Excel guide covers code identity, field rules, review and troubleshooting. The readable 12-character sample password `MemberAwal01` must be replaced before use. Remove unused examples before import.
 - Stable member code is mandatory. Preserve leading-zero text identifiers; never guess lost zeroes or
   coerce unsafe numeric values. Password whitespace is significant and passwords must be text.
 - MP has no registration/account/password. Supervisor, LL and QC require registration and username;

@@ -1,10 +1,12 @@
 # Enterprise Digital Henkaten Management — Implementation Roadmap
 
-Status: active · Updated: 2026-11-02 · Approach: backend first, dependency driven
+Status: active · Updated: 2026-11-03 · Approach: backend first, dependency driven
 
 This file tracks sequence, current state, dependencies, and remaining acceptance gates. The [PRD](PRD.md) defines product behavior; [rules](rules.md) define agent and engineering process; [session handoff](sessionHandoff.md) records recent changes and checks; [ADRs](../docs/adr/) explain durable decisions. Detailed local browser evidence and unresolved checks live in the [QA report](../docs/audits/local-browser-qa-2026-09-24.md) and [scenario plan](../docs/qa/browser-local-end-to-end-verification-plan.md). Do not copy their histories into this roadmap.
 
 ## Current position
+
+- **Member import guidance, 2026-11-03:** dedicated Excel and CSV templates share 20 examples and readable 12-character sample passwords. The Excel guide explains member codes, field rules, matching, review and troubleshooting. The Member dialog exposes actionable file/row/server errors and preserves file-repair feedback when downloading a template. Both frontend images require patched libexpat 2.10.0-r0 after the refreshed vulnerability scan. Validation and PR delivery are recorded in [handoff](sessionHandoff.md); Phase 15 staging/device gates remain unchanged.
 
 - **Member & Akun import, 2026-11-02:** dedicated CSV/Excel entry on the Member page, Member-only API contracts and focused responsive review reuse durable setup operations. Templates, bounded worker parsing, explicit identity matching/MP linkage, masked credentials, stale/uncertain retry and separate account activation are included. Shared setup restoration now preserves inactive account status; imported username changes revoke old sessions/push. No database migration or seed edit is required. Local validation is recorded in the handoff; Phase 15 staging/device/UAT remains in progress. See [plan](memberImportPlan.md) and [ADR 0046](../docs/adr/0046-supplier-setup-workbook-import-and-reset.md).
 

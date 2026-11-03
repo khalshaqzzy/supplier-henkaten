@@ -944,3 +944,76 @@
 .member-import-dialog .setup-status {
   font-size: 13px;
 }
+
+.member-import-issue-heading {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.member-import-issue-heading > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #b34131;
+}
+.member-import-issue-heading p {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--hds-text-primary);
+}
+.member-import-dialog .member-import-issue-heading > span {
+  font-size: 14px;
+}
+.member-import-dialog .setup-import-errors {
+  max-height: 320px;
+  scroll-padding: 12px;
+}
+.member-import-dialog .setup-import-errors button {
+  padding: 14px 16px;
+  gap: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--hds-text-primary);
+  overflow-wrap: anywhere;
+}
+.member-import-dialog .setup-import-errors button:hover {
+  background: var(--hds-surface-inset);
+}
+.member-import-dialog .setup-import-errors button:focus-visible,
+.member-import-dialog .setup-import-issue-summary:focus-visible,
+.member-import-dialog .member-import-problem:focus-visible {
+  outline: 2px solid var(--hds-text-primary);
+  outline-offset: -3px;
+}
+.member-import-file-help {
+  padding: 24px;
+  background: var(--hds-surface-inset);
+  border-radius: 10px;
+}
+.member-import-file-help h3 {
+  font-size: 18px;
+  margin: 0 0 10px;
+}
+.member-import-file-help p {
+  margin: 0 0 18px;
+  max-width: 560px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--hds-text-secondary);
+}
+.member-import-file-help > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+@media (max-width: 767px) {
+  .member-import-file-help {
+    padding: 18px;
+  }
+  .member-import-dialog .setup-import-issue-summary {
+    gap: 8px;
+    padding: 12px;
+  }
+  .member-import-dialog .member-import-issue-heading {
+    flex-basis: 100%;
+  }
+}

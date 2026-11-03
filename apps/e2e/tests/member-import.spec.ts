@@ -38,7 +38,10 @@ test('imports only members and accounts with Excel, CSV review, recovery and sep
         path: testInfo.outputPath(`member-${state}-${width}.png`),
         animations: 'disabled',
       });
-      if (state === 'review' && width === 1440) {
+      if (
+        ['review', 'error', 'file-error', 'server-error', 'upload'].includes(state) &&
+        width === 1440
+      ) {
         const snapshot = await page.evaluate(() => {
           const css = Array.from(document.styleSheets)
             .flatMap((sheet) => {
@@ -57,11 +60,29 @@ test('imports only members and accounts with Excel, CSV review, recovery and sep
             '</body></html>'
           );
         });
-        await writeFile(testInfo.outputPath('member-review.html'), snapshot);
+        await writeFile(testInfo.outputPath(`member-${state}.html`), snapshot);
       }
     }
   };
   await capture('upload');
+  await input.setInputFiles({
+    name: 'broken.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: Buffer.from('not an Excel file'),
+  });
+  await expect(dialog.getByText('File belum dapat diproses', { exact: true })).toBeVisible();
+  await expect(
+    dialog.getByText('File Excel tidak dapat dibaca. Simpan ulang sebagai .xlsx.', { exact: true }),
+  ).toBeVisible();
+  await expect(dialog.getByText('Berubah', { exact: true })).toHaveCount(0);
+  await capture('file-error');
+  await input.setInputFiles({
+    name: 'shifted.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(headers + '\nM1,Operator,MP,,,,extra'),
+  });
+  await expect(dialog.getByText(/7 kolom; header memiliki 6/)).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Import data', exact: true })).toBeDisabled();
   await input.setInputFiles({
     name: 'invalid.csv',
     mimeType: 'text/csv',
@@ -70,6 +91,8 @@ test('imports only members and accounts with Excel, CSV review, recovery and sep
   await expect(dialog.getByText(/error perlu diperbaiki/)).toBeVisible();
   await expect(dialog).not.toContainText('do-not-show-this-password');
   await expect(dialog.getByRole('button', { name: 'Import data', exact: true })).toBeDisabled();
+  await expect(dialog.getByText(/Isi nomor registrasi/)).toBeVisible();
+  await expect(dialog.getByText(/Isi username/)).toBeVisible();
   await capture('error');
   const template = await fixture.request.get(
     `${runtime.apiOrigin}/api/v1/supplier/master-data/members/import/template`,
@@ -115,6 +138,17 @@ test('imports only members and accounts with Excel, CSV review, recovery and sep
   expect(requests[0]).toEqual(requests[1]);
   await capture('result');
   await dialog.getByRole('link', { name: /^Lihat member/ }).click();
+  await page.getByRole('button', { name: 'Import CSV / Excel' }).click();
+  await input.setInputFiles({
+    name: 'conflicting-code.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(headers + '\nQC-OTHER,QC contoh 1,QC,001003,qc.contoh,'),
+  });
+  await expect(dialog.getByText(/Member ini sudah memiliki kode berbeda/)).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Import data', exact: true })).toBeDisabled();
+  await capture('server-error');
+  await dialog.getByRole('button', { name: 'Batal', exact: true }).click();
+  await page.getByRole('button', { name: 'Tutup import', exact: true }).click();
   const before = await (
     await fixture.request.get(`${runtime.apiOrigin}/api/v1/supplier/master-data/lines`)
   ).json();

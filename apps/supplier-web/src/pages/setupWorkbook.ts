@@ -133,7 +133,14 @@ export function parseSetupSheets(
             sheet: spec.name,
             sourceRow: index + 2,
             column: column.label,
-            message: 'Gunakan teks; untuk jam gunakan format HH:mm.',
+            message:
+              spec.name === 'Member'
+                ? typeof value === 'number' && !Number.isSafeInteger(value)
+                  ? 'Angka tidak dapat dibaca utuh. Format sel sebagai Text dan ketik ulang nilainya dari sumber asli agar tidak terpotong atau dibulatkan.'
+                  : column.key === 'password'
+                    ? 'Password awal harus berupa teks. Format sel sebagai Text, lalu isi kembali password sepanjang 12 sampai 128 karakter.'
+                    : 'Isi sel sebagai teks biasa. Hapus format tanggal atau nilai yang tidak sesuai, lalu isi kembali dari sumber asli.'
+                : 'Gunakan teks; untuk jam gunakan format HH:mm.',
           });
         characters += text.length;
         if (characters > 64 * 1024 * 1024)

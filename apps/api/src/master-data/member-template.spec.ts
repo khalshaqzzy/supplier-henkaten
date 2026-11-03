@@ -21,10 +21,26 @@ describe('member template', () => {
           ),
         });
     });
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(20);
     expect(validateSetupRows(rows, true)).toEqual([]);
     expect(sheet.getCell('D2').text).toBe('001001');
     expect(sheet.getColumn(4).numFmt).toBe('@');
     expect(sheet.getCell('C2').dataValidation.type).toBe('list');
+    expect(rows.filter((row) => row.data['role'] === 'MP')).toHaveLength(13);
+    for (const row of rows) {
+      expect(row.data['password']).toBe(row.data['role'] === 'MP' ? '' : 'MemberAwal01');
+    }
+    const guide = book.getWorksheet('Panduan')!;
+    const guidance = guide
+      .getSheetValues()
+      .flat(Infinity)
+      .filter((value): value is string => typeof value === 'string')
+      .join(' ');
+    expect(guidance).toContain('KRY-0007');
+    expect(guidance).toContain('tidak mencocokkan orang berdasarkan nama');
+    expect(guidance).toContain('Hubungkan MP existing');
+    expect(guidance).toContain('aktifkan akunnya secara terpisah');
+    expect(guidance).not.toMatch(/[—–]/);
+    expect(sheet.getCell('A1').note).toContain('kode yang sudah terikat tidak dapat diganti');
   });
 });
