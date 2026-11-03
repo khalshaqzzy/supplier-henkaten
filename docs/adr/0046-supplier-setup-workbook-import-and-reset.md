@@ -218,9 +218,10 @@ The dedicated worker accepts CSV and `.xlsx` up to 50 MB. CSV supports BOM, comm
 quoted multiline records, physical source-line reporting and early row/column limits. Excel preserves
 existing ZIP expansion limits and selects Member, or the sole unambiguous non-guide worksheet. Other
 worksheets are reported as ignored. Template headers/field keys may be reordered; arbitrary manual
-column mapping and `.xls` are excluded. The CSV template is header-only, avoiding accidental example
-account creation. Excel includes conditional field guidance, frozen headers, text identifiers, role
-validation and editable examples for all four operational member roles.
+column mapping and `.xls` are excluded. The CSV and Excel templates share 20 editable examples. Unused examples must be replaced or removed
+before import. Excel includes conditional field guidance, frozen headers, text identifiers and role
+validation for all four operational member roles. The detailed guide and sample-password decision
+are recorded in the 3 November amendment below.
 
 Stable member codes remain required. Existing code or unambiguous operational registration/username
 identifies a person; names never link identities automatically. An uncoded MP can be linked explicitly.
@@ -267,3 +268,60 @@ Excel template and CSV, check scoped-route rejection, uncertain-response recover
 axe and screenshots at 1440/768/390 px. A fresh isolated seed verifies compatibility without changing seed
 fixtures. Exact final commands and outcomes are retained in the session handoff. Staging, real mobile
 and desktop Excel acceptance are subsequent release gates; no deployment is included.
+
+
+## Dedicated Member template guidance and feedback, 3 November 2026
+
+### Context and decision
+
+Stable import codes require an explanation beyond a mandatory-field marker, particularly for
+MPs that have no registration or login account. File correction also requires a concrete cause
+and location; a generic error count or workbook-library exception does not identify a repair.
+
+The dedicated Excel and CSV templates share 20 synthetic examples from one exported constant.
+Seven operational members and thirteen MPs demonstrate conditional fields. The readable
+12-character example password `MemberAwal01` replaces generated passwords in these two templates
+only. The guide and password header note instruct replacing it before use. Randomized passwords
+in the general setup workbook are unchanged. Real imports retain the existing password length,
+first-login change, hashing and existing-password retention rules.
+
+The Excel guide is organized into filling instructions, member-code identity, column rules,
+existing-member linkage, review/save, and troubleshooting. Section bands, wrapped text, row heights,
+text identifiers, frozen headers, column notes and role dropdowns support reading and editing.
+Codes remain supplier scoped and cannot be renamed or recycled through import.
+
+### Implementation and tradeoffs
+
+The Member dialog presents actionable Indonesian validation copy without repeating cell values.
+Server issues open automatically alongside local issues. Commit field errors retain their row and
+column; file-reading failures retain replacement actions and omit empty review metrics. Generic
+spreadsheet-library read errors are replaced with a file-format/protection recovery message.
+CSV field counts are checked against the header with physical source-line locations before review.
+This intentionally requires trailing empty cells in a CSV row when its header contains those columns.
+
+A header-only CSV was considered but does not provide the requested editable examples. Both formats
+therefore require removing unused sample rows. The upload instructions and Excel guide state this.
+A single compact error summary with an expandable, scrollable cause list preserves the dialog's
+existing footprint and keyboard navigation. Mapping existing validation messages in the Member UI
+keeps shared API schemas and general setup semantics unchanged; unknown business messages remain
+visible and new validation messages should receive a corresponding copy review.
+
+### Validation and follow-up
+
+Template tests read the generated workbook, validate all 20 rows, check role/account examples,
+identifier formatting and guide content. Parser tests cover malformed/empty/ambiguous files,
+CSV column shifts, physical line locations, precision loss and password redaction. Component tests
+cover automatically opened server errors, commit field errors, unreadable-file recovery and the
+existing stale/uncertain retry behavior. Browser journeys exercise downloaded templates, corrupted
+Excel, malformed CSV and server identity conflicts at desktop, tablet and phone widths with axe.
+Final execution results are recorded in the current handoff. Device/staging acceptance remains
+separate from local verification.
+
+
+### Container delivery compatibility
+
+The current vulnerability database identified CVE-2026-117610 and CVE-2026-118370 in the existing
+frontend images' libexpat 2.9.0 package. Both frontend Dockerfiles require libexpat 2.10.0-r0 or
+later from the same Alpine distribution. The existing non-root runtime and pinned base images
+remain in use. No vulnerability exception is introduced. Rebuilt image scans and the production-like
+routing/persistence checks are required before delivery.

@@ -34,6 +34,7 @@ import { supplierApi } from '../app/api';
 import { useSession } from '../app/session';
 import type { ParsedSetupWorkbook } from './setupWorkbook';
 import { memberCsvTemplate } from './memberImport';
+import { memberImportFailure, memberImportIssue } from './memberImportFeedback';
 import './setup-import.css';
 
 export const setupErrorMessage = (error: unknown) =>
@@ -74,12 +75,14 @@ export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean
     null,
   );
   const [operation, setOperation] = useState<SetupOperation | null>(null);
+  const [problemIssues, setProblemIssues] = useState<SetupIssue[]>([]);
   const [problem, setProblem] = useState<string | null>(null);
   const [uncertain, setUncertain] = useState(false);
   const [templateBusy, setTemplateBusy] = useState(false);
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [highlight, setHighlight] = useState<number | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const problemSummary = useRef<HTMLDivElement>(null);
   const errorSummary = useRef<HTMLDivElement>(null);
   const worker = useRef<Worker | null>(null);
   const sequence = useRef(0);
@@ -104,10 +107,44 @@ export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean
         ]
       : [];
   });
-  const allIssues = [...localIssues, ...(preview?.issues ?? []), ...accountIssues];
+  const issues = [...localIssues, ...(preview?.issues ?? []), ...problemIssues, ...accountIssues];
+  const allIssues = Array.from(
+    new Map(
+      issues.map((issue) => {
+        const value = memberOnly ? memberImportIssue(issue) : issue;
+        return [JSON.stringify(value), value];
+      }),
+    ).values(),
+  );
   useEffect(() => {
-    if (allIssues.length) errorSummary.current?.focus();
-  }, [allIssues.length]);
+    if (allIssues.length) {
+      if (memberOnly) setIssuesOpen(true);
+      errorSummary.current?.focus();
+    }
+  }, [allIssues.length, memberOnly]);
+  useEffect(() => {
+    if (problem) problemSummary.current?.focus();
+  }, [problem]);
+  const reportProblem = (error: unknown) => {
+    setProblem(memberOnly ? memberImportFailure(error) : setupErrorMessage(error));
+    if (memberOnly && error instanceof ApiProblemError) {
+      setProblemIssues(
+        (error.problem.fieldErrors ?? []).flatMap((field) => {
+          const match = /^Member\.(\d+)\.(.+)$/.exec(field.path);
+          return match
+            ? [
+                {
+                  sheet: 'Member' as const,
+                  sourceRow: Number(match[1]),
+                  column: match[2]!,
+                  message: field.message,
+                },
+              ]
+            : [];
+        }),
+      );
+    }
+  };
   const diffs = preview?.rows.filter((r) => r.sheet === sheet) ?? [];
   const interesting = diffs.filter((r) => r.status !== 'SAME');
   const shown = interesting.slice(page * 50, (page + 1) * 50);
@@ -194,6 +231,7 @@ export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean
     setFile(null);
     setRows([]);
     setLocalIssues([]);
+    setProblemIssues([]);
     setWarnings([]);
     setPreview(null);
     setChoices({});
@@ -221,6 +259,7 @@ export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean
     decisions: Record<string, SetupDecision['action']> = {},
   ) => {
     const token = ++sequence.current;
+    setProblemIssues([]);
     setStage('MATCHING');
     setProblem(null);
     try {
@@ -238,7 +277,7 @@ export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean
       }
     } catch (error) {
       if (token === sequence.current) {
-        setProblem(setupErrorMessage(error));
+        reportProblem(error);
         setPreview(null);
         setStage(null);
       }
@@ -347,9 +386,10 @@ export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean
       setChoices({});
       setWarnings([]);
       setLocalIssues([]);
+      setProblemIssues([]);
       sessionStorage.setItem(storageKey, next.id);
     } catch (error) {
-      setProblem(setupErrorMessage(error));
+      reportProblem(error);
       if (setupResultUncertain(error)) setUncertain(true);
       else {
         setUncertain(false);
@@ -365,14 +405,14 @@ export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean
   };
   const template = async () => {
     setTemplateBusy(true);
-    setProblem(null);
+    if (!memberOnly || !file) setProblem(null);
     try {
       saveDownload(
         await (memberOnly ? supplierApi.memberImportTemplate() : supplierApi.setupTemplate()),
         memberOnly ? 'template-member-akun.xlsx' : 'template-setup-supplier.xlsx',
       );
     } catch (error) {
-      setProblem(setupErrorMessage(error));
+      reportProblem(error);
     } finally {
       setTemplateBusy(false);
     }
@@ -387,7 +427,10 @@ export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean
       ]
         .map((row) => row.map(cell).join(','))
         .join('\r\n');
-    saveDownload(new Blob([csv], { type: 'text/csv;charset=utf-8' }), 'error-import-setup.csv');
+    saveDownload(
+      new Blob([csv], { type: 'text/csv;charset=utf-8' }),
+      memberOnly ? 'error-import-member.csv' : 'error-import-setup.csv',
+    );
   };
   const statusLabel =
     stage === 'READING'
@@ -508,12 +551,20 @@ export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean
             })}
           </div>
           {problem && (
-            <Alert
-              tone="danger"
-              title={uncertain ? 'Memeriksa hasil import' : 'Import belum selesai'}
-            >
-              {problem}
-            </Alert>
+            <div ref={problemSummary} tabIndex={-1} className="member-import-problem">
+              <Alert
+                tone="danger"
+                title={
+                  uncertain
+                    ? 'Memeriksa hasil import'
+                    : memberOnly && !rows.length && file
+                      ? 'File belum dapat diproses'
+                      : 'Import belum selesai'
+                }
+              >
+                {problem}
+              </Alert>
+            </div>
           )}
           {operation ? (
             <div className="setup-import-result">
@@ -649,7 +700,8 @@ export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean
                   {memberOnly && (
                     <p className="member-import-guidance">
                       Kode member, nama dan role wajib diisi. MP tanpa akun; akun baru memerlukan
-                      registrasi, username dan password awal.
+                      registrasi, username dan password awal. Template berisi 20 contoh; ganti
+                      dengan data Anda dan hapus contoh yang tidak dipakai.
                     </p>
                   )}
                   <div className="setup-import-covered">
@@ -701,6 +753,27 @@ export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean
                         </div>
                       </div>
                     </div>
+                  ) : memberOnly && problem && !rows.length ? (
+                    <section className="member-import-file-help" aria-label="Perbaiki file member">
+                      <h3>Perbaiki file, lalu upload kembali</h3>
+                      <p>
+                        Gunakan header dari template. Buka sheet Panduan di template Excel untuk
+                        aturan pengisian dan contoh Kode member.
+                      </p>
+                      <div>
+                        <Button variant="primary" onClick={() => input.current?.click()}>
+                          Pilih file pengganti
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          leadingIcon={<Download />}
+                          loading={templateBusy}
+                          onClick={() => void template()}
+                        >
+                          Template Excel
+                        </Button>
+                      </div>
+                    </section>
                   ) : (
                     <>
                       <div className="setup-import-metrics">
@@ -726,11 +799,21 @@ export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean
                           tabIndex={-1}
                           role="alert"
                         >
-                          <span>{allIssues.length} error perlu diperbaiki</span>
+                          <div className="member-import-issue-heading">
+                            <span>{allIssues.length} error perlu diperbaiki</span>
+                            {memberOnly && (
+                              <p>
+                                Perbaiki baris dan kolom berikut di file Anda, lalu pilih Ganti
+                                file.
+                              </p>
+                            )}
+                          </div>
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => setIssuesOpen(!issuesOpen)}
+                            aria-expanded={issuesOpen}
+                            aria-controls="setup-import-error-list"
                           >
                             {issuesOpen ? 'Tutup daftar' : 'Lihat error'}
                           </Button>
@@ -745,7 +828,11 @@ export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean
                         </div>
                       )}
                       {issuesOpen && allIssues.length > 0 && (
-                        <div className="setup-import-errors" aria-label="Error workbook">
+                        <div
+                          id="setup-import-error-list"
+                          className="setup-import-errors"
+                          aria-label={memberOnly ? 'Kesalahan data member' : 'Error workbook'}
+                        >
                           {allIssues.slice(0, 200).map((issue, index) => (
                             <button
                               key={`${issue.sheet}:${issue.sourceRow}:${issue.column}:${index}`}
@@ -767,7 +854,11 @@ export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean
                               <strong>
                                 {issue.sheet}{' '}
                                 <span>
-                                  · Baris {issue.sourceRow} · {issue.column}
+                                  ·{' '}
+                                  {issue.sourceRow === 1
+                                    ? 'Header (baris 1)'
+                                    : `Baris ${issue.sourceRow}`}{' '}
+                                  · {issue.column}
                                 </span>
                               </strong>
                               <span>{issue.message}</span>

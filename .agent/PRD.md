@@ -1,3 +1,26 @@
+## Amendment: 3 November 2026, Member import guidance and validation feedback
+
+The Member & Akun Excel and CSV templates contain the same 20 editable synthetic examples,
+covering Supervisor, Line Leader, QC and MP. Operational example passwords use the readable
+12-character value `MemberAwal01`; the Excel guide and password column note instruct replacing
+it before use. This exception applies only to the dedicated Member templates. Actual account
+creation still requires a first-login password change; existing account passwords are retained.
+
+The Excel Panduan sheet explains stable member codes, supplier-scoped uniqueness, the difference
+from registration/username/internal ID, code retention across profile and role changes, explicit
+linkage of uncoded MPs, reference use in the general setup workbook, all field requirements,
+review/restore/account activation, limits and common file corrections. Users replace or delete
+unused examples before import. CSV remains CSV UTF-8 with comma/semicolon support.
+
+Member import errors show their cause and a practical correction in natural Indonesian, with
+source row and column where available. Server validation causes expand automatically, commit
+field errors remain visible, and unreadable files offer replacement/template actions without
+misleading empty review counts. CSV rows with a different number of columns from their header
+are rejected rather than silently dropping extra values. Password values remain excluded from
+error messages and downloads. Existing authorization, identity, lifecycle and retry rules apply.
+
+---
+
 ## Amendment — 2 November 2026: Member & Akun CSV/Excel import
 
 Supplier Admin can import Member and operational accounts from **Import CSV / Excel** on

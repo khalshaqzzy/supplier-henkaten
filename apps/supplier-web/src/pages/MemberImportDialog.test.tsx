@@ -152,4 +152,114 @@ describe('focused member import dialog', () => {
     expect(match).toHaveBeenCalledTimes(1);
     expect(screen.getByText('replacement.csv')).toBeTruthy();
   });
+  it('opens server validation causes automatically and offers an accessible repair summary', async () => {
+    vi.spyOn(supplierApi, 'previewMemberImport').mockResolvedValue({
+      ...preview,
+      issues: [
+        {
+          sheet: 'Member',
+          sourceRow: 2,
+          column: 'Identitas',
+          message: 'Registrasi dan username merujuk member berbeda.',
+        },
+        {
+          sheet: 'Member',
+          sourceRow: 3,
+          column: 'username',
+          message: 'Nilai sudah digunakan data lain.',
+        },
+      ],
+    });
+    const worker = await mountAndRead();
+    act(() => worker.onmessage?.({ data: { result: { rows, issues: [], warnings: [] } } }));
+    expect(
+      await screen.findByText(/Nomor registrasi dan username merujuk dua member berbeda/),
+    ).toBeTruthy();
+    expect(screen.getByText(/Username sudah digunakan member lain/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Tutup daftar' }).getAttribute('aria-expanded')).toBe(
+      'true',
+    );
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Import data' }).disabled).toBe(
+      true,
+    );
+    expect(document.body.textContent).not.toContain(rows[0]!.data.password);
+  });
+  it('shows file-reading causes with replacement actions and no misleading zero metrics', async () => {
+    const worker = await mountAndRead();
+    act(() =>
+      worker.onmessage?.({
+        data: {
+          error:
+            'Ada beberapa sheet data tanpa sheet Member. Gunakan nama sheet Member untuk data yang akan diimport.',
+        },
+      }),
+    );
+    expect(screen.getByText('File belum dapat diproses')).toBeTruthy();
+    expect(screen.getByText(/Ada beberapa sheet data/)).toBeTruthy();
+    expect(
+      screen.getByRole('heading', { name: 'Perbaiki file, lalu upload kembali' }),
+    ).toBeTruthy();
+    expect(screen.queryByText('Berubah')).toBeNull();
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Periksa data' }).disabled).toBe(
+      true,
+    );
+  });
+  it('keeps field-specific commit failures visible with their row and correction', async () => {
+    vi.spyOn(supplierApi, 'previewMemberImport').mockResolvedValue(preview);
+    vi.spyOn(supplierApi, 'commitMemberImport').mockRejectedValue(
+      new ApiProblemError({
+        type: 'https://henkaten.test/problems/validation',
+        status: 422,
+        code: 'VALIDATION_FAILED',
+        title: 'Data perlu diperbaiki',
+        detail: 'Perbaiki error sebelum import.',
+        correlationId: 'test',
+        fieldErrors: [
+          {
+            path: 'Member.2.Username',
+            code: 'INVALID_REFERENCE',
+            message: 'Username sudah digunakan akun supplier lain.',
+          },
+        ],
+      }),
+    );
+    await finishReading(await mountAndRead());
+    await userEvent.click(screen.getByRole('button', { name: 'Import data' }));
+    expect(
+      await screen.findByText(/Username sudah digunakan akun lain dalam supplier ini/),
+    ).toBeTruthy();
+    expect(screen.getByText(/Baris 2 · Username/)).toBeTruthy();
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Import data' }).disabled).toBe(
+      true,
+    );
+  });
+  it('retains the file repair cause after downloading a replacement template', async () => {
+    vi.spyOn(supplierApi, 'memberImportTemplate').mockResolvedValue(new Blob(['xlsx']));
+    vi.stubGlobal(
+      'URL',
+      class extends URL {
+        static override createObjectURL() {
+          return 'blob:template';
+        }
+        static override revokeObjectURL() {
+          return undefined;
+        }
+      },
+    );
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const worker = await mountAndRead();
+    act(() =>
+      worker.onmessage?.({
+        data: { error: 'File Excel tidak dapat dibaca. Simpan ulang sebagai .xlsx.' },
+      }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Template Excel' }));
+    expect(
+      screen.getByText('File Excel tidak dapat dibaca. Simpan ulang sebagai .xlsx.'),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('heading', { name: 'Perbaiki file, lalu upload kembali' }),
+    ).toBeTruthy();
+    expect(screen.queryByText('Berubah')).toBeNull();
+  });
 });

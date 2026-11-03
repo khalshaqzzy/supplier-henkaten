@@ -15,5 +15,6 @@ export * from './shifts.js';
 export * from './tmmin.js';
 export * from './tanoko.js';
 export * from './setup-import.js';
+export * from './member-import-examples.js';
 export * from './henkaten-deletion.js';
 export * from './member-role.js';

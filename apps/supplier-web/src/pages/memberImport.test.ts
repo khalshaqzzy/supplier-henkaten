@@ -80,7 +80,65 @@ describe('member file import', () => {
     expect(parsed.issues.some((issue) => issue.column === 'Kode member')).toBe(true);
     expect(JSON.stringify(parsed.issues)).not.toContain('secret');
   });
-  it('provides a header-only CSV template', () => {
-    expect(memberCsvTemplate()).toBe('\uFEFF' + headers.join(',') + '\r\n');
+  it('provides 20 valid CSV examples matching the Excel template', () => {
+    const parsed = parseMemberCsv(memberCsvTemplate());
+    expect(parsed.issues).toEqual([]);
+    expect(parsed.rows).toHaveLength(20);
+    expect(parsed.rows[0]?.data['password']).toBe('MemberAwal01');
+    expect(parsed.rows[0]?.data['password']).toHaveLength(12);
+    expect(parsed.rows[0]?.data['registration']).toBe('001001');
+    expect(parsed.rows.filter((row) => row.data['role'] === 'MP')).toHaveLength(13);
+  });
+  it.each(['', 'Kode member,Nama,Role', 'Kode member,Nama,Role\n,,,'])(
+    'explains files without member rows',
+    (source) => {
+      expect(() => parseMemberCsv(source)).toThrow('Isi setidaknya satu baris');
+    },
+  );
+  it('reports shifted CSV fields instead of silently discarding extra cells', () => {
+    const parsed = parseMemberCsv(headers.join(',') + '\nM1,Operator,MP,,,,extra');
+    expect(parsed.issues).toContainEqual(
+      expect.objectContaining({
+        sourceRow: 2,
+        column: 'Susunan kolom',
+        message: expect.stringContaining('7 kolom; header memiliki 6'),
+      }),
+    );
+    expect(JSON.stringify(parsed.issues)).not.toContain('extra');
+  });
+  it('reports short CSV rows with physical line numbers', () => {
+    const parsed = parseMemberCsv(headers.join(',') + '\n\nM1,Operator,MP');
+    expect(parsed.issues).toContainEqual(
+      expect.objectContaining({ sourceRow: 3, column: 'Susunan kolom' }),
+    );
+  });
+  it('keeps duplicate-code locations accurate after empty lines and multiline names', () => {
+    const parsed = parseMemberCsv(
+      headers.join(',') + '\n\nM1,"Nama\nPanjang",MP,,,\n m1 ,Kedua,MP,,,',
+    );
+    expect(parsed.issues).toContainEqual(
+      expect.objectContaining({ sourceRow: 5, message: 'Duplikat dengan baris 3.' }),
+    );
+  });
+  it('explains unsafe Excel identifiers and numeric passwords without including the values', () => {
+    const parsed = parseMemberSheets([
+      {
+        sheet: 'Member',
+        data: [headers, [9007199254740992, 'QC', 'QC', '001', 'qc', 123456789012]],
+      },
+    ]);
+    expect(parsed.issues).toContainEqual(
+      expect.objectContaining({
+        column: 'Kode member',
+        message: expect.stringContaining('ketik ulang'),
+      }),
+    );
+    expect(parsed.issues).toContainEqual(
+      expect.objectContaining({
+        column: 'Password awal',
+        message: expect.stringContaining('harus berupa teks'),
+      }),
+    );
+    expect(JSON.stringify(parsed.issues)).not.toContain('123456789012');
   });
 });
