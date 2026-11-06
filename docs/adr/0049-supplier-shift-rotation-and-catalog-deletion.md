@@ -108,3 +108,23 @@ workflow Node 22.23.1/pnpm 11.16.0 runtime. Linux deployment harness, current-so
 container routing/persistence and current vulnerability-database scans passed before publication.
 The reviewed change is delivered through a feature-branch PR; hosted CI and subsequent release
 acceptance remain independently observable gates.
+
+
+## Select option layout correction — 6 November 2026
+
+Unselected Radix Select options omit ItemIndicator, making ItemText their first child. A positional
+CSS selector that sized that child as a 16px icon therefore constrained multiword labels and allowed
+text to overflow row bounds. Named slots are now used for the indicator, label and optional secondary
+description. The indicator is absolutely positioned in reserved padding; copy gets flexible width
+and automatic height regardless of selection state. Popup bounds, spacing, focus and minimum touch
+row height follow the surrounding design system. Shift choices expose current hours, overnight
+boundaries and timezone as secondary copy while selected triggers retain only the name.
+
+Validation explicitly opens both menus before selection at 1440/768/390/320px, checks label and row
+geometry and viewport containment, and scans the popup with axe on Chromium and Edge. Selected,
+disabled and label-only-trigger behavior is also exercised. This closes the coverage gap left by
+screenshots taken only after selection. The change is frontend-only and retains scheduling semantics.
+
+The correction passed both browser engines, the 24 shared UI and 108 Supplier unit tests, typing,
+lint, formatting and production frontend builds. Popover spacing reuses existing component token
+metadata. No API/database or dependency change was required.

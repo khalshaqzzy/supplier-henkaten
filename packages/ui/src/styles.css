@@ -946,9 +946,91 @@ textarea {
   animation: hds-overlay-in var(--hds-duration-overlay) var(--hds-ease-enter);
 }
 
+/* Separate the optional checkmark from text: unselected labels must never inherit icon sizing. */
 .hds-select__content {
-  min-width: var(--radix-select-trigger-width);
-  padding: var(--hds-space-1);
+  width: var(--radix-select-trigger-width);
+  min-width: min(180px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: min(360px, var(--radix-select-content-available-height));
+  overflow: hidden;
+  padding: 4px;
+  animation: none;
+}
+.hds-select__viewport {
+  max-height: inherit;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.hds-select__value {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+  line-height: 1.45;
+}
+.hds-select__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.hds-select {
+  padding-block: 10px;
+  min-height: 44px;
+  font-size: 14px;
+}
+.hds-select[data-placeholder] .hds-select__value {
+  color: var(--hds-text-secondary);
+  font-weight: 400;
+}
+.hds-select[data-state='open'] {
+  border-color: var(--hds-border-active);
+}
+.hds-select:focus-visible {
+  outline: 2px solid var(--hds-border-active);
+  outline-offset: 3px;
+}
+.hds-select__content .hds-select__item {
+  position: relative;
+  min-height: 44px;
+  padding: 10px 10px 10px 34px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.hds-select__indicator {
+  position: absolute;
+  inset-inline-start: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+}
+.hds-select__indicator svg {
+  width: 16px;
+  height: 16px;
+}
+.hds-select__option-copy {
+  display: grid;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.hds-select__option-label {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.hds-select__option-description {
+  color: var(--hds-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.hds-select__item[data-state='checked'] .hds-select__option-label {
+  font-weight: 600;
 }
 
 .hds-select__item,
@@ -975,7 +1057,6 @@ textarea {
   cursor: not-allowed;
 }
 
-.hds-select__item > span:first-child,
 .hds-menu__item svg {
   width: var(--hds-space-4);
   height: var(--hds-space-4);

@@ -164,9 +164,65 @@ test('Supplier operations: searchable assignments, reviewed shift rotation, Tano
   await page.goto(`${runtime.supplierOrigin}/master-data/shifts`);
   await page.getByRole('button', { name: 'Tukar waktu shift', exact: true }).click();
   const sheet = page.getByRole('dialog', { name: 'Tukar waktu shift', exact: true });
+  // Opening the unselected menu used to constrain the first text span to the 16px icon slot.
+  // Check both menus before selection; selected-only screenshots cannot catch that regression.
+  for (const width of [1440, 768, 390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    for (const [index, label] of ['Shift pertama', 'Shift kedua'].entries()) {
+      await sheet.getByRole('combobox', { name: label }).click();
+      const menu = page.getByRole('listbox');
+      await expect(menu).toBeVisible();
+      await expect(menu.getByText('18:00–06:00 · +1 hari · Asia/Jakarta')).toBeVisible();
+      const rows = await menu.locator('.hds-select__item').evaluateAll((items) =>
+        items.map((item) => {
+          const copy = item.querySelector('.hds-select__option-label')!.getBoundingClientRect();
+          const row = item.getBoundingClientRect();
+          return {
+            textWidth: copy.width,
+            textTop: copy.top,
+            textBottom: copy.bottom,
+            rowTop: row.top,
+            rowBottom: row.bottom,
+            rowHeight: row.height,
+          };
+        }),
+      );
+      for (const row of rows) {
+        expect(row.textWidth).toBeGreaterThan(80);
+        expect(row.rowHeight).toBeGreaterThanOrEqual(44);
+        expect(row.textTop).toBeGreaterThanOrEqual(row.rowTop);
+        expect(row.textBottom).toBeLessThanOrEqual(row.rowBottom);
+      }
+      for (let row = 1; row < rows.length; row++)
+        expect(rows[row]!.rowTop).toBeGreaterThanOrEqual(rows[row - 1]!.rowBottom);
+      const bounds = await menu.boundingBox();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+      expect(
+        (await new AxeBuilder({ page }).include('.hds-select__content').analyze()).violations,
+      ).toEqual([]);
+      await page.screenshot({
+        path: testInfo.outputPath(`shift-options-${index + 1}-${width}.png`),
+        animations: 'disabled',
+      });
+      await page.keyboard.press('Escape');
+    }
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
   await sheet.getByRole('combobox', { name: 'Shift pertama' }).click();
   await page.getByRole('option', { name: morning.name, exact: true }).click();
+  await expect(sheet.getByRole('combobox', { name: 'Shift pertama' })).toHaveText(morning.name);
+  await sheet.getByRole('combobox', { name: 'Shift pertama' }).click();
+  await expect(
+    page.getByRole('option', { name: morning.name, exact: true }).locator('.hds-select__indicator'),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
   await sheet.getByRole('combobox', { name: 'Shift kedua' }).click();
+  await expect(page.getByRole('option', { name: morning.name, exact: true })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
   await page.getByRole('option', { name: night.name, exact: true }).click();
   await expect(sheet.getByText('2 line menggunakan shift ini')).toBeVisible();
   for (const width of [1440, 768, 390, 320]) {

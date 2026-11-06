@@ -1,3 +1,11 @@
+## Shift dropdown component correction — 6 November 2026
+
+Local follow-up on `fix/shift-select-option-layout` fixes unselected option text inheriting icon
+width/height, separates icon/text slots, adds time-window descriptions and validates open-menu
+geometry across desktop/tablet/phone widths. See ADR 0049 and the current handoff for validation.
+Direct main publication is authorized; clean-artifact local release parity passed and the automatic
+production workflow is monitored. Phase 15 remains `in_progress`; device/UAT acceptance is separate.
+
 ## Supplier operational improvements — 6 November 2026
 
 Local implementation on `feat/supplier-operations-improvements`: reviewed atomic shift-time swap,

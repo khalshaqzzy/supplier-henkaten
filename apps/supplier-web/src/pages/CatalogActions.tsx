@@ -240,6 +240,7 @@ function SwapShiftTimesSheet({ onClose }: { onClose: () => void }) {
                         options={shifts.data.map((shift) => ({
                           value: shift.id,
                           label: shift.name,
+                          description: `${shift.startTime}–${shift.endTime}${shift.crossesMidnight ? ' · +1 hari' : ''} · ${shift.timezone}`,
                           disabled: shift.id === secondId,
                         }))}
                       />
@@ -256,6 +257,7 @@ function SwapShiftTimesSheet({ onClose }: { onClose: () => void }) {
                         options={shifts.data.map((shift) => ({
                           value: shift.id,
                           label: shift.name,
+                          description: `${shift.startTime}–${shift.endTime}${shift.crossesMidnight ? ' · +1 hari' : ''} · ${shift.timezone}`,
                           disabled: shift.id === firstId,
                         }))}
                       />

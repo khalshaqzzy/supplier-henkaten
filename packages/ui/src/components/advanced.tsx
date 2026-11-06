@@ -37,6 +37,7 @@ import { Button, IconButton, Input, NativeSelect } from './primitives';
 export interface SelectOption {
   value: string;
   label: string;
+  description?: string;
   disabled?: boolean;
 }
 
@@ -59,6 +60,7 @@ export function Select({
   placeholder = 'Pilih',
   disabled,
 }: SelectProps) {
+  const descriptionId = useId();
   return (
     <RadixSelect.Root
       {...(value !== undefined ? { value } : {})}
@@ -67,25 +69,46 @@ export function Select({
       {...(disabled !== undefined ? { disabled } : {})}
     >
       <RadixSelect.Trigger className="hds-select" aria-label={label}>
-        <RadixSelect.Value placeholder={placeholder} />
-        <RadixSelect.Icon>
+        <span className="hds-select__value">
+          <RadixSelect.Value placeholder={placeholder} />
+        </span>
+        <RadixSelect.Icon className="hds-select__icon">
           <ChevronDown aria-hidden="true" />
         </RadixSelect.Icon>
       </RadixSelect.Trigger>
       <RadixSelect.Portal>
-        <RadixSelect.Content className="hds-select__content" position="popper">
-          <RadixSelect.Viewport>
-            {options.map((option) => (
+        <RadixSelect.Content
+          className="hds-select__content"
+          position="popper"
+          align="start"
+          sideOffset={componentMetrics.popoverOffset}
+          collisionPadding={12}
+        >
+          <RadixSelect.Viewport className="hds-select__viewport">
+            {options.map((option, index) => (
               <RadixSelect.Item
                 key={option.value}
                 value={option.value}
                 {...(option.disabled !== undefined ? { disabled: option.disabled } : {})}
                 className="hds-select__item"
+                aria-describedby={option.description ? `${descriptionId}-${index}` : undefined}
               >
-                <RadixSelect.ItemIndicator>
-                  <Check />
+                <RadixSelect.ItemIndicator className="hds-select__indicator">
+                  <Check aria-hidden="true" />
                 </RadixSelect.ItemIndicator>
-                <RadixSelect.ItemText>{option.label}</RadixSelect.ItemText>
+                <span className="hds-select__option-copy">
+                  <span className="hds-select__option-label">
+                    <RadixSelect.ItemText>{option.label}</RadixSelect.ItemText>
+                  </span>
+                  {option.description && (
+                    <span
+                      id={`${descriptionId}-${index}`}
+                      className="hds-select__option-description"
+                    >
+                      {option.description}
+                    </span>
+                  )}
+                </span>
               </RadixSelect.Item>
             ))}
           </RadixSelect.Viewport>
