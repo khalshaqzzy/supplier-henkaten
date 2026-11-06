@@ -1,3 +1,68 @@
+# Current Session Handoff: Supplier operations improvements
+
+- Date: 2026-11-06. Branch: `feat/supplier-operations-improvements`, created from fetched `origin/main` (`ffe009a`) with a clean working tree. Follow-up delivery is authorized: commit, push this feature branch, open a PR to main and monitor checks. Merge and deployment are excluded.
+- Objective: add shift-time rotation, custom searchable assignment controls, unblocked supplier-wide Part catalog deletion and independent Tanoko line dimensions. Analysis/sequence/acceptance is retained in [supplierOperationsPlan.md](supplierOperationsPlan.md). Phase 15 remains the sole current `in_progress` phase; staging/device/UAT acceptance is unchanged.
+- Confirmed UX: Tanoko has independent “Job di line ini” and “MP di line ini” checkboxes with Job enabled by default. MP scope comes from configured assignments across active LineShifts on the selected active line, not Tanoko qualification. Both/neither modes, search/category and page reset are supported. Qualified MP row totals follow the filtered member set. History retains its existing job-line semantics.
+- Placement correction: **Tukar waktu shift is available only on Shift Template**, not Line Setup. The responsive right sheet selects two active templates, places affected line scope first, compares old/new hours with overnight/timezone markers and a 24-hour track, and keeps actions fixed above the safe area. Names/IDs/MP/Supervisor/LL assignments and historical occurrences remain retained. The schedule changes immediately supplier-wide; no future rotation scheduler is included.
+- Search UI: new shared SearchSelect uses a custom named Radix popover/listbox rather than native select/datalist. It separates query from committed identity, searches name/registration/import code, wraps long names, shows selected identity/checkmark and occupancy/account reasons, supports explicit clearing, keyboard navigation, focus restoration and empty recovery. Member responses now expose the existing optional importCode for matching. The three assignment roles reuse this control. Portalled Select options render above modal overlays.
+- Part deletion: reviewed current count/revision covers active/inactive Parts across all list filters. No Open-Henkaten blocker applies. Deleted Parts are retained with `deletedAt` and active=false, hidden from catalog/details/ordinary edit/activation/new-input selection, while existing Henkaten snapshots/references remain readable. Part numbers stay reserved; dedicated Part import explicitly offers restoration, and general setup Restore clears deletion. Deleted Part restoration clears an earlier reset-archive marker as well. Ordinary deactivation remains unchanged.
+- Backend: additive migration `20261106002300_supplier_catalog_commands` adds Part deletion and a requester/supplier/key-scoped command ledger with retained results. Strict request/result contracts, three endpoints, typed client and generated OpenAPI are included. Transactions serialize on the supplier, revalidate current session/source/delegated operator, reject stale versions/revisions and mismatched key payloads, and return original results for safe retries. Changed LineShift versions invalidate stale forms. Audits retain counts/template IDs and delegated operator identity.
+- Documentation: PRD amendment, implementation plan, roadmap, ADR 0049 and the ADR 0011 visibility exception are updated. No new dependency or seed-data edit is needed. The existing local seed uses unchanged create/assignment contracts and completed against a freshly migrated Docker database: two Hosted suppliers and 240 Henkaten with its built-in invariant/dashboard checks; seed API/database/photos/credential file were removed.
+- Completed validation: supported Node 22.23.2/pnpm 11.16.0, frozen install, formatting, lint, full TypeScript, 311 workspace unit tests plus two repository-script tests, and 106 PostgreSQL integration tests. Tests cover atomic swaps, identity/version retention, stale/unknown pairs, replay/payload conflict, deduplicated Tanoko membership, deleted detail/activation exclusion, later-Part preservation and reviewed restoration (including reset-archive cleanup). All 23 migrations apply fresh; an isolated origin/main 22-migration database upgrades to current and reports up to date, then is dropped.
+- API/build validation: OpenAPI generator `--check` passed, generated client was regenerated with identical before/after SHA-256, and production application build passed. This is artifact stability evidence; the repository's Git-diff drift wrapper naturally compares the intentional new generated contract with HEAD. That initial implementation run used Node 22.23.2; the stricter clean-artifact Node 22.23.1 delivery parity is recorded in the follow-up below.
+- Browser validation: the focused four-feature journey passed Chromium and installed Microsoft Edge, including lost commit responses, exact-command retry, an Open Henkaten retaining Part history, 1440/768/390/320px screenshots, fixed sheet/footer geometry, no document overflow, reduced motion and zero scoped axe violations. Existing onboarding selectors were updated for the custom member pickers. Full regression passed all 20 journeys (ten Chromium, ten installed Microsoft Edge); after the final primary-action/focus/touch-target polish, the focused journey passed again on both browsers.
+- Visual review: inspected actual app screenshots and all six standalone inspection renders. Refined dialog specificity, body scrolling instead of clipped comparison rows, line scope placement, title alignment, modal dropdown layering, search popover naming/animation/viewport collision padding, mobile delete bottom sheet, button icon slots and the 320px catalog grid containment. Isolated sheet inspection reports 0 FAIL/0 WARN, allowing its legitimate floating shadow and blank ground outside the captured component. Subjective final component critique: design 8.1/usability 8.4/creativity 7.8/content 8.6 (overall 8.2); phone comparison requires intentional body scrolling. Artifacts and critique are outside the repo in this chat visualization folder `supplier-operations/`.
+- Secret scanning: Gitleaks 8.24.3 directory scan passed with no leaks. Compose configuration and `git diff --check` passed. Production-container validation/scanning and hosted CI are recorded separately in the delivery follow-up; deployment remains excluded.
+- Final verification/cleanup: after the reset-archive restoration regression and explicit FK update semantics, a reset disposable database applied all 23 current migrations and all 106 integration tests passed again. The origin/main upgrade was rerun against the final migration. Final formatting, lint, TypeScript, production build, API OpenAPI `--check` and Gitleaks 8.24.3 directory scan passed. All 20 full browser journeys plus both post-polish focused journeys passed; the final actual/statically captured UI has been inspected and standalone inspection remains 0 FAIL/0 WARN with the stated overlay allowances. No schema-diff SQL was applied: a read-only Prisma diff shows no CatalogCommand/deletedAt drift; legacy custom schema differences remain outside this change. The seed API, temporary seed/upgrade DBs/photos/credentials, E2E resources, inspector browser and local PostgreSQL stack are stopped/removed. `docker ps` and process inspection show no task-owned app/test runtime left running. `git diff --check` passes. Implementation and clean-artifact delivery parity completed; the feature branch is published for a PR to main, with hosted-check monitoring tracked on that PR.
+
+
+## Delivery follow-up — 6 November 2026
+
+Commit/push to the existing feature branch, a PR targeting main, and hosted-check monitoring are
+authorized. Both workflows were inspected; deployment remains excluded. The main base remains
+`ffe009aa85d305c97cd38f0847c7b643ee968821` after remote verification.
+
+Pre-commit parity uses checksum-verified official Node 22.23.1 and pnpm 11.16.0. `pnpm exec node -v`
+was also checked inside the API package. `pnpm clean`, explicit removal of ignored package/app dist,
+TypeScript build metadata and generated Prisma output, and `pnpm install --frozen-lockfile` preceded
+`pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`, `pnpm openapi:check` and
+`VITE_API_ORIGIN=https://api.example.invalid pnpm build`; all passed. Intended generated contracts
+were staged first so the actual OpenAPI/client Git-diff drift commands used their intended baseline.
+
+`docker compose config --quiet`, `pnpm db:up`, `pnpm db:wait`, `pnpm db:verify`, `pnpm db:test:reset`,
+`pnpm db:test:migrate`, and `NODE_ENV=test DATABASE_URL=<Docker disposable test URL> RELEASE_SHA=ci
+SESSION_CSRF_SECRET=<CI test value> AUTH_THROTTLE_SECRET=<CI test value> OUTBOX_ENABLED=false pnpm
+test:integration` passed all 106 tests. The archived origin/main migrations were applied to a separate
+upgrade database before current deploy/status; all 23 migrations were current. The upgrade database
+was dropped and `pnpm db:down` stopped the test stack. A direct staged-SQL scan found no destructive
+statement; the repository commit-range migration check is run after commit and before push.
+
+Workflow-pinned Actionlint 1.7.7, ShellCheck 0.11.0, Hadolint 2.14.0, `bash -n`, both Ubuntu 22.04
+bootstrap input checks, `pnpm deployment:validate`, the deployment-script harness in Linux Docker
+29 CLI with real flock, `pnpm security:exceptions:check` and `pnpm security:audit` passed. Audit has
+four low/17 moderate advisories and no high/critical finding. The first Linux harness invocation
+lacked jq in its test image; adding jq to the ephemeral harness image allowed the exact test to pass.
+No repository dependency or scanner suppression changed.
+
+Current-source production Compose images were rebuilt with `--pull`. In isolated local project
+`henkaten-ops-delivery`, the exact CI migration/bootstrap, three-domain routing/release identity,
+deep-link, unauthorized session/realtime, headers, non-root/private-PostgreSQL, repeated bootstrap
+and restart database/photo-persistence assertions passed. The production-like stack was stopped.
+Trivy 0.70.0 with the official database updated 2026-11-06 (next update 2026-11-07) passed the source
+filesystem and all five current runtime image HIGH/CRITICAL scans with the existing ignore file.
+The latest policy bundle skips one AWS CloudFront rule that needs Trivy >=0.72; no AWS/CloudFront
+configuration is part of this repository. Gitleaks 8.24.3 directory mode passed with no leaks.
+
+The pinned-runtime `pnpm --filter @tmmin-henkaten/e2e exec playwright install chromium msedge` and
+`pnpm test:e2e` completed successfully: all 20 journeys passed (ten Chromium, ten installed Edge).
+Gitleaks directory mode and formatting are checked again on the final staged content. Commit-mode
+Gitleaks and the commit-range migration check precede push. All task-owned runtimes/containers are
+stopped. Delivery is through head branch `feat/supplier-operations-improvements` targeting main;
+the resulting PR records its exact SHA and authoritative hosted CI results. Hosted checks are
+monitored to completion before delivery is reported; merge/deployment remain excluded.
+
+---
+
 # Current Session Handoff: Member import guidance and actionable errors
 
 - Date: 2026-11-03. Branch: `feat/member-import-guidance`, created from clean `main`, confirmed equal to `origin/main` after fetch. Delivery includes documentation, commit, branch push, comprehensive PR to `main` and monitoring checks. Merge/deployment are outside scope.

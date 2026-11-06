@@ -1,3 +1,4 @@
+import { CatalogCommandService } from './catalog-command.service.js';
 import { MemberRoleService } from './member-role.service.js';
 import { TanokoController } from './tanoko.controller.js';
 import { SetupController } from './setup.controller.js';
@@ -37,6 +38,7 @@ import { TmminMasterDataController } from './tmmin-master-data.controller.js';
     MemberService,
     MemberRoleService,
     CatalogService,
+    CatalogCommandService,
     ChecklistService,
     AssignmentService,
     PhotoService,

@@ -6,3 +6,4 @@ export * from './components/data-display';
 export * from './components/domain';
 export * from './components/henkaten-export';
 export * from './showcase/patterns';
+export * from './components/search-select';

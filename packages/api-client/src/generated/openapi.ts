@@ -4162,6 +4162,7 @@ export interface paths {
                 /** Format: uuid */
                 id: string;
                 fullName: string;
+                importCode?: string | null;
                 registrationNumber: string | null;
                 /** @enum {string} */
                 role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
@@ -4249,6 +4250,7 @@ export interface paths {
                 /** Format: uuid */
                 id: string;
                 fullName: string;
+                importCode?: string | null;
                 registrationNumber: string | null;
                 /** @enum {string} */
                 role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
@@ -4319,6 +4321,7 @@ export interface paths {
               /** Format: uuid */
               id: string;
               fullName: string;
+              importCode?: string | null;
               registrationNumber: string | null;
               /** @enum {string} */
               role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
@@ -4430,6 +4433,7 @@ export interface paths {
               /** Format: uuid */
               id: string;
               fullName: string;
+              importCode?: string | null;
               registrationNumber: string | null;
               /** @enum {string} */
               role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
@@ -4547,6 +4551,7 @@ export interface paths {
                 /** Format: uuid */
                 id: string;
                 fullName: string;
+                importCode?: string | null;
                 registrationNumber: string | null;
                 /** @enum {string} */
                 role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
@@ -4704,6 +4709,7 @@ export interface paths {
                 /** Format: uuid */
                 id: string;
                 fullName: string;
+                importCode?: string | null;
                 registrationNumber: string | null;
                 /** @enum {string} */
                 role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
@@ -4826,6 +4832,7 @@ export interface paths {
               /** Format: uuid */
               id: string;
               fullName: string;
+              importCode?: string | null;
               registrationNumber: string | null;
               /** @enum {string} */
               role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
@@ -4945,6 +4952,7 @@ export interface paths {
               /** Format: uuid */
               id: string;
               fullName: string;
+              importCode?: string | null;
               registrationNumber: string | null;
               /** @enum {string} */
               role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
@@ -5069,6 +5077,7 @@ export interface paths {
               /** Format: uuid */
               id: string;
               fullName: string;
+              importCode?: string | null;
               registrationNumber: string | null;
               /** @enum {string} */
               role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
@@ -5185,6 +5194,7 @@ export interface paths {
                 /** Format: uuid */
                 id: string;
                 fullName: string;
+                importCode?: string | null;
                 registrationNumber: string | null;
                 /** @enum {string} */
                 role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
@@ -5310,6 +5320,7 @@ export interface paths {
                 /** Format: uuid */
                 id: string;
                 fullName: string;
+                importCode?: string | null;
                 registrationNumber: string | null;
                 /** @enum {string} */
                 role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
@@ -5435,6 +5446,7 @@ export interface paths {
                 /** Format: uuid */
                 id: string;
                 fullName: string;
+                importCode?: string | null;
                 registrationNumber: string | null;
                 /** @enum {string} */
                 role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
@@ -5560,6 +5572,7 @@ export interface paths {
               /** Format: uuid */
               id: string;
               fullName: string;
+              importCode?: string | null;
               registrationNumber: string | null;
               /** @enum {string} */
               role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
@@ -9385,6 +9398,237 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/supplier/master-data/parts/delete-preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description All current supplier Parts */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              count: number;
+              revision: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/parts/delete-all': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header: {
+          'Idempotency-Key': string;
+        };
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            revision: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Deleted Parts */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              deleted: number;
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/shift-templates/swap-times': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header: {
+          'Idempotency-Key': string;
+        };
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            first: {
+              /** Format: uuid */
+              id: string;
+              expectedVersion: number;
+            };
+            second: {
+              /** Format: uuid */
+              id: string;
+              expectedVersion: number;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Swapped times */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @constant */
+              swapped: 2;
+              affectedLines: number;
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/supplier/master-data/parts/import/preview': {
     parameters: {
       query?: never;
@@ -9427,6 +9671,8 @@ export interface paths {
                   id: string;
                   partName: string;
                   active: boolean;
+                  /** @default false */
+                  deleted: boolean;
                   version: number;
                 } | null;
               }[];
@@ -11924,6 +12170,7 @@ export interface paths {
                 /** Format: uuid */
                 id: string;
                 fullName: string;
+                importCode?: string | null;
                 registrationNumber: string | null;
                 /** @enum {string} */
                 role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
@@ -12043,6 +12290,7 @@ export interface paths {
               /** Format: uuid */
               id: string;
               fullName: string;
+              importCode?: string | null;
               registrationNumber: string | null;
               /** @enum {string} */
               role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
@@ -16698,6 +16946,8 @@ export interface paths {
                 id: string;
                 name: string;
                 active: boolean;
+                /** @default [] */
+                lineIds: string[];
               }[];
               jobs: {
                 /** Format: uuid */

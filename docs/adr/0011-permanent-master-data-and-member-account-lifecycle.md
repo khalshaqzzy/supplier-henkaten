@@ -252,3 +252,12 @@ exception expires 2026-11-16 and must be re-reviewed before any PKI/provisioner/
 change. The independent v4 path remains patched and version-asserted. Upstream evidence:
 https://github.com/go-jose/go-jose/security/advisories/GHSA-mgcc-cww5-fp2q. This is a scoped residual
 dependency risk, not a claim that the v3 code is patched.
+
+
+## Supplier-wide Part catalog deletion amendment — 6 November 2026
+
+ADR 0049 adds retained `Part.deletedAt` and a dedicated Supplier Admin bulk command. It removes
+all current Parts from application catalog access without an Open-Henkaten blocker, while retaining
+historical references and snapshots. Ordinary deactivation is unchanged. Part numbers remain
+reserved; restoring a deleted Part requires reviewed import. This supersedes permanent visibility
+only for this command; physical historical deletion remains prohibited.

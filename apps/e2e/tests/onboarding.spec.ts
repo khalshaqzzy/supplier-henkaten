@@ -193,20 +193,24 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
   await supplier.getByLabel('Shift baru').selectOption({ label: 'Shift Pagi · 06:00–14:00' });
   await supplier.getByRole('button', { name: 'Tambah shift' }).click();
   await expect(supplier.getByRole('heading', { name: 'Shift Pagi · 06:00–14:00' })).toBeVisible();
+  await supplier.getByRole('button', { name: /^Supervisor / }).click();
+  await supplier.getByRole('combobox', { name: 'Cari Supervisor' }).fill('REG-ONBOARD-1');
+  await supplier.getByRole('combobox', { name: 'Cari Supervisor' }).press('Enter');
+  await supplier.getByRole('button', { name: /^Line Leader / }).click();
+  await supplier.getByRole('combobox', { name: 'Cari Line Leader' }).fill('REG-ONBOARD-2');
+  await supplier.getByRole('combobox', { name: 'Cari Line Leader' }).press('Enter');
+  await supplier.getByRole('button', { name: /MP · Install Component/ }).click();
   await supplier
-    .getByLabel('Supervisor')
-    .selectOption({ label: 'Supervisor Onboarding · REG-ONBOARD-1' });
-  await supplier
-    .getByLabel('Line Leader')
-    .selectOption({ label: 'Line Leader Onboarding · REG-ONBOARD-2' });
-  await supplier
-    .locator('.defaults-table__row')
-    .filter({ hasText: 'Install Component' })
-    .locator('select')
-    .selectOption({ label: 'MP Onboarding' });
+    .getByRole('combobox', { name: 'Cari MP · Install Component' })
+    .fill('MP Onboarding');
+  await supplier.getByRole('combobox', { name: 'Cari MP · Install Component' }).press('Enter');
   await supplier.getByRole('button', { name: 'Simpan assignment' }).click();
-  await expect(supplier.getByLabel('Supervisor')).toHaveValue(/.+/);
-  await expect(supplier.getByLabel('Line Leader')).toHaveValue(/.+/);
+  await expect(
+    supplier.getByRole('button', { name: /^Supervisor Supervisor Onboarding/ }),
+  ).toBeVisible();
+  await expect(
+    supplier.getByRole('button', { name: /^Line Leader Line Leader Onboarding/ }),
+  ).toBeVisible();
 
   await supplier.goto(`${runtime.supplierOrigin}/setup`);
   await expect(supplier.getByText('Siap beroperasi')).toBeVisible();

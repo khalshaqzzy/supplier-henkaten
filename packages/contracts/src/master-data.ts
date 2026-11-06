@@ -82,6 +82,7 @@ export const memberSchema = z
   .object({
     id: opaqueIdSchema,
     fullName: nameSchema,
+    importCode: z.string().nullable().optional(),
     registrationNumber: registrationNumberSchema.nullable(),
     role: memberRoleSchema,
     active: z.boolean(),
@@ -188,6 +189,7 @@ export const partImportPreviewResponseSchema = z
               id: opaqueIdSchema,
               partName: z.string(),
               active: z.boolean(),
+              deleted: z.boolean().default(false),
               version: optimisticVersionSchema,
             })
             .strict()
@@ -448,3 +450,5 @@ export const lineShiftOperationalContextSchema = z
     items: z.array(lineShiftOccurrenceSchema),
   })
   .strict();
+
+export type ShiftTemplate = z.infer<typeof shiftTemplateSchema>;

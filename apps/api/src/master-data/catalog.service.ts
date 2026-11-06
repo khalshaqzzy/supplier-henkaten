@@ -350,6 +350,7 @@ export class CatalogService {
     const rows = await this.prisma.part.findMany({
       where: {
         supplierId: scope.supplierId,
+        deletedAt: null,
         ...activeWhere(query.active),
         ...(query.search
           ? {
@@ -402,6 +403,7 @@ export class CatalogService {
       partName: string;
       active: boolean;
       version: number;
+      deletedAt: Date | null;
     }[];
     for (const batch of chunks(rows, 1_000)) {
       existing.push(
@@ -415,6 +417,7 @@ export class CatalogService {
             normalizedPartNumber: true,
             partName: true,
             active: true,
+            deletedAt: true,
             version: true,
           },
         })),
@@ -428,7 +431,13 @@ export class CatalogService {
           partNumber: row.partNumber.trim(),
           partName: row.partName.trim(),
           existing: part
-            ? { id: part.id, partName: part.partName, active: part.active, version: part.version }
+            ? {
+                id: part.id,
+                partName: part.partName,
+                active: part.active,
+                deleted: Boolean(part.deletedAt),
+                version: part.version,
+              }
             : null,
         };
       }),
@@ -477,7 +486,7 @@ export class CatalogService {
             throw partImportConflict(
               'A part changed while you were reviewing the file. Review the file again.',
             );
-          if (current.partName === row.partName.trim()) {
+          if (current.partName === row.partName.trim() && !current.deletedAt) {
             skipped++;
             continue;
           }
@@ -518,6 +527,9 @@ export class CatalogService {
           UPDATE "Part" AS part
           SET "partName" = source."partName",
               "normalizedPartName" = source."normalizedPartName",
+              active = CASE WHEN part."deletedAt" IS NOT NULL THEN true ELSE part.active END,
+              "resetArchivedAt" = CASE WHEN part."deletedAt" IS NOT NULL THEN NULL ELSE part."resetArchivedAt" END,
+              "deletedAt" = NULL,
               version = part.version + 1,
               "updatedAt" = CURRENT_TIMESTAMP,
               "updatedById" = ${context.actorUserId}::uuid
@@ -549,7 +561,7 @@ export class CatalogService {
 
   async getPart(scope: TenantScope, id: string) {
     const row = await this.prisma.part.findFirst({
-      where: { id, supplierId: scope.supplierId },
+      where: { id, deletedAt: null, supplierId: scope.supplierId },
     });
     if (!row) throw missing('Part');
     return presentPart(row);
@@ -563,7 +575,9 @@ export class CatalogService {
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
       await lockSupplier(tx, scope.supplierId);
-      const current = await tx.part.findFirst({ where: { id, supplierId: scope.supplierId } });
+      const current = await tx.part.findFirst({
+        where: { id, deletedAt: null, supplierId: scope.supplierId },
+      });
       if (!current) throw missing('Part');
       if (current.version !== input.expectedVersion) throw versionConflict();
       const updated = await tx.part.update({
@@ -603,7 +617,9 @@ export class CatalogService {
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
       await lockSupplier(tx, scope.supplierId);
-      const current = await tx.part.findFirst({ where: { id, supplierId: scope.supplierId } });
+      const current = await tx.part.findFirst({
+        where: { id, deletedAt: null, supplierId: scope.supplierId },
+      });
       if (!current) throw missing('Part');
       if (current.version !== expectedVersion) throw versionConflict();
       if (

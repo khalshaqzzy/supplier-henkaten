@@ -1,4 +1,11 @@
 import {
+  deletePartsPreviewSchema,
+  deletePartsRequestSchema,
+  deletePartsResultSchema,
+  swapShiftTimesRequestSchema,
+  swapShiftTimesResultSchema,
+} from '@tmmin-henkaten/contracts';
+import {
   henkatenDeletionPreviewSchema,
   henkatenDeletionResultSchema,
   deleteHenkatenRequestSchema,
@@ -1193,6 +1200,23 @@ function masterDataPaths() {
           '429': problem,
           '403': problem,
         },
+      },
+    },
+    '/api/v1/supplier/master-data/parts/delete-preview': {
+      get: { responses: { '200': json('All current supplier Parts', deletePartsPreviewSchema) } },
+    },
+    '/api/v1/supplier/master-data/parts/delete-all': {
+      post: {
+        requestParams: { header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }) },
+        requestBody: body(deletePartsRequestSchema),
+        responses: { '201': json('Deleted Parts', deletePartsResultSchema), '409': problem },
+      },
+    },
+    '/api/v1/supplier/master-data/shift-templates/swap-times': {
+      post: {
+        requestParams: { header: z.object({ 'Idempotency-Key': z.string().min(1).max(128) }) },
+        requestBody: body(swapShiftTimesRequestSchema),
+        responses: { '201': json('Swapped times', swapShiftTimesResultSchema), '409': problem },
       },
     },
     '/api/v1/supplier/master-data/parts/import/preview': {

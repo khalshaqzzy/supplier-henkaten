@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -20,8 +21,8 @@ vi.mock('../app/session', () => ({
 const fixture: TanokoMatrix = {
   canEdit: true,
   members: [
-    { id: 'mp-1', name: 'Budi Nama Panjang', active: true },
-    { id: 'mp-2', name: 'Dewi', active: true },
+    { id: 'mp-1', name: 'Budi Nama Panjang', active: true, lineIds: ['line-1'] },
+    { id: 'mp-2', name: 'Dewi', active: true, lineIds: [] },
   ],
   jobs: [
     {
@@ -68,6 +69,44 @@ afterEach(() => {
 });
 
 describe('Tanoko editing interactions', () => {
+  it('independently scopes job rows and assigned MP columns, then applies search within scope', async () => {
+    const user = userEvent.setup();
+    const data = structuredClone(fixture);
+    data.jobs.push({
+      ...data.jobs[0]!,
+      id: 'job-2',
+      name: 'Welding',
+      lineId: 'line-2',
+      lineName: 'Weld',
+      lineCode: 'L02',
+    });
+    vi.spyOn(supplierApi, 'tanoko').mockResolvedValue(data);
+    data.mappings.push({ ...data.mappings[0]!, memberId: 'mp-2', level: 3 });
+    const { container } = mount();
+    await screen.findByRole('button', { name: /Budi Nama Panjang, Spec Engine/ });
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filter line' }), 'line-1');
+    expect(screen.getByRole('checkbox', { name: 'Job di line ini' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'MP di line ini' })).not.toBeChecked();
+    expect(screen.queryByRole('button', { name: /Welding/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Dewi, Spec Engine/ })).toBeVisible();
+    expect(container.querySelector('.tanoko-row-total')?.textContent).toBe('1');
+    await user.click(screen.getByRole('checkbox', { name: 'MP di line ini' }));
+    expect(container.querySelector('.tanoko-row-total')?.textContent).toBe('0');
+    expect(screen.queryByRole('button', { name: /Dewi, Spec Engine/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('checkbox', { name: 'Job di line ini' }));
+    expect(screen.getByRole('button', { name: /Budi Nama Panjang, Welding/ })).toBeVisible();
+    const search = screen.getByRole('textbox', { name: 'Cari MP atau job' });
+    await user.type(search, 'Dewi');
+    expect(screen.queryByRole('button', { name: /Dewi, / })).not.toBeInTheDocument();
+    await user.clear(search);
+    await user.click(screen.getByRole('checkbox', { name: 'MP di line ini' }));
+    expect(screen.getByRole('button', { name: /Dewi, Welding/ })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Reset filter' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filter line' }), 'line-1');
+    expect(screen.getByRole('checkbox', { name: 'Job di line ini' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'MP di line ini' })).not.toBeChecked();
+  });
+
   it('preserves unsaved work when switching tabs and supports explicit discard', async () => {
     const user = userEvent.setup();
     mount();

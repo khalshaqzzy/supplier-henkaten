@@ -6888,3 +6888,21 @@ a.overview-activity-identifier:hover {
   font-size: 12px;
   font-weight: 650;
 }
+
+.defaults-summary > .hds-search-select {
+  display: grid;
+  align-items: stretch;
+  gap: 8px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.defaults-table__row > .hds-search-select {
+  padding-block: 10px;
+}
+
+/* Keep intrinsic table widths inside the page's scrolling container at 320px. */
+.product-page > * {
+  min-width: 0;
+}

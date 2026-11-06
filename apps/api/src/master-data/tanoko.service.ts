@@ -42,7 +42,7 @@ export class TanokoService {
 
   async matrix(principal: RequestPrincipal) {
     const supplierId = await this.scope(principal);
-    const [members, jobs, mappings] = await this.prisma.$transaction(
+    const [members, jobs, mappings, assignments] = await this.prisma.$transaction(
       [
         this.prisma.member.findMany({
           where: { supplierId, role: 'MP', resetArchivedAt: null },
@@ -55,12 +55,28 @@ export class TanokoService {
           orderBy: [{ line: { displayOrder: 'asc' } }, { displayOrder: 'asc' }, { id: 'asc' }],
         }),
         this.prisma.tanokoMapping.findMany({ where: { supplierId } }),
+        this.prisma.lineShiftJobAssignment.findMany({
+          where: {
+            supplierId,
+            lineShift: { active: true, line: { active: true }, shiftTemplate: { active: true } },
+          },
+          select: { mpMemberId: true, lineShift: { select: { lineId: true } } },
+        }),
       ],
       { isolationLevel: 'RepeatableRead' },
     );
     return {
       canEdit: ['SUPPLIER_ADMIN', 'SUPERVISOR'].includes(principal.role),
-      members: members.map((m) => ({ id: m.id, name: m.fullName, active: m.active })),
+      members: members.map((m) => ({
+        id: m.id,
+        name: m.fullName,
+        active: m.active,
+        lineIds: [
+          ...new Set(
+            assignments.filter((a) => a.mpMemberId === m.id).map((a) => a.lineShift.lineId),
+          ),
+        ],
+      })),
       jobs: jobs.map((j) => ({
         id: j.id,
         name: j.name,
