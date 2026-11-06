@@ -83,6 +83,8 @@ export default function TanokoPage() {
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search.trim().toLocaleLowerCase('id'));
   const [lineId, setLineId] = useState('');
+  const [filterJobs, setFilterJobs] = useState(true);
+  const [filterMembers, setFilterMembers] = useState(false);
   const [category, setCategory] = useState('');
   const [memberPage, setMemberPage] = useState(0);
   const [selected, setSelected] = useState<Selection | null>(null);
@@ -128,34 +130,38 @@ export default function TanokoPage() {
     const data = matrix.data;
     if (!data) return { jobs: [], members: [] };
     const jobs = data.jobs.filter(
-      (j) => (!lineId || j.lineId === lineId) && (!category || j.category === category),
+      (j) =>
+        (!lineId || !filterJobs || j.lineId === lineId) && (!category || j.category === category),
     );
-    if (!deferredSearch) return { jobs, members: data.members };
+    const scopedMembers = data.members.filter(
+      (member) => !lineId || !filterMembers || member.lineIds.includes(lineId),
+    );
+    if (!deferredSearch) return { jobs, members: scopedMembers };
     const matchingJobs = jobs.filter((j) =>
       `${j.name} ${j.lineName}`.toLocaleLowerCase('id').includes(deferredSearch),
     );
-    const matchingMembers = data.members.filter((m) =>
+    const matchingMembers = scopedMembers.filter((m) =>
       m.name.toLocaleLowerCase('id').includes(deferredSearch),
     );
     return {
       jobs: matchingJobs.length ? matchingJobs : matchingMembers.length ? jobs : [],
-      members: matchingMembers.length ? matchingMembers : matchingJobs.length ? data.members : [],
+      members: matchingMembers.length ? matchingMembers : matchingJobs.length ? scopedMembers : [],
     };
-  }, [matrix.data, lineId, category, deferredSearch]);
+  }, [matrix.data, lineId, filterJobs, filterMembers, category, deferredSearch]);
   const page = Math.min(
     memberPage,
     Math.max(0, Math.ceil(filtered.members.length / columnPageSize) - 1),
   );
   const members = filtered.members.slice(page * columnPageSize, (page + 1) * columnPageSize);
   const qualifiedByJob = useMemo(() => {
-    const active = new Set(matrix.data?.members.filter((m) => m.active).map((m) => m.id));
+    const active = new Set(filtered.members.filter((m) => m.active).map((m) => m.id));
     const counts = new Map<string, number>();
     matrix.data?.mappings.forEach((m) => {
       if (active.has(m.memberId) && (m.level ?? 0) >= 3)
         counts.set(m.jobId, (counts.get(m.jobId) ?? 0) + 1);
     });
     return counts;
-  }, [matrix.data]);
+  }, [matrix.data, filtered.members]);
   const qualifiedByMember = useMemo(() => {
     const visibleJobs = new Set(filtered.jobs.filter((j) => j.active).map((j) => j.id));
     const counts = new Map<string, number>();
@@ -224,6 +230,8 @@ export default function TanokoPage() {
     setSearch('');
     setCategory('');
     setLineId('');
+    setFilterJobs(true);
+    setFilterMembers(false);
     setMemberPage(0);
   };
   const moveCell = (event: KeyboardEvent<HTMLButtonElement>, row: number, column: number) => {
@@ -359,6 +367,33 @@ export default function TanokoPage() {
             ))}
           </NativeSelect>
         </label>
+        {tab === 'matrix' && lineId && (
+          <fieldset className="tanoko-line-scopes">
+            <legend className="sr-only">Batasi ke line terpilih</legend>
+            <label className={filterJobs ? 'is-checked' : ''}>
+              <input
+                type="checkbox"
+                checked={filterJobs}
+                onChange={(event) => {
+                  setFilterJobs(event.target.checked);
+                  setMemberPage(0);
+                }}
+              />
+              <span>Job di line ini</span>
+            </label>
+            <label className={filterMembers ? 'is-checked' : ''}>
+              <input
+                type="checkbox"
+                checked={filterMembers}
+                onChange={(event) => {
+                  setFilterMembers(event.target.checked);
+                  setMemberPage(0);
+                }}
+              />
+              <span>MP di line ini</span>
+            </label>
+          </fieldset>
+        )}
         {tab === 'matrix' && (
           <label className="tanoko-filter">
             <span className="sr-only">Filter kategori</span>
@@ -509,7 +544,10 @@ export default function TanokoPage() {
                             {!m.active && <small className="tanoko-inactive">Nonaktif</small>}
                           </th>
                         ))}
-                        <th scope="col" title="Seluruh MP aktif dengan level 3 atau 4 pada job ini">
+                        <th
+                          scope="col"
+                          title="MP aktif pada hasil filter dengan level 3 atau 4 pada job ini"
+                        >
                           MP ≥3
                         </th>
                       </tr>

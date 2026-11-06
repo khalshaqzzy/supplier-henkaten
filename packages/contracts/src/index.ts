@@ -18,3 +18,5 @@ export * from './setup-import.js';
 export * from './member-import-examples.js';
 export * from './henkaten-deletion.js';
 export * from './member-role.js';
+
+export * from './catalog-commands.js';

@@ -513,7 +513,7 @@ export class SetupService implements OnModuleInit, BeforeApplicationShutdown {
           restore: p.restore,
         })),
       );
-      await tx.$executeRaw`UPDATE "Part" p SET "partName" = s.name, "normalizedPartName" = s.normalized, active = CASE WHEN s.restore THEN true ELSE p.active END, "resetArchivedAt" = CASE WHEN s.restore THEN NULL ELSE p."resetArchivedAt" END, version = p.version + 1, "updatedAt" = CURRENT_TIMESTAMP, "updatedById" = ${context.actorUserId}::uuid FROM jsonb_to_recordset(${payload}::jsonb) AS s(id uuid, name text, normalized text, restore boolean) WHERE p.id = s.id AND p."supplierId" = ${supplierId}::uuid`;
+      await tx.$executeRaw`UPDATE "Part" p SET "partName" = s.name, "normalizedPartName" = s.normalized, active = CASE WHEN s.restore THEN true ELSE p.active END, "resetArchivedAt" = CASE WHEN s.restore THEN NULL ELSE p."resetArchivedAt" END, "deletedAt" = CASE WHEN s.restore THEN NULL ELSE p."deletedAt" END, version = p.version + 1, "updatedAt" = CURRENT_TIMESTAMP, "updatedById" = ${context.actorUserId}::uuid FROM jsonb_to_recordset(${payload}::jsonb) AS s(id uuid, name text, normalized text, restore boolean) WHERE p.id = s.id AND p."supplierId" = ${supplierId}::uuid`;
       await this.audit.writeMany(
         batch.map((p) =>
           masterAudit(context, supplierId, 'PART_UPDATED', 'Part', p.id, {

@@ -403,7 +403,7 @@ export function PartImportPage() {
                   <span className="product-eyebrow">Konfirmasi konflik</span>
                   <h2>{preview.rows.length} part dalam file</h2>
                   <p>
-                    {stats.newCount} baru · {stats.changedCount} nama berbeda · {stats.sameCount}{' '}
+                    {stats.newCount} baru · {stats.changedCount} perlu ditinjau · {stats.sameCount}{' '}
                     sudah sesuai
                   </p>
                 </div>
@@ -422,7 +422,7 @@ export function PartImportPage() {
                       )
                     }
                   >
-                    Update semua yang berbeda
+                    Terapkan semua perubahan
                   </Button>
                   <Button
                     size="sm"
@@ -484,7 +484,10 @@ export function PartImportPage() {
                             <td data-label="Nama di sistem">
                               {row.existing?.partName}
                               {row.existing && !row.existing.active && (
-                                <small className="part-import-archived"> · Nonaktif</small>
+                                <small className="part-import-archived">
+                                  {' '}
+                                  · {row.existing.deleted ? 'Dihapus' : 'Nonaktif'}
+                                </small>
                               )}
                             </td>
                             <td data-label="Nama dalam file">{row.partName}</td>
@@ -501,7 +504,9 @@ export function PartImportPage() {
                                 }
                               >
                                 <option value="SKIP">Lewati</option>
-                                <option value="UPDATE">Update nama</option>
+                                <option value="UPDATE">
+                                  {row.existing?.deleted ? 'Pulihkan part' : 'Update nama'}
+                                </option>
                               </NativeSelect>
                             </td>
                           </tr>
@@ -587,5 +592,7 @@ function problemMessage(error: unknown) {
 }
 
 function isChanged(row: Preview['rows'][number]) {
-  return Boolean(row.existing && row.existing.partName.trim() !== row.partName.trim());
+  return Boolean(
+    row.existing && (row.existing.deleted || row.existing.partName.trim() !== row.partName.trim()),
+  );
 }

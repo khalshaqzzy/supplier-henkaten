@@ -1275,3 +1275,44 @@
   margin-top: 3px;
   line-height: 1.45;
 }
+
+.tanoko-line-scopes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 3px;
+  border: 1px solid var(--hds-border-default);
+  border-radius: 8px;
+  min-width: 0;
+  background: var(--hds-surface-default);
+}
+.tanoko-line-scopes label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  font-size: 13px;
+  color: var(--hds-text-secondary);
+  cursor: pointer;
+}
+.tanoko-line-scopes label.is-checked {
+  color: var(--hds-text-primary);
+  background: var(--hds-surface-inset);
+}
+.tanoko-line-scopes input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--hds-text-primary);
+}
+.tanoko-line-scopes label:has(input:focus-visible) {
+  outline: 2px solid var(--hds-border-active);
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  .tanoko-line-scopes label {
+    min-height: 44px;
+  }
+}

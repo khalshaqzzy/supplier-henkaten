@@ -16,7 +16,14 @@ export const tanokoMatrixSchema = z
   .object({
     canEdit: z.boolean(),
     members: z.array(
-      z.object({ id: opaqueIdSchema, name: z.string(), active: z.boolean() }).strict(),
+      z
+        .object({
+          id: opaqueIdSchema,
+          name: z.string(),
+          active: z.boolean(),
+          lineIds: z.array(opaqueIdSchema).default([]),
+        })
+        .strict(),
     ),
     jobs: z.array(
       z

@@ -755,6 +755,156 @@ describe('supplier master data', () => {
     ).toBe(510);
   }, 120_000);
 
+  it('atomically swaps schedule times, retains assignment identities and rejects stale or foreign pairs', async () => {
+    const base = '/api/v1/supplier/master-data/shift-templates';
+    const first = await supplierPost(base, {
+      name: 'Rotasi A',
+      startTime: '06:00',
+      endTime: '18:00',
+      timezone: 'Asia/Jakarta',
+    });
+    const second = await supplierPost(base, {
+      name: 'Rotasi B',
+      startTime: '18:00',
+      endTime: '06:00',
+      timezone: 'Asia/Jakarta',
+    });
+    const shift = await supplierPost(`/api/v1/supplier/master-data/lines/${lineId}/shifts`, {
+      shiftTemplateId: first.body.id,
+    });
+    const assignments = await prisma.lineShiftJobAssignment.findMany({
+      where: { lineShiftId: shift.body.id },
+      orderBy: { id: 'asc' },
+    });
+    const input = {
+      first: { id: first.body.id, expectedVersion: 1 },
+      second: { id: second.body.id, expectedVersion: 1 },
+    };
+    const key = randomUUID();
+    const result = await supplierPost(`${base}/swap-times`, input).set('Idempotency-Key', key);
+    expect(result.status).toBe(201);
+    expect(result.body).toEqual({ swapped: 2, affectedLines: 1 });
+    const a = await prisma.shiftTemplate.findUniqueOrThrow({ where: { id: first.body.id } });
+    const b = await prisma.shiftTemplate.findUniqueOrThrow({ where: { id: second.body.id } });
+    expect([a.name, a.startMinute, a.endMinute, a.version]).toEqual(['Rotasi A', 1080, 360, 2]);
+    expect([b.name, b.startMinute, b.endMinute, b.version]).toEqual(['Rotasi B', 360, 1080, 2]);
+    expect(
+      await prisma.lineShiftJobAssignment.findMany({
+        where: { lineShiftId: shift.body.id },
+        orderBy: { id: 'asc' },
+      }),
+    ).toEqual(assignments);
+    expect(
+      (await prisma.lineShift.findUniqueOrThrow({ where: { id: shift.body.id } })).version,
+    ).toBe(shift.body.version + 1);
+    const retry = await supplierPost(`${base}/swap-times`, input).set('Idempotency-Key', key);
+    expect(retry.status).toBe(201);
+    expect(retry.body).toEqual(result.body);
+    expect(
+      (await prisma.shiftTemplate.findUniqueOrThrow({ where: { id: first.body.id } })).version,
+    ).toBe(2);
+    expect(
+      (await supplierPost(`${base}/swap-times`, input).set('Idempotency-Key', randomUUID())).status,
+    ).toBe(409);
+    expect(
+      (
+        await supplierPost(`${base}/swap-times`, {
+          ...input,
+          second: { id: randomUUID(), expectedVersion: 1 },
+        }).set('Idempotency-Key', randomUUID())
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await supplierPost(`${base}/swap-times`, {
+          ...input,
+          first: { ...input.first, expectedVersion: 2 },
+        }).set('Idempotency-Key', key)
+      ).status,
+    ).toBe(409);
+  });
+
+  it('returns deduplicated assigned line membership in the Tanoko snapshot', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/supplier/tanoko')
+      .set('Cookie', supplierCookie);
+    expect(response.status).toBe(200);
+    const member = (response.body.members as Array<{ id: string; lineIds: string[] }>).find(
+      (m) => m.id === mpId,
+    )!;
+    expect(member.lineIds).toContain(lineId);
+    expect(new Set(member.lineIds).size).toBe(member.lineIds.length);
+  });
+
+  it('deletes all catalog Parts with stale-review protection and durable retry that preserves later Parts', async () => {
+    const base = '/api/v1/supplier/master-data/parts';
+    const preview = () =>
+      request(app.getHttpServer()).get(`${base}/delete-preview`).set('Cookie', supplierCookie);
+    const old = await preview();
+    await supplierPost(base, { partNumber: 'DELETE-EXAMPLE', partName: 'Part before deletion' });
+    expect(
+      (
+        await supplierPost(`${base}/delete-all`, { revision: old.body.revision }).set(
+          'Idempotency-Key',
+          randomUUID(),
+        )
+      ).status,
+    ).toBe(409);
+    await prisma.part.updateMany({
+      where: { supplierId, partNumber: 'DELETE-EXAMPLE' },
+      data: { active: false, resetArchivedAt: new Date() },
+    });
+    const review = await preview();
+    const count = await prisma.part.count({ where: { supplierId, deletedAt: null } });
+    expect(review.body.count).toBe(count);
+    const key = randomUUID();
+    const input = { revision: review.body.revision };
+    const result = await supplierPost(`${base}/delete-all`, input).set('Idempotency-Key', key);
+    expect(result.status).toBe(201);
+    expect(result.body).toEqual({ deleted: count });
+    const retained = await prisma.part.findFirstOrThrow({
+      where: { supplierId, partNumber: 'DELETE-EXAMPLE' },
+    });
+    expect(retained.active).toBe(false);
+    expect(retained.deletedAt).not.toBeNull();
+    expect(
+      (
+        await request(app.getHttpServer())
+          .get(`${base}/${retained.id}`)
+          .set('Cookie', supplierCookie)
+      ).status,
+    ).toBe(404);
+    expect(
+      (await supplierPost(`${base}/${retained.id}/activate`, { expectedVersion: retained.version }))
+        .status,
+    ).toBe(404);
+    const later = await supplierPost(base, { partNumber: 'DELETE-LATER', partName: 'Later Part' });
+    const retried = await supplierPost(`${base}/delete-all`, input).set('Idempotency-Key', key);
+    expect(retried.status).toBe(201);
+    expect(retried.body).toEqual(result.body);
+    const listed = await request(app.getHttpServer())
+      .get(`${base}?active=ALL`)
+      .set('Cookie', supplierCookie);
+    expect(listed.body.items).toEqual([expect.objectContaining({ id: later.body.id })]);
+    expect(await prisma.part.count({ where: { supplierId } })).toBe(count + 1);
+    const restore = await supplierPost(`${base}/import/commit`, {
+      rows: [
+        {
+          partNumber: retained.partNumber,
+          partName: retained.partName,
+          action: 'UPDATE',
+          existingId: retained.id,
+          expectedVersion: retained.version,
+        },
+      ],
+    });
+    expect(restore.status).toBe(201);
+    const restored = await prisma.part.findUniqueOrThrow({ where: { id: retained.id } });
+    expect(restored.deletedAt).toBeNull();
+    expect(restored.active).toBe(true);
+    expect(restored.resetArchivedAt).toBeNull();
+  });
+
   function supplierPost(path: string, body: unknown) {
     return request(app.getHttpServer())
       .post(path)

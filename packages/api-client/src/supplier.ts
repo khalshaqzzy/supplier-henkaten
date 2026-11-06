@@ -1,4 +1,11 @@
 import {
+  deletePartsPreviewSchema,
+  deletePartsResultSchema,
+  swapShiftTimesResultSchema,
+  type SwapShiftTimesRequest,
+  type DeletePartsRequest,
+} from '@tmmin-henkaten/contracts';
+import {
   tanokoMatrixSchema,
   tanokoMappingSchema,
   tanokoHistorySchema,
@@ -465,6 +472,28 @@ export class SupplierApi {
   part(id: string) {
     return this.client.request(`/api/v1/supplier/master-data/parts/${id}`, {
       responseSchema: partSchema,
+    });
+  }
+
+  deletePartsPreview() {
+    return this.client.request('/api/v1/supplier/master-data/parts/delete-preview', {
+      responseSchema: deletePartsPreviewSchema,
+    });
+  }
+  deleteAllParts(body: DeletePartsRequest, idempotencyKey: string) {
+    return this.client.request('/api/v1/supplier/master-data/parts/delete-all', {
+      method: 'POST',
+      body,
+      idempotencyKey,
+      responseSchema: deletePartsResultSchema,
+    });
+  }
+  swapShiftTimes(body: SwapShiftTimesRequest, idempotencyKey: string) {
+    return this.client.request('/api/v1/supplier/master-data/shift-templates/swap-times', {
+      method: 'POST',
+      body,
+      idempotencyKey,
+      responseSchema: swapShiftTimesResultSchema,
     });
   }
 

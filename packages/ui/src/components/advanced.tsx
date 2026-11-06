@@ -267,6 +267,7 @@ export function DropdownMenu({
 export interface PopoverProps {
   trigger: ReactElement;
   title?: ReactNode;
+  ariaLabel?: string;
   children: ReactNode;
   open?: boolean;
   defaultOpen?: boolean;
@@ -276,6 +277,7 @@ export interface PopoverProps {
 export function Popover({
   trigger,
   title,
+  ariaLabel,
   children,
   open,
   defaultOpen,
@@ -291,7 +293,8 @@ export function Popover({
       <RadixPopover.Portal>
         <RadixPopover.Content
           className="hds-popover"
-          aria-label={typeof title === 'string' ? title : undefined}
+          aria-label={ariaLabel ?? (typeof title === 'string' ? title : undefined)}
+          collisionPadding={12}
           sideOffset={componentMetrics.popoverOffset}
           align="start"
         >

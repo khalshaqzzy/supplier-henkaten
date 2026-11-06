@@ -1,3 +1,4 @@
+import { SwapShiftTimesAction, DeleteAllPartsAction } from './CatalogActions';
 import { MemberRoleDialog } from './MemberRoleDialog';
 import { SetupImportDialog } from './SetupImportDialog';
 import {
@@ -164,6 +165,12 @@ export function MasterListPage({ kind }: { kind: ResourceKind }) {
         description={meta.description}
         actions={
           <div className="master-header-actions">
+            {kind === 'shifts' && session?.principal.role === 'SUPPLIER_ADMIN' && (
+              <SwapShiftTimesAction />
+            )}
+            {kind === 'parts' && session?.principal.role === 'SUPPLIER_ADMIN' && (
+              <DeleteAllPartsAction />
+            )}
             {kind === 'members' && session?.principal.role === 'SUPPLIER_ADMIN' && (
               <SetupImportDialog memberOnly />
             )}

@@ -32,6 +32,7 @@ export function presentMember(
   return {
     id: member.id,
     fullName: member.fullName,
+    importCode: member.importCode,
     registrationNumber: member.registrationNumber,
     role: member.role,
     active: member.active,

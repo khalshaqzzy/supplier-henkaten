@@ -1,0 +1,381 @@
+.hds-dialog.catalog-sheet {
+  inset: 0 0 0 auto;
+  transform: none;
+  width: min(100vw, 600px);
+  max-width: none;
+  max-height: 100dvh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px 0 0 16px;
+  animation: catalog-sheet-enter 180ms ease-out;
+}
+.catalog-sheet .hds-dialog__header,
+.catalog-sheet .hds-dialog__footer {
+  flex: none;
+  background: var(--hds-surface-default);
+}
+.catalog-sheet .hds-dialog__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px;
+}
+.catalog-sheet .hds-dialog__body > * {
+  flex-shrink: 0;
+}
+.catalog-sheet .hds-dialog__footer {
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+.catalog-sheet .hds-dialog__adornment,
+.catalog-delete-dialog .hds-dialog__adornment {
+  align-self: flex-start;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 10px;
+  background: var(--hds-surface-inset);
+  color: var(--hds-text-secondary);
+}
+.catalog-sheet .hds-dialog__adornment svg,
+.catalog-delete-dialog .hds-dialog__adornment svg {
+  width: 20px;
+  height: 20px;
+}
+.catalog-shift-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
+  gap: 12px;
+  align-items: end;
+}
+.catalog-shift-picker label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+}
+.catalog-shift-picker .hds-select {
+  min-width: 0;
+  width: 100%;
+  min-height: 48px;
+}
+.catalog-shift-picker .hds-select > span:first-child {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.catalog-shift-picker__arrow {
+  width: 20px;
+  height: 20px;
+  margin-bottom: 14px;
+  color: var(--hds-text-secondary);
+}
+.catalog-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.catalog-sheet h3 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+.catalog-section-heading > span {
+  color: var(--hds-text-secondary);
+  font-size: 12px;
+}
+.catalog-time-review {
+  display: grid;
+  border: 1px solid var(--hds-border-default);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: -12px;
+}
+.catalog-time-row {
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+.catalog-time-row + .catalog-time-row {
+  border-top: 1px solid var(--hds-border-default);
+}
+.catalog-time-row > strong {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.catalog-time-row__times {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+.catalog-time-row__times > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.catalog-time-row__times small {
+  color: var(--hds-text-secondary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.catalog-time-row__times span {
+  font-size: 20px;
+  line-height: 1.4;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  letter-spacing: -0.03em;
+}
+.catalog-time-row__times > svg {
+  width: 18px;
+  color: var(--hds-text-tertiary);
+}
+.catalog-time-row__next > span {
+  color: var(--hds-text-primary);
+  font-weight: 650;
+}
+.catalog-day {
+  display: grid;
+  gap: 6px;
+}
+.catalog-day__track {
+  position: relative;
+  height: 8px;
+  background: var(--hds-surface-inset);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.catalog-day__track > span {
+  position: absolute;
+  height: 100%;
+  background: var(--hds-brand-accent);
+}
+.catalog-day__axis {
+  display: flex;
+  justify-content: space-between;
+  color: var(--hds-text-secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.catalog-impact {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: var(--hds-surface-inset);
+  border-radius: 8px;
+}
+.catalog-impact p,
+.catalog-pair-empty p,
+.catalog-success p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--hds-text-secondary);
+  margin: 0;
+}
+.catalog-line-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.catalog-line-tags span {
+  background: var(--hds-surface-default);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.catalog-pair-empty {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 48px 20px;
+  background: var(--hds-surface-subtle);
+  border-radius: 8px;
+}
+.catalog-pair-empty > svg {
+  color: var(--hds-text-secondary);
+  width: 28px;
+  height: 28px;
+}
+.catalog-loading {
+  display: grid;
+  gap: 16px;
+}
+.catalog-success {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 16px;
+  padding: 40px 12px;
+}
+.catalog-success > svg {
+  width: 40px;
+  height: 40px;
+  color: var(--hds-state-success-fg);
+}
+.catalog-delete-trigger {
+  color: var(--hds-state-danger-fg);
+}
+.hds-dialog.catalog-delete-dialog {
+  width: min(520px, calc(100vw - 32px));
+  animation: catalog-dialog-enter 160ms ease-out;
+}
+.catalog-delete-dialog .hds-dialog__body {
+  display: grid;
+  gap: 20px;
+}
+.catalog-delete-dialog .hds-dialog__adornment {
+  color: var(--hds-state-danger-fg);
+  background: var(--hds-state-danger-bg);
+}
+.catalog-delete-summary {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  background: var(--hds-surface-inset);
+  border-radius: 8px;
+}
+.catalog-delete-summary > span {
+  font-size: 14px;
+  font-weight: 550;
+}
+.catalog-delete-summary > strong {
+  font-size: 32px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.catalog-delete-summary > small {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--hds-text-secondary);
+}
+.catalog-delete-note {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--hds-text-secondary);
+}
+@keyframes catalog-sheet-enter {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes catalog-dialog-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (max-width: 600px) {
+  .hds-dialog.catalog-sheet {
+    border-radius: 0;
+  }
+  .catalog-sheet .hds-dialog__body {
+    padding: 20px 16px;
+  }
+  .catalog-sheet .hds-dialog__footer > .hds-button {
+    flex: 1;
+  }
+  .catalog-shift-picker {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .catalog-shift-picker__arrow {
+    display: none;
+  }
+  .catalog-time-row {
+    padding: 16px 12px;
+  }
+  .catalog-time-row__times {
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr);
+  }
+  .catalog-time-row__times span {
+    font-size: 18px;
+  }
+  .catalog-delete-dialog .hds-dialog__footer {
+    flex-wrap: wrap;
+  }
+  .catalog-delete-dialog .hds-dialog__footer > .hds-button {
+    flex: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .catalog-sheet,
+  .hds-dialog.catalog-delete-dialog {
+    animation: none;
+  }
+}
+
+.catalog-sheet .hds-dialog__header > div:not(.hds-dialog__adornment),
+.catalog-delete-dialog .hds-dialog__header > div:not(.hds-dialog__adornment) {
+  flex: 1;
+  min-width: 0;
+}
+.hds-dialog.catalog-delete-dialog {
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  height: auto;
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+}
+.catalog-delete-dialog .hds-dialog__body {
+  overflow-y: auto;
+  min-height: 0;
+}
+.catalog-delete-dialog .hds-dialog__header,
+.catalog-delete-dialog .hds-dialog__footer {
+  flex: none;
+}
+.catalog-delete-dialog .hds-dialog__footer {
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+@media (max-width: 600px) {
+  .hds-dialog.catalog-delete-dialog {
+    inset: auto 0 0;
+    width: 100vw;
+    max-height: calc(100dvh - 24px);
+    border-radius: 16px 16px 0 0;
+    transform: none;
+  }
+  .catalog-delete-dialog .hds-dialog__footer > .hds-button:first-child {
+    flex: 0 0 auto;
+  }
+  .catalog-delete-dialog .hds-dialog__footer > .hds-button:last-child {
+    min-width: 0;
+  }
+}
+
+.catalog-sheet .hds-button,
+.catalog-delete-dialog .hds-button {
+  box-shadow: none;
+}
+
+.catalog-sheet .hds-dialog__header .hds-icon-button,
+.catalog-delete-dialog .hds-dialog__header .hds-icon-button {
+  min-width: 44px;
+  min-height: 44px;
+}

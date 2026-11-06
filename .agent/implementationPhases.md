@@ -1,3 +1,14 @@
+## Supplier operational improvements — 6 November 2026
+
+Local implementation on `feat/supplier-operations-improvements`: reviewed atomic shift-time swap,
+custom searchable assignment identity controls, supplier-wide Part catalog deletion without Open
+blocking, and confirmed independent Tanoko Job/MP line scopes. See
+[supplierOperationsPlan.md](supplierOperationsPlan.md) and
+[ADR 0049](../docs/adr/0049-supplier-shift-rotation-and-catalog-deletion.md).
+Implementation delivery now includes a feature-branch push, PR to main and hosted-check monitoring;
+verification status and remaining release work are recorded in the current session handoff.
+Phase 15 remains the sole current `in_progress` phase; staging/device/UAT is unchanged.
+
 # Enterprise Digital Henkaten Management — Implementation Roadmap
 
 Status: active · Updated: 2026-11-03 · Approach: backend first, dependency driven

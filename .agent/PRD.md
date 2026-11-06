@@ -1,3 +1,33 @@
+## Amendment — 6 November 2026: Supplier operational controls
+
+Supplier Admin can exchange the complete time windows (including timezone) of two active Shift
+Templates from the Shift Template menu. This is an immediate, atomic, supplier-wide change;
+shift names/IDs and their MP, Supervisor and LL assignments remain attached. The responsive review
+sheet shows current/new hours, overnight boundaries and affected lines. Historical occurrence
+snapshots remain unchanged. Stale versions require refresh and same-command retries cannot swap twice.
+
+Line Setup assignment selection uses custom searchable identity controls for MP, Supervisor and
+Line Leader, with name/registration/member-code matching, keyboard navigation, explicit clearing,
+empty results and unavailable-account/occupied-LL explanations. No browser member select/datalist
+is used for these controls.
+
+Supplier Admin can delete all current Parts from the Part menu, across active/inactive states and
+outside list filters, without an Open-Henkaten blocker. A count/revision review and a single explicit
+confirmation precede the action. Retained historical Henkaten and Part references remain readable;
+deleted Parts disappear from catalog/deep-link/edit/activation/new-input access. Part numbers remain
+reserved; explicit reviewed import can restore a deleted identity. Same-key retries preserve Parts
+created after the completed command. This supersedes the permanent-master visibility and Open
+blocker only for this dedicated bulk command; physical historical deletion remains prohibited.
+
+Tanoko line filtering has independent “Job di line ini” and “MP di line ini” checkboxes. Job is on
+by default. MP scope uses configured assignment membership across active shifts on the selected
+active line, not skill qualifications. Both toggles intersect rows/columns; neither leaves the
+matrix unrestricted by line. Search/category operate within that scope; history retains its existing
+job-line filter. See [implementation plan](supplierOperationsPlan.md) and
+[ADR 0049](../docs/adr/0049-supplier-shift-rotation-and-catalog-deletion.md).
+
+---
+
 ## Amendment: 3 November 2026, Member import guidance and validation feedback
 
 The Member & Akun Excel and CSV templates contain the same 20 editable synthetic examples,

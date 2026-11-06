@@ -1,3 +1,10 @@
+import { CatalogCommandService } from './catalog-command.service.js';
+import {
+  swapShiftTimesRequestSchema,
+  deletePartsRequestSchema,
+  type SwapShiftTimesRequest,
+  type DeletePartsRequest,
+} from '@tmmin-henkaten/contracts';
 import { MemberRoleService } from './member-role.service.js';
 import { requiredIdempotencyKey } from '../common/idempotency.js';
 import {
@@ -341,6 +348,7 @@ export class SupplierCatalogController {
   constructor(
     private readonly access: MasterDataAccessService,
     private readonly catalog: CatalogService,
+    private readonly commands: CatalogCommandService,
   ) {}
 
   @RequireCapabilities('SUPPLIER_MASTER_DATA_READ')
@@ -512,6 +520,43 @@ export class SupplierCatalogController {
       parseWithSchema(opaqueIdSchema, id),
       body.expectedVersion,
       false,
+      mutationContext(request),
+    );
+  }
+
+  @RequireCapabilities('SUPPLIER_MASTER_DATA_MANAGE')
+  @Get('/parts/delete-preview')
+  async deletePartsPreview(@Req() request: ContextRequest) {
+    const scope = await this.access.assertWritable(principal(request));
+    return this.commands.deletePreview(scope.supplierId);
+  }
+
+  @RequireCapabilities('SUPPLIER_MASTER_DATA_MANAGE')
+  @Post('/parts/delete-all')
+  async deleteAllParts(
+    @ValidatedBody(deletePartsRequestSchema) body: DeletePartsRequest,
+    @Req() request: ContextRequest,
+  ) {
+    await this.access.assertWritable(principal(request));
+    return this.commands.deleteParts(
+      principal(request),
+      body,
+      requiredIdempotencyKey(request),
+      mutationContext(request),
+    );
+  }
+
+  @RequireCapabilities('SUPPLIER_MASTER_DATA_MANAGE')
+  @Post('/shift-templates/swap-times')
+  async swapShiftTimes(
+    @ValidatedBody(swapShiftTimesRequestSchema) body: SwapShiftTimesRequest,
+    @Req() request: ContextRequest,
+  ) {
+    await this.access.assertWritable(principal(request));
+    return this.commands.swap(
+      principal(request),
+      body,
+      requiredIdempotencyKey(request),
       mutationContext(request),
     );
   }

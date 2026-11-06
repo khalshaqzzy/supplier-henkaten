@@ -12,6 +12,7 @@ import {
   NativeSelect,
   Panel,
   Skeleton,
+  SearchSelect,
   toast,
 } from '@tmmin-henkaten/ui';
 
@@ -318,19 +319,13 @@ function AssignmentEditor({
               {String(assignment.jobDisplayOrder).padStart(2, '0')}
             </span>
             <strong>{assignment.jobName}</strong>
-            <NativeSelect
+            <MemberSelect
+              hideLabel
+              label={`MP · ${assignment.jobName}`}
               value={mps[assignment.jobId] ?? ''}
-              onChange={(event) =>
-                setMps((current) => ({ ...current, [assignment.jobId]: event.target.value }))
-              }
-            >
-              <option value="">Pilih MP</option>
-              {role('MP').map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.fullName}
-                </option>
-              ))}
-            </NativeSelect>
+              members={role('MP')}
+              onChange={(value) => setMps((current) => ({ ...current, [assignment.jobId]: value }))}
+            />
           </div>
         ))}
       </div>
@@ -338,7 +333,7 @@ function AssignmentEditor({
         <Button variant="secondary" loading={toggling} onClick={onToggle}>
           {item.active ? 'Nonaktifkan shift' : 'Aktifkan shift'}
         </Button>
-        <Button loading={save.isPending} onClick={() => save.mutate()}>
+        <Button variant="primary" loading={save.isPending} onClick={() => save.mutate()}>
           Simpan assignment
         </Button>
       </div>
@@ -351,34 +346,36 @@ function MemberSelect({
   value,
   members,
   occupied,
+  hideLabel = false,
   onChange,
 }: {
   label: string;
   value: string;
   members: Member[];
   occupied?: Map<string, string>;
+  hideLabel?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="sheet-field">
-      <span>{label}</span>
-      <NativeSelect value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">Pilih {label}</option>
-        {members.map((member) => (
-          <option key={member.id} value={member.id} disabled={Boolean(occupied?.has(member.id))}>
-            {member.fullName}
-            {member.role === 'MP' ? '' : ` · ${member.registrationNumber}`}
-            {occupied?.has(member.id) ? ` · Ditugaskan di ${occupied.get(member.id)}` : ''}
-          </option>
-        ))}
-      </NativeSelect>
-      {occupied && occupied.size > 0 && (
-        <small className="sheet-field__hint">
-          {members.filter((member) => !occupied.has(member.id)).length} LL tersedia · LL yang
-          ditugaskan di shift aktif lain tidak dapat dipilih.
-        </small>
-      )}
-    </label>
+    <SearchSelect
+      hideLabel={hideLabel}
+      label={label}
+      value={value}
+      onValueChange={onChange}
+      placeholder={`Pilih ${label.startsWith('MP') ? 'MP' : label}`}
+      options={members.map((member) => ({
+        value: member.id,
+        label: member.fullName,
+        description:
+          [member.registrationNumber, member.importCode].filter(Boolean).join(' · ') ||
+          (member.role === 'MP' ? 'MP' : ''),
+        ...(member.role !== 'MP' && member.account?.status !== 'ACTIVE'
+          ? { disabledReason: 'Akun belum aktif' }
+          : occupied?.has(member.id)
+            ? { disabledReason: `Ditugaskan di ${occupied.get(member.id)}` }
+            : {}),
+      }))}
+    />
   );
 }
 
