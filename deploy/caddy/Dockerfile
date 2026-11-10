@@ -24,16 +24,16 @@ RUN --mount=type=cache,id=supplier-henkaten-go-mod,target=/go/pkg/mod \
   && go mod init supplier-henkaten/caddy \
   && go get github.com/caddyserver/caddy/v2@v2.11.4 \
   && go get google.golang.org/grpc@v1.83.2 \
-  && go get golang.org/x/net@v0.60.0 \
-  && go get golang.org/x/text@v0.42.0 \
-  && go get golang.org/x/crypto@v0.57.0 \
+  && go get golang.org/x/net@v0.62.0 \
+  && go get golang.org/x/text@v0.43.0 \
+  && go get golang.org/x/crypto@v0.58.0 \
   && go get github.com/klauspost/compress@v1.18.7 \
   && go get github.com/go-jose/go-jose/v4@v4.1.6 \
   && go mod tidy \
   && test "$(go list -m -f '{{.Version}}' google.golang.org/grpc)" = v1.83.2 \
-  && test "$(go list -m -f '{{.Version}}' golang.org/x/net)" = v0.60.0 \
-  && test "$(go list -m -f '{{.Version}}' golang.org/x/crypto)" = v0.57.0 \
-  && test "$(go list -m -f '{{.Version}}' golang.org/x/text)" = v0.42.0 \
+  && test "$(go list -m -f '{{.Version}}' golang.org/x/net)" = v0.62.0 \
+  && test "$(go list -m -f '{{.Version}}' golang.org/x/crypto)" = v0.58.0 \
+  && test "$(go list -m -f '{{.Version}}' golang.org/x/text)" = v0.43.0 \
   && test "$(go list -m -f '{{.Version}}' github.com/klauspost/compress)" = v1.18.7 \
   && test "$(go list -m -f '{{.Version}}' github.com/go-jose/go-jose/v4)" = v4.1.6 \
   && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/caddy .

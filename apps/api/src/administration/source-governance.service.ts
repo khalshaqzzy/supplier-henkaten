@@ -43,9 +43,12 @@ export class SourceGovernanceService {
       check: async (transaction, supplier, targetMode) => {
         if (targetMode !== 'HOSTED') return [];
         const readiness = await this.hostedReadiness.evaluate(supplier.id, transaction);
-        return readiness.blockers.map(({ contributor: _contributor, area: _area, ...blocker }) => ({
+        // TMMIN receives only the summary fields of its strict preflight contract; entity
+        // references such as assigned member names stay within the supplier tenant.
+        return readiness.blockers.map(({ code, detail }) => ({
           contributor: 'phase-4-hosted-configuration',
-          ...blocker,
+          code,
+          detail,
         }));
       },
     });

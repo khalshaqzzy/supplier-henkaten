@@ -18015,6 +18015,57 @@ export interface paths {
                 resourceType?: string;
                 /** Format: uuid */
                 resourceId?: string;
+                /** @enum {string} */
+                reason?:
+                  | 'NOT_CONFIGURED'
+                  | 'ONLY_INACTIVE'
+                  | 'UNASSIGNED'
+                  | 'MEMBER_ARCHIVED'
+                  | 'ACCOUNT_INACTIVE'
+                  | 'COUNT_MISMATCH';
+                line?: {
+                  /** Format: uuid */
+                  id: string;
+                  code: string;
+                  name: string;
+                };
+                shift?: {
+                  /** Format: uuid */
+                  lineShiftId: string;
+                  /** Format: uuid */
+                  shiftTemplateId: string;
+                  name: string;
+                  startTime: string;
+                  endTime: string;
+                  crossesMidnight: boolean;
+                  active: boolean;
+                };
+                job?: {
+                  /** Format: uuid */
+                  id: string;
+                  name: string;
+                  displayOrder: number;
+                };
+                member?: {
+                  /** Format: uuid */
+                  id: string;
+                  fullName: string;
+                  /** @enum {string} */
+                  role: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
+                  active: boolean;
+                  accountStatus: ('ACTIVE' | 'INACTIVE') | null;
+                };
+                candidates?: {
+                  /** @enum {string} */
+                  kind: 'MEMBER' | 'LINE' | 'SHIFT_TEMPLATE';
+                  /** Format: uuid */
+                  id: string;
+                  label: string;
+                  detail: string | null;
+                  /** @enum {string} */
+                  role?: 'SUPERVISOR' | 'LINE_LEADER' | 'MP' | 'QC';
+                }[];
+                candidateTotal?: number;
               }[];
               nextArea:
                 | (

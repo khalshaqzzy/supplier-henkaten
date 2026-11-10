@@ -1,3 +1,23 @@
+## Amendment — 10 November 2026: Actionable supplier setup blockers
+
+Setup Supplier shows readiness blockers in a full-width “Perlu diselesaikan” panel grouped by setup
+area and blocker type. Each type expands to the affected entities: line and shift (with hours), job,
+assigned member and the reason — not created, inactive only, unassigned, member archived, account
+inactive or Supplier Admin count mismatch. Every entity offers the corrective link for its reason:
+Line Setup with the line, shift and Supervisor/Line Leader/job row selected and highlighted; the
+member account or status section; the Shift Template, line status or job section; or the relevant
+creation page. A Supplier Admin count mismatch is shown without a supplier-side action. Expanded
+types persist in the URL so Back restores them; long lists collapse after six rows. An area rail
+lists all six areas and jumps to their blockers.
+
+Destination pages highlight the target briefly, move focus to its first control and remove the
+focus parameter afterwards. The readiness API adds optional reason, line, shift, job, member and
+bounded candidate fields; counts and codes are unchanged. TMMIN source preflight receives only
+code and detail, without member names. See
+[ADR 0050](../docs/adr/0050-actionable-supplier-setup-blockers.md).
+
+---
+
 ## Amendment — 6 November 2026: Supplier operational controls
 
 Supplier Admin can exchange the complete time windows (including timezone) of two active Shift

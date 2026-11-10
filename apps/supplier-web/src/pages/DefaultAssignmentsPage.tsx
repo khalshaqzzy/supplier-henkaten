@@ -17,6 +17,7 @@ import {
 } from '@tmmin-henkaten/ui';
 
 import { supplierApi } from '../app/api';
+import { useFocusTarget } from '../app/focus-target';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { PageHeader } from '../components/layout';
@@ -26,7 +27,7 @@ export function DefaultAssignmentsPage() {
   const { session } = useSession();
   const [params, setParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const [selectedShiftId, setSelectedShiftId] = useState('');
+  const [selectedShiftId, setSelectedShiftId] = useState(() => params.get('lineShiftId') ?? '');
   const [newShiftTemplateId, setNewShiftTemplateId] = useState('');
   const [copyFromId, setCopyFromId] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
@@ -63,6 +64,18 @@ export function DefaultAssignmentsPage() {
   useEffect(() => {
     if (selected && selected.id !== selectedShiftId) setSelectedShiftId(selected.id);
   }, [selected, selectedShiftId]);
+  const selectShift = (id: string) => {
+    setSelectedShiftId(id);
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        next.set('lineShiftId', id);
+        next.delete('focus');
+        return next;
+      },
+      { replace: true },
+    );
+  };
 
   const availableTemplates = useMemo(() => {
     const configured = new Set(
@@ -115,6 +128,7 @@ export function DefaultAssignmentsPage() {
     templates.isLoading ||
     lineShifts.isLoading ||
     allLineShifts.isLoading;
+  useFocusTarget(!loading && Boolean(lineShifts.data));
 
   return (
     <div className="product-page">
@@ -169,13 +183,17 @@ export function DefaultAssignmentsPage() {
               <ShiftTimeline
                 items={lineShifts.data.items}
                 selectedId={selected?.id ?? ''}
-                onSelect={setSelectedShiftId}
+                onSelect={selectShift}
               />
             )}
-            <div className="defaults-toolbar defaults-toolbar--create">
+            <div
+              className="defaults-toolbar defaults-toolbar--create"
+              data-focus-target="add-shift"
+            >
               <label>
                 <span>Shift baru</span>
                 <NativeSelect
+                  data-focus-initial
                   value={newShiftTemplateId}
                   onChange={(event) => setNewShiftTemplateId(event.target.value)}
                 >
@@ -293,19 +311,23 @@ function AssignmentEditor({
   return (
     <Panel title={`${item.shiftName} · ${item.startTime}–${item.endTime}`}>
       <div className="defaults-summary">
-        <MemberSelect
-          label="Supervisor"
-          value={supervisorId}
-          members={role('SUPERVISOR')}
-          onChange={setSupervisorId}
-        />
-        <MemberSelect
-          label="Line Leader"
-          value={leaderId}
-          members={role('LINE_LEADER')}
-          occupied={leaderOccupancy}
-          onChange={setLeaderId}
-        />
+        <div className="focus-target-frame" data-focus-target="supervisor">
+          <MemberSelect
+            label="Supervisor"
+            value={supervisorId}
+            members={role('SUPERVISOR')}
+            onChange={setSupervisorId}
+          />
+        </div>
+        <div className="focus-target-frame" data-focus-target="line-leader">
+          <MemberSelect
+            label="Line Leader"
+            value={leaderId}
+            members={role('LINE_LEADER')}
+            occupied={leaderOccupancy}
+            onChange={setLeaderId}
+          />
+        </div>
       </div>
       <div className="defaults-table">
         <div className="defaults-table__head">
@@ -314,7 +336,11 @@ function AssignmentEditor({
           <span>MP</span>
         </div>
         {item.assignments.map((assignment) => (
-          <div className="defaults-table__row" key={assignment.id}>
+          <div
+            className="defaults-table__row"
+            key={assignment.id}
+            data-focus-target={`job:${assignment.jobId}`}
+          >
             <span className="order-pill">
               {String(assignment.jobDisplayOrder).padStart(2, '0')}
             </span>
@@ -330,7 +356,12 @@ function AssignmentEditor({
         ))}
       </div>
       <div className="assignment-sheet-actions">
-        <Button variant="secondary" loading={toggling} onClick={onToggle}>
+        <Button
+          variant="secondary"
+          loading={toggling}
+          onClick={onToggle}
+          data-focus-target="shift-status"
+        >
           {item.active ? 'Nonaktifkan shift' : 'Aktifkan shift'}
         </Button>
         <Button variant="primary" loading={save.isPending} onClick={() => save.mutate()}>
