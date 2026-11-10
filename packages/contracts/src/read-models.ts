@@ -13,8 +13,10 @@ import {
   assignmentIssueTypeSchema,
   henkatenCategorySchema,
   henkatenStatusSchema,
+  memberRoleSchema,
   sourceModeSchema,
   userRoleSchema,
+  userStatusSchema,
   workingAssignmentStateSchema,
 } from './enums.js';
 
@@ -417,6 +419,82 @@ export const supplierSetupAreaSchema = z.enum([
 ]);
 export type SupplierSetupArea = z.infer<typeof supplierSetupAreaSchema>;
 
+/** Why a setup requirement is unmet; selects the corrective action shown to the Supplier Admin. */
+export const supplierSetupBlockerReasonSchema = z.enum([
+  'NOT_CONFIGURED',
+  'ONLY_INACTIVE',
+  'UNASSIGNED',
+  'MEMBER_ARCHIVED',
+  'ACCOUNT_INACTIVE',
+  'COUNT_MISMATCH',
+]);
+export type SupplierSetupBlockerReason = z.infer<typeof supplierSetupBlockerReasonSchema>;
+
+const setupClockTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+
+export const supplierSetupBlockerCandidateSchema = z
+  .object({
+    kind: z.enum(['MEMBER', 'LINE', 'SHIFT_TEMPLATE']),
+    id: opaqueIdSchema,
+    label: z.string().min(1).max(200),
+    detail: z.string().max(200).nullable(),
+    role: memberRoleSchema.optional(),
+  })
+  .strict();
+export type SupplierSetupBlockerCandidate = z.infer<typeof supplierSetupBlockerCandidateSchema>;
+
+export const supplierSetupBlockerSchema = z
+  .object({
+    area: supplierSetupAreaSchema,
+    code: z.string().min(1).max(100),
+    detail: z.string().min(1).max(500),
+    resourceType: z.string().max(100).optional(),
+    resourceId: opaqueIdSchema.optional(),
+    reason: supplierSetupBlockerReasonSchema.optional(),
+    line: z
+      .object({
+        id: opaqueIdSchema,
+        code: z.string().min(1).max(100),
+        name: z.string().min(1).max(150),
+      })
+      .strict()
+      .optional(),
+    shift: z
+      .object({
+        lineShiftId: opaqueIdSchema,
+        shiftTemplateId: opaqueIdSchema,
+        name: z.string().min(1).max(150),
+        startTime: setupClockTimeSchema,
+        endTime: setupClockTimeSchema,
+        crossesMidnight: z.boolean(),
+        active: z.boolean(),
+      })
+      .strict()
+      .optional(),
+    job: z
+      .object({
+        id: opaqueIdSchema,
+        name: z.string().min(1).max(150),
+        displayOrder: z.number().int().nonnegative(),
+      })
+      .strict()
+      .optional(),
+    member: z
+      .object({
+        id: opaqueIdSchema,
+        fullName: z.string().min(1).max(150),
+        role: memberRoleSchema,
+        active: z.boolean(),
+        accountStatus: userStatusSchema.nullable(),
+      })
+      .strict()
+      .optional(),
+    candidates: z.array(supplierSetupBlockerCandidateSchema).max(20).optional(),
+    candidateTotal: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+export type SupplierSetupBlocker = z.infer<typeof supplierSetupBlockerSchema>;
+
 export const supplierSetupReadinessSchema = z
   .object({
     generatedAt: utcTimestampSchema,
@@ -432,17 +510,8 @@ export const supplierSetupReadinessSchema = z
         })
         .strict(),
     ),
-    blockers: z.array(
-      z
-        .object({
-          area: supplierSetupAreaSchema,
-          code: z.string().min(1).max(100),
-          detail: z.string().min(1).max(500),
-          resourceType: z.string().max(100).optional(),
-          resourceId: opaqueIdSchema.optional(),
-        })
-        .strict(),
-    ),
+    blockers: z.array(supplierSetupBlockerSchema),
     nextArea: supplierSetupAreaSchema.nullable(),
   })
   .strict();
+export type SupplierSetupReadiness = z.infer<typeof supplierSetupReadinessSchema>;

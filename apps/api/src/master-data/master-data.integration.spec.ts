@@ -7,7 +7,10 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { supplierSetupReadinessSchema } from '@tmmin-henkaten/contracts';
+import {
+  sourcePreflightResponseSchema,
+  supplierSetupReadinessSchema,
+} from '@tmmin-henkaten/contracts';
 
 import { AppModule } from '../app.module.js';
 import { PasswordService } from '../auth/password.service.js';
@@ -298,6 +301,45 @@ describe('supplier master data', () => {
     );
     expect(incompleteReadiness.blockers).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'LINE_SHIFT_MISSING' })]),
+    );
+    const mpBlockers = incompleteReadiness.blockers.filter(
+      ({ code }) => code === 'LINE_SHIFT_MP_MISSING',
+    );
+    expect(mpBlockers.map(({ job }) => job?.name).sort()).toEqual([
+      'Inspection Station',
+      'Torque Station',
+    ]);
+    for (const blocker of incompleteReadiness.blockers.filter(({ code }) =>
+      code.startsWith('LINE_SHIFT_'),
+    )) {
+      expect(blocker).toMatchObject({
+        reason: 'UNASSIGNED',
+        resourceType: 'LineShift',
+        resourceId: lineShiftBody.id,
+        line: { id: lineId, name: 'Main Assembly' },
+        shift: {
+          lineShiftId: lineShiftBody.id,
+          name: 'Night Shift',
+          startTime: '22:00',
+          endTime: '06:00',
+          crossesMidnight: true,
+        },
+      });
+    }
+    const governance = app.get(SourceGovernanceService);
+    await prisma.supplier.update({ where: { id: supplierId }, data: { sourceMode: 'EXTERNAL' } });
+    const incompletePreflight = await governance.preflight(supplierId, 'HOSTED');
+    await prisma.supplier.update({ where: { id: supplierId }, data: { sourceMode: 'HOSTED' } });
+    // The TMMIN contract is strict: entity references must not leak into preflight blockers.
+    const parsedPreflight = sourcePreflightResponseSchema.parse(incompletePreflight);
+    expect(parsedPreflight.blockers).toEqual(
+      expect.arrayContaining([
+        {
+          contributor: 'phase-4-hosted-configuration',
+          code: 'LINE_SHIFT_MP_MISSING',
+          detail: expect.stringContaining('Torque Station') as string,
+        },
+      ]),
     );
     const configured = await supplierPatch(
       `/api/v1/supplier/master-data/line-shifts/${lineShiftBody.id}/assignments`,

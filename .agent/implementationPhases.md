@@ -1,3 +1,16 @@
+## Actionable setup blockers — 10 November 2026
+
+Implementation on `feat/setup-blocker-navigation`: structured readiness blockers (reason, Line,
+Shift, Job, Member, bounded candidates), strict TMMIN preflight projection, expandable Setup
+Supplier panel with reason-specific deep links, and Line Setup/master-detail focus targets. See
+[ADR 0050](../docs/adr/0050-actionable-supplier-setup-blockers.md) and the current handoff for
+validation and delivery. No schema/migration change. Phase 15 remains the sole current
+`in_progress` phase; staging/device/UAT is unchanged.
+
+The release image gate also patches the Caddy builder for CVE-2026-78661: x/net 0.62.0 with its
+required x/crypto 0.58.0 and x/text 0.43.0, retaining exact post-tidy assertions (ADR 0008
+amendment of 10 November 2026).
+
 ## Shift dropdown component correction — 6 November 2026
 
 Local follow-up on `fix/shift-select-option-layout` fixes unselected option text inheriting icon

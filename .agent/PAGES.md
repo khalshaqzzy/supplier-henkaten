@@ -398,8 +398,15 @@ Catatan:
   checklists, defaults. Individual form saja; tidak ada bulk import/export.
 - **States:** empty tenant, partially configured, ready, preparation mode, stale after another admin
   change.
-- **Alur keluar:** deep link ke prerequisite berikutnya; normal Hosted Admin kembali ke overview
-  saat ready; preparation Admin tetap tidak dapat masuk operational pages.
+- **Blocker detail (10 November 2026):** panel “Perlu diselesaikan” mengelompokkan blocker per
+  area dan jenis; setiap jenis dapat di-expand untuk menampilkan Line · Shift, job, member terkait
+  dan alasan, dengan link perbaikan per entity. Rail area menampilkan enam area dan melompat ke
+  blocker area tersebut. Lihat ADR 0050.
+- **Alur keluar:** deep link ke prerequisite berikutnya dan ke field yang tepat
+  (`/master-data/line-setup?lineId&lineShiftId&focus=supervisor|line-leader|job:<id>|add-shift|shift-status`,
+  `/master-data/members/:id?focus=account|status`, `/master-data/lines/:id?focus=jobs|status`,
+  `/master-data/shifts/:id?focus=status`); normal Hosted Admin kembali ke overview saat ready;
+  preparation Admin tetap tidak dapat masuk operational pages.
 - **Dependency:** `AVAILABLE`; consolidated readiness memakai evaluator yang sama dengan
   source-governance readiness. TMMIN cutover preflight tidak dipakai sebagai supplier
   self-service endpoint.

@@ -1383,7 +1383,6 @@ body {
 
 .data-table a,
 .master-overview a,
-.setup-card a,
 .board-line a,
 .detail-action-rail > a,
 .shift-card,
@@ -2630,7 +2629,6 @@ a.overview-activity-identifier:hover {
 
 .metric-list,
 .activity-list,
-.blocker-list,
 .notification-list,
 .audit-timeline,
 .version-list,
@@ -2761,87 +2759,10 @@ a.overview-activity-identifier:hover {
   display: grid;
 }
 
-.setup-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--hds-space-4);
-}
-
 .setup-summary-strip {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.setup-workspace {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  align-items: start;
-  gap: 14px;
-}
-
-.setup-workspace .setup-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.setup-next-copy {
-  margin: 0;
-  color: var(--hds-text-secondary);
-  font-size: 13px;
-}
-
-.setup-workspace .blocker-list {
-  display: grid;
-  gap: 7px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.setup-workspace .blocker-list li {
-  grid-template-columns: 1fr;
-  gap: 3px;
-  padding: 9px;
-}
-
-.setup-workspace .blocker-list span,
-.setup-workspace .blocker-list code {
-  font-size: 11px;
-}
-
-.setup-grid > .hds-skeleton {
-  min-height: 160px;
-}
-
-.setup-card .hds-panel__content {
-  display: grid;
-  gap: var(--hds-space-4);
-}
-
-.setup-card__state,
-.setup-card a {
-  display: flex;
-  align-items: center;
-  gap: var(--hds-space-2);
-}
-
-.setup-card a {
-  justify-content: space-between;
-}
-
-.setup-card.is-ready .setup-card__state {
-  color: var(--hds-state-success-fg);
-}
-
-.blocker-list li {
-  display: grid;
-  grid-template-columns: 160px 1fr auto;
-  gap: var(--hds-space-3);
-  align-items: center;
-  padding: var(--hds-space-3);
-  border-radius: var(--hds-radius-md);
-  background: var(--hds-state-danger-bg);
-}
-
-.blocker-list code,
 .preflight-grid code {
   color: var(--hds-state-danger-fg);
   font-size: var(--hds-type-11-size);
@@ -6426,9 +6347,7 @@ a.overview-activity-identifier:hover {
   .form-grid,
   .form-two-col,
   .detail-panels,
-  .setup-grid,
   .setup-summary-strip,
-  .setup-workspace .setup-grid,
   .checklist-category-grid,
   .one-time-secret dl,
   .defaults-summary,
@@ -6476,7 +6395,6 @@ a.overview-activity-identifier:hover {
 
   .overview-quick-links,
   .overview-activity-list > li,
-  .blocker-list li,
   .version-list li,
   .resolution-list article,
   .notification-list li,
@@ -6905,4 +6823,69 @@ a.overview-activity-identifier:hover {
 /* Keep intrinsic table widths inside the page's scrolling container at 320px. */
 .product-page > * {
   min-width: 0;
+}
+
+/* Deep-link destination highlight (Setup Supplier blocker actions) */
+.focus-target-frame {
+  border-radius: var(--hds-radius-md);
+}
+
+[data-focus-target] {
+  scroll-margin-block: 96px;
+}
+
+.is-focus-target {
+  position: relative;
+  border-radius: var(--hds-radius-md);
+  animation: setup-focus-target 2.6s var(--hds-ease-standard) both;
+}
+
+@keyframes setup-focus-target {
+  0% {
+    background-color: rgb(255 90 31 / 0%);
+    box-shadow: 0 0 0 0 rgb(255 90 31 / 0%);
+  }
+
+  12% {
+    background-color: rgb(255 90 31 / 9%);
+    box-shadow: 0 0 0 4px rgb(255 90 31 / 32%);
+  }
+
+  70% {
+    background-color: rgb(255 90 31 / 6%);
+    box-shadow: 0 0 0 3px rgb(255 90 31 / 22%);
+  }
+
+  100% {
+    background-color: rgb(255 90 31 / 0%);
+    box-shadow: 0 0 0 0 rgb(255 90 31 / 0%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-focus-target {
+    animation: none;
+    box-shadow: 0 0 0 3px rgb(255 90 31 / 32%);
+  }
+}
+
+/* Controls keep their own fill; only the ring signals the destination. */
+.hds-button.is-focus-target {
+  animation-name: setup-focus-ring;
+}
+
+@keyframes setup-focus-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(255 90 31 / 0%);
+  }
+
+  12%,
+  70% {
+    box-shadow: 0 0 0 4px rgb(255 90 31 / 30%);
+  }
+}
+
+[data-focus-target][tabindex='-1']:focus {
+  outline: none;
 }

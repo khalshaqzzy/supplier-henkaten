@@ -116,9 +116,14 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
   await supplier.goto(`${runtime.supplierOrigin}/setup`);
   await expect(supplier.getByRole('heading', { name: 'Setup Supplier' })).toBeVisible();
   await expect(supplier.getByText('Readiness tidak dapat dimuat')).toHaveCount(0);
-  await expect(supplier.getByText('Minimal satu Shift Template aktif diperlukan.')).toBeVisible();
+  const shiftIssue = supplier.getByRole('button', { name: /Belum ada Shift Template aktif/ });
+  await expect(shiftIssue).toHaveAttribute('aria-expanded', 'true');
+  await expect(supplier.getByRole('link', { name: 'Buat Shift Template' })).toHaveAttribute(
+    'href',
+    '/master-data/shifts/new',
+  );
   await expect(
-    supplier.getByText('Tambahkan line sebelum mengatur assignment line dan shift.'),
+    supplier.getByRole('button', { name: /Line Setup menunggu line aktif/ }),
   ).toBeVisible();
 
   await createResource(supplier, 'lines', {

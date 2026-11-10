@@ -34,6 +34,7 @@ import {
 
 import { ApiProblemError } from '@tmmin-henkaten/api-client';
 
+import { useFocusTarget } from '../app/focus-target';
 import { supplierApi, supplierAssetUrl } from '../app/api';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
@@ -365,6 +366,7 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
   useEffect(() => {
     if (detail.data) setValues(valuesFromResource(kind, detail.data));
   }, [detail.data, kind]);
+  useFocusTarget(!editing || Boolean(detail.data));
 
   useEffect(() => {
     const dirty = Object.values(values).some(Boolean);
@@ -547,24 +549,26 @@ function ResourceLifecycle({
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
   return (
-    <Panel title="Status" description="">
-      {problem && (
-        <Alert tone="danger" title="Perubahan gagal">
-          {problem}
-        </Alert>
-      )}
-      <Button
-        variant="secondary"
-        loading={action.isPending}
-        onClick={() => {
-          setProblem(null);
-          if (window.confirm(`${active ? 'Nonaktifkan' : 'Aktifkan'} resource ini?`))
-            action.mutate();
-        }}
-      >
-        {active ? 'Nonaktifkan' : 'Aktifkan'}
-      </Button>
-    </Panel>
+    <div className="focus-target-frame" data-focus-target="status">
+      <Panel title="Status" description="">
+        {problem && (
+          <Alert tone="danger" title="Perubahan gagal">
+            {problem}
+          </Alert>
+        )}
+        <Button
+          variant="secondary"
+          loading={action.isPending}
+          onClick={() => {
+            setProblem(null);
+            if (window.confirm(`${active ? 'Nonaktifkan' : 'Aktifkan'} resource ini?`))
+              action.mutate();
+          }}
+        >
+          {active ? 'Nonaktifkan' : 'Aktifkan'}
+        </Button>
+      </Panel>
+    </div>
   );
 }
 
@@ -868,7 +872,7 @@ export function MemberLifecycle({
         </div>
       </div>
       {member.account && (
-        <div className="member-account-state">
+        <div className="member-account-state focus-target-frame" data-focus-target="account">
           <div>
             <strong>Akun {member.account.status === 'ACTIVE' ? 'aktif' : 'nonaktif'}</strong>
             <p>
@@ -897,7 +901,7 @@ export function MemberLifecycle({
           )}
         </div>
       )}
-      <div className="lifecycle-actions">
+      <div className="lifecycle-actions focus-target-frame" data-focus-target="status">
         <MemberRoleDialog member={member} scope={scope} />
         {member.account && (
           <p className="member-account-identity">
@@ -919,7 +923,11 @@ export function MemberLifecycle({
             action.mutate('status');
           }}
           trigger={
-            <Button variant={member.active ? 'danger' : 'secondary'} loading={action.isPending}>
+            <Button
+              variant={member.active ? 'danger' : 'secondary'}
+              loading={action.isPending}
+              data-focus-initial
+            >
               {member.active ? 'Hapus member' : 'Pulihkan member'}
             </Button>
           }
@@ -1062,178 +1070,181 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
   return (
-    <Panel title="Job berurutan" description="">
-      {problem && (
-        <Alert tone="danger" title="Perubahan job gagal">
-          {problem}
-        </Alert>
-      )}
-      <form
-        className="inline-create"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (name.trim()) {
-            setProblem(null);
-            create.mutate();
-          }
-        }}
-      >
-        <Input
-          value={name}
-          placeholder="Nama job baru"
-          onChange={(event) => setName(event.target.value)}
-        />
-        <NativeSelect
-          aria-label="Kategori skill job baru"
-          value={skillCategory}
-          onChange={(e) => setSkillCategory(e.target.value)}
+    <div className="focus-target-frame" data-focus-target="jobs">
+      <Panel title="Job berurutan" description="">
+        {problem && (
+          <Alert tone="danger" title="Perubahan job gagal">
+            {problem}
+          </Alert>
+        )}
+        <form
+          className="inline-create"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (name.trim()) {
+              setProblem(null);
+              create.mutate();
+            }
+          }}
         >
-          <option value="HIGH">High</option>
-          <option value="MEDIUM">Medium</option>
-          <option value="LOW">Low</option>
-        </NativeSelect>
-        <Button type="submit" loading={create.isPending}>
-          Tambah job
-        </Button>
-      </form>
-      <ol className="job-list">
-        {jobs.data?.items.map((job, index) => (
-          <li key={job.id}>
-            <span>{job.displayOrder}</span>
-            {editingJobId === job.id ? (
-              <form
-                className="job-rename"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (editingJobName.trim() && editingJobName.trim() !== job.name) {
-                    setProblem(null);
-                    rename.mutate({
-                      id: job.id,
-                      version: job.version,
-                      skillCategory: job.skillCategory ?? null,
-                    });
-                  }
-                }}
-              >
-                <Input
-                  aria-label={`Nama job ${job.name}`}
-                  autoFocus
-                  required
-                  maxLength={150}
-                  value={editingJobName}
-                  disabled={rename.isPending}
-                  onChange={(event) => setEditingJobName(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape' && !rename.isPending) {
-                      setEditingJobId(null);
-                      setEditingJobName('');
+          <Input
+            data-focus-initial
+            value={name}
+            placeholder="Nama job baru"
+            onChange={(event) => setName(event.target.value)}
+          />
+          <NativeSelect
+            aria-label="Kategori skill job baru"
+            value={skillCategory}
+            onChange={(e) => setSkillCategory(e.target.value)}
+          >
+            <option value="HIGH">High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
+          </NativeSelect>
+          <Button type="submit" loading={create.isPending}>
+            Tambah job
+          </Button>
+        </form>
+        <ol className="job-list">
+          {jobs.data?.items.map((job, index) => (
+            <li key={job.id}>
+              <span>{job.displayOrder}</span>
+              {editingJobId === job.id ? (
+                <form
+                  className="job-rename"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (editingJobName.trim() && editingJobName.trim() !== job.name) {
+                      setProblem(null);
+                      rename.mutate({
+                        id: job.id,
+                        version: job.version,
+                        skillCategory: job.skillCategory ?? null,
+                      });
                     }
                   }}
-                />
-                <Button
-                  size="sm"
-                  type="submit"
-                  loading={rename.isPending}
-                  disabled={!editingJobName.trim() || editingJobName.trim() === job.name}
                 >
-                  Simpan
-                </Button>
+                  <Input
+                    aria-label={`Nama job ${job.name}`}
+                    autoFocus
+                    required
+                    maxLength={150}
+                    value={editingJobName}
+                    disabled={rename.isPending}
+                    onChange={(event) => setEditingJobName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape' && !rename.isPending) {
+                        setEditingJobId(null);
+                        setEditingJobName('');
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    type="submit"
+                    loading={rename.isPending}
+                    disabled={!editingJobName.trim() || editingJobName.trim() === job.name}
+                  >
+                    Simpan
+                  </Button>
+                  <Button
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                    disabled={rename.isPending}
+                    onClick={() => {
+                      setEditingJobId(null);
+                      setEditingJobName('');
+                    }}
+                  >
+                    Batal
+                  </Button>
+                </form>
+              ) : (
+                <strong className="job-list__name">{job.name}</strong>
+              )}
+              <NativeSelect
+                aria-label={`Kategori skill ${job.name}`}
+                value={job.skillCategory ?? ''}
+                disabled={categoryChange.isPending || editingJobId !== null}
+                onChange={(e) =>
+                  categoryChange.mutate({
+                    id: job.id,
+                    name: job.name,
+                    version: job.version,
+                    skillCategory: e.target.value,
+                  })
+                }
+              >
+                <option value="" disabled>
+                  Belum diatur
+                </option>
+                <option value="HIGH">High</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="LOW">Low</option>
+              </NativeSelect>
+              <small>{job.active ? 'Aktif' : 'Nonaktif'}</small>
+              <div>
+                {editingJobId !== job.id && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`Ubah nama job ${job.name}`}
+                    disabled={rename.isPending || editingJobId !== null}
+                    onClick={() => {
+                      setProblem(null);
+                      setEditingJobId(job.id);
+                      setEditingJobName(job.name);
+                    }}
+                  >
+                    Ubah nama
+                  </Button>
+                )}
                 <Button
                   size="sm"
-                  type="button"
                   variant="ghost"
-                  disabled={rename.isPending}
-                  onClick={() => {
-                    setEditingJobId(null);
-                    setEditingJobName('');
-                  }}
-                >
-                  Batal
-                </Button>
-              </form>
-            ) : (
-              <strong className="job-list__name">{job.name}</strong>
-            )}
-            <NativeSelect
-              aria-label={`Kategori skill ${job.name}`}
-              value={job.skillCategory ?? ''}
-              disabled={categoryChange.isPending || editingJobId !== null}
-              onChange={(e) =>
-                categoryChange.mutate({
-                  id: job.id,
-                  name: job.name,
-                  version: job.version,
-                  skillCategory: e.target.value,
-                })
-              }
-            >
-              <option value="" disabled>
-                Belum diatur
-              </option>
-              <option value="HIGH">High</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="LOW">Low</option>
-            </NativeSelect>
-            <small>{job.active ? 'Aktif' : 'Nonaktif'}</small>
-            <div>
-              {editingJobId !== job.id && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={`Ubah nama job ${job.name}`}
-                  disabled={rename.isPending || editingJobId !== null}
+                  disabled={index === 0 || change.isPending || editingJobId !== null}
                   onClick={() => {
                     setProblem(null);
-                    setEditingJobId(job.id);
-                    setEditingJobName(job.name);
+                    change.mutate({ jobId: job.id, kind: 'up', index });
                   }}
                 >
-                  Ubah nama
+                  Naik
                 </Button>
-              )}
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={index === 0 || change.isPending || editingJobId !== null}
-                onClick={() => {
-                  setProblem(null);
-                  change.mutate({ jobId: job.id, kind: 'up', index });
-                }}
-              >
-                Naik
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={
-                  index === (jobs.data?.items.length ?? 0) - 1 ||
-                  change.isPending ||
-                  editingJobId !== null
-                }
-                onClick={() => {
-                  setProblem(null);
-                  change.mutate({ jobId: job.id, kind: 'down', index });
-                }}
-              >
-                Turun
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={change.isPending || editingJobId !== null}
-                onClick={() => {
-                  setProblem(null);
-                  if (window.confirm(`${job.active ? 'Nonaktifkan' : 'Aktifkan'} job ini?`))
-                    change.mutate({ jobId: job.id, kind: 'toggle', index });
-                }}
-              >
-                {job.active ? 'Nonaktifkan' : 'Aktifkan'}
-              </Button>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </Panel>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={
+                    index === (jobs.data?.items.length ?? 0) - 1 ||
+                    change.isPending ||
+                    editingJobId !== null
+                  }
+                  onClick={() => {
+                    setProblem(null);
+                    change.mutate({ jobId: job.id, kind: 'down', index });
+                  }}
+                >
+                  Turun
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={change.isPending || editingJobId !== null}
+                  onClick={() => {
+                    setProblem(null);
+                    if (window.confirm(`${job.active ? 'Nonaktifkan' : 'Aktifkan'} job ini?`))
+                      change.mutate({ jobId: job.id, kind: 'toggle', index });
+                  }}
+                >
+                  {job.active ? 'Nonaktifkan' : 'Aktifkan'}
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </Panel>
+    </div>
   );
 }
 
