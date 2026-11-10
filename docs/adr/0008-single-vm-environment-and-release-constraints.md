@@ -264,3 +264,17 @@ affected by [GHSA-259r-337f-4rfw](https://github.com/klauspost/compress/security
 reachability exception and preserves the complete binary scan. The public Caddy version and
 configuration stay compatible; rebuilt routing, headers, restart persistence and image scans
 verify the resulting binary.
+
+## Caddy module floor review — 2026-11-10
+
+The Caddy image scan reported CVE-2026-78661 (HIGH, `golang.org/x/net/html` denial of service) in
+the pinned x/net 0.60.0 module, fixed in 0.62.0. The builder now pins x/net 0.62.0 together with
+the versions it requires, x/crypto 0.58.0 and x/text 0.43.0, because the earlier x/crypto and
+x/text requests would otherwise downgrade x/net during resolution. The post-`go mod tidy` exact
+version assertions are updated accordingly and continue to fail the build on any implicit
+downgrade. Caddy remains 2.11.4 with grpc 1.83.2 on the digest-pinned Go 1.26.10 builder; routing
+configuration, the distroless non-root runtime and the existing exact exception registry are
+unchanged. No scanning exception is added for this finding.
+
+Validation repeats the Caddy and full runtime image HIGH/CRITICAL scans and the rebuilt
+production-like routing, headers, non-root, bootstrap idempotence and restart/persistence checks.
