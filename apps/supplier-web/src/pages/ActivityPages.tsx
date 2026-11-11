@@ -8,7 +8,7 @@ import {
   ErrorState,
   FilterBar,
   Input,
-  NativeSelect,
+  Select,
   Panel,
   Skeleton,
 } from '@tmmin-henkaten/ui';
@@ -68,17 +68,18 @@ export function NotificationsPage() {
       <FilterBar>
         <label>
           <span>Tampilan</span>
-          <NativeSelect
+          <Select
             value={unreadOnly ? 'true' : 'false'}
-            onChange={(event) =>
-              setParams(event.target.value === 'true' ? { unreadOnly: 'true' } : {}, {
+            onValueChange={(next) =>
+              setParams(next === 'true' ? { unreadOnly: 'true' } : {}, {
                 replace: true,
               })
             }
-          >
-            <option value="false">Semua notifikasi</option>
-            <option value="true">Belum dibaca</option>
-          </NativeSelect>
+            options={[
+              { value: 'false', label: 'Semua notifikasi' },
+              { value: 'true', label: 'Belum dibaca' },
+            ]}
+          />
         </label>
       </FilterBar>
       <PushSettings

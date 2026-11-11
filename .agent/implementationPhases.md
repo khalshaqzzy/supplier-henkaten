@@ -1,3 +1,12 @@
+## Member detail workspace and shared Select — 11 November 2026
+
+Implementation on `feat/supplier-member-ui-polish`: dedicated Supplier member detail
+workspace (identity header, Profil/Foto main column, Akun/Status member rail, stay-on-save with
+unsaved state) and a shared searchable `Select` replacing every Supplier-owned native dropdown. See
+[ADR 0051](../docs/adr/0051-member-detail-workspace-and-shared-select.md) and the current handoff
+for validation and delivery. Frontend only; no API, schema, migration or seed change. Phase 15
+remains the sole current `in_progress` phase; staging/device/UAT is unchanged.
+
 ## Actionable setup blockers — 10 November 2026
 
 Implementation on `feat/setup-blocker-navigation`: structured readiness blockers (reason, Line,

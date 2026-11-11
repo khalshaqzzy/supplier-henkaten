@@ -1,3 +1,24 @@
+## Amendment — 11 November 2026: Member detail workspace and Supplier dropdowns
+
+The Supplier member detail page is a single workspace for one member. Its header shows the photo or
+initials, name, role, member status and account status, plus registration, username and last update
+when present. A main column holds **Profil** (name, registration and a read-only role with its
+description and the existing *Ubah role* action) and **Foto** (drag-and-drop or file selection with
+the existing validation). A rail holds **Akun** (username with copy, temporary password state,
+*Reset password* or *Aktifkan akun*) and **Status member** (*Hapus member* or *Pulihkan member*).
+Profile saving sends only changed fields, shows unsaved state, allows discarding, and keeps the user
+on the page after success. MP members show no account and no role action. The existing account and
+status deep links remain.
+
+Every Supplier-owned dropdown uses one shared select component instead of the browser-native list:
+consistent styling across operating systems, option descriptions, right-aligned metadata, disabled
+reasons, grouping, keyboard selection with typeahead, and a search field when a list has more than
+eight options. The shared Henkaten export panel used by both portals is unchanged in this
+amendment. No API, schema or seed change. See
+[ADR 0051](../docs/adr/0051-member-detail-workspace-and-shared-select.md).
+
+---
+
 ## Amendment — 10 November 2026: Actionable supplier setup blockers
 
 Setup Supplier shows readiness blockers in a full-width “Perlu diselesaikan” panel grouped by setup

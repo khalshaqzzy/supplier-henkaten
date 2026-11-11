@@ -23,7 +23,7 @@ import {
   FilterBar,
   Input,
   LastUpdated,
-  NativeSelect,
+  Select,
   Popover,
   Skeleton,
 } from '@tmmin-henkaten/ui';
@@ -142,43 +142,45 @@ export function OverviewPage() {
           </Popover>
           <label className="overview-filter overview-filter--status">
             <span>Status</span>
-            <NativeSelect
+            <Select
               value={draft.get('status') ?? ''}
-              onChange={(event) => updateDraft(draft, setDraft, 'status', event.target.value)}
-            >
-              <option value="">Semua status</option>
-              <option value="OPEN">Open</option>
-              <option value="APPROVED">Approved</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="CANCELLED">Cancelled</option>
-            </NativeSelect>
+              onValueChange={(next) => updateDraft(draft, setDraft, 'status', next)}
+              options={[
+                { value: '', label: 'Semua status' },
+                { value: 'OPEN', label: 'Open' },
+                { value: 'APPROVED', label: 'Approved' },
+                { value: 'REJECTED', label: 'Rejected' },
+                { value: 'CANCELLED', label: 'Cancelled' },
+              ]}
+            />
           </label>
           <label className="overview-filter overview-filter--category">
             <span>Kategori 4M</span>
-            <NativeSelect
+            <Select
               value={draft.get('category') ?? ''}
-              onChange={(event) => updateDraft(draft, setDraft, 'category', event.target.value)}
-            >
-              <option value="">Semua kategori</option>
-              <option value="MAN">Man</option>
-              <option value="MACHINE">Machine</option>
-              <option value="MATERIAL">Material</option>
-              <option value="METHOD">Method</option>
-            </NativeSelect>
+              onValueChange={(next) => updateDraft(draft, setDraft, 'category', next)}
+              options={[
+                { value: '', label: 'Semua kategori' },
+                { value: 'MAN', label: 'Man' },
+                { value: 'MACHINE', label: 'Machine' },
+                { value: 'MATERIAL', label: 'Material' },
+                { value: 'METHOD', label: 'Method' },
+              ]}
+            />
           </label>
           <label className="overview-filter overview-filter--line">
             <span>Line</span>
-            <NativeSelect
+            <Select
               value={draft.get('lineId') ?? ''}
-              onChange={(event) => updateDraft(draft, setDraft, 'lineId', event.target.value)}
-            >
-              <option value="">Semua line</option>
-              {dashboard.data?.filterOptions.lines.map((line) => (
-                <option key={line.id} value={line.id}>
-                  {line.code} · {line.name}
-                </option>
-              ))}
-            </NativeSelect>
+              onValueChange={(next) => updateDraft(draft, setDraft, 'lineId', next)}
+              options={[
+                { value: '', label: 'Semua line' },
+                ...(dashboard.data?.filterOptions.lines ?? []).map((line) => ({
+                  value: line.id,
+                  label: `${line.code} · ${line.name}`,
+                })),
+              ]}
+            />
           </label>
           <Popover
             title="Filter lainnya"
@@ -200,19 +202,17 @@ export function OverviewPage() {
             <div className="overview-filter-advanced">
               <label className="overview-filter">
                 <span>Shift Template</span>
-                <NativeSelect
+                <Select
                   value={draft.get('shiftTemplateId') ?? ''}
-                  onChange={(event) =>
-                    updateDraft(draft, setDraft, 'shiftTemplateId', event.target.value)
-                  }
-                >
-                  <option value="">Semua shift</option>
-                  {dashboard.data?.filterOptions.shiftTemplates.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.name}
-                    </option>
-                  ))}
-                </NativeSelect>
+                  onValueChange={(next) => updateDraft(draft, setDraft, 'shiftTemplateId', next)}
+                  options={[
+                    { value: '', label: 'Semua shift' },
+                    ...(dashboard.data?.filterOptions.shiftTemplates ?? []).map((template) => ({
+                      value: template.id,
+                      label: template.name,
+                    })),
+                  ]}
+                />
               </label>
               <label className="overview-filter">
                 <span>Part</span>
@@ -224,44 +224,41 @@ export function OverviewPage() {
               </label>
               <label className="overview-filter">
                 <span>Approval route</span>
-                <NativeSelect
+                <Select
                   value={draft.get('approvalRoute') ?? ''}
-                  onChange={(event) =>
-                    updateDraft(draft, setDraft, 'approvalRoute', event.target.value)
-                  }
-                >
-                  <option value="">Semua route</option>
-                  <option value="SUPERVISOR">Supervisor</option>
-                  <option value="QC">QC</option>
-                </NativeSelect>
+                  onValueChange={(next) => updateDraft(draft, setDraft, 'approvalRoute', next)}
+                  options={[
+                    { value: '', label: 'Semua route' },
+                    { value: 'SUPERVISOR', label: 'Supervisor' },
+                    { value: 'QC', label: 'QC' },
+                  ]}
+                />
               </label>
               <label className="overview-filter">
                 <span>Approval status</span>
-                <NativeSelect
+                <Select
                   value={draft.get('approvalStatus') ?? ''}
-                  onChange={(event) =>
-                    updateDraft(draft, setDraft, 'approvalStatus', event.target.value)
-                  }
-                >
-                  <option value="">Semua status</option>
-                  <option value="PENDING">Pending</option>
-                  <option value="APPROVED">Approved</option>
-                  <option value="REJECTED">Rejected</option>
-                  <option value="NOT_REQUIRED">Not Required</option>
-                </NativeSelect>
+                  onValueChange={(next) => updateDraft(draft, setDraft, 'approvalStatus', next)}
+                  options={[
+                    { value: '', label: 'Semua status' },
+                    { value: 'PENDING', label: 'Pending' },
+                    { value: 'APPROVED', label: 'Approved' },
+                    { value: 'REJECTED', label: 'Rejected' },
+                    { value: 'NOT_REQUIRED', label: 'Not Required' },
+                  ]}
+                />
               </label>
               <label className="overview-filter">
                 <span>Interval tren</span>
-                <NativeSelect
+                <Select
                   value={draft.get('granularity') ?? 'DAY'}
-                  onChange={(event) =>
-                    updateDraft(draft, setDraft, 'granularity', event.target.value)
-                  }
-                >
-                  <option value="DAY">Harian</option>
-                  <option value="WEEK">Mingguan</option>
-                  <option value="MONTH">Bulanan</option>
-                </NativeSelect>
+                  onValueChange={(next) => updateDraft(draft, setDraft, 'granularity', next)}
+                  options={[
+                    { value: 'DAY', label: 'Harian' },
+                    { value: 'WEEK', label: 'Mingguan' },
+                    { value: 'MONTH', label: 'Bulanan' },
+                  ]}
+                />
               </label>
             </div>
           </Popover>

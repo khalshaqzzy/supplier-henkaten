@@ -1,7 +1,14 @@
 import { expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 
-import { createHostedFixture, get, loginBootstrapThroughApi, runtime, test } from './support.js';
+import {
+  chooseOption,
+  createHostedFixture,
+  get,
+  loginBootstrapThroughApi,
+  runtime,
+  test,
+} from './support.js';
 
 test('reviews CSV conflicts and imports an Excel workbook @edge', async ({
   trackedBrowser: browser,
@@ -21,8 +28,8 @@ test('reviews CSV conflicts and imports an Excel workbook @edge', async ({
   });
   await expect(page.getByRole('heading', { name: 'Pilih data yang akan diimpor' })).toBeVisible();
   await expect(page.locator('.part-import-sample tbody tr')).toHaveCount(2);
-  await page.getByLabel('Kolom Part number').selectOption('1');
-  await page.getByLabel('Kolom Nama part').selectOption('2');
+  await chooseOption(page.getByLabel('Kolom Part number'), '1');
+  await chooseOption(page.getByLabel('Kolom Nama part'), '2');
   await expect(page.locator('.part-import-sample th.is-selected')).toHaveCount(2);
   await page.screenshot({
     path: testInfo.outputPath('part-import-mapping-desktop.png'),
@@ -58,7 +65,7 @@ test('reviews CSV conflicts and imports an Excel workbook @edge', async ({
     fullPage: true,
     animations: 'disabled',
   });
-  await page.getByLabel('Keputusan PART-part-import').selectOption('UPDATE');
+  await chooseOption(page.getByLabel('Keputusan PART-part-import'), 'UPDATE');
   await page.getByRole('button', { name: 'Simpan import' }).click();
   await expect(page.getByRole('heading', { name: 'Import selesai' })).toBeVisible();
   await expect(page.locator('.part-import-stats')).toContainText('1Ditambahkan');

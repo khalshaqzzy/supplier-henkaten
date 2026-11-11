@@ -4,7 +4,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiProblemError, createIdempotencyKey } from '@tmmin-henkaten/api-client';
 import type { CreateHenkatenRequest, HenkatenCategory } from '@tmmin-henkaten/contracts';
-import { Alert, Button, Field, Input, NativeSelect, Panel, Textarea } from '@tmmin-henkaten/ui';
+import { Alert, Button, Field, Input, Panel, Select, Textarea } from '@tmmin-henkaten/ui';
 
 import { supplierApi } from '../app/api';
 import { scopedKey } from '../app/query';
@@ -232,22 +232,22 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
               </div>
             )}
             <Field label="Job" htmlFor="job" required>
-              <NativeSelect
+              <Select
                 id="job"
                 value={jobId}
                 disabled={!selectedShift}
-                onChange={(event) => {
-                  setJobId(event.target.value);
+                placeholder="Pilih job"
+                searchPlaceholder="Cari job atau MP…"
+                onValueChange={(next) => {
+                  setJobId(next);
                   setReplacementMpId('');
                 }}
-              >
-                <option value="">Pilih job</option>
-                {selectedShift?.assignments.map((assignment) => (
-                  <option key={assignment.id} value={assignment.jobId}>
-                    {assignment.jobName} · {assignment.mpName ?? 'Belum ada MP'}
-                  </option>
-                ))}
-              </NativeSelect>
+                options={(selectedShift?.assignments ?? []).map((assignment) => ({
+                  value: assignment.jobId,
+                  label: assignment.jobName,
+                  description: assignment.mpName ?? 'Belum ada MP',
+                }))}
+              />
             </Field>
             <Field label="Cari part" htmlFor="part-search">
               <Input
@@ -260,19 +260,21 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
               />
             </Field>
             <Field label="Part" htmlFor="part" required>
-              <NativeSelect
+              <Select
                 id="part"
                 value={partId}
-                onChange={(event) => setPartId(event.target.value)}
-              >
-                <option value="">Pilih part</option>
-                {options.data?.parts.map((part) => (
-                  <option key={part.id} value={part.id}>
-                    {part.partNumber} · {part.partName}
-                  </option>
-                ))}
-                <option value="OTHER">Other</option>
-              </NativeSelect>
+                placeholder="Pilih part"
+                searchPlaceholder="Cari nomor atau nama part…"
+                onValueChange={setPartId}
+                options={[
+                  ...(options.data?.parts ?? []).map((part) => ({
+                    value: part.id,
+                    label: part.partNumber,
+                    description: part.partName,
+                  })),
+                  { value: 'OTHER', label: 'Other' },
+                ]}
+              />
             </Field>
             <SelectedPart
               part={partId === 'OTHER' ? { partNumber: 'Other', partName: '' } : selectedPart}
@@ -282,23 +284,24 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
           {category === 'MAN' ? (
             <Panel title="Replacement MP">
               <Field label="MP pengganti" htmlFor="replacement" required>
-                <NativeSelect
+                <Select
                   id="replacement"
                   value={replacementMpId}
                   disabled={!jobId}
-                  onChange={(event) => setReplacementMpId(event.target.value)}
-                >
-                  <option value="">Pilih MP</option>
-                  {options.data?.replacementMembers.map((member) => {
+                  placeholder="Pilih MP"
+                  searchPlaceholder="Cari nama MP…"
+                  onValueChange={setReplacementMpId}
+                  options={(options.data?.replacementMembers ?? []).map((member) => {
                     const level =
                       member.skillLevels?.find(({ jobId: id }) => id === jobId)?.level ?? 0;
-                    return (
-                      <option key={member.id} value={member.id} disabled={level < 3}>
-                        {member.fullName} · Tanoko {level || '—'}
-                      </option>
-                    );
+                    return {
+                      value: member.id,
+                      label: member.fullName,
+                      meta: `Tanoko ${level || '—'}`,
+                      disabled: level < 3,
+                    };
                   })}
-                </NativeSelect>
+                />
               </Field>
               {replacementMpId && tanoko < 3 && (
                 <Alert tone="danger" title="Tanoko belum memenuhi">

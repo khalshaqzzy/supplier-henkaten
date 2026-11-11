@@ -1571,7 +1571,7 @@ body {
   font-size: 0.85rem;
   font-weight: 700;
 }
-.part-import-mapping__fields select {
+.part-import-mapping__fields .hds-select {
   width: 100%;
 }
 .part-import-sample-heading {
@@ -1681,7 +1681,7 @@ body {
 .part-import-table td:first-child {
   padding-left: 1.5rem;
 }
-.part-import-table select {
+.part-import-table .hds-select {
   min-width: 8rem;
 }
 .part-import-new {
@@ -1872,7 +1872,7 @@ body {
   .part-import-table td strong {
     overflow-wrap: anywhere;
   }
-  .part-import-table td select {
+  .part-import-table td .hds-select {
     min-width: 0;
     width: 100%;
   }
@@ -1929,12 +1929,11 @@ body {
 }
 
 .overview-filter-shell .hds-input,
-.overview-filter-shell .hds-native-select {
+.overview-filter-shell .hds-select {
   width: 100%;
 }
 
-.overview-filter-shell .hds-native-select,
-.overview-filter-shell .hds-native-select select {
+.overview-filter-shell .hds-select {
   min-height: 36px;
 }
 
@@ -2063,12 +2062,8 @@ body {
 
 .overview-filter-date-popover .hds-input,
 .overview-filter-advanced .hds-input,
-.overview-filter-advanced .hds-native-select {
+.overview-filter-advanced .hds-select {
   width: 100%;
-}
-
-.overview-filter-advanced .hds-native-select select {
-  color: var(--hds-text-primary);
 }
 
 .overview-filter-updated {
@@ -2993,6 +2988,17 @@ a.overview-activity-identifier:hover {
 }
 .job-list__name {
   overflow-wrap: anywhere;
+}
+.job-skill-select.hds-select {
+  width: 8.5rem;
+}
+.inline-create .job-skill-select.hds-select {
+  flex: none;
+  width: 9.5rem;
+}
+.inline-create > .hds-button {
+  flex: none;
+  white-space: nowrap;
 }
 .job-rename {
   display: flex;

@@ -27,7 +27,7 @@ import {
   SlidersHorizontal,
   X,
 } from 'lucide-react';
-import { Button, EmptyState, ErrorState, Input, NativeSelect } from '@tmmin-henkaten/ui';
+import { Button, EmptyState, ErrorState, Input, Select } from '@tmmin-henkaten/ui';
 import { ApiProblemError } from '@tmmin-henkaten/api-client';
 import type { TanokoMapping, TanokoMatrix } from '@tmmin-henkaten/contracts';
 import { supplierApi } from '../app/api';
@@ -350,22 +350,19 @@ export default function TanokoPage() {
           )}
         </label>
         <label className="tanoko-filter">
-          <SlidersHorizontal />
           <span className="sr-only">Filter line</span>
-          <NativeSelect
+          <Select
             value={lineId}
-            onChange={(e) => {
-              setLineId(e.target.value);
+            leadingIcon={<SlidersHorizontal />}
+            onValueChange={(next) => {
+              setLineId(next);
               setMemberPage(0);
             }}
-          >
-            <option value="">Semua line</option>
-            {lines.map((line) => (
-              <option key={line.id} value={line.id}>
-                {line.name}
-              </option>
-            ))}
-          </NativeSelect>
+            options={[
+              { value: '', label: 'Semua line' },
+              ...lines.map((line) => ({ value: line.id, label: line.name })),
+            ]}
+          />
         </label>
         {tab === 'matrix' && lineId && (
           <fieldset className="tanoko-line-scopes">
@@ -397,14 +394,14 @@ export default function TanokoPage() {
         {tab === 'matrix' && (
           <label className="tanoko-filter">
             <span className="sr-only">Filter kategori</span>
-            <NativeSelect value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="">Semua kategori</option>
-              {Object.entries(categories).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </NativeSelect>
+            <Select
+              value={category}
+              onValueChange={setCategory}
+              options={[
+                { value: '', label: 'Semua kategori' },
+                ...Object.entries(categories).map(([value, label]) => ({ value, label })),
+              ]}
+            />
           </label>
         )}
         {(search || lineId || category) && (

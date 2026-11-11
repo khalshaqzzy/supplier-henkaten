@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { Alert, Button, Card, NativeSelect, toast } from '@tmmin-henkaten/ui';
+import { Alert, Button, Card, Select, toast } from '@tmmin-henkaten/ui';
 import { ApiProblemError } from '@tmmin-henkaten/api-client';
 
 import { supplierApi } from '../app/api';
@@ -278,43 +278,29 @@ export function PartImportPage() {
               <div className="part-import-mapping__fields">
                 <label>
                   <span>Kolom Part number</span>
-                  <NativeSelect
-                    value={mapping.numberIndex}
+                  <Select
+                    value={mapping.numberIndex < 0 ? '' : String(mapping.numberIndex)}
+                    placeholder="Pilih kolom"
+                    searchPlaceholder="Cari kolom…"
                     disabled={processing || review.isPending}
-                    onChange={(event) =>
-                      setMapping((current) => ({
-                        ...current,
-                        numberIndex: Number(event.target.value),
-                      }))
+                    onValueChange={(next) =>
+                      setMapping((current) => ({ ...current, numberIndex: Number(next) }))
                     }
-                  >
-                    <option value={-1}>Pilih kolom</option>
-                    {sheet.headers.map((header, index) => (
-                      <option key={index} value={index} disabled={index === mapping.nameIndex}>
-                        {partColumnLabel(index)} · {header || 'Tanpa judul'}
-                      </option>
-                    ))}
-                  </NativeSelect>
+                    options={columnOptions(sheet.headers, mapping.nameIndex)}
+                  />
                 </label>
                 <label>
                   <span>Kolom Nama part</span>
-                  <NativeSelect
-                    value={mapping.nameIndex}
+                  <Select
+                    value={mapping.nameIndex < 0 ? '' : String(mapping.nameIndex)}
+                    placeholder="Pilih kolom"
+                    searchPlaceholder="Cari kolom…"
                     disabled={processing || review.isPending}
-                    onChange={(event) =>
-                      setMapping((current) => ({
-                        ...current,
-                        nameIndex: Number(event.target.value),
-                      }))
+                    onValueChange={(next) =>
+                      setMapping((current) => ({ ...current, nameIndex: Number(next) }))
                     }
-                  >
-                    <option value={-1}>Pilih kolom</option>
-                    {sheet.headers.map((header, index) => (
-                      <option key={index} value={index} disabled={index === mapping.numberIndex}>
-                        {partColumnLabel(index)} · {header || 'Tanpa judul'}
-                      </option>
-                    ))}
-                  </NativeSelect>
+                    options={columnOptions(sheet.headers, mapping.numberIndex)}
+                  />
                 </label>
               </div>
               <div className="part-import-sample-heading">
@@ -492,22 +478,25 @@ export function PartImportPage() {
                             </td>
                             <td data-label="Nama dalam file">{row.partName}</td>
                             <td data-label="Keputusan">
-                              <NativeSelect
+                              <Select
+                                size="sm"
                                 aria-label={`Keputusan ${row.partNumber}`}
                                 value={choices[index] ?? 'SKIP'}
                                 disabled={commit.isPending}
-                                onChange={(event) =>
+                                onValueChange={(next) =>
                                   setChoices((current) => ({
                                     ...current,
-                                    [index]: event.target.value as Choice,
+                                    [index]: next as Choice,
                                   }))
                                 }
-                              >
-                                <option value="SKIP">Lewati</option>
-                                <option value="UPDATE">
-                                  {row.existing?.deleted ? 'Pulihkan part' : 'Update nama'}
-                                </option>
-                              </NativeSelect>
+                                options={[
+                                  { value: 'SKIP', label: 'Lewati' },
+                                  {
+                                    value: 'UPDATE',
+                                    label: row.existing?.deleted ? 'Pulihkan part' : 'Update nama',
+                                  },
+                                ]}
+                              />
                             </td>
                           </tr>
                         ))}
@@ -595,4 +584,14 @@ function isChanged(row: Preview['rows'][number]) {
   return Boolean(
     row.existing && (row.existing.deleted || row.existing.partName.trim() !== row.partName.trim()),
   );
+}
+
+function columnOptions(headers: readonly string[], takenIndex: number) {
+  return headers.map((header, index) => ({
+    value: String(index),
+    label: header || 'Tanpa judul',
+    meta: `Kolom ${partColumnLabel(index)}`,
+    keywords: partColumnLabel(index),
+    disabled: index === takenIndex,
+  }));
 }

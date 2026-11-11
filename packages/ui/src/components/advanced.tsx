@@ -1,7 +1,6 @@
 import {
   Bell,
   CalendarDays,
-  Check,
   ChevronDown,
   ChevronRight,
   CircleHelp,
@@ -26,97 +25,13 @@ import {
   Dialog as RadixDialog,
   DropdownMenu as RadixMenu,
   Popover as RadixPopover,
-  Select as RadixSelect,
   Tabs as RadixTabs,
   Tooltip as RadixTooltip,
 } from 'radix-ui';
 import { cn } from '../lib/utils';
 import { componentMetrics } from '../tokens';
 import { Button, IconButton, Input, NativeSelect } from './primitives';
-
-export interface SelectOption {
-  value: string;
-  label: string;
-  description?: string;
-  disabled?: boolean;
-}
-
-export interface SelectProps {
-  value?: string;
-  defaultValue?: string;
-  onValueChange?: (value: string) => void;
-  options: readonly SelectOption[];
-  label: string;
-  placeholder?: string;
-  disabled?: boolean;
-}
-
-export function Select({
-  value,
-  defaultValue,
-  onValueChange,
-  options,
-  label,
-  placeholder = 'Pilih',
-  disabled,
-}: SelectProps) {
-  const descriptionId = useId();
-  return (
-    <RadixSelect.Root
-      {...(value !== undefined ? { value } : {})}
-      {...(defaultValue !== undefined ? { defaultValue } : {})}
-      {...(onValueChange ? { onValueChange } : {})}
-      {...(disabled !== undefined ? { disabled } : {})}
-    >
-      <RadixSelect.Trigger className="hds-select" aria-label={label}>
-        <span className="hds-select__value">
-          <RadixSelect.Value placeholder={placeholder} />
-        </span>
-        <RadixSelect.Icon className="hds-select__icon">
-          <ChevronDown aria-hidden="true" />
-        </RadixSelect.Icon>
-      </RadixSelect.Trigger>
-      <RadixSelect.Portal>
-        <RadixSelect.Content
-          className="hds-select__content"
-          position="popper"
-          align="start"
-          sideOffset={componentMetrics.popoverOffset}
-          collisionPadding={12}
-        >
-          <RadixSelect.Viewport className="hds-select__viewport">
-            {options.map((option, index) => (
-              <RadixSelect.Item
-                key={option.value}
-                value={option.value}
-                {...(option.disabled !== undefined ? { disabled: option.disabled } : {})}
-                className="hds-select__item"
-                aria-describedby={option.description ? `${descriptionId}-${index}` : undefined}
-              >
-                <RadixSelect.ItemIndicator className="hds-select__indicator">
-                  <Check aria-hidden="true" />
-                </RadixSelect.ItemIndicator>
-                <span className="hds-select__option-copy">
-                  <span className="hds-select__option-label">
-                    <RadixSelect.ItemText>{option.label}</RadixSelect.ItemText>
-                  </span>
-                  {option.description && (
-                    <span
-                      id={`${descriptionId}-${index}`}
-                      className="hds-select__option-description"
-                    >
-                      {option.description}
-                    </span>
-                  )}
-                </span>
-              </RadixSelect.Item>
-            ))}
-          </RadixSelect.Viewport>
-        </RadixSelect.Content>
-      </RadixSelect.Portal>
-    </RadixSelect.Root>
-  );
-}
+import type { SelectOption } from './select';
 
 export interface ComboboxProps {
   value?: string;

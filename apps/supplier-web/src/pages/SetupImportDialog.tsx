@@ -29,7 +29,7 @@ import {
   type SetupRow,
   type SetupSheet,
 } from '@tmmin-henkaten/contracts';
-import { Alert, Button, Dialog, NativeSelect, Skeleton, toast } from '@tmmin-henkaten/ui';
+import { Alert, Button, Dialog, Select, Skeleton, toast } from '@tmmin-henkaten/ui';
 import { supplierApi } from '../app/api';
 import { useSession } from '../app/session';
 import type { ParsedSetupWorkbook } from './setupWorkbook';
@@ -902,17 +902,14 @@ export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean
                           <div className="setup-import-review">
                             <label className="setup-import-sheet-select">
                               <span>Sheet</span>
-                              <NativeSelect
+                              <Select
                                 value={sheet}
-                                onChange={(e) => {
-                                  setSheet(e.target.value as SetupSheet);
+                                onValueChange={(next) => {
+                                  setSheet(next as SetupSheet);
                                   setPage(0);
                                 }}
-                              >
-                                {available.map((s) => (
-                                  <option key={s.name}>{s.name}</option>
-                                ))}
-                              </NativeSelect>
+                                options={available.map((s) => ({ value: s.name, label: s.name }))}
+                              />
                             </label>
                             <div className="setup-import-review__header">
                               <div>
@@ -1030,32 +1027,28 @@ export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean
                                     {diff.status !== 'NEW' && (
                                       <label className="setup-import-choice">
                                         <span>Aksi</span>
-                                        <NativeSelect
+                                        <Select
+                                          size="sm"
                                           value={choices[diff.key] ?? ''}
+                                          placeholder="Pilih aksi"
                                           disabled={locked}
-                                          onChange={(e) =>
-                                            choose(
-                                              diff.key,
-                                              e.target.value as SetupDecision['action'],
-                                            )
+                                          onValueChange={(next) =>
+                                            choose(diff.key, next as SetupDecision['action'])
                                           }
-                                        >
-                                          <option value="" disabled>
-                                            Pilih aksi
-                                          </option>
-                                          <option value="SKIP">Skip</option>
-                                          <option
-                                            value={
-                                              diff.status === 'INACTIVE' ? 'RESTORE' : 'UPDATE'
-                                            }
-                                          >
-                                            {diff.status === 'INACTIVE'
-                                              ? memberOnly
-                                                ? 'Pulihkan dan update'
-                                                : 'Restore dan update'
-                                              : 'Update'}
-                                          </option>
-                                        </NativeSelect>
+                                          options={[
+                                            { value: 'SKIP', label: 'Skip' },
+                                            {
+                                              value:
+                                                diff.status === 'INACTIVE' ? 'RESTORE' : 'UPDATE',
+                                              label:
+                                                diff.status === 'INACTIVE'
+                                                  ? memberOnly
+                                                    ? 'Pulihkan dan update'
+                                                    : 'Restore dan update'
+                                                  : 'Update',
+                                            },
+                                          ]}
+                                        />
                                       </label>
                                     )}
                                   </article>
@@ -1143,21 +1136,23 @@ export function SetupImportDialog({ memberOnly = false }: { memberOnly?: boolean
                                     .map((r) => (
                                       <label key={r.sourceRow}>
                                         <span>{r.data['name']}</span>
-                                        <NativeSelect
+                                        <Select
+                                          size="sm"
                                           value={r.targetId ?? ''}
                                           disabled={locked}
-                                          onChange={(e) => linkMember(r, e.target.value)}
-                                        >
-                                          <option value="">Member baru</option>
-                                          {preview.candidates
-                                            .filter((m) => m.role === 'MP')
-                                            .map((m) => (
-                                              <option key={m.id} value={m.id}>
-                                                {m.name}
-                                                {m.active ? '' : ' · Arsip'}
-                                              </option>
-                                            ))}
-                                        </NativeSelect>
+                                          searchPlaceholder="Cari member…"
+                                          onValueChange={(next) => linkMember(r, next)}
+                                          options={[
+                                            { value: '', label: 'Member baru' },
+                                            ...preview.candidates
+                                              .filter((m) => m.role === 'MP')
+                                              .map((m) => ({
+                                                value: m.id,
+                                                label: m.name,
+                                                ...(m.active ? {} : { meta: 'Arsip' }),
+                                              })),
+                                          ]}
+                                        />
                                       </label>
                                     ))}
                                 </div>

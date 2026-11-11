@@ -26,6 +26,7 @@ import { BoardPage } from './pages/BoardPage';
 import { DefaultAssignmentsPage } from './pages/DefaultAssignmentsPage';
 import { HenkatenDetailPage, HenkatenListPage } from './pages/HenkatenPages';
 import { HenkatenCreatePage } from './pages/HenkatenCreatePage';
+import { MemberDetailPage } from './pages/MemberDetailPage';
 import { PcrWaitPage } from './pages/PcrWaitPage';
 import {
   ChecklistDetailPage,
@@ -202,7 +203,7 @@ function ProductRoutes() {
           path="master-data/members/:resourceId"
           element={
             <CapabilityRoute capability="SUPPLIER_MASTER_DATA_MANAGE" allowPreparation>
-              <MasterFormPage kind="members" />
+              <MemberDetailPage />
             </CapabilityRoute>
           }
         />

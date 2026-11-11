@@ -1,6 +1,7 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect } from '@playwright/test';
 import {
+  chooseOption,
   createHostedFixture,
   get,
   loginBootstrapThroughApi,
@@ -99,8 +100,8 @@ test('submits optional 4M evidence directly and preserves No and unanswered snap
     }
     await page.goto(`${runtime.supplierOrigin}/henkatens/new`);
     await page.getByRole('radio', { name: 'Method', exact: true }).click();
-    await page.getByLabel('Job', { exact: false }).selectOption(fixture.job.id);
-    await page.getByLabel(/^Part/).selectOption('OTHER');
+    await chooseOption(page.getByLabel('Job', { exact: false }), fixture.job.id);
+    await chooseOption(page.getByLabel(/^Part/), 'OTHER');
     await page.getByLabel('Objek terdampak').fill('Routine condition');
     await page.getByLabel('Kondisi baru').fill('Replacement condition');
     await page.getByLabel('Penyebab').fill('Routine replacement');

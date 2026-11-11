@@ -15,7 +15,7 @@ import {
   Field,
   FilterBar,
   Input,
-  NativeSelect,
+  Select,
   Panel,
   Skeleton,
   Textarea,
@@ -125,45 +125,44 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
         {approvalQueue && (
           <label>
             <span>Route</span>
-            <NativeSelect
+            <Select
               value={params.get('route') ?? query.approvalRoute}
-              onChange={(event) => update('route', event.target.value)}
-            >
-              {session!.principal.role !== 'QC' && <option value="SUPERVISOR">Supervisor</option>}
-              {session!.principal.role === 'QC' && <option value="QC">QC</option>}
-            </NativeSelect>
+              onValueChange={(next) => update('route', next)}
+              options={
+                session!.principal.role === 'QC'
+                  ? [{ value: 'QC', label: 'QC' }]
+                  : [{ value: 'SUPERVISOR', label: 'Supervisor' }]
+              }
+            />
           </label>
         )}
         <label>
           <span>Status</span>
-          <NativeSelect
+          <Select
             value={params.get('status') ?? (approvalQueue ? 'PENDING' : '')}
-            onChange={(event) => update('status', event.target.value)}
-          >
-            <option value="">{approvalQueue ? 'Semua route state' : 'Semua status'}</option>
-            {(approvalQueue
-              ? ['PENDING', 'APPROVED', 'REJECTED']
-              : ['OPEN', 'APPROVED', 'REJECTED', 'CANCELLED']
-            ).map((value) => (
-              <option key={value} value={value}>
-                {humanize(value)}
-              </option>
-            ))}
-          </NativeSelect>
+            onValueChange={(next) => update('status', next)}
+            options={[
+              { value: '', label: approvalQueue ? 'Semua route state' : 'Semua status' },
+              ...(approvalQueue
+                ? ['PENDING', 'APPROVED', 'REJECTED']
+                : ['OPEN', 'APPROVED', 'REJECTED', 'CANCELLED']
+              ).map((value) => ({ value, label: humanize(value) })),
+            ]}
+          />
         </label>
         <label>
           <span>Kategori</span>
-          <NativeSelect
+          <Select
             value={params.get('category') ?? ''}
-            onChange={(event) => update('category', event.target.value)}
-          >
-            <option value="">Semua 4M</option>
-            {['MAN', 'MACHINE', 'MATERIAL', 'METHOD'].map((value) => (
-              <option key={value} value={value}>
-                {humanize(value)}
-              </option>
-            ))}
-          </NativeSelect>
+            onValueChange={(next) => update('category', next)}
+            options={[
+              { value: '', label: 'Semua 4M' },
+              ...['MAN', 'MACHINE', 'MATERIAL', 'METHOD'].map((value) => ({
+                value,
+                label: humanize(value),
+              })),
+            ]}
+          />
         </label>
         <label>
           <span>Part</span>
@@ -175,17 +174,17 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
         </label>
         <label>
           <span>Line</span>
-          <NativeSelect
+          <Select
             value={params.get('lineId') ?? ''}
-            onChange={(event) => update('lineId', event.target.value)}
-          >
-            <option value="">Semua line</option>
-            {filterOptions.data?.filterOptions.lines.map((line) => (
-              <option key={line.id} value={line.id}>
-                {line.code} · {line.name}
-              </option>
-            ))}
-          </NativeSelect>
+            onValueChange={(next) => update('lineId', next)}
+            options={[
+              { value: '', label: 'Semua line' },
+              ...(filterOptions.data?.filterOptions.lines ?? []).map((line) => ({
+                value: line.id,
+                label: `${line.code} · ${line.name}`,
+              })),
+            ]}
+          />
         </label>
       </FilterBar>
       <details className="henkaten-more-filters" open={advancedCount > 0}>
@@ -211,27 +210,29 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
             <>
               <label>
                 <span>Approval route</span>
-                <NativeSelect
+                <Select
                   value={params.get('approvalRoute') ?? ''}
-                  onChange={(event) => update('approvalRoute', event.target.value)}
-                >
-                  <option value="">Semua route</option>
-                  <option value="SUPERVISOR">Supervisor</option>
-                  <option value="QC">QC</option>
-                </NativeSelect>
+                  onValueChange={(next) => update('approvalRoute', next)}
+                  options={[
+                    { value: '', label: 'Semua route' },
+                    { value: 'SUPERVISOR', label: 'Supervisor' },
+                    { value: 'QC', label: 'QC' },
+                  ]}
+                />
               </label>
               <label>
                 <span>Approval status</span>
-                <NativeSelect
+                <Select
                   value={params.get('approvalStatus') ?? ''}
-                  onChange={(event) => update('approvalStatus', event.target.value)}
-                >
-                  <option value="">Semua approval</option>
-                  <option value="PENDING">Pending</option>
-                  <option value="APPROVED">Approved</option>
-                  <option value="REJECTED">Rejected</option>
-                  <option value="NOT_REQUIRED">Not Required</option>
-                </NativeSelect>
+                  onValueChange={(next) => update('approvalStatus', next)}
+                  options={[
+                    { value: '', label: 'Semua approval' },
+                    { value: 'PENDING', label: 'Pending' },
+                    { value: 'APPROVED', label: 'Approved' },
+                    { value: 'REJECTED', label: 'Rejected' },
+                    { value: 'NOT_REQUIRED', label: 'Not Required' },
+                  ]}
+                />
               </label>
             </>
           )}
@@ -656,24 +657,24 @@ export function HenkatenDetailPage() {
           {canReroute && (
             <div className="detail-action-group">
               <Field label="Reroute Supervisor" htmlFor="reroute-supervisor">
-                <NativeSelect
+                <Select
                   id="reroute-supervisor"
                   value={rerouteMemberId}
-                  onChange={(event) => setRerouteMemberId(event.target.value)}
-                >
-                  <option value="">Pilih Supervisor aktif</option>
-                  {supervisors.data?.items
+                  placeholder="Pilih Supervisor aktif"
+                  searchPlaceholder="Cari nama atau registrasi…"
+                  onValueChange={setRerouteMemberId}
+                  options={(supervisors.data?.items ?? [])
                     .filter(
                       (member) =>
                         member.role === 'SUPERVISOR' &&
                         member.id !== item.routes.supervisor.currentResponsibleMemberId,
                     )
-                    .map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.fullName} · {member.registrationNumber}
-                      </option>
-                    ))}
-                </NativeSelect>
+                    .map((member) => ({
+                      value: member.id,
+                      label: member.fullName,
+                      meta: member.registrationNumber ?? undefined,
+                    }))}
+                />
               </Field>
               <AlertDialog
                 title="Reroute Supervisor?"

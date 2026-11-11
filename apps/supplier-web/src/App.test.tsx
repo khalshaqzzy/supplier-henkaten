@@ -12,6 +12,7 @@ import { supplierApi } from './app/api';
 import { queryClient, scopedKey } from './app/query';
 import { consumeIntendedPath, rememberIntendedPath } from './app/session';
 import { supplierDashboardVisualFixture } from './test/visualFixtures';
+import { chooseOption } from './test/select';
 
 const supplierContext = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -220,13 +221,13 @@ describe('Supplier application foundation', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Overview Supplier' })).toBeTruthy();
-    expect(screen.getByLabelText('Status')).toHaveProperty('value', 'OPEN');
+    expect(screen.getByLabelText('Status').textContent).toContain('Open');
     expect(
       screen.queryByRole('link', {
         name: 'HEN-E2E-20260726-0012',
       }),
     ).toBeNull();
-    await user.selectOptions(screen.getByLabelText('Status'), 'APPROVED');
+    await chooseOption(user, screen.getByLabelText('Status'), 'APPROVED');
     await user.click(screen.getByRole('button', { name: 'Terapkan' }));
     await waitFor(() =>
       expect(dashboard).toHaveBeenLastCalledWith(
@@ -254,8 +255,8 @@ describe('Supplier application foundation', () => {
 
     expect(await screen.findByRole('heading', { name: 'Overview Supplier' })).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Filter lainnya' }));
-    await user.selectOptions(screen.getByLabelText('Approval route'), 'QC');
-    await user.selectOptions(screen.getByLabelText('Interval tren'), 'WEEK');
+    await chooseOption(user, screen.getByLabelText('Approval route'), 'QC');
+    await chooseOption(user, screen.getByLabelText('Interval tren'), 'WEEK');
     expect(screen.getByRole('button', { name: 'Filter lainnya' })).toBeTruthy();
     expect(dashboard).toHaveBeenCalledTimes(1);
 
@@ -331,7 +332,7 @@ describe('Supplier application foundation', () => {
     ).toBe('true');
     expect(screen.getAllByText(/Shift run/).length).toBeGreaterThan(0);
 
-    await user.selectOptions(screen.getByLabelText('Status'), 'OPEN');
+    await chooseOption(user, screen.getByLabelText('Status'), 'OPEN');
     await user.click(screen.getByRole('button', { name: 'Terapkan' }));
     await waitFor(() =>
       expect(document.querySelectorAll('#overview-recent-activity > li')).toHaveLength(5),

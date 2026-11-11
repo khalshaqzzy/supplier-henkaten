@@ -1,10 +1,9 @@
 import { SwapShiftTimesAction, DeleteAllPartsAction } from './CatalogActions';
-import { MemberRoleDialog } from './MemberRoleDialog';
+import { memberRoleDescriptions, memberRoleLabels } from './memberRoles';
 import { SetupImportDialog } from './SetupImportDialog';
 import {
   ArrowLeft,
   ArrowRight,
-  Camera,
   Check,
   Clipboard,
   Database,
@@ -18,7 +17,6 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import {
   Alert,
-  AlertDialog,
   Button,
   Card,
   EmptyState,
@@ -26,7 +24,7 @@ import {
   Field,
   FilterBar,
   Input,
-  NativeSelect,
+  Select,
   Panel,
   Skeleton,
   toast,
@@ -77,6 +75,12 @@ export function MasterBackLink({ to, label }: { to: string; label: string }) {
 }
 
 type ResourceKind = keyof typeof resources;
+
+const skillCategoryOptions = [
+  { value: 'HIGH', label: 'High' },
+  { value: 'MEDIUM', label: 'Medium' },
+  { value: 'LOW', label: 'Low' },
+];
 
 export function MasterDataOverviewPage() {
   const { session } = useSession();
@@ -204,11 +208,15 @@ export function MasterListPage({ kind }: { kind: ResourceKind }) {
         </label>
         <label>
           <span>Status</span>
-          <NativeSelect value={active} onChange={(event) => update('active', event.target.value)}>
-            <option value="ACTIVE">Aktif</option>
-            <option value="INACTIVE">{kind === 'members' ? 'Arsip' : 'Nonaktif'}</option>
-            <option value="ALL">Semua</option>
-          </NativeSelect>
+          <Select
+            value={active}
+            onValueChange={(next) => update('active', next)}
+            options={[
+              { value: 'ACTIVE', label: 'Aktif' },
+              { value: 'INACTIVE', label: kind === 'members' ? 'Arsip' : 'Nonaktif' },
+              { value: 'ALL', label: 'Semua' },
+            ]}
+          />
         </label>
       </FilterBar>
       {query.isLoading && <TableSkeleton />}
@@ -381,13 +389,7 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
   const save = useMutation<MasterItem, Error>({
     mutationFn: async (): Promise<MasterItem> => {
       if (kind === 'members') {
-        if (editing) {
-          return supplierApi.updateMember(resourceId!, {
-            expectedVersion: detail.data!.version,
-            fullName: values.fullName,
-            ...(values.role === 'MP' ? {} : { registrationNumber: values.registrationNumber }),
-          });
-        }
+        // Existing members are edited on MemberDetailPage; this form only creates them.
         const result = await supplierApi.createMember({
           fullName: values.fullName,
           ...(values.role === 'MP' ? {} : { registrationNumber: values.registrationNumber }),
@@ -507,9 +509,6 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
           </form>
         </Card>
       )}
-      {editing && kind === 'members' && detail.data && 'role' in detail.data && (
-        <MemberLifecycle member={detail.data} scope={scope} />
-      )}
       {editing && kind !== 'members' && detail.data && (
         <ResourceLifecycle kind={kind} resource={detail.data} scope={scope} />
       )}
@@ -606,17 +605,17 @@ function MasterFields({
           </Field>
         )}
         <Field label="Role" htmlFor="role" required>
-          <NativeSelect
+          <Select
             id="role"
             disabled={editing}
             value={values.role}
-            onChange={(event) => field('role', event.target.value)}
-          >
-            <option value="MP">MP</option>
-            <option value="LINE_LEADER">Line Leader</option>
-            <option value="SUPERVISOR">Supervisor</option>
-            <option value="QC">QC</option>
-          </NativeSelect>
+            onValueChange={(next) => field('role', next)}
+            options={(['MP', 'LINE_LEADER', 'SUPERVISOR', 'QC'] as const).map((role) => ({
+              value: role,
+              label: memberRoleLabels[role],
+              description: memberRoleDescriptions[role],
+            }))}
+          />
         </Field>
         {!editing && values.role !== 'MP' && (
           <Field label="Username" htmlFor="username" required>
@@ -711,241 +710,6 @@ function MasterFields({
         />
       </Field>
     </>
-  );
-}
-
-export function MemberLifecycle({
-  member,
-  scope,
-}: {
-  member: Awaited<ReturnType<typeof supplierApi.member>>;
-  scope: ReturnType<typeof scopeOf>;
-}) {
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const [secret, setSecret] = useState<{ username: string; temporaryPassword: string } | null>(
-    null,
-  );
-  const [problem, setProblem] = useState<string | null>(null);
-  const [photoNotice, setPhotoNotice] = useState<string | null>(null);
-  const invalidatePhotoViews = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: scopedKey(scope, 'master-members-detail', member.id),
-      }),
-      queryClient.invalidateQueries({
-        queryKey: scopedKey(scope, 'master-members').slice(0, -1),
-      }),
-      queryClient.invalidateQueries({
-        queryKey: scopedKey(scope, 'assignment-board').slice(0, -1),
-      }),
-    ]);
-  };
-  const action = useMutation({
-    mutationFn: async (kind: 'status' | 'reset' | 'account') => {
-      if (kind === 'account') {
-        const result = await supplierApi.memberAccountAction(member.id, 'activate', {
-          expectedVersion: member.account!.version,
-        });
-        setSecret(result.credential ?? null);
-        return;
-      }
-      if (kind === 'reset') {
-        const result = await supplierApi.resetMemberPassword(member.id, {
-          expectedVersion: member.account!.version,
-        });
-        setSecret(result.credential ?? null);
-        return;
-      }
-      await supplierApi.memberAction(member.id, member.active ? 'deactivate' : 'activate', {
-        expectedVersion: member.version,
-      });
-    },
-    onSuccess: async (_, kind) => {
-      await queryClient.invalidateQueries({
-        queryKey: scopedKey(scope, 'master-members-detail', member.id),
-      });
-      if (kind === 'status') {
-        await queryClient.invalidateQueries({
-          queryKey: scopedKey(scope, 'master-members').slice(0, -1),
-        });
-        toast.success(member.active ? 'Member dipindahkan ke arsip' : 'Member diaktifkan');
-        if (member.active) void navigate('/master-data/members', { replace: true });
-      } else {
-        await queryClient.invalidateQueries({
-          queryKey: scopedKey(scope, 'master-members').slice(0, -1),
-        });
-        toast.success(kind === 'account' ? 'Akun diaktifkan' : 'Password berhasil direset');
-      }
-    },
-    onError: (error) => setProblem(masterMutationProblem(error)),
-  });
-  const photo = useMutation({
-    mutationFn: (file: File) => supplierApi.uploadMemberPhoto(member.id, file),
-    onSuccess: async (updatedMember) => {
-      queryClient.setQueryData(scopedKey(scope, 'master-members-detail', member.id), updatedMember);
-      setPhotoNotice(member.photo ? 'Foto berhasil diganti.' : 'Foto berhasil diset.');
-      await invalidatePhotoViews();
-    },
-    onError: (error) => setProblem(masterMutationProblem(error)),
-  });
-  const removePhoto = useMutation({
-    mutationFn: () => supplierApi.removeMemberPhoto(member.id, member.photo!.version),
-    onSuccess: async () => {
-      setPhotoNotice('Foto berhasil dihapus. Initials kembali digunakan sebagai avatar.');
-      await invalidatePhotoViews();
-    },
-    onError: (error) => setProblem(masterMutationProblem(error)),
-  });
-  const photoPending = photo.isPending || removePhoto.isPending;
-  return (
-    <Panel title="Member & foto" description="">
-      {secret && <OneTimeCredential value={secret} onDone={() => setSecret(null)} />}
-      {problem && (
-        <Alert tone="danger" title="Perubahan member gagal">
-          {problem}
-        </Alert>
-      )}
-      {photoNotice && (
-        <Alert tone="success" title="Foto member diperbarui">
-          {photoNotice}
-        </Alert>
-      )}
-      <div className="member-photo-editor">
-        <div className="member-photo-editor__preview">
-          <PhotoWithFallback
-            src={member.photo ? supplierAssetUrl(member.photo.thumbnailUrl) : null}
-            alt={`Foto ${member.fullName}`}
-            fallback={member.initials}
-            fallbackLabel={`Initials ${member.fullName}`}
-          />
-        </div>
-        <div className="member-photo-editor__content">
-          <strong>{member.photo ? 'Foto member aktif' : 'Foto belum diset'}</strong>
-          <p>Gunakan JPG, PNG, atau WebP dengan ukuran maksimum 2 MB.</p>
-          <div className="member-photo-editor__actions">
-            <label className={`photo-upload${photoPending ? ' is-disabled' : ''}`}>
-              <Camera aria-hidden="true" />
-              {photo.isPending ? 'Mengunggah…' : member.photo ? 'Ganti foto' : 'Set foto'}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                disabled={photoPending}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  event.target.value = '';
-                  if (!file) return;
-                  setProblem(null);
-                  setPhotoNotice(null);
-                  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-                    setProblem('Format foto harus JPG, PNG, atau WebP.');
-                    return;
-                  }
-                  if (file.size > 2 * 1024 * 1024) {
-                    setProblem('Ukuran foto maksimal 2 MB.');
-                    return;
-                  }
-                  photo.mutate(file);
-                }}
-              />
-            </label>
-            {member.photo && (
-              <Button
-                variant="danger"
-                leadingIcon={<Trash2 />}
-                loading={removePhoto.isPending}
-                disabled={photoPending}
-                onClick={() => {
-                  setProblem(null);
-                  setPhotoNotice(null);
-                  if (
-                    window.confirm('Hapus foto member ini dan gunakan initials sebagai avatar?')
-                  ) {
-                    removePhoto.mutate();
-                  }
-                }}
-              >
-                Hapus foto
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
-      {member.account && (
-        <div className="member-account-state focus-target-frame" data-focus-target="account">
-          <div>
-            <strong>Akun {member.account.status === 'ACTIVE' ? 'aktif' : 'nonaktif'}</strong>
-            <p>
-              {member.account.status === 'ACTIVE'
-                ? `Username ${member.account.username}`
-                : member.active
-                  ? 'Aktifkan akun agar member dapat login.'
-                  : 'Pulihkan member sebelum mengaktifkan akun.'}
-            </p>
-          </div>
-          {member.account.status !== 'ACTIVE' && (
-            <AlertDialog
-              title="Aktifkan akun member?"
-              description="Password sementara baru akan ditampilkan. Member perlu mengganti password saat login."
-              confirmLabel="Aktifkan akun"
-              onConfirm={() => {
-                setProblem(null);
-                action.mutate('account');
-              }}
-              trigger={
-                <Button variant="secondary" disabled={!member.active || action.isPending}>
-                  Aktifkan akun
-                </Button>
-              }
-            />
-          )}
-        </div>
-      )}
-      <div className="lifecycle-actions focus-target-frame" data-focus-target="status">
-        <MemberRoleDialog member={member} scope={scope} />
-        {member.account && (
-          <p className="member-account-identity">
-            <span>Username</span>
-            <strong>{member.account.username}</strong>
-          </p>
-        )}
-        <AlertDialog
-          title={member.active ? 'Hapus member dari daftar aktif?' : 'Pulihkan member?'}
-          description={
-            member.active
-              ? `${member.fullName} akan dipindahkan ke Arsip. Riwayatnya tetap tersedia.`
-              : `${member.fullName} akan kembali ke daftar member aktif.`
-          }
-          confirmLabel={member.active ? 'Hapus member' : 'Pulihkan member'}
-          destructive={member.active}
-          onConfirm={() => {
-            setProblem(null);
-            action.mutate('status');
-          }}
-          trigger={
-            <Button
-              variant={member.active ? 'danger' : 'secondary'}
-              loading={action.isPending}
-              data-focus-initial
-            >
-              {member.active ? 'Hapus member' : 'Pulihkan member'}
-            </Button>
-          }
-        />
-        {member.account?.status === 'ACTIVE' && (
-          <AlertDialog
-            title="Reset password member?"
-            description="Password sementara yang baru akan ditampilkan satu kali."
-            confirmLabel="Reset password"
-            onConfirm={() => {
-              setProblem(null);
-              action.mutate('reset');
-            }}
-            trigger={<Button variant="secondary">Reset password</Button>}
-          />
-        )}
-      </div>
-    </Panel>
   );
 }
 
@@ -1093,15 +857,13 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
             placeholder="Nama job baru"
             onChange={(event) => setName(event.target.value)}
           />
-          <NativeSelect
+          <Select
             aria-label="Kategori skill job baru"
+            className="job-skill-select"
             value={skillCategory}
-            onChange={(e) => setSkillCategory(e.target.value)}
-          >
-            <option value="HIGH">High</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="LOW">Low</option>
-          </NativeSelect>
+            onValueChange={setSkillCategory}
+            options={skillCategoryOptions}
+          />
           <Button type="submit" loading={create.isPending}>
             Tambah job
           </Button>
@@ -1164,26 +926,23 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
               ) : (
                 <strong className="job-list__name">{job.name}</strong>
               )}
-              <NativeSelect
+              <Select
                 aria-label={`Kategori skill ${job.name}`}
+                className="job-skill-select"
+                size="sm"
                 value={job.skillCategory ?? ''}
+                placeholder="Belum diatur"
                 disabled={categoryChange.isPending || editingJobId !== null}
-                onChange={(e) =>
+                onValueChange={(next) =>
                   categoryChange.mutate({
                     id: job.id,
                     name: job.name,
                     version: job.version,
-                    skillCategory: e.target.value,
+                    skillCategory: next,
                   })
                 }
-              >
-                <option value="" disabled>
-                  Belum diatur
-                </option>
-                <option value="HIGH">High</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="LOW">Low</option>
-              </NativeSelect>
+                options={skillCategoryOptions}
+              />
               <small>{job.active ? 'Aktif' : 'Nonaktif'}</small>
               <div>
                 {editingJobId !== job.id && (
@@ -1248,7 +1007,7 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
   );
 }
 
-function OneTimeCredential({
+export function OneTimeCredential({
   value,
   onDone,
 }: {

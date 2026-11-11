@@ -2,6 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect } from '@playwright/test';
 import {
+  chooseOption,
   createHostedFixture,
   get,
   loginBootstrapThroughApi,
@@ -93,7 +94,7 @@ test('Supplier Admin changes roles with handover and separately activates restor
   // One replacement covers the current shift, retained default assignment and Open Henkaten.
   await expect(dialog.getByLabel('Pengganti', { exact: false })).toHaveCount(1);
   for (const field of await dialog.getByLabel('Pengganti', { exact: false }).all())
-    await field.selectOption(replacement.member.id);
+    await chooseOption(field, replacement.member.id);
   for (const width of [1440, 768, 390]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
     expect(

@@ -1,7 +1,7 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect, type Page, type TestInfo } from '@playwright/test';
 
-import { loginBootstrapThroughUi, runtime, test } from './support.js';
+import { chooseOption, loginBootstrapThroughUi, runtime, test } from './support.js';
 
 test('onboards a Hosted tenant through both portals and completes start-ready setup @edge', async ({
   trackedBrowser: browser,
@@ -148,9 +148,10 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
   for (const [index, role] of ['Supervisor', 'Line Leader', 'QC', 'MP'].entries()) {
     await supplier.goto(`${runtime.supplierOrigin}/master-data/members/new`);
     await supplier.getByLabel('Nama lengkap').fill(`${role} Onboarding`);
-    await supplier
-      .getByLabel('Role')
-      .selectOption(role === 'Line Leader' ? 'LINE_LEADER' : role.toUpperCase());
+    await chooseOption(
+      supplier.getByLabel('Role'),
+      role === 'Line Leader' ? 'LINE_LEADER' : role.toUpperCase(),
+    );
     if (role !== 'MP') {
       await supplier.getByLabel('Nomor registrasi').fill(`REG-ONBOARD-${index + 1}`);
       await supplier.getByLabel('Username').fill(`${role.toLowerCase().replace(' ', '.')}.onboard`);
@@ -195,7 +196,7 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
 
   await supplier.goto(`${runtime.supplierOrigin}/master-data/line-setup`);
   await expect(supplier.getByRole('heading', { name: 'Line Setup' })).toBeVisible();
-  await supplier.getByLabel('Shift baru').selectOption({ label: 'Shift Pagi · 06:00–14:00' });
+  await chooseOption(supplier.getByLabel('Shift baru'), { label: 'Shift Pagi' });
   await supplier.getByRole('button', { name: 'Tambah shift' }).click();
   await expect(supplier.getByRole('heading', { name: 'Shift Pagi · 06:00–14:00' })).toBeVisible();
   await supplier.getByRole('button', { name: /^Supervisor / }).click();
