@@ -9,7 +9,7 @@ import {
   Button,
   EmptyState,
   ErrorState,
-  NativeSelect,
+  Select,
   Panel,
   Skeleton,
   SearchSelect,
@@ -137,19 +137,20 @@ export function DefaultAssignmentsPage() {
       <div className="defaults-toolbar">
         <label>
           <span>Line</span>
-          <NativeSelect
+          <Select
             value={lineId}
-            onChange={(event) => {
+            placeholder="Pilih line"
+            searchPlaceholder="Cari kode atau nama line…"
+            onValueChange={(next) => {
               setSelectedShiftId('');
-              setParams({ lineId: event.target.value }, { replace: true });
+              setParams({ lineId: next }, { replace: true });
             }}
-          >
-            {lines.data?.items.map((line) => (
-              <option key={line.id} value={line.id}>
-                {line.code} · {line.name}
-              </option>
-            ))}
-          </NativeSelect>
+            options={(lines.data?.items ?? []).map((line) => ({
+              value: line.id,
+              label: line.code,
+              description: line.name,
+            }))}
+          />
         </label>
       </div>
       {problem && (
@@ -192,32 +193,32 @@ export function DefaultAssignmentsPage() {
             >
               <label>
                 <span>Shift baru</span>
-                <NativeSelect
+                <Select
                   data-focus-initial
                   value={newShiftTemplateId}
-                  onChange={(event) => setNewShiftTemplateId(event.target.value)}
-                >
-                  <option value="">Pilih shift</option>
-                  {availableTemplates.map((shift) => (
-                    <option key={shift.id} value={shift.id}>
-                      {shift.name} · {shift.startTime}–{shift.endTime}
-                    </option>
-                  ))}
-                </NativeSelect>
+                  placeholder="Pilih shift"
+                  onValueChange={setNewShiftTemplateId}
+                  options={availableTemplates.map((shift) => ({
+                    value: shift.id,
+                    label: shift.name,
+                    meta: `${shift.startTime}–${shift.endTime}`,
+                  }))}
+                />
               </label>
               <label>
                 <span>Salin assignment</span>
-                <NativeSelect
+                <Select
                   value={copyFromId}
-                  onChange={(event) => setCopyFromId(event.target.value)}
-                >
-                  <option value="">Tanpa salinan</option>
-                  {lineShifts.data.items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.shiftName}
-                    </option>
-                  ))}
-                </NativeSelect>
+                  onValueChange={setCopyFromId}
+                  options={[
+                    { value: '', label: 'Tanpa salinan' },
+                    ...lineShifts.data.items.map((item) => ({
+                      value: item.id,
+                      label: item.shiftName,
+                      meta: `${item.startTime}–${item.endTime}`,
+                    })),
+                  ]}
+                />
               </label>
               <Button
                 disabled={!newShiftTemplateId}

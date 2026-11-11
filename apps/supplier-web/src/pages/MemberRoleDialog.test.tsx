@@ -7,6 +7,7 @@ import { ApiProblemError } from '@tmmin-henkaten/api-client';
 import type { MemberRolePreview } from '@tmmin-henkaten/contracts';
 import { supplierApi } from '../app/api';
 import { MemberRoleDialog } from './MemberRoleDialog';
+import { chooseOption } from '../test/select';
 const id = '00000000-0000-4000-8000-000000000001';
 const replacementId = '00000000-0000-4000-8000-000000000002';
 const member: MemberRolePreview['member'] = {
@@ -81,7 +82,7 @@ describe('member role change flow', () => {
     await choose();
     const next = await screen.findByRole('button', { name: 'Tinjau perubahan' });
     expect((next as HTMLButtonElement).disabled).toBe(true);
-    await userEvent.selectOptions(screen.getByLabelText(/Pengganti/), replacementId);
+    await chooseOption(userEvent.setup(), screen.getByLabelText(/Pengganti/), replacementId);
     await userEvent.click(next);
     const commit = screen.getByRole('button', { name: 'Simpan perubahan role' });
     expect((commit as HTMLButtonElement).disabled).toBe(true);
@@ -136,16 +137,13 @@ describe('member role change flow', () => {
     );
     mount();
     await choose();
-    await userEvent.selectOptions(
-      await screen.findByLabelText<HTMLSelectElement>(/Pengganti/),
-      replacementId,
-    );
+    await chooseOption(userEvent.setup(), await screen.findByLabelText(/Pengganti/), replacementId);
     await userEvent.click(screen.getByRole('button', { name: 'Tinjau perubahan' }));
     await userEvent.type(screen.getByLabelText(/Alasan perubahan/), 'Penugasan baru');
     await userEvent.click(screen.getByRole('button', { name: 'Simpan perubahan role' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Muat ulang tinjauan' }));
     await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
-    expect((await screen.findByLabelText<HTMLSelectElement>(/Pengganti/)).value).toBe('');
+    expect((await screen.findByLabelText(/Pengganti/)).textContent).toContain('Pilih pengganti');
   });
   it('uses one replacement for every assignment and Henkaten, including large sets', async () => {
     const dependencies = Array.from({ length: 26 }, (_, index) => ({
@@ -162,7 +160,7 @@ describe('member role change flow', () => {
     await choose();
     await screen.findByText('Seluruh assignment dan Henkaten');
     expect(screen.getAllByLabelText(/Pengganti/)).toHaveLength(1);
-    await userEvent.selectOptions(screen.getByLabelText(/Pengganti/), replacementId);
+    await chooseOption(userEvent.setup(), screen.getByLabelText(/Pengganti/), replacementId);
     await userEvent.click(screen.getByRole('button', { name: 'Tinjau perubahan' }));
     expect(screen.getByText('Pengganti seluruh tanggung jawab')).toBeTruthy();
     await userEvent.type(

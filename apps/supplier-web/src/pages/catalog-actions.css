@@ -64,11 +64,6 @@
 .catalog-shift-picker .hds-select {
   min-width: 0;
   width: 100%;
-  min-height: 48px;
-}
-.catalog-shift-picker .hds-select > span:first-child {
-  overflow-wrap: anywhere;
-  white-space: normal;
 }
 .catalog-shift-picker__arrow {
   width: 20px;

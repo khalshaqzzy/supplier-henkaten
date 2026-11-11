@@ -9,6 +9,7 @@ import type { TanokoMatrix } from '@tmmin-henkaten/contracts';
 import { ApiProblemError } from '@tmmin-henkaten/api-client';
 import TanokoPage from './TanokoPage';
 import { supplierApi } from '../app/api';
+import { chooseOption } from '../test/select';
 
 vi.mock('../app/session', () => ({
   useSession: () => ({
@@ -84,7 +85,7 @@ describe('Tanoko editing interactions', () => {
     data.mappings.push({ ...data.mappings[0]!, memberId: 'mp-2', level: 3 });
     const { container } = mount();
     await screen.findByRole('button', { name: /Budi Nama Panjang, Spec Engine/ });
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Filter line' }), 'line-1');
+    await chooseOption(user, screen.getByRole('combobox', { name: 'Filter line' }), 'line-1');
     expect(screen.getByRole('checkbox', { name: 'Job di line ini' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'MP di line ini' })).not.toBeChecked();
     expect(screen.queryByRole('button', { name: /Welding/ })).not.toBeInTheDocument();
@@ -102,7 +103,7 @@ describe('Tanoko editing interactions', () => {
     await user.click(screen.getByRole('checkbox', { name: 'MP di line ini' }));
     expect(screen.getByRole('button', { name: /Dewi, Welding/ })).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Reset filter' }));
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Filter line' }), 'line-1');
+    await chooseOption(user, screen.getByRole('combobox', { name: 'Filter line' }), 'line-1');
     expect(screen.getByRole('checkbox', { name: 'Job di line ini' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'MP di line ini' })).not.toBeChecked();
   });

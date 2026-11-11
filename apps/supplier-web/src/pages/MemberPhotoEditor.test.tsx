@@ -8,7 +8,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { supplierApi } from '../app/api';
-import { MemberLifecycle } from './MasterDataPages';
+import { MemberPhotoPanel } from './MemberDetailPage';
 
 const memberId = '00000000-0000-4000-8000-000000000001';
 const scope = {
@@ -105,7 +105,7 @@ describe('Member photo editor', () => {
   });
 });
 
-function renderEditor(value: Parameters<typeof MemberLifecycle>[0]['member']) {
+function renderEditor(value: Parameters<typeof MemberPhotoPanel>[0]['member']) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -118,7 +118,7 @@ function renderEditor(value: Parameters<typeof MemberLifecycle>[0]['member']) {
       createElement(
         QueryClientProvider,
         { client: queryClient },
-        createElement(MemberLifecycle, {
+        createElement(MemberPhotoPanel, {
           member: value,
           scope,
         }),

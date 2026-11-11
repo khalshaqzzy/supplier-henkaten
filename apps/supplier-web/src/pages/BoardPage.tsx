@@ -24,7 +24,7 @@ import {
   ErrorState,
   FourMDot,
   LastUpdated,
-  NativeSelect,
+  Select,
   Skeleton,
 } from '@tmmin-henkaten/ui';
 
@@ -152,39 +152,46 @@ export function BoardPage() {
       <div className="board-toolbar">
         <label>
           <span>Shift</span>
-          <NativeSelect
+          <Select
             aria-label="Filter shift"
             value={shiftStatus}
-            onChange={(event) => {
+            options={[
+              { value: 'CURRENT', label: 'Sedang aktif' },
+              { value: 'OTHER', label: 'Shift lain' },
+              { value: 'ALL', label: 'Semua shift' },
+            ]}
+            onValueChange={(nextValue) => {
               if (
                 canvasDirty &&
                 !window.confirm('Ganti shift dan buang perubahan Canvas yang belum disimpan?')
               )
                 return;
               const next = new URLSearchParams(params);
-              if (event.target.value === 'CURRENT') next.delete('shiftStatus');
-              else next.set('shiftStatus', event.target.value);
+              if (nextValue === 'CURRENT') next.delete('shiftStatus');
+              else next.set('shiftStatus', nextValue);
               next.delete('lineShiftId');
               next.delete('view');
               setParams(next, { replace: true });
             }}
-          >
-            <option value="CURRENT">Sedang aktif</option>
-            <option value="OTHER">Shift lain</option>
-            <option value="ALL">Semua shift</option>
-          </NativeSelect>
+          />
         </label>
         <label>
           <span>Line dalam scope</span>
-          <NativeSelect
+          <Select
             value={lineId ?? ''}
-            onChange={(event) => {
+            options={[
+              { value: '', label: 'Semua line' },
+              ...lineOptions.map((line) => ({
+                value: line.lineId,
+                label: `${line.lineCode} · ${line.lineName}`,
+              })),
+            ]}
+            onValueChange={(nextLineId) => {
               if (
                 canvasDirty &&
                 !window.confirm('Ganti line dan buang perubahan Canvas yang belum disimpan?')
               )
                 return;
-              const nextLineId = event.target.value;
               const next = new URLSearchParams(params);
               if (nextLineId) next.set('lineId', nextLineId);
               else {
@@ -194,41 +201,35 @@ export function BoardPage() {
               next.delete('lineShiftId');
               setParams(next, { replace: true });
             }}
-          >
-            <option value="">Semua line</option>
-            {lineOptions.map((line) => (
-              <option key={line.lineId} value={line.lineId}>
-                {line.lineCode} · {line.lineName}
-              </option>
-            ))}
-          </NativeSelect>
+          />
         </label>
         {lineId && shiftOptions.length > 1 && (
           <label>
             <span>Shift pada line</span>
-            <NativeSelect
+            <Select
               aria-label="Pilih shift pada line"
               value={selectedLineShiftId ?? ''}
-              onChange={(event) => {
+              options={[
+                { value: '', label: 'Semua shift pada line' },
+                ...shiftOptions.map((line) => ({
+                  value: line.shiftRunId,
+                  label: line.shiftName,
+                  description: `${line.businessDate} · ${line.lineLeader.name ?? 'Tanpa LL'}`,
+                })),
+              ]}
+              onValueChange={(nextValue) => {
                 if (
                   canvasDirty &&
                   !window.confirm('Ganti shift dan buang perubahan Canvas yang belum disimpan?')
                 )
                   return;
                 const next = new URLSearchParams(params);
-                if (event.target.value) next.set('lineShiftId', event.target.value);
+                if (nextValue) next.set('lineShiftId', nextValue);
                 else next.delete('lineShiftId');
                 next.delete('view');
                 setParams(next, { replace: true });
               }}
-            >
-              <option value="">Semua shift pada line</option>
-              {shiftOptions.map((line) => (
-                <option key={line.shiftRunId} value={line.shiftRunId}>
-                  {line.shiftName} · {line.businessDate} · {line.lineLeader.name ?? 'Tanpa LL'}
-                </option>
-              ))}
-            </NativeSelect>
+            />
           </label>
         )}
         <div className="board-view-toggle" role="group" aria-label="Tampilan assignment board">

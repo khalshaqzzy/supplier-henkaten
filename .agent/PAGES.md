@@ -145,6 +145,10 @@ Dependency:
   dilepas.
 - Value rahasia, password, secret, CSRF token, dan Authorization data tidak pernah dimasukkan ke URL,
   client log, analytics, atau persistent browser storage.
+- Supplier memakai satu komponen `Select` bersama untuk semua dropdown (bukan native `<select>`):
+  trigger combobox yang dinamai oleh label field, listbox dengan deskripsi, metadata, alasan
+  disabled dan grup opsi, keyboard/typeahead, serta kolom pencarian otomatis bila opsi lebih dari
+  delapan. Nilai kosong (“Semua …”) valid. Panel ekspor Henkaten bersama TMMIN belum termasuk.
 
 ### 2.4 Lists, Search, Filter, dan Pagination
 
@@ -606,14 +610,25 @@ Catatan:
 - **Tujuan:** individual lifecycle management member dan login account.
 - **Elements list:** name, registration number, role, active, account status; search/active filter;
   create.
-- **Elements create/edit:** full name, registration number, immutable role; username only
-  Supervisor/LL/QC; optional JPG/PNG/WebP photo max 2 MB; current photo/initials; account username
-  and status; activate/deactivate/reset actions.
+- **Elements create:** full name, registration number, role select with per-role description;
+  username only Supervisor/LL/QC.
+- **Elements detail (`/:memberId`):** identity header (photo/initials, name, breadcrumbs, role,
+  member and account badges, registration/username/last-update facts shown only when present).
+  Main column: **Profil** (full name, registration number, read-only role with description and
+  *Ubah role* via the role-change dialog; MP has none) and **Foto** (drag-and-drop or *Set/Ganti
+  foto*, *Hapus foto*, JPG/PNG/WebP max 2 MB). Sticky rail: **Akun** (username with copy, password
+  temporary/changed, *Reset password* or *Aktifkan akun*, disabled while archived; MP shows “Tanpa
+  akun login”) and **Status member** (created time, outlined *Hapus member* / *Pulihkan member*).
+  Rail moves below the main column under 1180 px; everything stacks on phones.
+- **Save behaviour:** only changed fields are sent with `expectedVersion`; *Simpan perubahan*
+  enables only when dirty and valid; *Batalkan* discards; the page stays in place after success
+  with a short confirmation. `?focus=account|status` targets are preserved.
 - **Validasi dan rules:** MP has no credential; role immutable; registration unique; deactivation
   blocker; temporary password one-time; photo server validation remains authority.
 - **States:** invalid image, referenced resource in use, optimistic conflict, inactive member/account,
   one-time credential acknowledgement.
-- **Alur keluar:** detail after create/update; reset remains on detail until credential acknowledged.
+- **Alur keluar:** detail after create; update stays on detail; reset remains on detail until
+  credential acknowledged.
 - **Dependency:** `AVAILABLE`.
 
 #### Lines and Jobs

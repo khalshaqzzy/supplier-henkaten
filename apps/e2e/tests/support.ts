@@ -5,6 +5,7 @@ import {
   type APIResponse,
   type Browser,
   type BrowserContext,
+  type Locator,
   type Page,
 } from '@playwright/test';
 
@@ -462,4 +463,24 @@ function required(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`${name} is required by the E2E harness.`);
   return value;
+}
+
+/**
+ * Commits an option in the shared Select component. `option` matches the stored value, or the
+ * visible option label when passed as `{ label }`. The list closes once the value is committed.
+ */
+export async function chooseOption(
+  trigger: Locator,
+  option: string | { label: string },
+): Promise<void> {
+  const page = trigger.page();
+  await trigger.click();
+  const list = page.locator('.hds-select__content [role="listbox"]');
+  await expect(list).toBeVisible();
+  const target =
+    typeof option === 'string'
+      ? list.locator(`[role="option"][data-value="${option}"]`)
+      : list.getByRole('option', { name: option.label, exact: true });
+  await target.click();
+  await expect(list).toBeHidden();
 }

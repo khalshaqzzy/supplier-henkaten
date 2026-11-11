@@ -1,7 +1,14 @@
 import { expect } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { AxeBuilder } from '@axe-core/playwright';
-import { createHostedFixture, loginBootstrapThroughApi, runtime, test, post } from './support.js';
+import {
+  chooseOption,
+  createHostedFixture,
+  loginBootstrapThroughApi,
+  runtime,
+  test,
+  post,
+} from './support.js';
 
 const headers = 'Kode member,Nama,Role,Nomor registrasi,Username,Password awal';
 test('imports only members and accounts with Excel, CSV review, recovery and separate activation @edge', async ({
@@ -207,7 +214,7 @@ test('imports only members and accounts with Excel, CSV review, recovery and sep
     buffer: Buffer.from(headers + '\nQC-01,QC diperbarui,QC,001003,qc.contoh,'),
   });
   await expect(dialog.getByRole('combobox', { name: 'Aksi', exact: true })).toBeVisible();
-  await dialog.getByRole('combobox', { name: 'Aksi', exact: true }).selectOption('RESTORE');
+  await chooseOption(dialog.getByRole('combobox', { name: 'Aksi', exact: true }), 'RESTORE');
   await expect(dialog.getByRole('button', { name: 'Import data', exact: true })).toBeEnabled();
   await dialog.getByRole('button', { name: 'Import data', exact: true }).click();
   await expect(dialog.getByText('Data berhasil diimport', { exact: true })).toBeVisible({

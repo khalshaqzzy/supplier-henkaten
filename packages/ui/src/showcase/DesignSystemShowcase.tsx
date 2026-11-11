@@ -37,13 +37,13 @@ import {
   DropdownMenu,
   PanelHeader,
   Popover,
-  Select,
   Sheet,
   Sidebar,
   Tabs,
   Tooltip,
   Topbar,
 } from '../components/advanced';
+import { Select } from '../components/select';
 import {
   Card,
   ChartFrame,

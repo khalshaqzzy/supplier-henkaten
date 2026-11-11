@@ -148,7 +148,7 @@
   overflow-wrap: anywhere;
   font-size: var(--hds-type-14-size);
 }
-.member-role-transfer-row select {
+.member-role-transfer-row .hds-select {
   width: 100%;
   min-width: 0;
 }
@@ -294,7 +294,7 @@
     gap: 12px;
     padding: 20px 0;
   }
-  .member-role-transfer-row select {
+  .member-role-transfer-row .hds-select {
     min-height: 44px;
   }
   .member-role-current {

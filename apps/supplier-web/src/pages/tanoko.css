@@ -202,23 +202,19 @@
   align-items: center;
   position: relative;
 }
-.tanoko-filter > svg {
-  width: 14px;
-  height: 14px;
-  position: absolute;
-  left: 10px;
-  pointer-events: none;
+.tanoko-filter .hds-select {
+  width: auto;
+  min-width: 150px;
+  max-width: 220px;
+  min-height: 35px;
+  font-size: 12px;
+}
+.tanoko-filter .hds-select__leading {
   color: #59697e;
 }
-.tanoko-filter select {
-  font-size: 12px;
-  height: 35px;
-  min-height: 35px;
-  max-width: 220px;
-  padding-block: 5px;
-}
-.tanoko-filter:has(svg) select {
-  padding-left: 31px;
+.tanoko-filter .hds-select__leading svg {
+  width: 14px;
+  height: 14px;
 }
 .tanoko-clear {
   border: 0;
@@ -1125,7 +1121,7 @@
     width: 290px;
     flex-basis: 290px;
   }
-  .tanoko-filter select {
+  .tanoko-filter .hds-select {
     max-width: 160px;
   }
   .tanoko-permission {

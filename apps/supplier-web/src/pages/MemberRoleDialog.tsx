@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, ArrowRightLeft, Check, RefreshCw } from 'lucide-react';
 import { ApiProblemError } from '@tmmin-henkaten/api-client';
 import type { ChangeMemberRoleRequest, MemberRolePreview } from '@tmmin-henkaten/contracts';
-import { Alert, Button, Dialog, Field, NativeSelect, toast } from '@tmmin-henkaten/ui';
+import { Alert, Button, Dialog, Field, Select, toast } from '@tmmin-henkaten/ui';
 import { supplierApi } from '../app/api';
 import { scopedKey } from '../app/query';
 import './member-role.css';
@@ -265,19 +265,21 @@ export function MemberRoleDialog({
                   <p>Dialihkan ke pengganti yang sama.</p>
                 </div>
                 <Field label="Pengganti" htmlFor="role-replacement" required>
-                  <NativeSelect
+                  <Select
                     id="role-replacement"
                     value={replacementMemberId}
-                    onChange={(e) => setReplacementMemberId(e.target.value)}
-                  >
-                    <option value="">Pilih pengganti</option>
-                    {review.candidates.map((c) => (
-                      <option key={c.id} value={c.id} disabled={!c.available}>
-                        {c.fullName} · {c.registrationNumber}
-                        {!c.available ? ` (${c.unavailableReason})` : ''}
-                      </option>
-                    ))}
-                  </NativeSelect>
+                    placeholder="Pilih pengganti"
+                    searchPlaceholder="Cari nama atau registrasi…"
+                    onValueChange={setReplacementMemberId}
+                    options={review.candidates.map((c) => ({
+                      value: c.id,
+                      label: c.fullName,
+                      meta: c.registrationNumber ?? undefined,
+                      ...(c.available
+                        ? {}
+                        : { disabledReason: c.unavailableReason ?? 'Tidak tersedia' }),
+                    }))}
+                  />
                 </Field>
               </div>
             </>

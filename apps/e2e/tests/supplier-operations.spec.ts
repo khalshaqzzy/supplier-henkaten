@@ -16,6 +16,7 @@ type LineShift = {
 };
 type TanokoMatrix = { members: Array<{ id: string; lineIds: string[] }> };
 import {
+  chooseOption,
   createHostedFixture,
   get,
   loginBootstrapThroughApi,
@@ -164,7 +165,7 @@ test('Supplier operations: searchable assignments, reviewed shift rotation, Tano
   await page.goto(`${runtime.supplierOrigin}/master-data/shifts`);
   await page.getByRole('button', { name: 'Tukar waktu shift', exact: true }).click();
   const sheet = page.getByRole('dialog', { name: 'Tukar waktu shift', exact: true });
-  // Opening the unselected menu used to constrain the first text span to the 16px icon slot.
+  // Unselected rows must keep the label in its own flexible column, never the check slot.
   // Check both menus before selection; selected-only screenshots cannot catch that regression.
   for (const width of [1440, 768, 390, 320]) {
     await page.setViewportSize({ width, height: 844 });
@@ -174,7 +175,7 @@ test('Supplier operations: searchable assignments, reviewed shift rotation, Tano
       const menu = page.getByRole('listbox');
       await expect(menu).toBeVisible();
       await expect(menu.getByText('18:00–06:00 · +1 hari · Asia/Jakarta')).toBeVisible();
-      const rows = await menu.locator('.hds-select__item').evaluateAll((items) =>
+      const rows = await menu.locator('.hds-select__option').evaluateAll((items) =>
         items.map((item) => {
           const copy = item.querySelector('.hds-select__option-label')!.getBoundingClientRect();
           const row = item.getBoundingClientRect();
@@ -215,7 +216,7 @@ test('Supplier operations: searchable assignments, reviewed shift rotation, Tano
   await expect(sheet.getByRole('combobox', { name: 'Shift pertama' })).toHaveText(morning.name);
   await sheet.getByRole('combobox', { name: 'Shift pertama' }).click();
   await expect(
-    page.getByRole('option', { name: morning.name, exact: true }).locator('.hds-select__indicator'),
+    page.getByRole('option', { name: morning.name, exact: true }).locator('.hds-select__check svg'),
   ).toBeVisible();
   await page.keyboard.press('Escape');
   await sheet.getByRole('combobox', { name: 'Shift kedua' }).click();
@@ -292,7 +293,7 @@ test('Supplier operations: searchable assignments, reviewed shift rotation, Tano
     fixture.line.id,
   );
   await page.goto(`${runtime.supplierOrigin}/tanoko`);
-  await page.getByRole('combobox', { name: 'Filter line' }).selectOption(fixture.line.id);
+  await chooseOption(page.getByRole('combobox', { name: 'Filter line' }), fixture.line.id);
   await page.getByRole('checkbox', { name: 'MP di line ini' }).check();
   await expect(page.getByText('Budi Santoso', { exact: true })).toHaveCount(0);
   await expect(page.locator('.tanoko-name').filter({ hasText: 'Dewi Wulandari' })).toBeVisible();

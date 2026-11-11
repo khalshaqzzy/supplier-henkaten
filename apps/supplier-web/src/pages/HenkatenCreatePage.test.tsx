@@ -8,6 +8,7 @@ import { ApiMutationUncertainError } from '@tmmin-henkaten/api-client';
 import { supplierApi } from '../app/api';
 import { useSession } from '../app/session';
 import { HenkatenCreatePage } from './HenkatenCreatePage';
+import { chooseOption } from '../test/select';
 
 vi.mock('../app/session', () => ({ useSession: vi.fn() }));
 afterEach(() => {
@@ -60,10 +61,10 @@ it('retries an uncertain submission with the same key and displayed assignment c
     </QueryClientProvider>,
   );
   const user = userEvent.setup();
-  await screen.findByRole('option', { name: /^Job/ });
+  await waitFor(() => expect(screen.getByLabelText(/Job/)).toHaveProperty('disabled', false));
   await user.click(screen.getByRole('radio', { name: 'Machine' }));
-  await user.selectOptions(screen.getByLabelText(/Job/), 'job');
-  await user.selectOptions(screen.getByLabelText(/^Part/), 'OTHER');
+  await chooseOption(user, screen.getByLabelText(/Job/), 'job');
+  await chooseOption(user, screen.getByLabelText(/^Part/), 'OTHER');
   await user.type(screen.getByLabelText(/Objek terdampak/), 'A');
   await user.type(screen.getByLabelText(/Kondisi baru/), 'B');
   await user.type(screen.getByLabelText(/Penyebab/), 'Cause');
@@ -198,10 +199,10 @@ it.each(['absent', 'empty', 'unanswered', 'partial', 'no'] as const)(
       </QueryClientProvider>,
     );
     const user = userEvent.setup();
-    await screen.findByRole('option', { name: /^Job/ });
+    await waitFor(() => expect(screen.getByLabelText(/Job/)).toHaveProperty('disabled', false));
     await user.click(screen.getByRole('radio', { name: 'Machine' }));
-    await user.selectOptions(screen.getByLabelText(/Job/), 'job');
-    await user.selectOptions(screen.getByLabelText(/^Part/), 'OTHER');
+    await chooseOption(user, screen.getByLabelText(/Job/), 'job');
+    await chooseOption(user, screen.getByLabelText(/^Part/), 'OTHER');
     await user.type(screen.getByLabelText(/Objek terdampak/), 'Before');
     await user.type(screen.getByLabelText(/Kondisi baru/), 'After');
     await user.type(screen.getByLabelText(/Penyebab/), 'Cause');
