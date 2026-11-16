@@ -124,18 +124,32 @@ as staging or production seed operations.
 
 ## Full-stack browser journeys
 
-Install the pinned browsers once, then run the complete Chromium suite or the critical Edge smoke:
+Install the pinned browser once, then run the complete Chromium suite:
 
 ```bash
 pnpm e2e:install
 pnpm test:e2e
-pnpm test:e2e:edge
 ```
 
-Each spec receives a unique pgvector Compose project, dynamic loopback ports, fresh migrations, an
-operator-CLI bootstrap identity, and isolated application processes. The runner destroys its
-containers, network, volumes, photo storage, and processes even after failure. Failure diagnostics
-are written to root `test-results/e2e`, `playwright-report`, and `blob-report`.
+One disposable pgvector container serves the run. It is migrated and bootstrapped once, and every
+journey gets its own database cloned from that template, its own API process and its own storage
+root. Journeys run on parallel workers; each worker builds both web applications once and serves
+them on its own loopback ports. The runner destroys its container, network, volume, scratch files
+and processes even after failure. Failure diagnostics are written to root `test-results/e2e`,
+`playwright-report`, and `blob-report`.
+
+```bash
+pnpm test:e2e --workers=2          # parallel workers (default: half of the cores, at most 4)
+pnpm test:e2e --shard=1/3          # one deterministic slice, as used by CI
+pnpm test:e2e --spec=onboarding    # a single journey
+```
+
+Automated Microsoft Edge journeys are deferred. The Edge smoke set can still be run on demand:
+
+```bash
+pnpm e2e:install:edge
+pnpm test:e2e:edge
+```
 
 ## Tests and generated contracts
 
