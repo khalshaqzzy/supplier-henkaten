@@ -1,3 +1,13 @@
+## Faster browser journeys — 16 November 2026
+
+Implementation on `ci/faster-e2e`: the browser journey runner uses one PostgreSQL per run with a
+template-cloned database per journey, builds the web applications once per worker, runs on parallel
+workers and as three CI shards, and automated Edge journeys are deferred (Chromium only). Tooling,
+workflow and documentation only; no application, API, schema or seed change. See
+[ADR 0053](../docs/adr/0053-shared-postgresql-parallel-browser-journeys.md) and the current handoff
+for measurements. Phase 15 remains the sole current `in_progress` phase; the staging/device
+rehearsal remains the acceptance path for Edge and mobile browsers.
+
 ## Multi-part Henkaten and 100 active lines — 16 November 2026
 
 Implementation on `feat/multi-part-henkaten-line-capacity`: a Hosted Henkaten references 1–50

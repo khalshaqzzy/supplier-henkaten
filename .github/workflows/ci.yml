@@ -156,9 +156,13 @@ jobs:
         run: pnpm db:down
 
   browser-e2e:
-    name: Chromium and Edge journeys
+    name: Chromium journeys (shard ${{ matrix.shard }}/3)
     runs-on: ubuntu-22.04
-    timeout-minutes: 50
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -174,15 +178,18 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Install pinned browsers
-        run: pnpm --filter @tmmin-henkaten/e2e exec playwright install --with-deps chromium msedge
+      - name: Install pinned browser
+        run: pnpm --filter @tmmin-henkaten/e2e exec playwright install --with-deps chromium
       - name: Run isolated journeys
+        env:
+          E2E_SHARD: ${{ matrix.shard }}/3
+          E2E_WORKERS: 2
         run: pnpm test:e2e
       - name: Upload failure artifacts
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: browser-e2e-artifacts
+          name: browser-e2e-artifacts-shard-${{ matrix.shard }}
           if-no-files-found: warn
           retention-days: 14
           path: |

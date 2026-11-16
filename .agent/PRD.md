@@ -1,3 +1,18 @@
+## Amendment — 16 November 2026: Automated browser coverage and faster journeys
+
+Automated browser journeys run in **Chromium only**. Automated Microsoft Edge journeys are
+**deferred**: they repeated the same specifications in a second Chromium-based browser and nearly
+doubled the pipeline. Chrome and Edge remain the supported browsers; Edge acceptance is covered by
+the staging and device rehearsal, and the Edge smoke set can be run on demand. No journey was
+removed: every specification previously repeated in Edge already runs in Chromium.
+
+The journey runtime uses one disposable PostgreSQL per run with an isolated, template-cloned
+database per journey, builds the web applications once per worker and runs journeys on parallel
+workers and CI shards. Product behaviour is unchanged. See
+[ADR 0053](../docs/adr/0053-shared-postgresql-parallel-browser-journeys.md).
+
+---
+
 ## Amendment — 16 November 2026: Multi-part Henkaten and 100 active lines
 
 One Hosted Henkaten can affect several parts. On the Henkaten form the Line Leader opens one part
@@ -1931,6 +1946,8 @@ Supplier Admin melihat seluruh item. Role lain hanya melihat item yang relevan.
 - Minimum touch target `44×44px`; desktop keyboard support tetap wajib.
 - Supported: current dan previous major Chrome/Edge pada desktop dan Android, serta Home Screen PWA
   pada iOS/iPadOS 16.4+. Safari browser tab di iOS tidak dianggap push-capable sebelum install.
+  Regression browser otomatis berjalan pada Chromium; journey Edge otomatis ditunda (amendment
+  16 November 2026) dan penerimaan Edge dilakukan melalui staging/device rehearsal.
 - Internet Explorer tidak didukung.
 
 ### 22.4 Supplier PWA dan Offline Policy

@@ -102,12 +102,24 @@ NODE_ENV=test DATABASE_URL=<disposable-test-url> RELEASE_SHA=ci \
   SESSION_CSRF_SECRET=<safe-test-value> AUTH_THROTTLE_SECRET=<safe-test-value> \
   OUTBOX_ENABLED=false pnpm test:integration
 pnpm db:down
-pnpm --filter @tmmin-henkaten/e2e exec playwright install chromium msedge
+pnpm --filter @tmmin-henkaten/e2e exec playwright install chromium
 pnpm test:e2e
 docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.24.3 \
   dir /repo --config=/repo/.gitleaks.toml --redact --verbose
 git diff --check
 ```
+
+`pnpm test:e2e` runs every browser journey in Chromium on parallel workers against one disposable
+PostgreSQL container (a template-cloned database per journey). It takes about one minute locally
+and prints one `PASS`/`FAIL` line per journey and a final `PASSED`/`FAILED` summary line; rely on
+that summary and the exit code. Useful options: `--workers=<n>` (default: half of the cores, at
+most four), `--shard=<index>/<total>` (the hosted job runs shards `1/3`, `2/3`, `3/3` with two
+workers; the unsharded local run covers the same journeys), and `--spec=<name>` for one journey.
+Automated Edge journeys are deferred: Edge is not installed or run by CI, and
+`pnpm e2e:install:edge` plus `pnpm test:e2e:edge` remain available on demand only.
+
+When adding a journey, keep it independent of other journeys and of machine-wide state (no fixed
+ports, no shared files outside its own storage root), because journeys run concurrently.
 
 For staging release work, the baseline above is extended by the commands and assertions in
 `.github/workflows/ci.yml`. Local parity must additionally cover:

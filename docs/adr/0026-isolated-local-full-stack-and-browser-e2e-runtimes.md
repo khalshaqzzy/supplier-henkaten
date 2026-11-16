@@ -58,6 +58,11 @@ Playwright uses distinct browser contexts for roles and tenants. A deliberate sh
 journey proves the Supplier and TMMIN cookie names do not overwrite one another. Chromium covers the
 complete suite; pinned Microsoft Edge covers tagged critical smoke journeys.
 
+Amendment, 16 November 2026: the journey runtime now uses one PostgreSQL container per run with a
+template-cloned database per journey, parallel workers and shards, and Chromium as the only
+automated browser; Edge smoke journeys run on demand. See
+[ADR 0053](0053-shared-postgresql-parallel-browser-journeys.md).
+
 Seeded-runtime QA follows an explicit order: audit a Supplier Admin first, reseed to the verified
 baseline, then audit TMMIN Admin. Suspected defects are triangulated against database state, public
 API behavior, and UI presentation before changing either seed or application code. External-source
