@@ -10,6 +10,7 @@ import {
   henkatenFormOptionsQuerySchema,
   henkatenFormOptionsSchema,
   henkatenListQuerySchema,
+  MAX_HENKATEN_PARTS,
   prepareShiftRequestSchema,
   rerouteSupervisorRequestSchema,
 } from './index.js';
@@ -124,6 +125,38 @@ describe('operational contracts', () => {
     expect(createHenkatenRequestSchema.safeParse(base).success).toBe(false);
     expect(
       createHenkatenRequestSchema.safeParse({ ...base, partId: id(), otherPart: true }).success,
+    ).toBe(false);
+  });
+
+  it('accepts several distinct parts and rejects mixed, duplicate or oversized selections', () => {
+    const base = {
+      category: 'METHOD' as const,
+      lineShiftId: id(),
+      jobId: id(),
+      cause: 'Change',
+      detail: 'Method updated',
+      affectedObject: 'Old method',
+      replacementObject: 'New method',
+    };
+    const first = id();
+    expect(
+      createHenkatenRequestSchema.safeParse({ ...base, partIds: [first, id(), id()] }).success,
+    ).toBe(true);
+    expect(createHenkatenRequestSchema.safeParse({ ...base, partIds: [] }).success).toBe(false);
+    expect(
+      createHenkatenRequestSchema.safeParse({ ...base, partIds: [first, first] }).success,
+    ).toBe(false);
+    expect(
+      createHenkatenRequestSchema.safeParse({ ...base, partIds: [first], partId: first }).success,
+    ).toBe(false);
+    expect(
+      createHenkatenRequestSchema.safeParse({ ...base, partIds: [first], otherPart: true }).success,
+    ).toBe(false);
+    expect(
+      createHenkatenRequestSchema.safeParse({
+        ...base,
+        partIds: Array.from({ length: MAX_HENKATEN_PARTS + 1 }, () => id()),
+      }).success,
     ).toBe(false);
   });
 

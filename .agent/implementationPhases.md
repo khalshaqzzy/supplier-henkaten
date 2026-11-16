@@ -1,3 +1,15 @@
+## Multi-part Henkaten and 100 active lines — 16 November 2026
+
+Implementation on `feat/multi-part-henkaten-line-capacity`: a Hosted Henkaten references 1–50
+catalog parts (or Other) through the new immutable `HenkatenPart` table, one warning is opened per
+affected part, part filters/distributions/export cover every part, and the Supplier form uses a
+searchable multi-select part picker. Active line capacity is 100 per supplier through one shared
+constant. Additive migration `20261116002400_henkaten_multi_part` with backfill; API, OpenAPI,
+client, seed, Supplier and TMMIN pages changed. See
+[ADR 0052](../docs/adr/0052-multi-part-henkaten-and-line-capacity.md) and the current handoff for
+validation and delivery. Phase 15 remains the sole current `in_progress` phase; staging/device/UAT
+is unchanged. A 100-line performance baseline run remains open under Phase 16 hardening.
+
 ## Member detail workspace and shared Select — 11 November 2026
 
 Implementation on `feat/supplier-member-ui-polish`: dedicated Supplier member detail

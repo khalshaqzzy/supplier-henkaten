@@ -11,6 +11,15 @@ import { HenkatenCreatePage } from './HenkatenCreatePage';
 import { chooseOption } from '../test/select';
 
 vi.mock('../app/session', () => ({ useSession: vi.fn() }));
+// The part picker popover measures its arrow, which jsdom cannot observe.
+vi.stubGlobal(
+  'ResizeObserver',
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+);
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -232,3 +241,90 @@ it.each(['absent', 'empty', 'unanswered', 'partial', 'no'] as const)(
     client.clear();
   },
 );
+
+it('submits several selected parts in the order they were chosen', async () => {
+  vi.mocked(useSession).mockReturnValue({
+    session: {
+      principal: { userId: 'user', role: 'LINE_LEADER', purpose: 'NORMAL' },
+      supplier: { id: 'supplier' },
+    },
+  } as ReturnType<typeof useSession>);
+  vi.spyOn(supplierApi, 'lineShiftOperationalContext').mockResolvedValue({
+    items: [
+      {
+        id: 'shift',
+        version: 1,
+        lineName: 'Line',
+        effectiveStartAt: '2026-09-30T00:00:00Z',
+        effectiveEndAt: '2026-09-30T23:59:00Z',
+        assignments: [{ id: 'assignment', jobId: 'job', jobName: 'Job', mpMemberId: 'mp' }],
+      },
+    ],
+  } as never);
+  vi.spyOn(supplierApi, 'henkatenFormOptions').mockResolvedValue({
+    parts: [
+      { id: 'part-a', partNumber: 'P-A', partName: 'Bracket' },
+      { id: 'part-b', partNumber: 'P-B', partName: 'Clip' },
+      { id: 'part-c', partNumber: 'P-C', partName: 'Hinge' },
+    ],
+    replacementMembers: [],
+    checklist: null,
+  } as never);
+  const submit = vi
+    .spyOn(supplierApi, 'createHenkaten')
+    .mockRejectedValue(new ApiMutationUncertainError());
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <HenkatenCreatePage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  const user = userEvent.setup();
+  await waitFor(() => expect(screen.getByLabelText(/Job/)).toHaveProperty('disabled', false));
+  await user.click(screen.getByRole('radio', { name: 'Machine' }));
+  await chooseOption(user, screen.getByLabelText(/Job/), 'job');
+
+  const trigger = screen.getByLabelText(/^Part/);
+  await user.click(trigger);
+  const listbox = await screen.findByRole('listbox');
+  const option = (value: string) =>
+    listbox.querySelector<HTMLElement>(`[role="option"][data-value="${value}"]`)!;
+  // The list stays open so several parts can be picked in one pass.
+  await user.click(option('part-c'));
+  await user.click(option('part-a'));
+  await user.click(option('part-b'));
+  await user.click(option('part-b'));
+  expect(option('part-c').getAttribute('aria-selected')).toBe('true');
+  expect(option('part-b').getAttribute('aria-selected')).toBe('false');
+  await user.click(screen.getByRole('button', { name: 'Selesai' }));
+  expect(trigger.textContent).toContain('2 part dipilih');
+
+  // Choosing Other replaces the catalog selection; picking a part again clears Other.
+  await chooseOption(user, trigger, 'OTHER');
+  expect(trigger.textContent).toContain('Other');
+  await user.click(trigger);
+  await user.click(
+    (await screen.findByRole('listbox')).querySelector<HTMLElement>('[data-value="part-b"]')!,
+  );
+  await user.click(screen.getByRole('button', { name: 'Selesai' }));
+  await chooseOption(user, trigger, 'part-a');
+  await user.click(screen.getByRole('button', { name: 'Selesai' }));
+  await user.click(screen.getByRole('button', { name: 'Hapus pilihan part P-B' }));
+  await chooseOption(user, trigger, 'part-c');
+  await user.click(screen.getByRole('button', { name: 'Selesai' }));
+
+  await user.type(screen.getByLabelText(/Objek terdampak/), 'Before');
+  await user.type(screen.getByLabelText(/Kondisi baru/), 'After');
+  await user.type(screen.getByLabelText(/Penyebab/), 'Cause');
+  await user.type(screen.getByLabelText(/Detail kejadian/), 'Detail');
+  await user.click(screen.getByRole('button', { name: 'Submit Henkaten' }));
+  await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
+  expect(submit.mock.calls[0]![0]).toMatchObject({ partIds: ['part-a', 'part-c'] });
+  expect(submit.mock.calls[0]![0]).not.toHaveProperty('otherPart');
+  expect(submit.mock.calls[0]![0]).not.toHaveProperty('partId');
+  client.clear();
+});

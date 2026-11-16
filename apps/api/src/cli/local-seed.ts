@@ -772,6 +772,13 @@ const pcrSeedNarratives = [
   },
 ] as const;
 
+/** Every fourth record affects two parts and every eighth affects three. */
+function seedPartIds(runtime: SupplierRuntime, primaryIndex: number, ordinal: number) {
+  const count = runtime.parts.length;
+  const offsets = ordinal % 8 === 0 ? [0, 1, 3] : ordinal % 4 === 0 ? [0, 1] : [0];
+  return [...new Set(offsets.map((offset) => runtime.parts[(primaryIndex + offset) % count]!.id))];
+}
+
 function selectPcrSeedNarrative(runtime: SupplierRuntime, record: SeedHenkatenPlan) {
   const assigned = assignedPcrSeedExamples.get(runtime.plan.code) ?? new Set<number>();
   assignedPcrSeedExamples.set(runtime.plan.code, assigned);
@@ -954,7 +961,7 @@ async function createSeedHenkaten(
   const base = {
     lineShiftId: occurrence.id,
     jobId: job.id,
-    partId: runtime.parts[record.partIndex ?? ordinal % runtime.parts.length]!.id,
+    partIds: seedPartIds(runtime, record.partIndex ?? ordinal, ordinal),
     checklistVersionId: checklist.id,
     checklistAnswers: checklist.itemIds.map((itemId) => ({ itemId, answer: 'YES' })),
     cause: narrative.cause,
@@ -1433,9 +1440,13 @@ async function verifySeed(prisma: PrismaClient) {
       prisma.henkaten.count({
         where: { supplierId: supplier.id, submissionKey: { contains: '-historical-' } },
       }),
-      prisma.warningInstance.count({
-        where: { supplierId: supplier.id, status: 'OPEN', sourceMode: 'HOSTED' },
-      }),
+      prisma.warningInstance
+        .findMany({
+          where: { supplierId: supplier.id, status: 'OPEN', sourceMode: 'HOSTED' },
+          distinct: ['henkatenId'],
+          select: { henkatenId: true },
+        })
+        .then((rows) => rows.length),
       prisma.lineBoardLayout.count({ where: { supplierId: supplier.id } }),
       prisma.memberPhoto.count({ where: { supplierId: supplier.id, state: 'CURRENT' } }),
       prisma.tanokoMapping.findMany({ where: { supplierId: supplier.id } }),

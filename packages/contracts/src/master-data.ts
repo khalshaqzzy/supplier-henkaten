@@ -110,6 +110,9 @@ export const updateMemberAccountRequestSchema = z
   .object({ expectedVersion: optimisticVersionSchema, username: usernameSchema })
   .strict();
 
+/** Active Line capacity of one Supplier. */
+export const MAX_ACTIVE_LINES_PER_SUPPLIER = 100;
+
 export const createLineRequestSchema = z
   .object({ code: z.string().trim().min(1).max(100), name: nameSchema })
   .strict();

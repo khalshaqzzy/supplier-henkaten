@@ -16,6 +16,7 @@ import { AuditWriter } from '../persistence/audit-writer.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 import type { MutationContext } from '../administration/mutation-context.js';
 import { addEditableCharts, type ExportChart } from './henkaten-export-charts.js';
+import { henkatenPartSearch, presentHenkatenParts } from './henkaten-presenters.js';
 
 const EXPIRES_MS = 60 * 60 * 1_000;
 const BATCH_SIZE = 200;
@@ -50,6 +51,7 @@ const exportInclude = {
     include: { answers: { orderBy: { displayOrderSnapshot: 'asc' as const } } },
   },
   transitions: { orderBy: [{ occurredAt: 'asc' as const }, { id: 'asc' as const }] },
+  parts: { orderBy: { position: 'asc' as const } },
   manDetail: true,
   movement: { include: { sourceLine: true, sourceJob: true } },
   pcrAssessment: true,
@@ -417,7 +419,8 @@ export class HenkatenExportService implements OnModuleInit, BeforeApplicationShu
               increment(months, month);
               incrementNested(lineStatus, line, row.status);
               incrementNested(monthlyCategory, month, row.category);
-              increment(parts, row.partNumberSnapshot || 'Other');
+              for (const part of presentHenkatenParts(row))
+                increment(parts, part.number || 'Other');
               for (const route of row.approvalRoutes) {
                 if (route.status === 'PENDING') increment(pending, route.route);
               }
@@ -517,14 +520,7 @@ function exportWhere(
     ...(filter.shiftTemplateId ? { shiftRun: { shiftTemplateId: filter.shiftTemplateId } } : {}),
     ...(filter.status ? { status: filter.status } : {}),
     ...(filter.category ? { category: filter.category } : {}),
-    ...(filter.part
-      ? {
-          OR: [
-            { partNumberSnapshot: { contains: filter.part, mode: 'insensitive' } },
-            { partNameSnapshot: { contains: filter.part, mode: 'insensitive' } },
-          ],
-        }
-      : {}),
+    ...(filter.part ? henkatenPartSearch(filter.part) : {}),
     ...(filter.approvalRoute || filter.approvalStatus
       ? {
           approvalRoutes: {
@@ -643,6 +639,7 @@ function writeRecord(
 ) {
   const supervisor = row.approvalRoutes.find((route) => route.route === 'SUPERVISOR');
   const qc = row.approvalRoutes.find((route) => route.route === 'QC');
+  const affectedParts = presentHenkatenParts(row);
   records.add([
     row.identifier,
     row.businessDate.toISOString().slice(0, 10),
@@ -654,8 +651,8 @@ function writeRecord(
     row.lineNameSnapshot,
     row.jobNameSnapshot,
     row.shiftNameSnapshot,
-    row.partNumberSnapshot,
-    row.partNameSnapshot,
+    affectedParts.map((part) => part.number).join('; '),
+    affectedParts.map((part) => part.name).join('; '),
     row.cause,
     row.detail,
     row.affectedObject,

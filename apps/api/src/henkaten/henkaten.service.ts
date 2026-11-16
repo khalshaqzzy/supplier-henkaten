@@ -30,6 +30,7 @@ import { presentWorking } from '../shifts/shift-presenters.js';
 import { PcrService, presentPcrAssessment } from '../pcr/pcr.service.js';
 import {
   henkatenDetailInclude,
+  henkatenPartSearch,
   presentHenkatenDetail,
   presentHenkatenSummary,
 } from './henkaten-presenters.js';
@@ -96,7 +97,8 @@ export class HenkatenService {
       ) {
         throw shiftSelectionConflict();
       }
-      const [supplier, job, selectedPart, checklist] = await Promise.all([
+      const requestedPartIds = input.partIds ?? (input.partId ? [input.partId] : []);
+      const [supplier, job, catalogParts, checklist] = await Promise.all([
         tx.supplier.findUnique({ where: { id: scope.supplierId } }),
         tx.job.findFirst({
           where: {
@@ -106,11 +108,11 @@ export class HenkatenService {
             active: true,
           },
         }),
-        input.partId
-          ? tx.part.findFirst({
-              where: { id: input.partId, supplierId: scope.supplierId, active: true },
+        requestedPartIds.length
+          ? tx.part.findMany({
+              where: { id: { in: requestedPartIds }, supplierId: scope.supplierId, active: true },
             })
-          : Promise.resolve(null),
+          : Promise.resolve([]),
         input.checklistVersionId
           ? tx.checklistVersion.findFirst({
               where: {
@@ -131,13 +133,30 @@ export class HenkatenService {
       )
         throw sourceMismatch();
       if (!job) throw missing('Active job');
-      if (input.partId && !selectedPart) throw missing('Active part');
+      if (catalogParts.length !== requestedPartIds.length) throw missing('Active part');
       const henkatenId = randomUUID();
-      const partNumber = selectedPart?.partNumber ?? 'Other';
-      const partName = selectedPart?.partName ?? '';
-      const partWarningKey = selectedPart
-        ? normalizeLookup(selectedPart.partNumber)
-        : `other:${henkatenId}`;
+      // Submission order is evidence: the first part stays the primary part of the record.
+      const affectedParts = requestedPartIds.length
+        ? requestedPartIds.map((partId, index) => {
+            const part = catalogParts.find(({ id }) => id === partId)!;
+            return {
+              position: index + 1,
+              partId: part.id,
+              partNumberSnapshot: part.partNumber,
+              normalizedPartNumberSnapshot: normalizeLookup(part.partNumber),
+              partNameSnapshot: part.partName,
+            };
+          })
+        : [
+            {
+              position: 1,
+              partId: null,
+              partNumberSnapshot: 'Other',
+              normalizedPartNumberSnapshot: `other:${henkatenId}`,
+              partNameSnapshot: '',
+            },
+          ];
+      const primaryPart = affectedParts[0]!;
       const answers = new Map(
         (input.checklistAnswers ?? []).map((answer) => [answer.itemId, answer.answer]),
       );
@@ -239,7 +258,7 @@ export class HenkatenService {
           lineShiftId: lineShift.id,
           lineId: lineShift.lineId,
           jobId: job.id,
-          partId: selectedPart?.id ?? null,
+          partId: primaryPart.partId,
           identifier,
           dailySequence: sequence,
           sourceMode: supplier.sourceMode,
@@ -251,9 +270,10 @@ export class HenkatenService {
           lineCodeSnapshot: lineShift.line.code,
           lineNameSnapshot: lineShift.line.name,
           jobNameSnapshot: job.name,
-          partNumberSnapshot: partNumber,
-          normalizedPartNumberSnapshot: partWarningKey,
-          partNameSnapshot: partName,
+          partNumberSnapshot: primaryPart.partNumberSnapshot,
+          normalizedPartNumberSnapshot: primaryPart.normalizedPartNumberSnapshot,
+          partNameSnapshot: primaryPart.partNameSnapshot,
+          parts: { create: affectedParts },
           creatorMemberId: memberId,
           creatorNameSnapshot: principal.displayName,
           cause: input.cause,
@@ -301,12 +321,12 @@ export class HenkatenService {
               correlationId: context.correlationId,
             },
           },
-          warning: {
-            create: {
-              partNumberSnapshot: partNumber,
-              normalizedPartNumberSnapshot: partWarningKey,
-              partNameSnapshot: partName,
-            },
+          warnings: {
+            create: affectedParts.map((part) => ({
+              partNumberSnapshot: part.partNumberSnapshot,
+              normalizedPartNumberSnapshot: part.normalizedPartNumberSnapshot,
+              partNameSnapshot: part.partNameSnapshot,
+            })),
           },
           approvalRoutes: {
             create: [
@@ -403,6 +423,7 @@ export class HenkatenService {
           lineShiftId: lineShift.id,
           jobId: created.jobId,
           partId: created.partId,
+          partIds: requestedPartIds,
           assignmentAppliedImmediately: Boolean(man),
         }),
         tx,
@@ -421,6 +442,7 @@ export class HenkatenService {
             category: created.category,
             lineId: created.lineId,
             partNumber: created.partNumberSnapshot,
+            partNumbers: affectedParts.map((part) => part.partNumberSnapshot),
           },
         },
         tx,
@@ -434,7 +456,10 @@ export class HenkatenService {
           supplierId: scope.supplierId,
           actor: { userId: principal.userId, role: principal.role },
           correlationId: context.correlationId,
-          payload: { partNumber: created.partNumberSnapshot },
+          payload: {
+            partNumber: created.partNumberSnapshot,
+            partNumbers: affectedParts.map((part) => part.partNumberSnapshot),
+          },
         },
         tx,
       );
@@ -542,14 +567,7 @@ export class HenkatenService {
       ...(query.pcrStatus ? { pcrAssessment: { status: query.pcrStatus } } : {}),
       ...(query.lineId ? { lineId: query.lineId } : {}),
       ...(query.shiftRunId ? { shiftRunId: query.shiftRunId } : {}),
-      ...(query.part
-        ? {
-            OR: [
-              { partNumberSnapshot: { contains: query.part, mode: 'insensitive' } },
-              { partNameSnapshot: { contains: query.part, mode: 'insensitive' } },
-            ],
-          }
-        : {}),
+      ...(query.part ? henkatenPartSearch(query.part) : {}),
       ...(query.from || query.to
         ? {
             occurredAt: {
@@ -574,7 +592,11 @@ export class HenkatenService {
     const rows: Array<{
       bucket: number;
       row: Prisma.HenkatenGetPayload<{
-        include: { approvalRoutes: { include: { decision: true } }; pcrAssessment: true };
+        include: {
+          approvalRoutes: { include: { decision: true } };
+          pcrAssessment: true;
+          parts: true;
+        };
       }>;
     }> = [];
     for (let bucket = 0; bucket < buckets.length && rows.length <= query.limit; bucket++) {
@@ -591,6 +613,7 @@ export class HenkatenService {
         include: {
           approvalRoutes: { include: { decision: true }, orderBy: { route: 'asc' } },
           pcrAssessment: true,
+          parts: { orderBy: { position: 'asc' } },
         },
         orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
         take: query.limit + 1 - rows.length,
@@ -757,10 +780,11 @@ export class HenkatenService {
   async clonePrefill(scope: TenantScope, id: string, principal: RequestPrincipal) {
     const row = await this.prisma.henkaten.findFirst({
       where: { deletedAt: null, id, supplierId: scope.supplierId, ...roleWhere(principal) },
-      include: { manDetail: true },
+      include: { manDetail: true, parts: { orderBy: { position: 'asc' } } },
     });
     if (!row) throw missing('Henkaten');
-    const [checklist, operational, job, part] = await Promise.all([
+    const sourcePartIds = row.parts.flatMap(({ partId }) => (partId ? [partId] : []));
+    const [checklist, operational, job, activeParts] = await Promise.all([
       this.prisma.checklistVersion.findFirst({
         where: {
           supplierId: scope.supplierId,
@@ -774,12 +798,16 @@ export class HenkatenService {
       this.prisma.job.findFirst({
         where: { id: row.jobId, supplierId: scope.supplierId, active: true },
       }),
-      row.partId
-        ? this.prisma.part.findFirst({
-            where: { id: row.partId, supplierId: scope.supplierId, active: true },
+      sourcePartIds.length
+        ? this.prisma.part.findMany({
+            where: { id: { in: sourcePartIds }, supplierId: scope.supplierId, active: true },
           })
-        : Promise.resolve(null),
+        : Promise.resolve([]),
     ]);
+    const cloneParts = sourcePartIds.flatMap((partId) => {
+      const part = activeParts.find(({ id }) => id === partId);
+      return part ? [{ id: part.id, partNumber: part.partNumber, partName: part.partName }] : [];
+    });
     const selectable = operational.currentLineShiftIds.length
       ? operational.items.filter(({ id }) => operational.currentLineShiftIds.includes(id))
       : operational.items;
@@ -802,6 +830,7 @@ export class HenkatenService {
       lineShiftId: shift?.id ?? null,
       jobId: row.jobId,
       partId: row.partId,
+      parts: cloneParts,
       cause: row.cause,
       detail: row.detail,
       affectedObject: row.affectedObject,
@@ -819,7 +848,7 @@ export class HenkatenService {
         job.lineId === shift.lineId &&
         shift.assignments.some(({ jobId }) => jobId === job.id),
       ),
-      partStillValid: row.partId === null || Boolean(part),
+      partStillValid: cloneParts.length === sourcePartIds.length,
       assignmentStillValid: Boolean(
         !row.manDetail || (working && working.version === row.manDetail.targetAssignmentVersion),
       ),
@@ -1011,29 +1040,13 @@ export class HenkatenService {
                   ...(query.line
                     ? { lineNameSnapshot: { contains: query.line, mode: 'insensitive' as const } }
                     : {}),
-                  ...(query.part
-                    ? {
-                        OR: [
-                          {
-                            partNumberSnapshot: {
-                              contains: query.part,
-                              mode: 'insensitive' as const,
-                            },
-                          },
-                          {
-                            partNameSnapshot: {
-                              contains: query.part,
-                              mode: 'insensitive' as const,
-                            },
-                          },
-                        ],
-                      }
-                    : {}),
+                  ...(query.part ? henkatenPartSearch(query.part) : {}),
                 },
                 include: {
                   supplier: { select: { code: true, name: true } },
                   approvalRoutes: true,
                   pcrAssessment: true,
+                  _count: { select: { parts: true } },
                 },
                 orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
                 take: query.limit + 1,
@@ -1100,6 +1113,7 @@ export class HenkatenService {
             jobName: row.jobNameSnapshot,
             partNumber: row.partNumberSnapshot,
             partName: row.partNameSnapshot,
+            partCount: Math.max(1, row._count.parts),
             occurredAt: row.occurredAt.toISOString(),
             updatedAt: row.updatedAt.toISOString(),
             pcr: presentPcrAssessment(row.pcrAssessment),
@@ -1129,6 +1143,7 @@ export class HenkatenService {
               jobName: safeText(job['name']),
               partNumber: safeText(part['number']),
               partName: safeText(part['name']),
+              partCount: 1,
               occurredAt: row.occurredAt.toISOString(),
               updatedAt: row.updatedAt.toISOString(),
               pcr: presentPcrAssessment(row.pcrAssessment),

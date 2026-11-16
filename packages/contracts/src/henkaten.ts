@@ -22,6 +22,18 @@ import { pcrAssessmentSchema, pcrStatusSchema } from './pcr.js';
 
 const requiredText = z.string().trim().min(1).max(2_000);
 
+/** Upper bound of catalog parts one Henkaten can reference. */
+export const MAX_HENKATEN_PARTS = 50;
+
+export const henkatenPartSchema = z
+  .object({
+    id: opaqueIdSchema.nullable(),
+    number: z.string(),
+    name: z.string(),
+  })
+  .strict();
+export type HenkatenPart = z.infer<typeof henkatenPartSchema>;
+
 export const checklistSubmissionAnswerSchema = z
   .object({ itemId: opaqueIdSchema, answer: checklistAnswerSchema })
   .strict();
@@ -33,7 +45,9 @@ const submissionBase = {
   expectedEffectiveStartAt: utcTimestampSchema.optional(),
   expectedLineShiftVersion: optimisticVersionSchema.optional(),
   jobId: opaqueIdSchema,
+  // Legacy single-part clients send `partId`; it is equivalent to a one-item `partIds`.
   partId: opaqueIdSchema.optional(),
+  partIds: z.array(opaqueIdSchema).min(1).max(MAX_HENKATEN_PARTS).optional(),
   otherPart: z.literal(true).optional(),
   checklistVersionId: opaqueIdSchema.optional(),
   checklistAnswers: z.array(checklistSubmissionAnswerSchema).max(100).optional(),
@@ -82,8 +96,18 @@ export const createHenkatenRequestSchema = z
         message: 'Item checklist tidak boleh duplikat.',
       });
     }
-    if (Boolean(value.partId) === Boolean(value.otherPart)) {
-      context.addIssue({ code: 'custom', path: ['partId'], message: 'Pilih part atau Other.' });
+    if (
+      [Boolean(value.partId), Boolean(value.partIds), Boolean(value.otherPart)].filter(Boolean)
+        .length !== 1
+    ) {
+      context.addIssue({ code: 'custom', path: ['partIds'], message: 'Pilih part atau Other.' });
+    }
+    if (value.partIds && new Set(value.partIds).size !== value.partIds.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['partIds'],
+        message: 'Part tidak boleh duplikat.',
+      });
     }
   });
 export type CreateHenkatenRequest = z.infer<typeof createHenkatenRequestSchema>;
@@ -141,7 +165,9 @@ export const henkatenSummarySchema = z
     line: z.object({ code: z.string(), name: z.string() }).strict(),
     shiftName: z.string(),
     jobName: z.string(),
+    // `part` and `partId` describe the first entry of `parts`.
     part: z.object({ number: z.string(), name: z.string() }).strict(),
+    parts: z.array(henkatenPartSchema).min(1).max(MAX_HENKATEN_PARTS),
     routes: approvalRouteSummarySchema,
     version: optimisticVersionSchema,
     pcr: pcrAssessmentSchema.nullable(),
@@ -387,6 +413,16 @@ export const clonePrefillSchema = z
     lineShiftId: opaqueIdSchema.nullable(),
     jobId: opaqueIdSchema,
     partId: opaqueIdSchema.nullable(),
+    // Catalog parts of the source Henkaten that can still be selected, in source order.
+    parts: z.array(
+      z
+        .object({
+          id: opaqueIdSchema,
+          partNumber: z.string().min(1).max(100),
+          partName: z.string().min(1).max(200),
+        })
+        .strict(),
+    ),
     cause: z.string(),
     detail: z.string(),
     affectedObject: z.string().nullable(),

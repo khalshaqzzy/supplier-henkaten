@@ -1,3 +1,25 @@
+## Amendment — 16 November 2026: Multi-part Henkaten and 100 active lines
+
+One Hosted Henkaten can affect several parts. On the Henkaten form the Line Leader opens one part
+picker, searches the part master by number or name and selects **1–50 active parts**, or **Other**.
+Other stays exclusive: it cannot be combined with master parts. The first selected part is the
+primary part shown in compact lists, followed by a `+N` count; the Henkaten record lists every
+affected part. Cloning preselects the source parts that are still active.
+
+Each affected part opens its own warning for TMMIN, so a multi-part Henkaten appears under every
+one of its parts in the affected-part view and all of them close together when the Henkaten is
+Approved, Rejected or Cancelled. Part filters match any affected part; per-part distributions count
+each affected part. A master part cannot be deactivated while any Open Henkaten references it. The
+Excel export keeps one row per Henkaten with part numbers and names joined by `; `. External
+ingestion is unchanged (one part per event). Earlier statements that a Henkaten has exactly one
+part or one warning are superseded by this amendment.
+
+The functional capacity is **100 active lines per supplier** (previously 20), applied to line
+creation, activation and the setup workbook. Member (300) and job (500) capacities are unchanged.
+See [ADR 0052](../docs/adr/0052-multi-part-henkaten-and-line-capacity.md).
+
+---
+
 ## Amendment — 11 November 2026: Member detail workspace and Supplier dropdowns
 
 The Supplier member detail page is a single workspace for one member. Its header shows the photo or
@@ -458,7 +480,7 @@ Produk ini bukan:
 Platform wajib mendukung:
 
 - 20-42 supplier aktif;
-- maksimum 20 line per supplier;
+- maksimum 100 line aktif per supplier;
 - maksimum 300 member per supplier;
 - maksimum 500 job per supplier;
 - maksimum 30 concurrent authenticated users per supplier;
@@ -803,6 +825,8 @@ Field minimum:
 Part number dan part name wajib diisi pada master part. Pada input Henkaten, user dapat mencari
 menggunakan salah satunya dan UI menampilkan keduanya setelah part dipilih. Pilihan `Other` tidak
 memerlukan nomor/nama part dan tidak menambahkan master part.
+Satu Henkaten dapat memilih hingga 50 part master sekaligus; `Other` tidak dapat digabung dengan
+part master (amendment 16 November 2026).
 
 ### 10.5 Shift Template
 
@@ -1390,7 +1414,7 @@ Filter minimum:
 
 ### 17.3 Warning Part
 
-- Setiap Henkaten Open membuat warning instance.
+- Setiap Henkaten Open membuat satu warning instance per part terdampak.
 - TMMIN part view mengagregasi warning part spesifik berdasarkan supplier + part number; setiap
   warning `Other` tampil sebagai item tersendiri.
 - Part tetap `AFFECTED` selama minimal satu Henkaten untuk supplier/part tersebut Open.
@@ -2178,7 +2202,7 @@ External log/metric platform ditentukan TMMIN kemudian; absence of sink tidak me
 Targets diuji pada baseline:
 
 - 42 supplier;
-- 20 line per supplier;
+- 20 line per supplier (baseline uji performa; kapasitas fungsional 100 line aktif, lihat amendment 16 November 2026);
 - 300 member per supplier;
 - 500 job per supplier;
 - 30 concurrent user per supplier;

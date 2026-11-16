@@ -1,7 +1,11 @@
 import { lockSetupMutation } from './setup-lock.js';
 import { Injectable } from '@nestjs/common';
 
-import type { MasterListQuery, PartImportCommitRequest } from '@tmmin-henkaten/contracts';
+import {
+  MAX_ACTIVE_LINES_PER_SUPPLIER,
+  type MasterListQuery,
+  type PartImportCommitRequest,
+} from '@tmmin-henkaten/contracts';
 
 import type { Prisma } from '../generated/prisma/client.js';
 import { normalizeLookup } from '../auth/auth.service.js';
@@ -66,8 +70,11 @@ export class CatalogService {
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
       await lockSupplier(tx, scope.supplierId);
-      if ((await tx.line.count({ where: { supplierId: scope.supplierId, active: true } })) >= 20) {
-        throw capacity('lines', 20);
+      if (
+        (await tx.line.count({ where: { supplierId: scope.supplierId, active: true } })) >=
+        MAX_ACTIVE_LINES_PER_SUPPLIER
+      ) {
+        throw capacity('lines', MAX_ACTIVE_LINES_PER_SUPPLIER);
       }
       const displayOrder =
         (
@@ -150,9 +157,10 @@ export class CatalogService {
         if (jobs || lineShifts || openHenkaten)
           throw resourceInUse('Line masih memiliki job, shift, atau Henkaten aktif.');
       } else if (
-        (await tx.line.count({ where: { supplierId: scope.supplierId, active: true } })) >= 20
+        (await tx.line.count({ where: { supplierId: scope.supplierId, active: true } })) >=
+        MAX_ACTIVE_LINES_PER_SUPPLIER
       ) {
-        throw capacity('lines', 20);
+        throw capacity('lines', MAX_ACTIVE_LINES_PER_SUPPLIER);
       }
       const updated = await tx.line.update({
         where: { id },
@@ -625,7 +633,12 @@ export class CatalogService {
       if (
         !active &&
         (await tx.henkaten.count({
-          where: { deletedAt: null, supplierId: scope.supplierId, partId: id, status: 'OPEN' },
+          where: {
+            deletedAt: null,
+            supplierId: scope.supplierId,
+            status: 'OPEN',
+            parts: { some: { partId: id } },
+          },
         }))
       ) {
         throw resourceInUse('Part is required by an Open Henkaten.');

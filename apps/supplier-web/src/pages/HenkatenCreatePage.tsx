@@ -3,14 +3,22 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { ApiProblemError, createIdempotencyKey } from '@tmmin-henkaten/api-client';
-import type { CreateHenkatenRequest, HenkatenCategory } from '@tmmin-henkaten/contracts';
-import { Alert, Button, Field, Input, Panel, Select, Textarea } from '@tmmin-henkaten/ui';
+import {
+  MAX_HENKATEN_PARTS,
+  type CreateHenkatenRequest,
+  type HenkatenCategory,
+} from '@tmmin-henkaten/contracts';
+import { Alert, Button, Field, Panel, Select, Textarea } from '@tmmin-henkaten/ui';
 
 import { supplierApi } from '../app/api';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { PageHeader } from '../components/layout';
-import { ChecklistResponseList, HenkatenCategoryPicker, SelectedPart } from './HenkatenWorkflow';
+import { HenkatenPartPicker, type PartChoice, type PartSelection } from './HenkatenPartPicker';
+import { ChecklistResponseList, HenkatenCategoryPicker } from './HenkatenWorkflow';
+
+// Page size of the catalog search behind the part picker.
+const PART_RESULT_LIMIT = 50;
 
 export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
   const { session } = useSession();
@@ -24,7 +32,9 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
   };
   const [category, setCategory] = useState<HenkatenCategory>('MAN');
   const [jobId, setJobId] = useState(params.get('jobId') ?? '');
-  const [partId, setPartId] = useState('');
+  const [partSelection, setPartSelection] = useState<PartSelection>({ parts: [], other: false });
+  const [partResults, setPartResults] = useState<readonly PartChoice[]>([]);
+  const [clonePartsDropped, setClonePartsDropped] = useState(false);
   const [partSearch, setPartSearch] = useState('');
   const [replacementMpId, setReplacementMpId] = useState('');
   const [cause, setCause] = useState('');
@@ -57,6 +67,10 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
         ...(partSearch.trim() ? { part: partSearch.trim() } : {}),
       }),
   });
+  // Keep the last result page visible while the next search is loading.
+  useEffect(() => {
+    if (options.data) setPartResults(options.data.parts);
+  }, [options.data]);
   const [displayedChecklist, setDisplayedChecklist] = useState<{
     category: HenkatenCategory;
     checklist: NonNullable<typeof options.data>['checklist'];
@@ -75,7 +89,8 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
     if (!prefill) return;
     setCategory(prefill.category);
     setJobId(prefill.jobStillValid ? prefill.jobId : '');
-    setPartId(prefill.partStillValid ? (prefill.partId ?? 'OTHER') : '');
+    setPartSelection({ parts: prefill.parts, other: prefill.partId === null });
+    setClonePartsDropped(!prefill.partStillValid);
     setCause(prefill.cause);
     setDetail(prefill.detail);
     setAffectedObject(prefill.affectedObject ?? '');
@@ -96,7 +111,7 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
     }
   }, [selectedShift, jobId]);
   const selectedAssignment = selectedShift?.assignments.find(({ jobId: id }) => id === jobId);
-  const selectedPart = options.data?.parts.find(({ id }) => id === partId);
+  const partChosen = partSelection.other || partSelection.parts.length > 0;
   const replacement = options.data?.replacementMembers.find(({ id }) => id === replacementMpId);
   const tanoko = replacement?.skillLevels?.find(({ jobId: id }) => id === jobId)?.level ?? 0;
   const checklist =
@@ -108,7 +123,7 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
   const valid = Boolean(
     selectedShift &&
     jobId &&
-    partId &&
+    partChosen &&
     cause.trim() &&
     detail.trim() &&
     categoryComplete &&
@@ -124,7 +139,9 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
         expectedEffectiveStartAt: selectedShift!.effectiveStartAt,
         expectedLineShiftVersion: selectedShift!.version,
         jobId,
-        ...(partId === 'OTHER' ? { otherPart: true as const } : { partId }),
+        ...(partSelection.other
+          ? { otherPart: true as const }
+          : { partIds: partSelection.parts.map(({ id }) => id) }),
         ...(checklist
           ? {
               checklistVersionId: checklist.id,
@@ -249,37 +266,26 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
                 }))}
               />
             </Field>
-            <Field label="Cari part" htmlFor="part-search">
-              <Input
-                id="part-search"
-                value={partSearch}
-                onChange={(event) => {
-                  setPartSearch(event.target.value);
-                  setPartId('');
-                }}
-              />
-            </Field>
             <Field label="Part" htmlFor="part" required>
-              <Select
+              <HenkatenPartPicker
                 id="part"
-                value={partId}
-                placeholder="Pilih part"
-                searchPlaceholder="Cari nomor atau nama part…"
-                onValueChange={setPartId}
-                options={[
-                  ...(options.data?.parts ?? []).map((part) => ({
-                    value: part.id,
-                    label: part.partNumber,
-                    description: part.partName,
-                  })),
-                  { value: 'OTHER', label: 'Other' },
-                ]}
+                value={partSelection}
+                onChange={(next) => {
+                  setPartSelection(next);
+                  setClonePartsDropped(false);
+                }}
+                results={partResults}
+                resultLimit={PART_RESULT_LIMIT}
+                loading={options.isFetching}
+                onSearch={setPartSearch}
+                max={MAX_HENKATEN_PARTS}
               />
             </Field>
-            <SelectedPart
-              part={partId === 'OTHER' ? { partNumber: 'Other', partName: '' } : selectedPart}
-              onClear={() => setPartId('')}
-            />
+            {clonePartsDropped && (
+              <Alert tone="warning" title="Part perlu diperiksa">
+                Sebagian part dari Henkaten asal sudah tidak aktif.
+              </Alert>
+            )}
           </Panel>
           {category === 'MAN' ? (
             <Panel title="Replacement MP">
@@ -387,7 +393,19 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
             </div>
             <div>
               <dt>Part</dt>
-              <dd>{partId === 'OTHER' ? 'Other' : (selectedPart?.partNumber ?? '—')}</dd>
+              <dd>
+                {partSelection.other ? (
+                  'Other'
+                ) : partSelection.parts.length ? (
+                  <ul className="henkaten-review__parts">
+                    {partSelection.parts.map((part) => (
+                      <li key={part.id}>{part.partNumber}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  '—'
+                )}
+              </dd>
             </div>
           </dl>
           <Button type="submit" loading={submit.isPending} disabled={!submittedIntent && !valid}>

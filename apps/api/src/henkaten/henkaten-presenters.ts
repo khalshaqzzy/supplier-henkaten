@@ -1,5 +1,6 @@
 import type {
   Henkaten,
+  HenkatenPart,
   HenkatenChecklistAnswer,
   HenkatenChecklistSnapshot,
   HenkatenApprovalRoute,
@@ -9,12 +10,17 @@ import type {
   ApprovalDecision,
   AssignmentMovement,
   PcrAssessment,
+  Prisma,
 } from '../generated/prisma/client.js';
 import { databaseDate } from '../shifts/shift-time.js';
 import { presentPcrAssessment } from '../pcr/pcr.service.js';
 
 type RouteRow = HenkatenApprovalRoute & { decision: ApprovalDecision | null };
-type SummaryRow = Henkaten & { approvalRoutes: RouteRow[]; pcrAssessment: PcrAssessment | null };
+type SummaryRow = Henkaten & {
+  approvalRoutes: RouteRow[];
+  pcrAssessment: PcrAssessment | null;
+  parts: HenkatenPart[];
+};
 
 export function routeSummary(routes: RouteRow[]) {
   const supervisor = routes.find(({ route }) => route === 'SUPERVISOR');
@@ -44,15 +50,51 @@ export function presentHenkatenSummary(row: SummaryRow) {
     shiftName: row.shiftNameSnapshot,
     jobName: row.jobNameSnapshot,
     part: { number: row.partNumberSnapshot, name: row.partNameSnapshot },
+    parts: presentHenkatenParts(row),
     routes: routeSummary(row.approvalRoutes),
     version: row.version,
     pcr: presentPcrAssessment(row.pcrAssessment),
   };
 }
 
+/** Matches a Henkaten when any of its affected parts contains the search text. */
+export function henkatenPartSearch(text: string): Prisma.HenkatenWhereInput {
+  return {
+    parts: {
+      some: {
+        OR: [
+          { partNumberSnapshot: { contains: text, mode: 'insensitive' } },
+          { partNameSnapshot: { contains: text, mode: 'insensitive' } },
+        ],
+      },
+    },
+  };
+}
+
+/** Affected parts in submission order; falls back to the primary part snapshot. */
+export function presentHenkatenParts(row: {
+  partId: string | null;
+  partNumberSnapshot: string;
+  partNameSnapshot: string;
+  parts: Array<
+    Pick<HenkatenPart, 'position' | 'partId' | 'partNumberSnapshot' | 'partNameSnapshot'>
+  >;
+}) {
+  if (!row.parts.length)
+    return [{ id: row.partId, number: row.partNumberSnapshot, name: row.partNameSnapshot }];
+  return [...row.parts]
+    .sort((left, right) => left.position - right.position)
+    .map((part) => ({
+      id: part.partId,
+      number: part.partNumberSnapshot,
+      name: part.partNameSnapshot,
+    }));
+}
+
 type DetailRow = Henkaten & {
   clonedFrom: { deletedAt: Date | null } | null;
   pcrAssessment: PcrAssessment | null;
+  parts: HenkatenPart[];
   checklistSnapshot: (HenkatenChecklistSnapshot & { answers: HenkatenChecklistAnswer[] }) | null;
   manDetail: ManHenkatenDetail | null;
   reservation: MPReservation | null;
@@ -135,6 +177,7 @@ export function presentHenkatenDetail(row: DetailRow) {
 export const henkatenDetailInclude = {
   clonedFrom: { select: { deletedAt: true } },
   pcrAssessment: true,
+  parts: { orderBy: { position: 'asc' as const } },
   checklistSnapshot: {
     include: { answers: { orderBy: { displayOrderSnapshot: 'asc' as const } } },
   },

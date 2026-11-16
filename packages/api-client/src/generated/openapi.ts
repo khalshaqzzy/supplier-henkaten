@@ -13530,6 +13530,11 @@ export interface paths {
                   number: string;
                   name: string;
                 };
+                parts: {
+                  id: string | null;
+                  number: string;
+                  name: string;
+                }[];
                 routes: {
                   supervisor: {
                     /** @enum {string} */
@@ -13625,6 +13630,7 @@ export interface paths {
                 jobId: string;
                 /** Format: uuid */
                 partId?: string;
+                partIds?: string[];
                 /** @constant */
                 otherPart?: true;
                 /** Format: uuid */
@@ -13657,6 +13663,7 @@ export interface paths {
                 jobId: string;
                 /** Format: uuid */
                 partId?: string;
+                partIds?: string[];
                 /** @constant */
                 otherPart?: true;
                 /** Format: uuid */
@@ -13686,6 +13693,7 @@ export interface paths {
                 jobId: string;
                 /** Format: uuid */
                 partId?: string;
+                partIds?: string[];
                 /** @constant */
                 otherPart?: true;
                 /** Format: uuid */
@@ -13715,6 +13723,7 @@ export interface paths {
                 jobId: string;
                 /** Format: uuid */
                 partId?: string;
+                partIds?: string[];
                 /** @constant */
                 otherPart?: true;
                 /** Format: uuid */
@@ -13778,6 +13787,11 @@ export interface paths {
                 number: string;
                 name: string;
               };
+              parts: {
+                id: string | null;
+                number: string;
+                name: string;
+              }[];
               routes: {
                 supervisor: {
                   /** @enum {string} */
@@ -14412,6 +14426,11 @@ export interface paths {
                 number: string;
                 name: string;
               };
+              parts: {
+                id: string | null;
+                number: string;
+                name: string;
+              }[];
               routes: {
                 supervisor: {
                   /** @enum {string} */
@@ -14727,6 +14746,11 @@ export interface paths {
                 number: string;
                 name: string;
               };
+              parts: {
+                id: string | null;
+                number: string;
+                name: string;
+              }[];
               routes: {
                 supervisor: {
                   /** @enum {string} */
@@ -14992,6 +15016,11 @@ export interface paths {
                 number: string;
                 name: string;
               };
+              parts: {
+                id: string | null;
+                number: string;
+                name: string;
+              }[];
               routes: {
                 supervisor: {
                   /** @enum {string} */
@@ -15256,6 +15285,11 @@ export interface paths {
                 number: string;
                 name: string;
               };
+              parts: {
+                id: string | null;
+                number: string;
+                name: string;
+              }[];
               routes: {
                 supervisor: {
                   /** @enum {string} */
@@ -15484,6 +15518,12 @@ export interface paths {
               /** Format: uuid */
               jobId: string;
               partId: string | null;
+              parts: {
+                /** Format: uuid */
+                id: string;
+                partNumber: string;
+                partName: string;
+              }[];
               cause: string;
               detail: string;
               affectedObject: string | null;
@@ -15651,6 +15691,11 @@ export interface paths {
                   number: string;
                   name: string;
                 };
+                parts: {
+                  id: string | null;
+                  number: string;
+                  name: string;
+                }[];
                 routes: {
                   supervisor: {
                     /** @enum {string} */
@@ -16330,6 +16375,11 @@ export interface paths {
                 number: string;
                 name: string;
               };
+              parts: {
+                id: string | null;
+                number: string;
+                name: string;
+              }[];
               routes: {
                 supervisor: {
                   /** @enum {string} */
@@ -18953,6 +19003,7 @@ export interface paths {
                     jobName: string;
                     partNumber: string;
                     partName: string;
+                    partCount: number;
                     /** Format: date-time */
                     occurredAt: string;
                     /** Format: date-time */
@@ -18992,6 +19043,7 @@ export interface paths {
                     jobName: string;
                     partNumber: string;
                     partName: string;
+                    partCount: number;
                     /** Format: date-time */
                     occurredAt: string;
                     /** Format: date-time */

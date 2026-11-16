@@ -87,30 +87,6 @@ export function HenkatenCategoryPicker({
   );
 }
 
-export function SelectedPart({
-  part,
-  onClear,
-}: {
-  part: { partNumber: string; partName: string } | undefined;
-  onClear: () => void;
-}) {
-  if (!part) return null;
-  return (
-    <div className="selected-part" role="status">
-      <span className="selected-part__icon">
-        <Check aria-hidden="true" />
-      </span>
-      <span>
-        <strong>{part.partNumber}</strong>
-        {part.partName && <small>{part.partName}</small>}
-      </span>
-      <button type="button" aria-label={`Hapus pilihan part ${part.partNumber}`} onClick={onClear}>
-        <X aria-hidden="true" />
-      </button>
-    </div>
-  );
-}
-
 export function ManMovementPreview({
   target,
   replacement,
