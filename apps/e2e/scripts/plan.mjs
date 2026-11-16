@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 
 /**
@@ -81,5 +81,7 @@ export function planJourneys(specs, options, pathOf, read = defaultRead) {
 }
 
 function defaultRead(path) {
-  return { size: statSync(path).size, edge: readFileSync(path, 'utf8').includes('@edge') };
+  // Read once and derive both facts from the same content.
+  const content = readFileSync(path, 'utf8');
+  return { size: content.length, edge: content.includes('@edge') };
 }
