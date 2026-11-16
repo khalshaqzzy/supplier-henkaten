@@ -1896,3 +1896,25 @@ textarea {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* Multi-part Henkaten: remaining-part count in lists and the full list on the record. */
+.tmmin-part-more {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: var(--hds-radius-full);
+  background: var(--hds-surface-inset);
+  color: var(--hds-text-secondary);
+  font-size: var(--hds-type-11-size);
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.tmmin-part-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-wrap: anywhere;
+}

@@ -493,6 +493,93 @@ describe('Line Shift Henkaten operations', () => {
     }
   });
 
+  it('records several affected parts and opens one warning per part', async () => {
+    const extraParts = await Promise.all(
+      ['A', 'B'].map((suffix) => {
+        const partNumber = `MULTI-${suffix}-${randomUUID()}`;
+        return prisma.part.create({
+          data: {
+            supplierId,
+            partNumber,
+            normalizedPartNumber: partNumber.toLowerCase(),
+            partName: `Multi Part ${suffix}`,
+            normalizedPartName: `multi part ${suffix.toLowerCase()} ${randomUUID()}`,
+          },
+        });
+      }),
+    );
+    const submit = (partIds: string[], key = randomUUID()) =>
+      request(app.getHttpServer())
+        .post('/api/v1/supplier/henkatens')
+        .set('Origin', supplierOrigin)
+        .set('Cookie', leaderCookie)
+        .set('X-CSRF-Token', leaderCsrf)
+        .set('Idempotency-Key', key)
+        .send({
+          category: 'METHOD',
+          lineShiftId,
+          jobId: job2Id,
+          partIds,
+          affectedObject: 'Old sequence',
+          replacementObject: 'New sequence',
+          cause: 'Sequence change',
+          detail: 'Applies to every listed part',
+        });
+    const duplicate = await submit([partId, partId]);
+    expect(duplicate.status).toBeGreaterThanOrEqual(400);
+    const unknown = await submit([partId, randomUUID()]);
+    expect(unknown.status).toBe(404);
+
+    const partIds = [extraParts[1]!.id, partId, extraParts[0]!.id];
+    const key = randomUUID();
+    const created = await submit(partIds, key);
+    expect(created.status).toBe(201);
+    expect((await submit(partIds, key)).body.id).toBe(created.body.id);
+    expect(created.body.partId).toBe(partIds[0]);
+    expect(created.body.part.number).toBe(extraParts[1]!.partNumber);
+    expect((created.body.parts as Array<{ id: string }>).map(({ id }) => id)).toEqual(partIds);
+
+    const henkatenId = created.body.id as string;
+    const warnings = await prisma.warningInstance.findMany({ where: { henkatenId } });
+    expect(warnings).toHaveLength(3);
+    expect(warnings.every(({ status }) => status === 'OPEN')).toBe(true);
+    await expect(
+      prisma.henkatenPart.updateMany({ where: { henkatenId }, data: { position: 9 } }),
+    ).rejects.toThrow();
+
+    const affected = await app
+      .get(HenkatenService)
+      .affectedPart(supplierId, extraParts[0]!.partNumber);
+    expect(affected.openWarningCount).toBe(1);
+    expect(affected.warnings[0]!.displayIdentifier).toBe(created.body.identifier);
+
+    // A part that is not the primary part is still found by the list filter.
+    const listed = await request(app.getHttpServer())
+      .get('/api/v1/supplier/henkatens')
+      .query({ part: extraParts[0]!.partNumber })
+      .set('Cookie', leaderCookie);
+    expect(listed.status).toBe(200);
+    expect((listed.body.items as Array<{ id: string }>).map(({ id }) => id)).toEqual([henkatenId]);
+    expect(listed.body.items[0].parts).toHaveLength(3);
+
+    const clone = await request(app.getHttpServer())
+      .get(`/api/v1/supplier/henkatens/${henkatenId}/clone-prefill`)
+      .set('Cookie', leaderCookie);
+    expect(clone.status).toBe(200);
+    expect(clone.body.partStillValid).toBe(true);
+    expect((clone.body.parts as Array<{ id: string }>).map(({ id }) => id)).toEqual(partIds);
+
+    const withdrawn = await request(app.getHttpServer())
+      .post(`/api/v1/supplier/henkatens/${henkatenId}/withdraw`)
+      .set('Origin', supplierOrigin)
+      .set('Cookie', leaderCookie)
+      .set('X-CSRF-Token', leaderCsrf)
+      .set('Idempotency-Key', randomUUID())
+      .send({ expectedVersion: created.body.version, reason: 'Cleanup multi-part test' });
+    expect(withdrawn.status).toBe(201);
+    expect(await prisma.warningInstance.count({ where: { henkatenId, status: 'CLOSED' } })).toBe(3);
+  });
+
   it('returns the next occurrence for an LL outside shift time', async () => {
     const before = Date.now();
     const response = await request(app.getHttpServer())
@@ -1239,7 +1326,7 @@ describe('Line Shift Henkaten operations', () => {
           .set('Cookie', leaderCookie);
         expect(supplierRead.status).toBe(404);
         expect(
-          (await prisma.warningInstance.findUniqueOrThrow({ where: { henkatenId: id } })).hiddenAt,
+          (await prisma.warningInstance.findFirstOrThrow({ where: { henkatenId: id } })).hiddenAt,
         ).not.toBeNull();
         expect(
           (await prisma.pcrAssessment.findUniqueOrThrow({ where: { henkatenId: id } })).hiddenAt,

@@ -1,0 +1,238 @@
+/* Multi-part picker on the Henkaten form, plus the compact part cell used by lists. */
+.part-picker {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.part-picker__trigger-detail {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.part-picker__trigger .hds-search-select__identity {
+  overflow: hidden;
+}
+
+.part-picker__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.part-picker__option {
+  min-height: 48px;
+}
+
+.part-picker__box {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--hds-border-strong);
+  border-radius: var(--hds-radius-xs);
+  background: var(--hds-surface-default);
+  color: #fff;
+}
+
+.part-picker__box.is-radio {
+  border-radius: var(--hds-radius-full);
+}
+
+.part-picker__box.is-checked {
+  border-color: var(--hds-border-active);
+  background: var(--hds-border-active);
+}
+
+.part-picker__box svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 3;
+}
+
+.part-picker__option[aria-disabled='true'] .part-picker__box {
+  background: var(--hds-surface-disabled);
+}
+
+.part-picker__hint {
+  margin: 0;
+  padding: 6px 14px 8px;
+  color: var(--hds-text-secondary);
+  font-size: var(--hds-type-11-size);
+}
+
+.part-picker__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 10px;
+  border-top: 1px solid var(--hds-border-default);
+  background: var(--hds-surface-subtle);
+}
+
+.part-picker__done {
+  min-height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--hds-radius-sm);
+  background: var(--hds-text-primary);
+  color: var(--hds-surface-default);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.part-picker__done:focus-visible,
+.part-picker__selection-head button:focus-visible,
+.part-picker__chip button:focus-visible {
+  outline: 2px solid var(--hds-border-active);
+  outline-offset: 2px;
+}
+
+.part-picker__selection {
+  display: grid;
+  gap: 6px;
+}
+
+.part-picker__selection-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 24px;
+  color: var(--hds-text-secondary);
+  font-size: var(--hds-type-11-size);
+  font-weight: 600;
+}
+
+.part-picker__selection-head button {
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--hds-radius-xs);
+  background: transparent;
+  color: var(--hds-text-secondary);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.part-picker__selection-head button:hover {
+  color: var(--hds-state-danger-fg);
+}
+
+.part-picker__chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.part-picker__chip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 5px 5px 5px 11px;
+  border: 1px solid var(--hds-state-success-border);
+  border-radius: var(--hds-radius-md);
+  background: var(--hds-state-success-bg);
+}
+
+.part-picker__chip-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.part-picker__chip-text strong,
+.part-picker__chip-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.part-picker__chip-text strong {
+  font-size: 13px;
+}
+
+.part-picker__chip-text small {
+  color: var(--hds-text-secondary);
+  font-size: var(--hds-type-11-size);
+}
+
+.part-picker__chip button {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--hds-radius-sm);
+  background: transparent;
+  color: var(--hds-text-secondary);
+  cursor: pointer;
+}
+
+.part-picker__chip button svg {
+  width: 14px;
+}
+
+.part-picker__chip button:hover {
+  color: var(--hds-state-danger-fg);
+  background: var(--hds-state-danger-bg);
+}
+
+.part-summary__more {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: var(--hds-radius-full);
+  background: var(--hds-surface-inset);
+  color: var(--hds-text-secondary);
+  font-size: var(--hds-type-11-size);
+  font-weight: 600;
+  line-height: 1.6;
+  vertical-align: 1px;
+}
+
+.henkaten-review__parts {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.henkaten-parts-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.henkaten-parts-list li {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--hds-border-default);
+  border-radius: var(--hds-radius-md);
+  background: var(--hds-surface-subtle);
+}
+
+.henkaten-parts-list strong,
+.henkaten-parts-list small {
+  overflow-wrap: anywhere;
+}
+
+.henkaten-parts-list small {
+  color: var(--hds-text-secondary);
+  font-size: var(--hds-type-11-size);
+}

@@ -456,8 +456,9 @@ Catatan:
 - **Pengguna:** Line Leader normal session untuk own line.
 - **Tujuan:** membuat satu valid Henkaten 4M pada active atau planned Shift Run.
 - **Entry point:** Henkaten list, active shift, board job, atau resolution wizard.
-- **Elements umum:** resolved line/shift; category; target job; part search by number/name; current
-  checklist version dan ordered answers; cause; detail; submission review.
+- **Elements umum:** resolved line/shift; category; target job; multi-select part picker (search by
+  number/name, 1–50 master parts atau Other, removable selected entries); current checklist version
+  dan ordered answers; cause; detail; submission review listing the selected parts.
 - **Elements Man:** target assignment; replaced MP atau VACANT; replacement MP; source
   line/job/assignment bila replacement currently assigned; linked issue.
 - **Elements non-Man:** affected object dan replacement/new condition.
@@ -476,7 +477,7 @@ Catatan:
 - **Pengguna:** scope-permitted supplier roles.
 - **Tujuan:** menjadi immutable traceability view dan action context yang sah.
 - **Elements:** identifier/status/category; source mode; shift/business date/timezone; line/job/part
-  snapshots; creator/time; cause/detail; affected/replacement object; checklist snapshot/version;
+  snapshots (primary part plus a *Part terdampak* panel when several parts are affected); creator/time; cause/detail; affected/replacement object; checklist snapshot/version;
   route responsibility/decisions; lifecycle history; Man reservation/movement/source/donor details;
   cancellation/withdrawal reason; clone relationship.
 - **Actions:** LL Withdraw bila own line dan Open; LL Clone; Supervisor/QC decision bila route

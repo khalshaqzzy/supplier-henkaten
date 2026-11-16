@@ -789,6 +789,7 @@ model Part {
   updatedById          String?    @db.Uuid
   supplier             Supplier   @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   henkatens            Henkaten[]
+  henkatenParts        HenkatenPart[]
 
   @@unique([supplierId, normalizedPartNumber])
   @@unique([id, supplierId])
@@ -1229,7 +1230,8 @@ model Henkaten {
   manDetail                    ManHenkatenDetail?
   transitions                  HenkatenTransition[]
   reservation                  MPReservation?
-  warning                      WarningInstance?
+  parts                        HenkatenPart[]
+  warnings                     WarningInstance[]
   pcrAssessment                PcrAssessment?
   approvalRoutes               HenkatenApprovalRoute[]
   approvalDecisions            ApprovalDecision[]
@@ -1247,6 +1249,24 @@ model Henkaten {
   @@index([supplierId, lineId, occurredAt(sort: Desc)])
   @@index([supplierId, lineShiftId, effectiveStartAt, effectiveEndAt])
   @@index([supplierId, normalizedPartNumberSnapshot, status])
+}
+
+model HenkatenPart {
+  id                           String   @id @default(uuid()) @db.Uuid
+  supplierId                   String   @db.Uuid
+  henkatenId                   String   @db.Uuid
+  position                     Int
+  partId                       String?  @db.Uuid
+  partNumberSnapshot           String   @db.VarChar(100)
+  normalizedPartNumberSnapshot String   @db.VarChar(100)
+  partNameSnapshot             String   @db.VarChar(200)
+  henkaten                     Henkaten @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  part                         Part?    @relation(fields: [partId, supplierId], references: [id, supplierId], onDelete: Restrict)
+
+  @@unique([henkatenId, position])
+  @@unique([henkatenId, normalizedPartNumberSnapshot])
+  @@index([supplierId, normalizedPartNumberSnapshot])
+  @@index([supplierId, partId])
 }
 
 model PcrAssessment {
@@ -1500,7 +1520,7 @@ model WarningInstance {
   hiddenAt DateTime? @db.Timestamptz(3)
   id                           String                      @id @default(uuid()) @db.Uuid
   supplierId                   String                      @db.Uuid
-  henkatenId                   String?                     @unique @db.Uuid
+  henkatenId                   String?                     @db.Uuid
   externalProjectionId         String?                     @unique @db.Uuid
   sourceMode                   SourceMode                  @default(HOSTED)
   status                       WarningStatus               @default(OPEN)
@@ -1516,7 +1536,7 @@ model WarningInstance {
   externalProjection           ExternalHenkatenProjection? @relation(fields: [externalProjectionId, supplierId], references: [id, supplierId], onDelete: Restrict)
 
   @@unique([id, supplierId])
-  @@unique([henkatenId, supplierId])
+  @@unique([henkatenId, normalizedPartNumberSnapshot])
   @@unique([externalProjectionId, supplierId])
   @@index([supplierId, status, normalizedPartNumberSnapshot, openedAt])
   @@index([status, openedAt])

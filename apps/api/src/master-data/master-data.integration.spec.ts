@@ -8,6 +8,7 @@ import request from 'supertest';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  MAX_ACTIVE_LINES_PER_SUPPLIER,
   sourcePreflightResponseSchema,
   supplierSetupReadinessSchema,
 } from '@tmmin-henkaten/contracts';
@@ -945,6 +946,33 @@ describe('supplier master data', () => {
     expect(restored.deletedAt).toBeNull();
     expect(restored.active).toBe(true);
     expect(restored.resetArchivedAt).toBeNull();
+  });
+
+  it('allows 100 active lines per supplier and rejects the next one', async () => {
+    const active = await prisma.line.count({ where: { supplierId, active: true } });
+    const filler = Array.from({ length: MAX_ACTIVE_LINES_PER_SUPPLIER - 1 - active }, () => {
+      const code = `CAP-${randomUUID()}`;
+      return { supplierId, code, normalizedCode: code.toLowerCase(), name: code, displayOrder: 1 };
+    });
+    await prisma.line.createMany({ data: filler });
+    const last = await supplierPost('/api/v1/supplier/master-data/lines', {
+      code: `CAP-${randomUUID()}`,
+      name: 'Line at capacity',
+    });
+    expect(last.status).toBe(201);
+    expect(await prisma.line.count({ where: { supplierId, active: true } })).toBe(
+      MAX_ACTIVE_LINES_PER_SUPPLIER,
+    );
+    const rejected = await supplierPost('/api/v1/supplier/master-data/lines', {
+      code: `CAP-${randomUUID()}`,
+      name: 'Line over capacity',
+    });
+    expect(rejected.status).toBe(409);
+    expect(rejected.body.code).toBe('CAPACITY_EXCEEDED');
+    await prisma.line.updateMany({
+      where: { supplierId, code: { startsWith: 'CAP-' } },
+      data: { active: false },
+    });
   });
 
   function supplierPost(path: string, body: unknown) {

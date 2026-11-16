@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { MAX_ACTIVE_LINES_PER_SUPPLIER } from './master-data.js';
+
 export const SETUP_WORKBOOK_VERSION = '1';
 export const SETUP_MAX_ROWS = 60_000;
 export const setupSheetSchema = z.enum([
@@ -44,7 +46,7 @@ export const SETUP_SHEETS: ReadonlyArray<{
   },
   {
     name: 'Line',
-    limit: 20,
+    limit: MAX_ACTIVE_LINES_PER_SUPPLIER,
     columns: [
       { key: 'code', label: 'Kode line', required: true, text: true },
       { key: 'name', label: 'Nama line', required: true },

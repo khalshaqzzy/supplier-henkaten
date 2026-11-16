@@ -592,6 +592,9 @@ export function HenkatenExplorerPage() {
                     </td>
                     <td>
                       {row.partNumber}
+                      {row.partCount > 1 && (
+                        <span className="tmmin-part-more">+{row.partCount - 1}</span>
+                      )}
                       <small>{row.partName}</small>
                     </td>
                     <td>
@@ -651,7 +654,7 @@ export function HenkatenDetailPage() {
     | null
     | undefined;
   const line = labelOf(data.line);
-  const part = labelOf(data.part, 'number');
+  const parts = partLabels(data);
   const evidence =
     external && data.change && typeof data.change === 'object' && !Array.isArray(data.change)
       ? (data.change as Record<string, unknown>)
@@ -706,7 +709,19 @@ export function HenkatenDetailPage() {
                   value: external ? String(data.sourceVersion) : `v${String(data.version)}`,
                 },
                 { label: 'Line', value: line },
-                { label: 'Part', value: part },
+                {
+                  label: parts.length > 1 ? `Part (${parts.length})` : 'Part',
+                  value:
+                    parts.length > 1 ? (
+                      <ul className="tmmin-part-list">
+                        {parts.map((part) => (
+                          <li key={part}>{part}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      (parts[0] ?? '—')
+                    ),
+                },
                 { label: 'Occurred', value: dateTime(String(data.occurredAt)) },
               ]}
             />
@@ -1625,6 +1640,11 @@ function labelOf(value: unknown, key = 'name') {
     if (typeof candidate === 'string' || typeof candidate === 'number') return String(candidate);
   }
   return '—';
+}
+/** Hosted records list every affected part; External snapshots carry a single part. */
+function partLabels(data: Record<string, unknown>) {
+  const parts = Array.isArray(data.parts) ? data.parts : [data.part];
+  return parts.map((part) => labelOf(part, 'number')).filter((label) => label !== '—');
 }
 function stringValue(value: unknown) {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : '';

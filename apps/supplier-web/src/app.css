@@ -5109,68 +5109,6 @@ a.overview-activity-identifier:hover {
   gap: 12px;
 }
 
-.selected-part {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) 28px;
-  align-items: center;
-  gap: 9px;
-  min-height: 50px;
-  padding: 8px 9px;
-  border: 1px solid var(--hds-state-success-border);
-  border-radius: var(--hds-radius-md);
-  background: var(--hds-state-success-bg);
-}
-
-.selected-part__icon {
-  width: 27px;
-  height: 27px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--hds-radius-full);
-  color: var(--hds-state-success-fg);
-  background: var(--hds-surface-default);
-}
-
-.selected-part__icon svg,
-.selected-part button svg {
-  width: 14px;
-}
-
-.selected-part > span:nth-child(2) {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.selected-part strong,
-.selected-part small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.selected-part small {
-  color: var(--hds-text-secondary);
-  font-size: var(--hds-type-11-size);
-}
-
-.selected-part button {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  border: 0;
-  border-radius: var(--hds-radius-sm);
-  place-items: center;
-  color: var(--hds-text-secondary);
-  background: transparent;
-  cursor: pointer;
-}
-
-.selected-part button:hover {
-  color: var(--hds-state-danger-fg);
-  background: var(--hds-state-danger-bg);
-}
-
 .movement-selectors {
   display: grid;
   grid-template-columns: 1fr 1fr;

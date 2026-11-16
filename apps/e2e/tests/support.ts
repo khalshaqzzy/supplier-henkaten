@@ -475,7 +475,10 @@ export async function chooseOption(
 ): Promise<void> {
   const page = trigger.page();
   await trigger.click();
-  const list = page.locator('.hds-select__content [role="listbox"]');
+  // The shared Select and the Henkaten part picker expose the same option contract.
+  const list = page.locator(
+    '.hds-select__content [role="listbox"], .part-picker__popup [role="listbox"]',
+  );
   await expect(list).toBeVisible();
   const target =
     typeof option === 'string'

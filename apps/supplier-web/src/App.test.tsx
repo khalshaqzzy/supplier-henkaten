@@ -393,6 +393,7 @@ describe('Supplier application foundation', () => {
       line: { code: 'SUP-L1', name: 'Line Satu' },
       jobName: 'Job Satu',
       part: { number: 'PART-1', name: 'Part Satu' },
+      parts: [{ id: '00000000-0000-4000-8000-000000000014', number: 'PART-1', name: 'Part Satu' }],
       routes: {
         supervisor: route('SUPERVISOR', 'APPROVED'),
         qc: route('QC', 'PENDING'),

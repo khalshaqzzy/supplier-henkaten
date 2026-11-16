@@ -292,8 +292,10 @@ const tmminHenkatenBase = {
   category: henkatenCategorySchema,
   lineName: z.string(),
   jobName: z.string(),
+  // First affected part; `partCount` tells how many parts the record covers.
   partNumber: z.string(),
   partName: z.string(),
+  partCount: z.number().int().positive(),
   occurredAt: utcTimestampSchema,
   updatedAt: utcTimestampSchema,
   pcr: pcrAssessmentSchema.nullable(),

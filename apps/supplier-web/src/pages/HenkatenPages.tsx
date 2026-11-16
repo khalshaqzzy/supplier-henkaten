@@ -27,6 +27,7 @@ import { useSession } from '../app/session';
 import { CursorPager } from '../components/CursorPager';
 import { PageHeader } from '../components/layout';
 import { FactItem, FactStrip } from '../components/OperationalUI';
+import { PartSummary } from './HenkatenPartPicker';
 import {
   ApprovalTimeline,
   ChangeEvidence,
@@ -309,10 +310,7 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
                     </td>
                     <td data-label="Shift">{item.shiftName}</td>
                     <td data-label="Part">
-                      <div className="henkaten-table__stack">
-                        <strong>{item.part.number}</strong>
-                        <small>{item.part.name}</small>
-                      </div>
+                      <PartSummary parts={item.parts} />
                     </td>
                     <td data-label="Supervisor">
                       <CompactRouteStatus value={item.routes.supervisor.status} />
@@ -498,7 +496,11 @@ export function HenkatenDetailPage() {
         <FactItem label="Business date" value={item.businessDate} />
         <FactItem label="Line" value={item.line.code} detail={item.line.name} />
         <FactItem label="Job" value={item.jobName} />
-        <FactItem label="Part" value={item.part.number} detail={item.part.name} />
+        <FactItem
+          label="Part"
+          value={item.part.number}
+          detail={item.parts.length > 1 ? `+${item.parts.length - 1} part lain` : item.part.name}
+        />
         <FactItem label="Dibuat oleh" value={item.creatorName} />
       </FactStrip>
       {item.pcr?.status === 'PCR' && item.pcr.assessment && (
@@ -538,6 +540,18 @@ export function HenkatenDetailPage() {
                 </Link>
               )}
             </div>
+          )}
+          {item.parts.length > 1 && (
+            <Panel title={`Part terdampak (${item.parts.length})`}>
+              <ul className="henkaten-parts-list">
+                {item.parts.map((part) => (
+                  <li key={part.id ?? part.number}>
+                    <strong>{part.number}</strong>
+                    {part.name && <small>{part.name}</small>}
+                  </li>
+                ))}
+              </ul>
+            </Panel>
           )}
           <div className="henkaten-evidence-grid">
             <ChangeEvidence category={item.category} cause={item.cause} detail={item.detail} />

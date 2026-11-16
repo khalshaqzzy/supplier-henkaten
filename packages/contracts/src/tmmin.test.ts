@@ -36,6 +36,7 @@ describe('TMMIN governance and monitoring contracts', () => {
       jobName: 'Job 1',
       partNumber: 'P-1',
       partName: 'Part 1',
+      partCount: 1,
       occurredAt: '2026-07-25T00:00:00.000Z',
       updatedAt: '2026-07-25T00:00:00.000Z',
       displayId: 'EXT-1',

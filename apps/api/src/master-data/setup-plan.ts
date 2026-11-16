@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  MAX_ACTIVE_LINES_PER_SUPPLIER,
   SETUP_SHEETS,
   setupNormalize as norm,
   setupRowKey,
@@ -487,7 +488,7 @@ export async function prepareSetupPlan(
   }
   for (const [sheet, limit] of [
     ['Member', 300],
-    ['Line', 20],
+    ['Line', MAX_ACTIVE_LINES_PER_SUPPLIER],
     ['Job', 500],
   ] as const)
     if ([...final.values()].filter((e) => e.sheet === sheet && e.active).length > limit) {

@@ -12,6 +12,7 @@ import { TenantScope } from '../common/scope.js';
 import { AuditWriter } from '../persistence/audit-writer.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 import { LineShiftService } from '../master-data/line-shift.service.js';
+import { henkatenPartSearch } from '../henkaten/henkaten-presenters.js';
 
 @Injectable()
 export class ReadModelService {
@@ -212,14 +213,7 @@ export class ReadModelService {
             },
           }
         : {}),
-      ...(query.part
-        ? {
-            OR: [
-              { partNumberSnapshot: { contains: query.part, mode: 'insensitive' } },
-              { partNameSnapshot: { contains: query.part, mode: 'insensitive' } },
-            ],
-          }
-        : {}),
+      ...(query.part ? henkatenPartSearch(query.part) : {}),
     };
     const [
       status,
@@ -252,9 +246,10 @@ export class ReadModelService {
         orderBy: { _count: { lineNameSnapshot: 'desc' } },
         take: 20,
       }),
-      this.prisma.henkaten.groupBy({
+      // Every affected part counts, so a multi-part Henkaten contributes to each of its parts.
+      this.prisma.henkatenPart.groupBy({
         by: ['partNumberSnapshot'],
-        where,
+        where: { supplierId: scope.supplierId, henkaten: where },
         _count: { _all: true },
         orderBy: { _count: { partNumberSnapshot: 'desc' } },
         take: 20,
@@ -476,14 +471,7 @@ export class ReadModelService {
       ...(query.status ? { status: query.status } : {}),
       ...(query.category ? { category: query.category } : {}),
       ...(query.line ? { lineNameSnapshot: { contains: query.line, mode: 'insensitive' } } : {}),
-      ...(query.part
-        ? {
-            OR: [
-              { partNumberSnapshot: { contains: query.part, mode: 'insensitive' } },
-              { partNameSnapshot: { contains: query.part, mode: 'insensitive' } },
-            ],
-          }
-        : {}),
+      ...(query.part ? henkatenPartSearch(query.part) : {}),
     };
     const externalWhere: Prisma.ExternalHenkatenProjectionWhereInput = {
       deletedAt: null,
@@ -520,6 +508,7 @@ export class ReadModelService {
               category: true,
               lineNameSnapshot: true,
               partNumberSnapshot: true,
+              parts: { select: { partNumberSnapshot: true }, orderBy: { position: 'asc' } },
               occurredAt: true,
               supplier: { select: { name: true } },
             },
@@ -631,7 +620,9 @@ export class ReadModelService {
         status: row.status,
         category: row.category,
         line: row.lineNameSnapshot,
-        part: row.partNumberSnapshot,
+        parts: row.parts.length
+          ? row.parts.map((part) => part.partNumberSnapshot)
+          : [row.partNumberSnapshot],
         occurredAt: row.occurredAt,
       })),
       ...externalRows.map((row) => ({
@@ -641,7 +632,7 @@ export class ReadModelService {
         status: row.status,
         category: row.category,
         line: snapshotLabel(row.lineSnapshot),
-        part: snapshotLabel(row.partSnapshot, 'number'),
+        parts: [snapshotLabel(row.partSnapshot, 'number')],
         occurredAt: row.occurredAt,
       })),
     ];
@@ -751,7 +742,7 @@ export class ReadModelService {
       rankings: {
         suppliers: rankLabels(records.map(({ supplierName }) => supplierName)),
         lines: rankLabels(records.map(({ line }) => line)),
-        parts: rankLabels(records.map(({ part }) => part)),
+        parts: rankLabels(records.flatMap(({ parts }) => parts)),
       },
       trend,
       freshnessSummary,
@@ -927,7 +918,7 @@ export type DashboardRecord = {
   status: string;
   category: string;
   line: string;
-  part: string;
+  parts: string[];
   occurredAt: Date;
 };
 

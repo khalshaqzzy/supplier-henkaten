@@ -14,7 +14,7 @@ function record(
     status,
     category: 'MAN',
     line: 'Line 1',
-    part: 'P-001',
+    parts: ['P-001'],
     occurredAt: new Date(occurredAt),
   };
 }
