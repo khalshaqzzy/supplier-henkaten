@@ -85,7 +85,7 @@ test('Setup blockers expand into named entities and deep-link to the exact fix @
     {
       expectedVersion: lineShift.version,
       supervisorMemberId: null,
-      lineLeaderMemberId: fixture.members.leader.id,
+      lineLeaderMemberIds: [fixture.members.leader.id],
       jobs: lineShift.assignments.map(({ jobId }) => ({
         jobId,
         mpMemberId: jobId === fixture.job.id ? fixture.members.mp.id : null,

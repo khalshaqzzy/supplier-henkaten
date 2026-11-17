@@ -1,3 +1,17 @@
+## Several Line Leaders, username changes and internal part numbers — 17 November 2026
+
+Implementation on `feat/multi-leader-username-part-numbers`: Line–Shift leaders move to the new
+`LineShiftLineLeader` table (0–10 per Line–Shift, any number of Line–Shifts per leader, co-leader
+Henkaten visibility and Withdraw, Line–Shift choice on the Henkaten form); admins rename usernames
+(Supplier Admin for supplier accounts, TMMIN Admin for Quality users and the Supplier Admin) without
+ending sessions; parts gain an optional, supplier-only Internal Part Number with a Henkaten part
+snapshot, and supplier screens label the part key *TMMIN Part Number*. Additive migration
+`20261117002500_multi_line_leader_internal_part_number` with backfill and one declared index drop;
+API, OpenAPI, client, seed, setup workbook, Supplier and TMMIN pages changed. See
+[ADR 0054](../docs/adr/0054-multi-line-leader-username-rename-internal-part-number.md) and the
+current handoff for validation and delivery. Phase 15 remains the sole current `in_progress` phase;
+staging/device/UAT is unchanged.
+
 ## Faster browser journeys — 16 November 2026
 
 Implementation on `ci/faster-e2e`: the browser journey runner uses one PostgreSQL per run with a

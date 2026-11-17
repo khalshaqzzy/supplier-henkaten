@@ -14,6 +14,7 @@ import {
   supplierListQuerySchema,
   startHostedPreparationRequestSchema,
   updateSupplierRequestSchema,
+  updateUsernameRequestSchema,
   qualityUserListQuerySchema,
   type CancelHostedPreparationRequest,
   type CreateSupplierRequest,
@@ -22,6 +23,7 @@ import {
   type SourceCutoverRequest,
   type StartHostedPreparationRequest,
   type UpdateSupplierRequest,
+  type UpdateUsernameRequest,
   type SupplierListQuery,
   type QualityUserListQuery,
 } from '@tmmin-henkaten/contracts';
@@ -62,6 +64,20 @@ export class TmminQualityAdminController {
   ) {
     response.setHeader('Cache-Control', 'no-store');
     return this.users.createQuality(body, mutationContext(request));
+  }
+
+  @RequireCapabilities('TMMIN_QUALITY_MANAGE')
+  @Patch('/:id')
+  updateUsername(
+    @Param('id') id: string,
+    @ValidatedBody(updateUsernameRequestSchema) body: UpdateUsernameRequest,
+    @Req() request: ContextRequest,
+  ) {
+    return this.users.updateQualityUsername(
+      parseWithSchema(opaqueIdSchema, id),
+      body,
+      mutationContext(request),
+    );
   }
 
   @RequireCapabilities('TMMIN_QUALITY_MANAGE')
@@ -199,6 +215,20 @@ export class SupplierAdministrationController {
       parseWithSchema(opaqueIdSchema, id),
       body.expectedVersion,
       false,
+      mutationContext(request),
+    );
+  }
+
+  @RequireCapabilities('TMMIN_SUPPLIER_MANAGE')
+  @Patch('/:id/supplier-admin')
+  updateAdminUsername(
+    @Param('id') id: string,
+    @ValidatedBody(updateUsernameRequestSchema) body: UpdateUsernameRequest,
+    @Req() request: ContextRequest,
+  ) {
+    return this.suppliers.updateAdminUsername(
+      parseWithSchema(opaqueIdSchema, id),
+      body,
       mutationContext(request),
     );
   }

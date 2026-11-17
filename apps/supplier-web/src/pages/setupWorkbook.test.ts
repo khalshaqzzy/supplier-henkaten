@@ -39,7 +39,7 @@ describe('multi-sheet setup parsing', () => {
       },
     ]);
     expect(result.issues).toContainEqual(
-      expect.objectContaining({ column: 'Part number', sourceRow: 2 }),
+      expect.objectContaining({ column: 'TMMIN Part Number', sourceRow: 2 }),
     );
   });
   it('preserves password whitespace and ignores extra supplier columns', () => {
@@ -76,7 +76,7 @@ describe('multi-sheet setup parsing', () => {
     ]);
     expect(result.issues).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ sourceRow: 1, column: 'Part number' }),
+        expect.objectContaining({ sourceRow: 1, column: 'TMMIN Part Number' }),
         expect.objectContaining({ sourceRow: 1, column: 'Nama part' }),
       ]),
     );

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { ApiProblemError } from '@tmmin-henkaten/api-client';
-import type { LineShift } from '@tmmin-henkaten/contracts';
+import { MAX_LINE_LEADERS_PER_LINE_SHIFT, type LineShift } from '@tmmin-henkaten/contracts';
 import {
   Alert,
   Button,
@@ -12,6 +12,7 @@ import {
   Select,
   Panel,
   Skeleton,
+  SearchMultiSelect,
   SearchSelect,
   toast,
 } from '@tmmin-henkaten/ui';
@@ -284,12 +285,19 @@ function AssignmentEditor({
   toggling: boolean;
 }) {
   const [supervisorId, setSupervisorId] = useState(item.supervisorMemberId ?? '');
-  const [leaderId, setLeaderId] = useState(item.lineLeaderMemberId ?? '');
-  const leaderOccupancy = new Map(
-    allLineShifts
-      .filter((shift) => shift.active && shift.id !== item.id && shift.lineLeaderMemberId)
-      .map((shift) => [shift.lineLeaderMemberId!, `${shift.lineCode} · ${shift.shiftName}`]),
+  const [leaderIds, setLeaderIds] = useState(() =>
+    item.lineLeaders.map(({ memberId }) => memberId),
   );
+  // Other active Line–Shifts per Line Leader, shown as context only.
+  const otherLeaderships = new Map<string, string[]>();
+  for (const shift of allLineShifts) {
+    if (!shift.active || shift.id === item.id) continue;
+    for (const leader of shift.lineLeaders)
+      otherLeaderships.set(leader.memberId, [
+        ...(otherLeaderships.get(leader.memberId) ?? []),
+        `${shift.lineCode} · ${shift.shiftName}`,
+      ]);
+  }
   const [mps, setMps] = useState<Record<string, string>>(
     Object.fromEntries(item.assignments.map(({ jobId, mpMemberId }) => [jobId, mpMemberId ?? ''])),
   );
@@ -298,7 +306,7 @@ function AssignmentEditor({
       supplierApi.updateLineShiftAssignments(item.id, {
         expectedVersion: item.version,
         supervisorMemberId: supervisorId || null,
-        lineLeaderMemberId: leaderId || null,
+        lineLeaderMemberIds: leaderIds,
         jobs: item.assignments.map(({ jobId }) => ({ jobId, mpMemberId: mps[jobId] || null })),
       }),
     onSuccess: async () => {
@@ -321,12 +329,28 @@ function AssignmentEditor({
           />
         </div>
         <div className="focus-target-frame" data-focus-target="line-leader">
-          <MemberSelect
+          <SearchMultiSelect
             label="Line Leader"
-            value={leaderId}
-            members={role('LINE_LEADER')}
-            occupied={leaderOccupancy}
-            onChange={setLeaderId}
+            addLabel="Tambah Line Leader"
+            emptyLabel="Belum ada Line Leader"
+            max={MAX_LINE_LEADERS_PER_LINE_SHIFT}
+            values={leaderIds}
+            onValuesChange={setLeaderIds}
+            options={role('LINE_LEADER').map((member) => {
+              const others = otherLeaderships.get(member.id);
+              return {
+                value: member.id,
+                label: member.fullName,
+                description: [member.registrationNumber, member.importCode]
+                  .filter(Boolean)
+                  .join(' · '),
+                keywords: others?.join(' ') ?? '',
+                ...(others?.length ? { note: `Juga memimpin ${others.join(', ')}` } : {}),
+                ...(member.account?.status !== 'ACTIVE'
+                  ? { disabledReason: 'Akun belum aktif' }
+                  : {}),
+              };
+            })}
           />
         </div>
       </div>
@@ -377,14 +401,12 @@ function MemberSelect({
   label,
   value,
   members,
-  occupied,
   hideLabel = false,
   onChange,
 }: {
   label: string;
   value: string;
   members: Member[];
-  occupied?: Map<string, string>;
   hideLabel?: boolean;
   onChange: (value: string) => void;
 }) {
@@ -403,9 +425,7 @@ function MemberSelect({
           (member.role === 'MP' ? 'MP' : ''),
         ...(member.role !== 'MP' && member.account?.status !== 'ACTIVE'
           ? { disabledReason: 'Akun belum aktif' }
-          : occupied?.has(member.id)
-            ? { disabledReason: `Ditugaskan di ${occupied.get(member.id)}` }
-            : {}),
+          : {}),
       }))}
     />
   );

@@ -13,6 +13,7 @@ import { AuditWriter } from '../persistence/audit-writer.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 import { LineShiftService } from '../master-data/line-shift.service.js';
 import { henkatenPartSearch } from '../henkaten/henkaten-presenters.js';
+import { lineLeaderHenkatenScope, lineLeaderShiftRunScope } from '../common/line-leader-scope.js';
 
 @Injectable()
 export class ReadModelService {
@@ -110,7 +111,7 @@ export class ReadModelService {
         isCurrent: item.current,
         businessDate: item.businessDate,
         supervisor: { memberId: item.supervisorMemberId, name: item.supervisorName },
-        lineLeader: { memberId: item.lineLeaderMemberId, name: item.lineLeaderName },
+        lineLeaders: item.lineLeaders,
         activeOverride: null,
         jobs: item.assignments.map((assignment) => ({
           assignmentId: assignment.id,
@@ -213,7 +214,7 @@ export class ReadModelService {
             },
           }
         : {}),
-      ...(query.part ? henkatenPartSearch(query.part) : {}),
+      ...(query.part ? henkatenPartSearch(query.part, true) : {}),
     };
     const [
       status,
@@ -1022,7 +1023,7 @@ function shiftScope(principal: RequestPrincipal): Prisma.ShiftRunWhereInput {
   if (!principal.memberId) return { id: '00000000-0000-0000-0000-000000000000' };
   return principal.role === 'SUPERVISOR'
     ? { supervisorMemberId: principal.memberId }
-    : { lineLeaderMemberId: principal.memberId };
+    : lineLeaderShiftRunScope(principal.memberId);
 }
 
 function henkatenScope(principal: RequestPrincipal): Prisma.HenkatenWhereInput {
@@ -1039,12 +1040,7 @@ function henkatenScope(principal: RequestPrincipal): Prisma.HenkatenWhereInput {
           },
         ],
       }
-    : {
-        OR: [
-          { lineLeaderResponsibility: { memberId: principal.memberId } },
-          { lineLeaderResponsibility: null, shiftRun: { lineLeaderMemberId: principal.memberId } },
-        ],
-      };
+    : lineLeaderHenkatenScope(principal.memberId);
 }
 
 function initials(name: string | null): string | null {

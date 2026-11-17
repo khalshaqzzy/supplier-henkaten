@@ -174,7 +174,7 @@ export class BoardLayoutService {
       principal.role === 'SUPERVISOR'
         ? { supervisorMemberId: principal.memberId ?? impossibleId }
         : principal.role === 'LINE_LEADER'
-          ? { lineLeaderMemberId: principal.memberId ?? impossibleId }
+          ? { lineLeaders: { some: { memberId: principal.memberId ?? impossibleId } } }
           : { id: impossibleId };
     const line = await client.line.findFirst({
       where: {
@@ -192,7 +192,7 @@ export class BoardLayoutService {
         lineShifts: {
           where: {
             active: true,
-            lineLeaderMemberId: principal.memberId ?? impossibleId,
+            lineLeaders: { some: { memberId: principal.memberId ?? impossibleId } },
           },
           select: { id: true },
         },

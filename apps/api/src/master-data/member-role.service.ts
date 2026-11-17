@@ -52,7 +52,9 @@ export class MemberRoleService {
         ? await tx.lineShift.findMany({
             where: {
               supplierId: scope.supplierId,
-              ...(isLeader ? { lineLeaderMemberId: id } : { supervisorMemberId: id }),
+              ...(isLeader
+                ? { lineLeaders: { some: { memberId: id } } }
+                : { supervisorMemberId: id }),
             },
             include: { line: true, shiftTemplate: true },
             orderBy: { id: 'asc' },
@@ -105,13 +107,6 @@ export class MemberRoleService {
       include: { member: true },
       orderBy: { id: 'asc' },
     });
-    const activeShifts = isLeader
-      ? await tx.lineShift.findMany({
-          where: { supplierId: scope.supplierId, active: true, lineLeaderMemberId: { not: null } },
-          select: { id: true, lineLeaderMemberId: true, version: true },
-          orderBy: { id: 'asc' },
-        })
-      : [];
     const leaderDefaults = isLeader
       ? await tx.defaultLineLeader.findMany({
           where: { supplierId: scope.supplierId },
@@ -173,18 +168,17 @@ export class MemberRoleService {
           u.memberId !== id && u.role === member.role && u.status === 'ACTIVE' && u.member?.active,
       )
       .map((u) => {
+        // A Line Leader may lead several Line–Shifts; only the legacy one-line default is exclusive.
         const occupied =
           isLeader &&
-          ((shifts.some((s) => s.active) &&
-            activeShifts.some((s) => s.lineLeaderMemberId === u.memberId)) ||
-            (defaults.length > 0 &&
-              leaderDefaults.some((d) => d.lineLeaderMemberId === u.memberId)));
+          defaults.length > 0 &&
+          leaderDefaults.some((d) => d.lineLeaderMemberId === u.memberId);
         return {
           id: u.memberId!,
           fullName: u.member!.fullName,
           registrationNumber: u.member!.registrationNumber,
           available: !occupied,
-          unavailableReason: occupied ? 'Sudah memiliki assignment LL lain' : null,
+          unavailableReason: occupied ? 'Sudah memiliki default line lain' : null,
         };
       });
     if (dependencies.length && !candidates.some((c) => c.available))
@@ -205,7 +199,6 @@ export class MemberRoleService {
         u.member?.version,
         u.member?.active,
       ]),
-      activeShifts,
       leaderDefaults,
       henkatens: henkatens.map((h) => [
         h.id,
@@ -283,21 +276,40 @@ export class MemberRoleService {
             'Pengganti tidak aktif, berbeda role, atau sudah memiliki assignment lain.',
           );
         const isLeader = review.member.role === 'LINE_LEADER';
-        // A single LL may not take over two active shifts, even when selected in one command.
-        const selectedActive = review.dependencies
-          .filter((d) => d.kind === 'LINE_SHIFT' && d.active)
-          .map((d) => mappings.get(`${d.kind}:${d.id}`));
-        if (new Set(selectedActive).size !== selectedActive.length)
-          throw conflict('Satu Line Leader hanya dapat menerima satu Line–Shift aktif.');
         for (const dependency of review.dependencies) {
           const replacementMemberId = mappings.get(`${dependency.kind}:${dependency.id}`)!;
           const replacement = review.candidates.find((c) => c.id === replacementMemberId)!;
           if (dependency.kind === 'LINE_SHIFT') {
+            let leaderIds: string[] | undefined;
+            if (isLeader) {
+              const current = await tx.lineShiftLineLeader.findMany({
+                where: { supplierId: scope.supplierId, lineShiftId: dependency.id },
+                orderBy: [{ position: 'asc' }, { id: 'asc' }],
+              });
+              // The replacement takes the outgoing leader's place; an existing co-leader keeps theirs.
+              leaderIds = [
+                ...new Set(
+                  current.map(({ memberId }) => (memberId === id ? replacementMemberId : memberId)),
+                ),
+              ];
+              await tx.lineShiftLineLeader.deleteMany({
+                where: { supplierId: scope.supplierId, lineShiftId: dependency.id },
+              });
+              await tx.lineShiftLineLeader.createMany({
+                data: leaderIds.map((memberId, index) => ({
+                  supplierId: scope.supplierId,
+                  lineShiftId: dependency.id,
+                  memberId,
+                  position: index + 1,
+                  createdById: principal.userId,
+                })),
+              });
+            }
             await tx.lineShift.update({
               where: { id: dependency.id },
               data: {
-                ...(isLeader
-                  ? { lineLeaderMemberId: replacementMemberId }
+                ...(leaderIds
+                  ? { lineLeaderMemberId: leaderIds[0] ?? null }
                   : { supervisorMemberId: replacementMemberId }),
                 version: { increment: 1 },
                 updatedById: principal.userId,

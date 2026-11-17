@@ -309,6 +309,14 @@ describe('reviewed member role handover', () => {
         supervisorMemberId: supervisor.member.id,
       },
     });
+    await prisma.lineShiftLineLeader.create({
+      data: {
+        supplierId: f.supplier.id,
+        lineShiftId: ls.id,
+        memberId: leader.member.id,
+        position: 1,
+      },
+    });
     const job = await prisma.job.create({
       data: {
         supplierId: f.supplier.id,
@@ -551,15 +559,15 @@ describe('reviewed member role handover', () => {
     });
   });
 
-  it('rejects an occupied replacement LL and stale work introduced after review', async () => {
+  it('offers an LL of another Line Shift as replacement and rejects stale work introduced after review', async () => {
     const f = await fixture();
     const source = await f.member('LINE_LEADER');
     const g = await graph(f, source);
-    const occupied = await f.member('LINE_LEADER');
-    await graph(f, occupied);
-    const available = await f.member('LINE_LEADER');
+    const otherLeader = await f.member('LINE_LEADER');
+    await graph(f, otherLeader);
     const review = await roles.preview(f.scope, source.member.id, 'SUPERVISOR');
-    expect(review.candidates.find((c) => c.id === occupied.member.id)?.available).toBe(false);
+    // Leading another Line Shift no longer blocks a leader from taking over.
+    expect(review.candidates.find((c) => c.id === otherLeader.member.id)?.available).toBe(true);
     const body = {
       role: 'SUPERVISOR' as const,
       revision: review.revision,
@@ -567,28 +575,12 @@ describe('reviewed member role handover', () => {
       handovers: review.dependencies.map((d) => ({
         kind: d.kind,
         id: d.id,
-        replacementMemberId: occupied.member.id,
+        replacementMemberId: otherLeader.member.id,
       })),
     };
-    await expect(
-      roles.change(f.scope, source.member.id, body, randomUUID(), f.principal, f.context),
-    ).rejects.toThrow();
     await prisma.henkaten.update({ where: { id: g.h.id }, data: { version: { increment: 1 } } });
     await expect(
-      roles.change(
-        f.scope,
-        source.member.id,
-        {
-          ...body,
-          handovers: body.handovers.map((d) => ({
-            ...d,
-            replacementMemberId: available.member.id,
-          })),
-        },
-        randomUUID(),
-        f.principal,
-        f.context,
-      ),
+      roles.change(f.scope, source.member.id, body, randomUUID(), f.principal, f.context),
     ).rejects.toMatchObject({ problem: { code: 'VERSION_CONFLICT' } });
   });
 

@@ -24,7 +24,7 @@ import {
   notificationPageSchema,
   notificationSchema,
   notificationUnreadCountSchema,
-  partPageSchema,
+  tmminPartPageSchema,
   qualityUserListQuerySchema,
   readinessResponseSchema,
   sessionResponseSchema,
@@ -206,6 +206,14 @@ export class TmminApi {
     });
   }
 
+  renameSupplierAdmin(id: string, body: { expectedVersion: number; username: string }) {
+    return this.client.request(`/api/v1/tmmin/suppliers/${id}/supplier-admin`, {
+      method: 'PATCH',
+      body,
+      responseSchema: userSummarySchema,
+    });
+  }
+
   resetSupplierAdmin(id: string, expectedVersion: number) {
     return this.client.request(`/api/v1/tmmin/suppliers/${id}/supplier-admin/reset-password`, {
       method: 'POST',
@@ -279,6 +287,14 @@ export class TmminApi {
     return this.client.request('/api/v1/tmmin/quality-users', {
       query: asQuery(qualityUserListQuerySchema.parse(query)),
       responseSchema: userPageSchema,
+    });
+  }
+
+  renameQualityUser(id: string, body: { expectedVersion: number; username: string }) {
+    return this.client.request(`/api/v1/tmmin/quality-users/${id}`, {
+      method: 'PATCH',
+      body,
+      responseSchema: userSummarySchema,
     });
   }
 
@@ -452,7 +468,7 @@ export class TmminApi {
   hostedParts(supplierId: string, query: QueryRecord = {}) {
     return this.client.request(`/api/v1/tmmin/suppliers/${supplierId}/master-data/parts`, {
       query,
-      responseSchema: partPageSchema,
+      responseSchema: tmminPartPageSchema,
     });
   }
 

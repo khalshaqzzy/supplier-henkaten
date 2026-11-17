@@ -28,7 +28,7 @@ test('reviews CSV conflicts and imports an Excel workbook @edge', async ({
   });
   await expect(page.getByRole('heading', { name: 'Pilih data yang akan diimpor' })).toBeVisible();
   await expect(page.locator('.part-import-sample tbody tr')).toHaveCount(2);
-  await chooseOption(page.getByLabel('Kolom Part number'), '1');
+  await chooseOption(page.getByLabel('Kolom TMMIN Part Number'), '1');
   await chooseOption(page.getByLabel('Kolom Nama part'), '2');
   await expect(page.locator('.part-import-sample th.is-selected')).toHaveCount(2);
   await page.screenshot({

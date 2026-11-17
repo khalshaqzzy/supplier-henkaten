@@ -1917,7 +1917,150 @@ export interface paths {
     delete?: never;
     options?: never;
     head?: never;
-    patch?: never;
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number;
+            username: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Renamed TMMIN Quality user */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: uuid */
+              id: string;
+              supplierId: string | null;
+              /** @enum {string} */
+              role:
+                | 'TMMIN_ADMIN'
+                | 'TMMIN_QUALITY'
+                | 'SUPPLIER_ADMIN'
+                | 'SUPERVISOR'
+                | 'LINE_LEADER'
+                | 'QC';
+              username: string;
+              displayName: string;
+              /** @enum {string} */
+              status: 'ACTIVE' | 'INACTIVE';
+              mustChangePassword: boolean;
+              protectedBootstrapAdmin: boolean;
+              version: number;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Problem Details */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
     trace?: never;
   };
   '/api/v1/tmmin/quality-users/{id}/deactivate': {
@@ -2987,6 +3130,165 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tmmin/suppliers/{id}/supplier-admin': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number;
+            username: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Renamed Supplier Admin */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: uuid */
+              id: string;
+              supplierId: string | null;
+              /** @enum {string} */
+              role:
+                | 'TMMIN_ADMIN'
+                | 'TMMIN_QUALITY'
+                | 'SUPPLIER_ADMIN'
+                | 'SUPERVISOR'
+                | 'LINE_LEADER'
+                | 'QC';
+              username: string;
+              displayName: string;
+              /** @enum {string} */
+              status: 'ACTIVE' | 'INACTIVE';
+              mustChangePassword: boolean;
+              protectedBootstrapAdmin: boolean;
+              version: number;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Problem Details */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
     trace?: never;
   };
   '/api/v1/tmmin/suppliers/{id}/supplier-admin/replace': {
@@ -6392,8 +6694,11 @@ export interface paths {
                 crossesMidnight: boolean;
                 supervisorMemberId: string | null;
                 supervisorName: string | null;
-                lineLeaderMemberId: string | null;
-                lineLeaderName: string | null;
+                lineLeaders: {
+                  /** Format: uuid */
+                  memberId: string;
+                  name: string;
+                }[];
                 active: boolean;
                 assignments: {
                   /** Format: uuid */
@@ -6457,8 +6762,11 @@ export interface paths {
               crossesMidnight: boolean;
               supervisorMemberId: string | null;
               supervisorName: string | null;
-              lineLeaderMemberId: string | null;
-              lineLeaderName: string | null;
+              lineLeaders: {
+                /** Format: uuid */
+                memberId: string;
+                name: string;
+              }[];
               active: boolean;
               assignments: {
                 /** Format: uuid */
@@ -6569,8 +6877,11 @@ export interface paths {
                 crossesMidnight: boolean;
                 supervisorMemberId: string | null;
                 supervisorName: string | null;
-                lineLeaderMemberId: string | null;
-                lineLeaderName: string | null;
+                lineLeaders: {
+                  /** Format: uuid */
+                  memberId: string;
+                  name: string;
+                }[];
                 active: boolean;
                 assignments: {
                   /** Format: uuid */
@@ -6642,8 +6953,11 @@ export interface paths {
                 crossesMidnight: boolean;
                 supervisorMemberId: string | null;
                 supervisorName: string | null;
-                lineLeaderMemberId: string | null;
-                lineLeaderName: string | null;
+                lineLeaders: {
+                  /** Format: uuid */
+                  memberId: string;
+                  name: string;
+                }[];
                 active: boolean;
                 assignments: {
                   /** Format: uuid */
@@ -6706,7 +7020,7 @@ export interface paths {
           'application/json': {
             expectedVersion: number;
             supervisorMemberId: string | null;
-            lineLeaderMemberId: string | null;
+            lineLeaderMemberIds: string[];
             jobs: {
               /** Format: uuid */
               jobId: string;
@@ -6738,8 +7052,11 @@ export interface paths {
               crossesMidnight: boolean;
               supervisorMemberId: string | null;
               supervisorName: string | null;
-              lineLeaderMemberId: string | null;
-              lineLeaderName: string | null;
+              lineLeaders: {
+                /** Format: uuid */
+                memberId: string;
+                name: string;
+              }[];
               active: boolean;
               assignments: {
                 /** Format: uuid */
@@ -6855,8 +7172,11 @@ export interface paths {
               crossesMidnight: boolean;
               supervisorMemberId: string | null;
               supervisorName: string | null;
-              lineLeaderMemberId: string | null;
-              lineLeaderName: string | null;
+              lineLeaders: {
+                /** Format: uuid */
+                memberId: string;
+                name: string;
+              }[];
               active: boolean;
               assignments: {
                 /** Format: uuid */
@@ -6976,8 +7296,11 @@ export interface paths {
               crossesMidnight: boolean;
               supervisorMemberId: string | null;
               supervisorName: string | null;
-              lineLeaderMemberId: string | null;
-              lineLeaderName: string | null;
+              lineLeaders: {
+                /** Format: uuid */
+                memberId: string;
+                name: string;
+              }[];
               active: boolean;
               assignments: {
                 /** Format: uuid */
@@ -7675,6 +7998,7 @@ export interface paths {
                 id: string;
                 partNumber: string;
                 partName: string;
+                internalPartNumber: string | null;
                 active: boolean;
                 version: number;
                 /** Format: date-time */
@@ -7704,6 +8028,7 @@ export interface paths {
           'application/json': {
             partNumber: string;
             partName: string;
+            internalPartNumber?: string | null;
           };
         };
       };
@@ -7719,6 +8044,7 @@ export interface paths {
               id: string;
               partNumber: string;
               partName: string;
+              internalPartNumber: string | null;
               active: boolean;
               version: number;
               /** Format: date-time */
@@ -9651,6 +9977,7 @@ export interface paths {
             rows: {
               partNumber: string;
               partName: string;
+              internalPartNumber?: string | null;
             }[];
           };
         };
@@ -9666,10 +9993,12 @@ export interface paths {
               rows: {
                 partNumber: string;
                 partName: string;
+                internalPartNumber: string | null;
                 existing: {
                   /** Format: uuid */
                   id: string;
                   partName: string;
+                  internalPartNumber: string | null;
                   active: boolean;
                   /** @default false */
                   deleted: boolean;
@@ -9755,6 +10084,7 @@ export interface paths {
             rows: {
               partNumber: string;
               partName: string;
+              internalPartNumber?: string | null;
               /** @enum {string} */
               action: 'CREATE' | 'UPDATE' | 'SKIP';
               /** Format: uuid */
@@ -9861,6 +10191,7 @@ export interface paths {
               id: string;
               partNumber: string;
               partName: string;
+              internalPartNumber: string | null;
               active: boolean;
               version: number;
               /** Format: date-time */
@@ -9938,6 +10269,7 @@ export interface paths {
             expectedVersion: number;
             partNumber?: string;
             partName?: string;
+            internalPartNumber?: string | null;
           };
         };
       };
@@ -9953,6 +10285,7 @@ export interface paths {
               id: string;
               partNumber: string;
               partName: string;
+              internalPartNumber: string | null;
               active: boolean;
               version: number;
               /** Format: date-time */
@@ -10049,6 +10382,7 @@ export interface paths {
               id: string;
               partNumber: string;
               partName: string;
+              internalPartNumber: string | null;
               active: boolean;
               version: number;
               /** Format: date-time */
@@ -10149,6 +10483,7 @@ export interface paths {
               id: string;
               partNumber: string;
               partName: string;
+              internalPartNumber: string | null;
               active: boolean;
               version: number;
               /** Format: date-time */
@@ -13534,6 +13869,7 @@ export interface paths {
                   id: string | null;
                   number: string;
                   name: string;
+                  internalNumber: string | null;
                 }[];
                 routes: {
                   supervisor: {
@@ -13791,6 +14127,7 @@ export interface paths {
                 id: string | null;
                 number: string;
                 name: string;
+                internalNumber: string | null;
               }[];
               routes: {
                 supervisor: {
@@ -14033,6 +14370,7 @@ export interface paths {
                 id: string;
                 partNumber: string;
                 partName: string;
+                internalPartNumber: string | null;
               }[];
               replacementMembers: {
                 /** Format: uuid */
@@ -14430,6 +14768,7 @@ export interface paths {
                 id: string | null;
                 number: string;
                 name: string;
+                internalNumber: string | null;
               }[];
               routes: {
                 supervisor: {
@@ -14750,6 +15089,7 @@ export interface paths {
                 id: string | null;
                 number: string;
                 name: string;
+                internalNumber: string | null;
               }[];
               routes: {
                 supervisor: {
@@ -15020,6 +15360,7 @@ export interface paths {
                 id: string | null;
                 number: string;
                 name: string;
+                internalNumber: string | null;
               }[];
               routes: {
                 supervisor: {
@@ -15289,6 +15630,7 @@ export interface paths {
                 id: string | null;
                 number: string;
                 name: string;
+                internalNumber: string | null;
               }[];
               routes: {
                 supervisor: {
@@ -15523,6 +15865,7 @@ export interface paths {
                 id: string;
                 partNumber: string;
                 partName: string;
+                internalPartNumber: string | null;
               }[];
               cause: string;
               detail: string;
@@ -15695,6 +16038,7 @@ export interface paths {
                   id: string | null;
                   number: string;
                   name: string;
+                  internalNumber: string | null;
                 }[];
                 routes: {
                   supervisor: {
@@ -16379,6 +16723,7 @@ export interface paths {
                 id: string | null;
                 number: string;
                 name: string;
+                internalNumber: string | null;
               }[];
               routes: {
                 supervisor: {
@@ -17235,10 +17580,11 @@ export interface paths {
                   memberId: string | null;
                   name: string | null;
                 };
-                lineLeader: {
-                  memberId: string | null;
-                  name: string | null;
-                };
+                lineLeaders: {
+                  /** Format: uuid */
+                  memberId: string;
+                  name: string;
+                }[];
                 activeOverride: {
                   reason: string;
                   /** Format: date-time */
@@ -18461,10 +18807,11 @@ export interface paths {
                   memberId: string | null;
                   name: string | null;
                 };
-                lineLeader: {
-                  memberId: string | null;
-                  name: string | null;
-                };
+                lineLeaders: {
+                  /** Format: uuid */
+                  memberId: string;
+                  name: string;
+                }[];
                 activeOverride: {
                   reason: string;
                   /** Format: date-time */

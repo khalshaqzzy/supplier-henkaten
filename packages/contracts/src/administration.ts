@@ -128,6 +128,12 @@ export const updateSupplierRequestSchema = z
   });
 export type UpdateSupplierRequest = z.infer<typeof updateSupplierRequestSchema>;
 
+/** Admin-only rename of one account; the user keeps the current password and sessions. */
+export const updateUsernameRequestSchema = z
+  .object({ expectedVersion: optimisticVersionSchema, username: usernameSchema })
+  .strict();
+export type UpdateUsernameRequest = z.infer<typeof updateUsernameRequestSchema>;
+
 export const replaceSupplierAdminRequestSchema = z
   .object({
     expectedVersion: optimisticVersionSchema,

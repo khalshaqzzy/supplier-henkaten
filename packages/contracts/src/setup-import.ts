@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { MAX_ACTIVE_LINES_PER_SUPPLIER } from './master-data.js';
+import { MAX_ACTIVE_LINES_PER_SUPPLIER, MAX_LINE_LEADERS_PER_LINE_SHIFT } from './master-data.js';
 
 export const SETUP_WORKBOOK_VERSION = '1';
 export const SETUP_MAX_ROWS = 60_000;
@@ -21,7 +21,17 @@ export type SetupColumn = {
   required?: boolean;
   text?: boolean;
   values?: readonly string[];
+  /** Earlier header labels that still map to this column. */
+  aliases?: readonly string[];
 };
+
+/** Line Leader codes of one Line Shift row, separated by commas. */
+export function splitSetupLeaderCodes(value: string): string[] {
+  return value
+    .split(/[,;\n]/)
+    .map((code) => code.trim())
+    .filter(Boolean);
+}
 export const SETUP_SHEETS: ReadonlyArray<{
   name: SetupSheet;
   limit: number;
@@ -68,8 +78,15 @@ export const SETUP_SHEETS: ReadonlyArray<{
     name: 'Part',
     limit: 50_000,
     columns: [
-      { key: 'code', label: 'Part number', required: true, text: true },
+      {
+        key: 'code',
+        label: 'TMMIN Part Number',
+        required: true,
+        text: true,
+        aliases: ['Part number'],
+      },
       { key: 'name', label: 'Nama part', required: true },
+      { key: 'internal', label: 'Internal Part Number', text: true },
     ],
   },
   {
@@ -259,7 +276,9 @@ export function validateSetupRows(rows: SetupRow[], checkPasswords = false): Set
               : 150
             : column.key === 'password'
               ? 128
-              : 100;
+              : column.key === 'leader'
+                ? 1_000
+                : 100;
       if (value.length > max) add(column.label, `Maksimal ${max} karakter.`);
     }
     if (row.data['order'] && !/^[1-9]\d{0,5}$/.test(row.data['order']))
@@ -273,6 +292,15 @@ export function validateSetupRows(rows: SetupRow[], checkPasswords = false): Set
           add('Password awal', 'Gunakan 12–128 karakter.');
       } else if (row.data['registration'] || row.data['username'] || row.data['password'])
         add('Role', 'MP tidak menggunakan registrasi atau akun.');
+    }
+    if (row.sheet === 'Line Shift' && row.data['leader']) {
+      const codes = splitSetupLeaderCodes(row.data['leader']);
+      if (codes.length > MAX_LINE_LEADERS_PER_LINE_SHIFT)
+        add('Kode LL', `Maksimal ${MAX_LINE_LEADERS_PER_LINE_SHIFT} LL per Line Shift.`);
+      if (new Set(codes.map(setupNormalize)).size !== codes.length)
+        add('Kode LL', 'Kode LL tidak boleh diulang.');
+      if (codes.some((code) => code.length > 100))
+        add('Kode LL', 'Maksimal 100 karakter per kode.');
     }
     if (row.sheet === 'Shift') {
       for (const key of ['start', 'end'])

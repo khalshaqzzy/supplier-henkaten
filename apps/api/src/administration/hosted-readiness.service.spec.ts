@@ -97,10 +97,9 @@ function lineShift(overrides: Record<string, unknown> = {}) {
     lineId: line.id,
     active: true,
     supervisorMemberId: supervisor.id,
-    lineLeaderMemberId: leader.id,
     shiftTemplate: template,
     supervisor,
-    lineLeader: leader,
+    lineLeaders: [{ memberId: leader.id, member: leader }],
     jobAssignments: jobs.map((job) => ({ jobId: job.id, mpMemberId: mp.id, mp })),
     ...overrides,
   };
@@ -135,8 +134,7 @@ describe('hosted readiness blocker detail', () => {
         lineShift({
           supervisorMemberId: null,
           supervisor: null,
-          lineLeaderMemberId: null,
-          lineLeader: null,
+          lineLeaders: [],
           jobAssignments: [{ jobId: jobs[0]!.id, mpMemberId: null, mp: null }],
         }),
       ],
@@ -192,8 +190,7 @@ describe('hosted readiness blocker detail', () => {
         lineShift({
           supervisorMemberId: archivedSupervisor.id,
           supervisor: archivedSupervisor,
-          lineLeaderMemberId: inactiveLeader.id,
-          lineLeader: inactiveLeader,
+          lineLeaders: [{ memberId: inactiveLeader.id, member: inactiveLeader }],
           jobAssignments: [{ jobId: jobs[0]!.id, mpMemberId: archivedMp.id, mp: archivedMp }],
         }),
       ],
@@ -225,6 +222,32 @@ describe('hosted readiness blocker detail', () => {
       activeCount: 0,
       requiredCount: 3,
     });
+  });
+
+  it('reports each unusable co-leader while an active co-leader remains', async () => {
+    const leader = member(21, 'LINE_LEADER');
+    const inactiveLeader = member(33, 'LINE_LEADER', {
+      users: [{ status: 'INACTIVE', role: 'LINE_LEADER' }],
+    });
+    const readiness = await evaluate({
+      lines: [line],
+      jobs,
+      lineShifts: [
+        lineShift({
+          lineLeaders: [
+            { memberId: leader.id, member: leader },
+            { memberId: inactiveLeader.id, member: inactiveLeader },
+          ],
+        }),
+      ],
+    });
+    expect(readiness.blockers).toEqual([
+      expect.objectContaining({
+        code: 'LINE_SHIFT_LEADER_MISSING',
+        reason: 'ACCOUNT_INACTIVE',
+        member: expect.objectContaining({ id: inactiveLeader.id }) as unknown,
+      }),
+    ]);
   });
 
   it('points a line without an active shift to its inactive shift when one exists', async () => {

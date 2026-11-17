@@ -30,7 +30,11 @@ export function PartImportPage() {
   const queryClient = useQueryClient();
   const [fileName, setFileName] = useState<string | null>(null);
   const [sheet, setSheet] = useState<PartImportSheet | null>(null);
-  const [mapping, setMapping] = useState<PartColumnMapping>({ numberIndex: -1, nameIndex: -1 });
+  const [mapping, setMapping] = useState<PartColumnMapping>({
+    numberIndex: -1,
+    nameIndex: -1,
+    internalIndex: -1,
+  });
   const [reading, setReading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const uploadSequence = useRef(0);
@@ -52,7 +56,11 @@ export function PartImportPage() {
   const review = useMutation({
     mutationFn: async ({ parsed }: { parsed: PartImportRow[]; sequence: number }) => {
       const response = await supplierApi.previewPartImport({
-        rows: parsed.map(({ partNumber, partName }) => ({ partNumber, partName })),
+        rows: parsed.map(({ partNumber, partName, internalPartNumber }) => ({
+          partNumber,
+          partName,
+          ...(internalPartNumber !== undefined ? { internalPartNumber } : {}),
+        })),
       });
       return { parsed, response };
     },
@@ -74,6 +82,7 @@ export function PartImportPage() {
         rows: preview!.rows.map((row, index) => ({
           partNumber: row.partNumber,
           partName: row.partName,
+          ...(mapping.internalIndex >= 0 ? { internalPartNumber: row.internalPartNumber } : {}),
           action: row.existing ? (isChanged(row) ? (choices[index] ?? 'SKIP') : 'SKIP') : 'CREATE',
           ...(row.existing
             ? { existingId: row.existing.id, expectedVersion: row.existing.version }
@@ -117,7 +126,7 @@ export function PartImportPage() {
     uploadSequence.current++;
     setFileName(null);
     setSheet(null);
-    setMapping({ numberIndex: -1, nameIndex: -1 });
+    setMapping({ numberIndex: -1, nameIndex: -1, internalIndex: -1 });
     setReading(false);
     setProcessing(false);
     setRows([]);
@@ -158,7 +167,8 @@ export function PartImportPage() {
     }
   };
   const downloadTemplate = () => {
-    const csv = '\uFEFFPart number,Nama part\r\n123456789,Contoh nama part\r\n';
+    const csv =
+      '\uFEFFTMMIN Part Number,Nama part,Internal Part Number\r\n123456789,Contoh nama part,INT-001\r\n';
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -277,7 +287,7 @@ export function PartImportPage() {
               </div>
               <div className="part-import-mapping__fields">
                 <label>
-                  <span>Kolom Part number</span>
+                  <span>Kolom TMMIN Part Number</span>
                   <Select
                     value={mapping.numberIndex < 0 ? '' : String(mapping.numberIndex)}
                     placeholder="Pilih kolom"
@@ -286,7 +296,10 @@ export function PartImportPage() {
                     onValueChange={(next) =>
                       setMapping((current) => ({ ...current, numberIndex: Number(next) }))
                     }
-                    options={columnOptions(sheet.headers, mapping.nameIndex)}
+                    options={columnOptions(sheet.headers, [
+                      mapping.nameIndex,
+                      mapping.internalIndex,
+                    ])}
                   />
                 </label>
                 <label>
@@ -299,7 +312,26 @@ export function PartImportPage() {
                     onValueChange={(next) =>
                       setMapping((current) => ({ ...current, nameIndex: Number(next) }))
                     }
-                    options={columnOptions(sheet.headers, mapping.numberIndex)}
+                    options={columnOptions(sheet.headers, [
+                      mapping.numberIndex,
+                      mapping.internalIndex,
+                    ])}
+                  />
+                </label>
+                <label>
+                  <span>Kolom Internal Part Number</span>
+                  <Select
+                    value={String(mapping.internalIndex)}
+                    placeholder="Tidak diimpor"
+                    searchPlaceholder="Cari kolom…"
+                    disabled={processing || review.isPending}
+                    onValueChange={(next) =>
+                      setMapping((current) => ({ ...current, internalIndex: Number(next) }))
+                    }
+                    options={[
+                      { value: '-1', label: 'Tidak diimpor' },
+                      ...columnOptions(sheet.headers, [mapping.numberIndex, mapping.nameIndex]),
+                    ]}
                   />
                 </label>
               </div>
@@ -321,15 +353,20 @@ export function PartImportPage() {
                         <th
                           key={index}
                           className={
-                            index === mapping.numberIndex || index === mapping.nameIndex
+                            [
+                              mapping.numberIndex,
+                              mapping.nameIndex,
+                              mapping.internalIndex,
+                            ].includes(index)
                               ? 'is-selected'
                               : ''
                           }
                         >
                           <small>{partColumnLabel(index)}</small>
                           {header || 'Tanpa judul'}
-                          {index === mapping.numberIndex && <em>Part number</em>}
+                          {index === mapping.numberIndex && <em>TMMIN Part Number</em>}
                           {index === mapping.nameIndex && <em>Nama part</em>}
+                          {index === mapping.internalIndex && <em>Internal Part Number</em>}
                         </th>
                       ))}
                     </tr>
@@ -342,8 +379,11 @@ export function PartImportPage() {
                           <td
                             key={columnIndex}
                             className={
-                              columnIndex === mapping.numberIndex ||
-                              columnIndex === mapping.nameIndex
+                              [
+                                mapping.numberIndex,
+                                mapping.nameIndex,
+                                mapping.internalIndex,
+                              ].includes(columnIndex)
                                 ? 'is-selected'
                                 : ''
                             }
@@ -359,7 +399,7 @@ export function PartImportPage() {
               <div className="part-import-review__footer">
                 <span>
                   {mapping.numberIndex >= 0 && mapping.nameIndex >= 0
-                    ? 'Dua kolom siap direview'
+                    ? `${mapping.internalIndex >= 0 ? 'Tiga' : 'Dua'} kolom siap direview`
                     : 'Pilih kedua kolom untuk melanjutkan'}
                 </span>
                 <Button
@@ -444,7 +484,7 @@ export function PartImportPage() {
                 <>
                   <div className="part-import-conflict-heading">
                     <div>
-                      <h3>Nama part yang berbeda</h3>
+                      <h3>Data part yang berbeda</h3>
                       <p>Pilih tindakan untuk setiap part. Default: Lewati.</p>
                     </div>
                     <span>{stats.changedCount.toLocaleString('id-ID')} konflik</span>
@@ -454,9 +494,9 @@ export function PartImportPage() {
                       <thead>
                         <tr>
                           <th>Baris</th>
-                          <th>Part number</th>
-                          <th>Nama di sistem</th>
-                          <th>Nama dalam file</th>
+                          <th>TMMIN Part Number</th>
+                          <th>Di sistem</th>
+                          <th>Dalam file</th>
                           <th>Keputusan</th>
                         </tr>
                       </thead>
@@ -464,11 +504,16 @@ export function PartImportPage() {
                         {shown.map(({ row, index }) => (
                           <tr key={`${row.partNumber}-${index}`}>
                             <td data-label="Baris">{rows[index]?.sourceRow ?? index + 2}</td>
-                            <td data-label="Part number">
+                            <td data-label="TMMIN Part Number">
                               <strong>{row.partNumber}</strong>
                             </td>
-                            <td data-label="Nama di sistem">
+                            <td data-label="Di sistem">
                               {row.existing?.partName}
+                              {row.existing?.internalPartNumber && (
+                                <small className="part-import-internal">
+                                  Internal {row.existing.internalPartNumber}
+                                </small>
+                              )}
                               {row.existing && !row.existing.active && (
                                 <small className="part-import-archived">
                                   {' '}
@@ -476,7 +521,14 @@ export function PartImportPage() {
                                 </small>
                               )}
                             </td>
-                            <td data-label="Nama dalam file">{row.partName}</td>
+                            <td data-label="Dalam file">
+                              {row.partName}
+                              {row.internalPartNumber && (
+                                <small className="part-import-internal">
+                                  Internal {row.internalPartNumber}
+                                </small>
+                              )}
+                            </td>
                             <td data-label="Keputusan">
                               <Select
                                 size="sm"
@@ -493,7 +545,7 @@ export function PartImportPage() {
                                   { value: 'SKIP', label: 'Lewati' },
                                   {
                                     value: 'UPDATE',
-                                    label: row.existing?.deleted ? 'Pulihkan part' : 'Update nama',
+                                    label: row.existing?.deleted ? 'Pulihkan part' : 'Update part',
                                   },
                                 ]}
                               />
@@ -582,16 +634,19 @@ function problemMessage(error: unknown) {
 
 function isChanged(row: Preview['rows'][number]) {
   return Boolean(
-    row.existing && (row.existing.deleted || row.existing.partName.trim() !== row.partName.trim()),
+    row.existing &&
+    (row.existing.deleted ||
+      row.existing.partName.trim() !== row.partName.trim() ||
+      (row.existing.internalPartNumber ?? null) !== (row.internalPartNumber ?? null)),
   );
 }
 
-function columnOptions(headers: readonly string[], takenIndex: number) {
+function columnOptions(headers: readonly string[], takenIndexes: readonly number[]) {
   return headers.map((header, index) => ({
     value: String(index),
     label: header || 'Tanpa judul',
     meta: `Kolom ${partColumnLabel(index)}`,
     keywords: partColumnLabel(index),
-    disabled: index === takenIndex,
+    disabled: takenIndexes.includes(index),
   }));
 }

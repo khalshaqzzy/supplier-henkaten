@@ -344,6 +344,14 @@ export class SupplierApi {
     });
   }
 
+  renameMemberAccount(id: string, body: { expectedVersion: number; username: string }) {
+    return this.client.request(`/api/v1/supplier/master-data/members/${id}/account`, {
+      method: 'PATCH',
+      body,
+      responseSchema: memberSchema,
+    });
+  }
+
   memberAccountAction(id: string, action: 'activate' | 'deactivate', body: unknown) {
     return this.client.request(`/api/v1/supplier/master-data/members/${id}/account/${action}`, {
       method: 'POST',

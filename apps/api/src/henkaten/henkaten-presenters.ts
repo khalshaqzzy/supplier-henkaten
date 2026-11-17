@@ -58,36 +58,57 @@ export function presentHenkatenSummary(row: SummaryRow) {
 }
 
 /** Matches a Henkaten when any of its affected parts contains the search text. */
-export function henkatenPartSearch(text: string): Prisma.HenkatenWhereInput {
+export function henkatenPartSearch(text: string, internal = false): Prisma.HenkatenWhereInput {
   return {
     parts: {
       some: {
         OR: [
           { partNumberSnapshot: { contains: text, mode: 'insensitive' } },
           { partNameSnapshot: { contains: text, mode: 'insensitive' } },
+          ...(internal
+            ? [{ internalPartNumberSnapshot: { contains: text, mode: 'insensitive' as const } }]
+            : []),
         ],
       },
     },
   };
 }
 
-/** Affected parts in submission order; falls back to the primary part snapshot. */
+/**
+ * Affected parts in submission order; falls back to the primary part snapshot. `internalNumber`
+ * is the supplier-internal part number and is only presented to the supplier.
+ */
 export function presentHenkatenParts(row: {
   partId: string | null;
   partNumberSnapshot: string;
   partNameSnapshot: string;
   parts: Array<
-    Pick<HenkatenPart, 'position' | 'partId' | 'partNumberSnapshot' | 'partNameSnapshot'>
+    Pick<
+      HenkatenPart,
+      | 'position'
+      | 'partId'
+      | 'partNumberSnapshot'
+      | 'partNameSnapshot'
+      | 'internalPartNumberSnapshot'
+    >
   >;
 }) {
   if (!row.parts.length)
-    return [{ id: row.partId, number: row.partNumberSnapshot, name: row.partNameSnapshot }];
+    return [
+      {
+        id: row.partId,
+        number: row.partNumberSnapshot,
+        name: row.partNameSnapshot,
+        internalNumber: null,
+      },
+    ];
   return [...row.parts]
     .sort((left, right) => left.position - right.position)
     .map((part) => ({
       id: part.partId,
       number: part.partNumberSnapshot,
       name: part.partNameSnapshot,
+      internalNumber: part.internalPartNumberSnapshot,
     }));
 }
 

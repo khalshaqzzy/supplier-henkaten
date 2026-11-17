@@ -1,7 +1,15 @@
 import { HenkatenDeletion } from '../components/HenkatenDeletion';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, KeyRound, Plus, RefreshCw, UserRoundPlus } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  KeyRound,
+  PencilLine,
+  Plus,
+  RefreshCw,
+  UserRoundPlus,
+} from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -23,6 +31,7 @@ import {
   Textarea,
   Timeline,
   HenkatenExportSheet,
+  UsernameDialog,
 } from '@tmmin-henkaten/ui';
 
 import { ApiProblemError } from '@tmmin-henkaten/api-client';
@@ -616,13 +625,23 @@ function SupplierAdminPanel({
             >
               Masuk sebagai Supplier Admin
             </Button>
-          </div>
-          {magicLinkProblem && (
-            <Alert tone="danger" title="Tautan masuk gagal">
-              {magicLinkProblem}
-            </Alert>
-          )}
-          <div className="tmmin-row-actions">
+            <UsernameDialog
+              owner={current.displayName}
+              username={current.username}
+              describeError={tmminMutationProblem}
+              onSubmit={async (username) => {
+                await tmminApi.renameSupplierAdmin(supplierId, {
+                  expectedVersion: supplierVersion,
+                  username,
+                });
+                onChanged();
+              }}
+              trigger={
+                <Button size="sm" leadingIcon={<PencilLine />}>
+                  Ubah username
+                </Button>
+              }
+            />
             <AlertDialog
               trigger={<Button size="sm">Reset temporary password</Button>}
               title={`Reset kata sandi ${current.username}?`}
@@ -637,6 +656,11 @@ function SupplierAdminPanel({
               }
             />
           </div>
+          {magicLinkProblem && (
+            <Alert tone="danger" title="Tautan masuk gagal">
+              {magicLinkProblem}
+            </Alert>
+          )}
           <form className="tmmin-inline-form" onSubmit={(event) => event.preventDefault()}>
             <Field label="Replacement username" errorText={form.formState.errors.username?.message}>
               <Input {...form.register('username')} />
@@ -1397,6 +1421,25 @@ export function QualityUsersPage() {
                     <td>{dateTime(row.updatedAt)}</td>
                     <td>
                       <div className="tmmin-row-actions">
+                        <UsernameDialog
+                          owner={row.displayName}
+                          username={row.username}
+                          describeError={tmminMutationProblem}
+                          onSubmit={async (username) => {
+                            await tmminApi.renameQualityUser(row.id, {
+                              expectedVersion: row.version,
+                              username,
+                            });
+                            await queryClient.invalidateQueries({
+                              queryKey: tmminKey(session!.principal.userId, 'quality-users'),
+                            });
+                          }}
+                          trigger={
+                            <Button size="sm" leadingIcon={<PencilLine />}>
+                              Ubah username
+                            </Button>
+                          }
+                        />
                         <AlertDialog
                           trigger={<Button size="sm">Reset kata sandi</Button>}
                           title={`Reset kata sandi ${row.username}?`}

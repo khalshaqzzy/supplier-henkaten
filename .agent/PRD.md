@@ -1,3 +1,33 @@
+## Amendment — 17 November 2026: Several Line Leaders per Line–Shift, username changes and internal part numbers
+
+**Line Leaders.** One Line–Shift may have **0–10 Line Leaders**, and one Line Leader may lead any
+number of Line–Shifts, including Line–Shifts of different lines that run at the same time. The
+earlier rule of one Line Leader per Line–Shift and one active Line–Shift per Line Leader is
+withdrawn. Line Setup assigns leaders with a searchable multi-select that lists each leader's other
+Line–Shifts. The setup workbook accepts several member codes in the *Kode LL* column, separated by
+commas. All leaders of a Line–Shift are co-leaders: each sees the Henkaten of that Line–Shift and may
+withdraw an Open Henkaten submitted by another co-leader. Supervisor/QC approval is unchanged. A
+leader assigned to several Line–Shifts chooses the Line–Shift on the Henkaten form; with exactly one
+assignment it is chosen automatically. Setup readiness reports a Line–Shift without leaders and
+each unusable leader (archived member or inactive account).
+
+**Usernames.** Admins can change a login username. The Supplier Admin renames Supervisor, Line
+Leader and QC accounts of their supplier; the TMMIN Admin renames TMMIN Quality users and the
+Supplier Admin of a Hosted supplier. A username must stay unique within its realm (and supplier).
+The password, active sessions and permissions are kept; the change is audited with the previous and
+new username. Users cannot rename themselves.
+
+**Parts.** The supplier-facing *Part Number* is labelled **TMMIN Part Number** and stays the unique
+part key. An optional **Internal Part Number** (up to 100 characters, not unique) can be recorded
+per part through the form, CSV/Excel part import and the setup workbook. It is supplier-only: it is
+shown and searchable on supplier screens, snapshotted on each Henkaten part and included in the
+supplier Henkaten export, but it never appears in TMMIN screens, the TMMIN export, TMMIN searches or
+the External API. TMMIN screens keep the label *Part Number*. Imports without the internal column
+keep stored values. See
+[ADR 0054](../docs/adr/0054-multi-line-leader-username-rename-internal-part-number.md).
+
+---
+
 ## Amendment — 16 November 2026: Automated browser coverage and faster journeys
 
 Automated browser journeys run in **Chromium only**. Automated Microsoft Edge journeys are

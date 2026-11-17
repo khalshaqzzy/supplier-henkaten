@@ -169,7 +169,7 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
           <span>Part</span>
           <Input
             value={params.get('part') ?? ''}
-            placeholder="Nomor atau nama part"
+            placeholder="TMMIN/internal part number atau nama"
             onChange={(event) => update('part', event.target.value)}
           />
         </label>
@@ -279,7 +279,7 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
                   <th>4M</th>
                   <th>Line / Job</th>
                   <th>Shift</th>
-                  <th>Part</th>
+                  <th>TMMIN Part Number</th>
                   <th>Supervisor</th>
                   <th>QC</th>
                   <th>PCR</th>
@@ -309,7 +309,7 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
                       </div>
                     </td>
                     <td data-label="Shift">{item.shiftName}</td>
-                    <td data-label="Part">
+                    <td data-label="TMMIN Part Number">
                       <PartSummary parts={item.parts} />
                     </td>
                     <td data-label="Supervisor">
@@ -497,9 +497,18 @@ export function HenkatenDetailPage() {
         <FactItem label="Line" value={item.line.code} detail={item.line.name} />
         <FactItem label="Job" value={item.jobName} />
         <FactItem
-          label="Part"
+          label="TMMIN Part Number"
           value={item.part.number}
-          detail={item.parts.length > 1 ? `+${item.parts.length - 1} part lain` : item.part.name}
+          detail={
+            item.parts.length > 1
+              ? `+${item.parts.length - 1} part lain`
+              : [
+                  item.part.name,
+                  item.parts[0]?.internalNumber && `Internal ${item.parts[0].internalNumber}`,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+          }
         />
         <FactItem label="Dibuat oleh" value={item.creatorName} />
       </FactStrip>
@@ -548,6 +557,7 @@ export function HenkatenDetailPage() {
                   <li key={part.id ?? part.number}>
                     <strong>{part.number}</strong>
                     {part.name && <small>{part.name}</small>}
+                    {part.internalNumber && <small>Internal {part.internalNumber}</small>}
                   </li>
                 ))}
               </ul>

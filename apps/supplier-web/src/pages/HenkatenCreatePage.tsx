@@ -32,6 +32,7 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
   };
   const [category, setCategory] = useState<HenkatenCategory>('MAN');
   const [jobId, setJobId] = useState(params.get('jobId') ?? '');
+  const [lineShiftId, setLineShiftId] = useState(params.get('lineShiftId') ?? '');
   const [partSelection, setPartSelection] = useState<PartSelection>({ parts: [], other: false });
   const [partResults, setPartResults] = useState<readonly PartChoice[]>([]);
   const [clonePartsDropped, setClonePartsDropped] = useState(false);
@@ -88,6 +89,7 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
     const prefill = clonePrefill.data;
     if (!prefill) return;
     setCategory(prefill.category);
+    if (prefill.lineShiftId) setLineShiftId(prefill.lineShiftId);
     setJobId(prefill.jobStillValid ? prefill.jobId : '');
     setPartSelection({ parts: prefill.parts, other: prefill.partId === null });
     setClonePartsDropped(!prefill.partStillValid);
@@ -97,10 +99,20 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
     setReplacementObject(prefill.replacementObject ?? '');
   }, [clonePrefill.data]);
   const [shownContext, setShownContext] = useState<typeof context.data>();
+  const shiftItems = shownContext?.items ?? [];
+  // One Line–Shift, or a single current one, is chosen automatically.
+  const defaultShiftId =
+    shiftItems.length === 1
+      ? shiftItems[0]!.id
+      : shownContext?.currentLineShiftIds.length === 1
+        ? shownContext.currentLineShiftIds[0]!
+        : '';
+  const effectiveShiftId = lineShiftId || defaultShiftId;
+  const selectedShift = shiftItems.find(({ id }) => id === effectiveShiftId);
+  // The chosen occurrence stays fixed while the form is filled; it refreshes after a conflict.
   useEffect(() => {
-    if (shownContext?.items.length !== 1 && context.data) setShownContext(context.data);
-  }, [shownContext, context.data]);
-  const selectedShift = shownContext?.items.length === 1 ? shownContext.items[0] : undefined;
+    if (context.data && (!shownContext || !selectedShift)) setShownContext(context.data);
+  }, [shownContext, selectedShift, context.data]);
   useEffect(() => {
     if (
       selectedShift &&
@@ -205,11 +217,9 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
           {problem}
         </Alert>
       )}
-      {!context.isLoading && !selectedShift && (
+      {!context.isLoading && !shiftItems.length && (
         <Alert tone="danger" title="Line shift tidak tersedia">
-          {context.data?.items.length
-            ? 'Assignment Line Leader perlu diperiksa oleh Supplier Admin.'
-            : 'Line Leader belum ditugaskan pada Line–Shift aktif. Hubungi Supplier Admin.'}
+          Line Leader belum ditugaskan pada Line–Shift aktif. Hubungi Supplier Admin.
         </Alert>
       )}
       <form onSubmit={send} className="henkaten-form">
@@ -222,7 +232,53 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
             <HenkatenCategoryPicker value={category} onChange={setCategory} />
           </Panel>
           <Panel title="Line dan shift">
-            {selectedShift && (
+            {shiftItems.length > 1 && (
+              <div
+                className="henkaten-shift-options"
+                role="radiogroup"
+                aria-label="Pilih Line–Shift"
+                data-focus-target="line-shift"
+              >
+                {shiftItems.map((item) => {
+                  const checked = item.id === effectiveShiftId;
+                  return (
+                    <label
+                      key={item.id}
+                      className={`henkaten-shift-option${checked ? ' is-selected' : ''}`}
+                    >
+                      <input
+                        type="radio"
+                        name="line-shift"
+                        value={item.id}
+                        checked={checked}
+                        onChange={() => setLineShiftId(item.id)}
+                      />
+                      <span className="henkaten-shift-option__body">
+                        <span className="henkaten-shift-option__top">
+                          <strong>
+                            {item.lineCode} · {item.lineName}
+                          </strong>
+                          <span className={item.current ? 'is-current' : 'is-next'}>
+                            {item.current ? 'Sedang berlangsung' : 'Shift berikutnya'}
+                          </span>
+                        </span>
+                        <span>
+                          {item.shiftName} · {item.startTime}–{item.endTime}
+                          {item.crossesMidnight ? ' (hari berikutnya)' : ''}
+                        </span>
+                        <small>
+                          {item.current ? 'Berlaku hingga ' : 'Berlaku mulai '}
+                          {formatDateTime(
+                            item.current ? item.effectiveEndAt : item.effectiveStartAt,
+                          )}
+                        </small>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {shiftItems.length === 1 && selectedShift && (
               <div className="henkaten-assigned-shift" aria-live="polite">
                 <div className="henkaten-assigned-shift__top">
                   <span className="henkaten-assigned-shift__eyebrow">Assignment Anda</span>

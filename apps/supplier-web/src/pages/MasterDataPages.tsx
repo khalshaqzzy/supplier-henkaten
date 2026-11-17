@@ -56,7 +56,7 @@ const resources = {
     title: 'Part',
     description: '',
     createLabel: 'Tambah part',
-    columns: ['Part number', 'Nama part', 'Status'],
+    columns: ['TMMIN Part Number', 'Internal Part Number', 'Nama part', 'Status'],
   },
   shifts: {
     title: 'Shift Template',
@@ -320,7 +320,12 @@ function MasterRow({
       : kind === 'lines' && 'code' in item
         ? [item.code, item.name, item.displayOrder, item.active ? 'Aktif' : 'Nonaktif']
         : kind === 'parts' && 'partNumber' in item
-          ? [item.partNumber, item.partName, item.active ? 'Aktif' : 'Nonaktif']
+          ? [
+              item.partNumber,
+              item.internalPartNumber ?? '—',
+              item.partName,
+              item.active ? 'Aktif' : 'Nonaktif',
+            ]
           : 'startTime' in item
             ? [
                 item.name,
@@ -409,7 +414,11 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
           : supplierApi.createLine(body);
       }
       if (kind === 'parts') {
-        const body = { partNumber: values.partNumber, partName: values.partName };
+        const body = {
+          partNumber: values.partNumber,
+          partName: values.partName,
+          internalPartNumber: values.internalPartNumber?.trim() || null,
+        };
         return editing
           ? supplierApi.updatePart(resourceId!, {
               expectedVersion: detail.data!.version,
@@ -632,12 +641,20 @@ function MasterFields({
   if (kind === 'parts')
     return (
       <>
-        <Field label="Part number" htmlFor="partNumber" required>
+        <Field label="TMMIN Part Number" htmlFor="partNumber" required>
           <Input
             id="partNumber"
             value={values.partNumber}
             onChange={(event) => field('partNumber', event.target.value)}
             required
+          />
+        </Field>
+        <Field label="Internal Part Number" htmlFor="internalPartNumber">
+          <Input
+            id="internalPartNumber"
+            value={values.internalPartNumber ?? ''}
+            maxLength={100}
+            onChange={(event) => field('internalPartNumber', event.target.value)}
           />
         </Field>
         <Field label="Nama part" htmlFor="partName" required>
@@ -1270,7 +1287,7 @@ function TableSkeleton() {
 
 function initialValues(kind: ResourceKind) {
   if (kind === 'members') return { fullName: '', registrationNumber: '', role: 'MP', username: '' };
-  if (kind === 'parts') return { partNumber: '', partName: '' };
+  if (kind === 'parts') return { partNumber: '', partName: '', internalPartNumber: '' };
   if (kind === 'shifts')
     return { name: '', startTime: '08:00', endTime: '17:00', timezone: 'Asia/Jakarta' };
   return { code: '', name: '' };
@@ -1285,7 +1302,11 @@ function valuesFromResource(kind: ResourceKind, resource: MasterItem) {
       username: resource.account?.username ?? '',
     };
   if (kind === 'parts' && 'partNumber' in resource)
-    return { partNumber: resource.partNumber, partName: resource.partName };
+    return {
+      partNumber: resource.partNumber,
+      partName: resource.partName,
+      internalPartNumber: resource.internalPartNumber ?? '',
+    };
   if (kind === 'shifts' && 'startTime' in resource)
     return {
       name: resource.name,

@@ -8,3 +8,5 @@ export * from './components/henkaten-export';
 export * from './showcase/patterns';
 export * from './components/search-select';
 export * from './components/select';
+export * from './components/search-multi-select';
+export * from './components/username-dialog';

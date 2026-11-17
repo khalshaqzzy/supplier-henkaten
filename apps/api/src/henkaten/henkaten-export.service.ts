@@ -309,6 +309,8 @@ export class HenkatenExportService implements OnModuleInit, BeforeApplicationShu
         views: [{ state: 'frozen', ySplit: 7, showGridLines: false }],
         pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 2 },
       });
+      // Supplier exports label the TMMIN number explicitly and add the supplier-internal number.
+      const supplierView = job.requestedRealm === 'SUPPLIER';
       const records = sheetGroup(writer, 'Henkaten', [
         'Henkaten ID',
         'Business date',
@@ -320,7 +322,7 @@ export class HenkatenExportService implements OnModuleInit, BeforeApplicationShu
         'Line',
         'Job',
         'Shift',
-        'Part number',
+        ...(supplierView ? ['TMMIN part number', 'Internal part number'] : ['Part number']),
         'Part',
         'Cause',
         'Detail',
@@ -394,7 +396,7 @@ export class HenkatenExportService implements OnModuleInit, BeforeApplicationShu
           : null,
       };
       let processed = 0;
-      const where = exportWhere(job.supplierId, job.createdAt, filters);
+      const where = exportWhere(job.supplierId, job.createdAt, filters, supplierView);
       await this.prisma.$transaction(
         async (tx) => {
           const total = await tx.henkaten.count({ where });
@@ -410,7 +412,15 @@ export class HenkatenExportService implements OnModuleInit, BeforeApplicationShu
             });
             if (!batch.length) break;
             for (const row of batch) {
-              writeRecord(row, supplier.timezone, records, approvals, checklist, history);
+              writeRecord(
+                row,
+                supplier.timezone,
+                records,
+                approvals,
+                checklist,
+                history,
+                supplierView,
+              );
               increment(counts, row.status);
               increment(categories, row.category);
               const line = `${row.lineCodeSnapshot} · ${row.lineNameSnapshot}`;
@@ -502,6 +512,7 @@ function exportWhere(
   supplierId: string,
   createdAt: Date,
   filter: HenkatenExportFilters,
+  internal = false,
 ): Prisma.HenkatenWhereInput {
   return {
     supplierId,
@@ -520,7 +531,7 @@ function exportWhere(
     ...(filter.shiftTemplateId ? { shiftRun: { shiftTemplateId: filter.shiftTemplateId } } : {}),
     ...(filter.status ? { status: filter.status } : {}),
     ...(filter.category ? { category: filter.category } : {}),
-    ...(filter.part ? henkatenPartSearch(filter.part) : {}),
+    ...(filter.part ? henkatenPartSearch(filter.part, internal) : {}),
     ...(filter.approvalRoute || filter.approvalStatus
       ? {
           approvalRoutes: {
@@ -636,6 +647,7 @@ function writeRecord(
   approvals: SheetGroup,
   checklist: SheetGroup,
   history: SheetGroup,
+  supplierView: boolean,
 ) {
   const supervisor = row.approvalRoutes.find((route) => route.route === 'SUPERVISOR');
   const qc = row.approvalRoutes.find((route) => route.route === 'QC');
@@ -652,6 +664,7 @@ function writeRecord(
     row.jobNameSnapshot,
     row.shiftNameSnapshot,
     affectedParts.map((part) => part.number).join('; '),
+    ...(supplierView ? [affectedParts.map((part) => part.internalNumber ?? '').join('; ')] : []),
     affectedParts.map((part) => part.name).join('; '),
     row.cause,
     row.detail,

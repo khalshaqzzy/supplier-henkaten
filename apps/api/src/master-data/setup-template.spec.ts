@@ -46,6 +46,17 @@ describe('comprehensive setup workbook template', () => {
     expect(rows.filter((row) => row.sheet === 'Job')).toHaveLength(4);
     expect(rows.filter((row) => row.sheet === 'Checklist 4M')).toHaveLength(12);
     expect(workbook.getWorksheet('Part')!.getCell('A2').text).toBe('001234567890');
+    const parts = workbook.getWorksheet('Part')!;
+    expect([parts.getCell('A1').text, parts.getCell('C1').text]).toEqual([
+      'TMMIN Part Number',
+      'Internal Part Number',
+    ]);
+    expect(parts.getCell('C2').text).toBe('INT-BR-01');
+    // Several Line Leaders share one Line Shift, and one leader appears on two Line Shifts.
+    const lineShifts = workbook.getWorksheet('Line Shift')!;
+    expect(lineShifts.getCell('D2').text).toBe('LL-01, LL-03');
+    expect(lineShifts.getCell('D4').text).toBe('LL-03');
+    expect(lineShifts.getCell('D2').dataValidation.prompt).toContain('koma');
     expect(workbook.getWorksheet('Job')!.getCell('E2').dataValidation.type).toBe('list');
     expect(workbook.getWorksheet('Line Shift')!.getCell('A2').dataValidation.formulae).toEqual([
       'LineCodes',

@@ -393,7 +393,14 @@ describe('Supplier application foundation', () => {
       line: { code: 'SUP-L1', name: 'Line Satu' },
       jobName: 'Job Satu',
       part: { number: 'PART-1', name: 'Part Satu' },
-      parts: [{ id: '00000000-0000-4000-8000-000000000014', number: 'PART-1', name: 'Part Satu' }],
+      parts: [
+        {
+          id: '00000000-0000-4000-8000-000000000014',
+          number: 'PART-1',
+          name: 'Part Satu',
+          internalNumber: null,
+        },
+      ],
       routes: {
         supervisor: route('SUPERVISOR', 'APPROVED'),
         qc: route('QC', 'PENDING'),
@@ -522,6 +529,7 @@ describe('Supplier application foundation', () => {
       id: partId,
       partNumber: 'NPM-53601-B',
       partName: 'Original part',
+      internalPartNumber: null,
       active: true,
       version: 2,
       createdAt: '2026-09-24T01:00:00.000Z',

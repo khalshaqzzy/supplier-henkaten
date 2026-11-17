@@ -253,6 +253,11 @@ change. The independent v4 path remains patched and version-asserted. Upstream e
 https://github.com/go-jose/go-jose/security/advisories/GHSA-mgcc-cww5-fp2q. This is a scoped residual
 dependency risk, not a claim that the v3 code is patched.
 
+Amendment, 2026-11-17: the exception was re-reviewed and renewed until 2026-11-30. No patched
+go-jose/v3 release exists; `smallstep/certificates` v0.30.2 (the latest release, still required by
+Caddy v2.11.9) imports go-jose/v3 directly, and forcing `go.step.sm/crypto` v0.92.0 (go-jose/v4)
+does not compile against it. The Caddyfile scope above is unchanged.
+
 
 ## Supplier-wide Part catalog deletion amendment — 6 November 2026
 

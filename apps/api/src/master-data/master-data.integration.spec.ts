@@ -347,7 +347,7 @@ describe('supplier master data', () => {
       {
         expectedVersion: lineShiftBody.version,
         supervisorMemberId: supervisorId,
-        lineLeaderMemberId: leaderId,
+        lineLeaderMemberIds: [leaderId],
         jobs: lineShiftBody.assignments.map((assignment) => ({
           jobId: assignment.jobId,
           mpMemberId: mpId,
@@ -379,20 +379,6 @@ describe('supplier master data', () => {
       version: number;
       assignments: Array<{ jobId: string }>;
     };
-    const duplicateLeader = await supplierPatch(
-      `/api/v1/supplier/master-data/line-shifts/${overlappingBody.id}/assignments`,
-      {
-        expectedVersion: overlappingBody.version,
-        supervisorMemberId: supervisorId,
-        lineLeaderMemberId: leaderId,
-        jobs: overlappingBody.assignments.map((assignment) => ({
-          jobId: assignment.jobId,
-          mpMemberId: mpId,
-        })),
-      },
-    );
-    expect(duplicateLeader.status).toBe(409);
-    expect(duplicateLeader.body.detail).toContain('Line Leader sudah ditugaskan');
     const secondLeader = await supplierPost('/api/v1/supplier/master-data/members', {
       role: 'LINE_LEADER',
       fullName: 'Overlap Line Leader',
@@ -400,12 +386,13 @@ describe('supplier master data', () => {
       username: `overlap-leader-${randomUUID()}`,
     });
     expect(secondLeader.status).toBe(201);
+    // A leader may lead overlapping Line Shifts, and a Line Shift may have several leaders.
     const assignedOverlap = await supplierPatch(
       `/api/v1/supplier/master-data/line-shifts/${overlappingBody.id}/assignments`,
       {
         expectedVersion: overlappingBody.version,
         supervisorMemberId: supervisorId,
-        lineLeaderMemberId: secondLeader.body.member.id,
+        lineLeaderMemberIds: [secondLeader.body.member.id, leaderId],
         jobs: overlappingBody.assignments.map((assignment) => ({
           jobId: assignment.jobId,
           mpMemberId: mpId,
@@ -413,6 +400,21 @@ describe('supplier master data', () => {
       },
     );
     expect(assignedOverlap.status).toBe(200);
+    expect(
+      (assignedOverlap.body as { lineLeaders: Array<{ memberId: string }> }).lineLeaders.map(
+        ({ memberId }) => memberId,
+      ),
+    ).toEqual([secondLeader.body.member.id, leaderId]);
+    const duplicateEntry = await supplierPatch(
+      `/api/v1/supplier/master-data/line-shifts/${overlappingBody.id}/assignments`,
+      {
+        expectedVersion: (assignedOverlap.body as { version: number }).version,
+        supervisorMemberId: supervisorId,
+        lineLeaderMemberIds: [leaderId, leaderId],
+        jobs: [],
+      },
+    );
+    expect(duplicateEntry.status).toBe(400);
     const allLineShifts = await request(app.getHttpServer())
       .get('/api/v1/supplier/master-data/line-shifts')
       .set('Cookie', supplierCookie);
@@ -946,6 +948,117 @@ describe('supplier master data', () => {
     expect(restored.deletedAt).toBeNull();
     expect(restored.active).toBe(true);
     expect(restored.resetArchivedAt).toBeNull();
+  });
+
+  it('renames a member account without ending its sessions and rejects a taken username', async () => {
+    const takenUsername = `taken-${randomUUID()}`;
+    const [renamed, other] = await Promise.all([
+      supplierPost('/api/v1/supplier/master-data/members', {
+        role: 'QC',
+        fullName: 'Renamed QC',
+        registrationNumber: `REG-Q-${randomUUID()}`,
+        username: `qc-${randomUUID()}`,
+      }),
+      supplierPost('/api/v1/supplier/master-data/members', {
+        role: 'QC',
+        fullName: 'Other QC',
+        registrationNumber: `REG-Q-${randomUUID()}`,
+        username: takenUsername,
+      }),
+    ]);
+    expect([renamed.status, other.status]).toEqual([201, 201]);
+    const memberId = renamed.body.member.id as string;
+    const account = renamed.body.member.account as { version: number };
+    const user = await prisma.user.findFirstOrThrow({ where: { memberId } });
+    const taken = await supplierPatch(`/api/v1/supplier/master-data/members/${memberId}/account`, {
+      expectedVersion: account.version,
+      username: takenUsername.toUpperCase(),
+    });
+    expect(taken.status).toBe(409);
+    expect(taken.body.detail).toBe('Username sudah digunakan akun lain.');
+    const nextUsername = `qc-renamed-${randomUUID()}`;
+    const changed = await supplierPatch(
+      `/api/v1/supplier/master-data/members/${memberId}/account`,
+      {
+        expectedVersion: account.version,
+        username: `  ${nextUsername}  `,
+      },
+    );
+    expect(changed.status).toBe(200);
+    expect(changed.body.account.username).toBe(nextUsername);
+    const saved = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(saved).toMatchObject({
+      username: nextUsername,
+      normalizedUsername: nextUsername,
+      passwordHash: user.passwordHash,
+      authorizationEpoch: user.authorizationEpoch,
+    });
+    const stale = await supplierPatch(`/api/v1/supplier/master-data/members/${memberId}/account`, {
+      expectedVersion: account.version,
+      username: `qc-stale-${randomUUID()}`,
+    });
+    expect(stale.status).toBe(409);
+  });
+
+  it('keeps the internal part number on supplier reads and out of TMMIN reads', async () => {
+    const partNumber = `TMMIN-${randomUUID()}`;
+    const internal = `INT-${randomUUID()}`;
+    const created = await supplierPost('/api/v1/supplier/master-data/parts', {
+      partNumber,
+      partName: 'Internal number part',
+      internalPartNumber: ` ${internal} `,
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.internalPartNumber).toBe(internal);
+    // A shared internal number is accepted.
+    const sibling = await supplierPost('/api/v1/supplier/master-data/parts', {
+      partNumber: `${partNumber}-B`,
+      partName: 'Sibling part',
+      internalPartNumber: internal,
+    });
+    expect(sibling.status).toBe(201);
+    const searched = await request(app.getHttpServer())
+      .get(
+        `/api/v1/supplier/master-data/parts?search=${encodeURIComponent(internal.toLowerCase())}`,
+      )
+      .set('Cookie', supplierCookie);
+    expect(searched.status).toBe(200);
+    expect((searched.body.items as Array<{ id: string }>).map(({ id }) => id).sort()).toEqual(
+      [created.body.id, sibling.body.id].sort(),
+    );
+    const tmmin = await request(app.getHttpServer())
+      .get(
+        `/api/v1/tmmin/suppliers/${supplierId}/master-data/parts?search=${encodeURIComponent(partNumber)}`,
+      )
+      .set('Cookie', tmminQualityCookie);
+    expect(tmmin.status).toBe(200);
+    expect(tmmin.body.items.length).toBeGreaterThan(0);
+    for (const item of tmmin.body.items as object[])
+      expect(item).not.toHaveProperty('internalPartNumber');
+    const byInternal = await request(app.getHttpServer())
+      .get(
+        `/api/v1/tmmin/suppliers/${supplierId}/master-data/parts?search=${encodeURIComponent(internal)}`,
+      )
+      .set('Cookie', tmminQualityCookie);
+    expect(byInternal.body.items).toEqual([]);
+    const kept = await supplierPatch(
+      `/api/v1/supplier/master-data/parts/${created.body.id as string}`,
+      {
+        expectedVersion: created.body.version,
+        partName: 'Renamed internal part',
+      },
+    );
+    expect(kept.status).toBe(200);
+    expect(kept.body.internalPartNumber).toBe(internal);
+    const cleared = await supplierPatch(
+      `/api/v1/supplier/master-data/parts/${created.body.id as string}`,
+      {
+        expectedVersion: kept.body.version,
+        internalPartNumber: '',
+      },
+    );
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.internalPartNumber).toBeNull();
   });
 
   it('allows 100 active lines per supplier and rejects the next one', async () => {

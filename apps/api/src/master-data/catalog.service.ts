@@ -21,6 +21,7 @@ import {
   presentJob,
   presentLine,
   presentPart,
+  presentTmminPart,
   presentShiftTemplate,
 } from './master-data-presenters.js';
 import { capacity, missing, resourceInUse } from './member.service.js';
@@ -353,7 +354,8 @@ export class CatalogService {
     return presentJob(row);
   }
 
-  async listParts(scope: TenantScope, query: MasterListQuery) {
+  /** TMMIN reads omit the supplier-internal part number from results and search. */
+  async listParts(scope: TenantScope, query: MasterListQuery, { internal = true } = {}) {
     const cursor = decodeCursor(query.cursor);
     const rows = await this.prisma.part.findMany({
       where: {
@@ -365,6 +367,9 @@ export class CatalogService {
               OR: [
                 { normalizedPartNumber: { contains: normalizeLookup(query.search) } },
                 { partName: { contains: query.search, mode: 'insensitive' } },
+                ...(internal
+                  ? [{ normalizedInternalPartNumber: { contains: normalizeLookup(query.search) } }]
+                  : []),
               ],
             }
           : {}),
@@ -373,12 +378,12 @@ export class CatalogService {
       take: query.limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
-    return page(rows, query.limit, presentPart);
+    return page(rows, query.limit, internal ? presentPart : presentTmminPart);
   }
 
   async createPart(
     scope: TenantScope,
-    input: { partNumber: string; partName: string },
+    input: { partNumber: string; partName: string; internalPartNumber?: string | null | undefined },
     context: MutationContext,
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
@@ -390,6 +395,7 @@ export class CatalogService {
           normalizedPartNumber: normalizeLookup(input.partNumber),
           partName: input.partName.trim(),
           normalizedPartName: normalizeLookup(input.partName),
+          ...internalPartNumberFields(input.internalPartNumber),
           createdById: context.actorUserId,
           updatedById: context.actorUserId,
         },
@@ -403,12 +409,20 @@ export class CatalogService {
     return presentPart(row);
   }
 
-  async previewPartImport(scope: TenantScope, rows: { partNumber: string; partName: string }[]) {
+  async previewPartImport(
+    scope: TenantScope,
+    rows: {
+      partNumber: string;
+      partName: string;
+      internalPartNumber?: string | null | undefined;
+    }[],
+  ) {
     assertDistinctPartNumbers(rows);
     const existing = [] as {
       id: string;
       normalizedPartNumber: string;
       partName: string;
+      internalPartNumber: string | null;
       active: boolean;
       version: number;
       deletedAt: Date | null;
@@ -424,6 +438,7 @@ export class CatalogService {
             id: true,
             normalizedPartNumber: true,
             partName: true,
+            internalPartNumber: true,
             active: true,
             deletedAt: true,
             version: true,
@@ -438,10 +453,15 @@ export class CatalogService {
         return {
           partNumber: row.partNumber.trim(),
           partName: row.partName.trim(),
+          internalPartNumber:
+            row.internalPartNumber === undefined
+              ? (part?.internalPartNumber ?? null)
+              : row.internalPartNumber?.trim() || null,
           existing: part
             ? {
                 id: part.id,
                 partName: part.partName,
+                internalPartNumber: part.internalPartNumber,
                 active: part.active,
                 deleted: Boolean(part.deletedAt),
                 version: part.version,
@@ -475,7 +495,12 @@ export class CatalogService {
         }
         const byNumber = new Map(existing.map((part) => [part.normalizedPartNumber, part]));
         const creates: PartImportCommitRequest['rows'] = [];
-        const updates: { id: string; partName: string; version: number }[] = [];
+        const updates: {
+          id: string;
+          partName: string;
+          internalPartNumber: string | null;
+          version: number;
+        }[] = [];
         let skipped = 0;
         for (const row of rows) {
           const normalizedPartNumber = normalizeLookup(row.partNumber);
@@ -494,11 +519,24 @@ export class CatalogService {
             throw partImportConflict(
               'A part changed while you were reviewing the file. Review the file again.',
             );
-          if (current.partName === row.partName.trim() && !current.deletedAt) {
+          const internalPartNumber =
+            row.internalPartNumber === undefined
+              ? current.internalPartNumber
+              : row.internalPartNumber?.trim() || null;
+          if (
+            current.partName === row.partName.trim() &&
+            current.internalPartNumber === internalPartNumber &&
+            !current.deletedAt
+          ) {
             skipped++;
             continue;
           }
-          updates.push({ id: current.id, partName: row.partName.trim(), version: current.version });
+          updates.push({
+            id: current.id,
+            partName: row.partName.trim(),
+            internalPartNumber,
+            version: current.version,
+          });
         }
         for (const batch of chunks(creates, 500)) {
           const saved = await tx.part.createManyAndReturn({
@@ -508,6 +546,7 @@ export class CatalogService {
               normalizedPartNumber: normalizeLookup(row.partNumber),
               partName: row.partName.trim(),
               normalizedPartName: normalizeLookup(row.partName),
+              ...internalPartNumberFields(row.internalPartNumber),
               createdById: context.actorUserId,
               updatedById: context.actorUserId,
             })),
@@ -529,12 +568,18 @@ export class CatalogService {
               version: row.version,
               partName: row.partName,
               normalizedPartName: normalizeLookup(row.partName),
+              internalPartNumber: row.internalPartNumber,
+              normalizedInternalPartNumber: row.internalPartNumber
+                ? normalizeLookup(row.internalPartNumber)
+                : null,
             })),
           );
           const changed = await tx.$executeRaw`
           UPDATE "Part" AS part
           SET "partName" = source."partName",
               "normalizedPartName" = source."normalizedPartName",
+              "internalPartNumber" = source."internalPartNumber",
+              "normalizedInternalPartNumber" = source."normalizedInternalPartNumber",
               active = CASE WHEN part."deletedAt" IS NOT NULL THEN true ELSE part.active END,
               "resetArchivedAt" = CASE WHEN part."deletedAt" IS NOT NULL THEN NULL ELSE part."resetArchivedAt" END,
               "deletedAt" = NULL,
@@ -542,7 +587,8 @@ export class CatalogService {
               "updatedAt" = CURRENT_TIMESTAMP,
               "updatedById" = ${context.actorUserId}::uuid
           FROM jsonb_to_recordset(${payload}::jsonb) AS source(
-            id uuid, version integer, "partName" text, "normalizedPartName" text
+            id uuid, version integer, "partName" text, "normalizedPartName" text,
+            "internalPartNumber" text, "normalizedInternalPartNumber" text
           )
           WHERE part.id = source.id AND part."supplierId" = ${scope.supplierId}::uuid
             AND part.version = source.version
@@ -555,7 +601,7 @@ export class CatalogService {
             batch.map((row) =>
               masterAudit(context, scope.supplierId, 'PART_UPDATED', 'Part', row.id, {
                 source: 'IMPORT',
-                fields: ['partName'],
+                fields: ['partName', 'internalPartNumber'],
               }),
             ),
             tx,
@@ -578,7 +624,12 @@ export class CatalogService {
   async updatePart(
     scope: TenantScope,
     id: string,
-    input: { expectedVersion: number; partNumber?: string; partName?: string },
+    input: {
+      expectedVersion: number;
+      partNumber?: string | undefined;
+      partName?: string | undefined;
+      internalPartNumber?: string | null | undefined;
+    },
     context: MutationContext,
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
@@ -603,6 +654,7 @@ export class CatalogService {
                 normalizedPartName: normalizeLookup(input.partName),
               }
             : {}),
+          ...internalPartNumberFields(input.internalPartNumber),
           version: { increment: 1 },
           updatedById: context.actorUserId,
         },
@@ -905,6 +957,16 @@ export class CatalogService {
 
 function activeWhere(active: MasterListQuery['active']) {
   return active === 'ACTIVE' ? { active: true } : active === 'INACTIVE' ? { active: false } : {};
+}
+
+/** Undefined keeps the stored internal part number; blank or null clears it. */
+function internalPartNumberFields(value: string | null | undefined) {
+  if (value === undefined) return {};
+  const trimmed = value?.trim() || null;
+  return {
+    internalPartNumber: trimmed,
+    normalizedInternalPartNumber: trimmed ? normalizeLookup(trimmed) : null,
+  };
 }
 
 function assertDistinctPartNumbers(rows: { partNumber: string }[]) {

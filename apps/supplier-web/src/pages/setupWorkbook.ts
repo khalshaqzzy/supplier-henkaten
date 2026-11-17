@@ -91,7 +91,9 @@ export function parseSetupSheets(
     if (headers.length > 32) throw new Error(`Sheet ${spec.name}: maksimal 32 kolom.`);
     const mapped = spec.columns.map((c) =>
       headers.flatMap((h, i) =>
-        [headerKey(c.label), headerKey(c.key)].includes(headerKey(cellText(h))) ? [i] : [],
+        [c.label, c.key, ...(c.aliases ?? [])].map(headerKey).includes(headerKey(cellText(h)))
+          ? [i]
+          : [],
       ),
     );
     for (const [index, matches] of mapped.entries()) {
@@ -116,6 +118,8 @@ export function parseSetupSheets(
         throw new Error('Workbook memiliki terlalu banyak sel. Pecah menjadi beberapa file.');
       const data: Record<string, string> = {};
       for (const [cIndex, column] of spec.columns.entries()) {
+        // Workbooks made before the internal part number column keep existing values.
+        if (column.key === 'internal' && !mapped[cIndex]?.length) continue;
         const value = sourceRow[mapped[cIndex]?.[0] ?? -1];
         let text = '';
         if (value instanceof Date && ['start', 'end'].includes(column.key))

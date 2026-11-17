@@ -1,5 +1,6 @@
 import { assertCurrentPrincipal } from '../auth/current-principal.js';
 import type { RequestPrincipal } from '../common/request-context.js';
+import { renameUser } from '../administration/username.js';
 import { lockSetupMutation } from './setup-lock.js';
 import { Injectable } from '@nestjs/common';
 
@@ -222,7 +223,7 @@ export class MemberService {
             where: {
               supplierId: scope.supplierId,
               active: true,
-              OR: [{ supervisorMemberId: id }, { lineLeaderMemberId: id }],
+              OR: [{ supervisorMemberId: id }, { lineLeaders: { some: { memberId: id } } }],
             },
           }),
           transaction.lineShiftJobAssignment.count({
@@ -320,20 +321,13 @@ export class MemberService {
       await lockSetupMutation(transaction, scope.supplierId);
       const user = await requireOperationalUser(transaction, scope, memberId);
       if (user.version !== input.expectedVersion) throw versionConflict();
-      await transaction.user.update({
-        where: { id: user.id },
-        data: {
-          username: input.username.trim(),
-          normalizedUsername: normalizeLookup(input.username),
-          authorizationEpoch: { increment: 1 },
-          version: { increment: 1 },
-          updatedById: context.actorUserId,
-        },
-      });
-      await revokeSessions(transaction, user.id, 'ROLE_CHANGED');
+      // The account keeps its password and sessions; only the sign-in name changes.
+      const updated = await renameUser(transaction, user, input.username, context.actorUserId);
       await this.audit.write(
         masterAudit(context, scope.supplierId, 'MEMBER_ACCOUNT_UPDATED', 'Member', memberId, {
           fields: ['username'],
+          previousUsername: user.username,
+          username: updated.username,
         }),
         transaction,
       );
