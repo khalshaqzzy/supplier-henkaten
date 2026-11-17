@@ -51,7 +51,7 @@ type MemberResource = Resource & { fullName?: string };
 type LineShiftDefinition = Resource & {
   lineId: string;
   shiftTemplateId: string;
-  lineLeaderMemberId: string | null;
+  lineLeaders: Array<{ memberId: string; name: string }>;
   shiftName: string;
   startTime: string;
   endTime: string;
@@ -374,6 +374,8 @@ async function provisionSupplier(
         {
           partNumber: plan.parts[index]!.number,
           partName: plan.parts[index]!.name,
+          // Most synthetic parts carry a supplier-internal number; some are left without one.
+          ...(index % 4 === 3 ? {} : { internalPartNumber: `INT-${plan.code}-${100 + index}` }),
         },
         admin.csrf,
       ),
@@ -525,7 +527,13 @@ async function provisionSupplier(
           {
             expectedVersion: lineShift.version,
             supervisorMemberId: supervisors[lineIndex % supervisors.length]!.memberId,
-            lineLeaderMemberId: leaders[lineIndex * shifts.length + shiftIndex]!.memberId,
+            // The first Line Shift is co-led with the next shift's leader, who then leads two.
+            lineLeaderMemberIds: [
+              leaders[lineIndex * shifts.length + shiftIndex]!.memberId,
+              ...(lineIndex === 0 && shiftIndex === 0
+                ? [leaders[lineIndex * shifts.length + 1]!.memberId]
+                : []),
+            ],
             jobs: lineShift.assignments.map(({ jobId }, jobIndex) => ({
               jobId,
               mpMemberId: mps[(lineIndex * 4 + jobIndex) % mps.length]!.id,
@@ -1130,11 +1138,12 @@ async function relocateHistoricalOccurrence(
   targetLineShift: LineShiftDefinition,
   daysAgo: number,
 ) {
-  if (!targetLineShift.lineLeaderMemberId) {
+  const targetLeaderId = targetLineShift.lineLeaders[0]?.memberId;
+  if (!targetLeaderId) {
     throw new Error('Historical seed target must have a Line Leader.');
   }
   const targetLeader = await prisma.member.findFirstOrThrow({
-    where: { id: targetLineShift.lineLeaderMemberId, supplierId: runtime.supplier.id },
+    where: { id: targetLeaderId, supplierId: runtime.supplier.id },
   });
   const targetUser = await prisma.user.findFirstOrThrow({
     where: { memberId: targetLeader.id, supplierId: runtime.supplier.id, status: 'ACTIVE' },

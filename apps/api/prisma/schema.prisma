@@ -219,6 +219,7 @@ model Supplier {
   shiftTemplates          ShiftTemplate[]
   lineShifts              LineShift[]
   lineShiftJobAssignments LineShiftJobAssignment[]
+  lineShiftLineLeaders    LineShiftLineLeader[]
   checklistTemplates      ChecklistTemplate[]
   checklistVersions       ChecklistVersion[]
   defaultAssignmentSet    DefaultAssignmentSet?
@@ -638,6 +639,7 @@ model Member {
   ledShiftRuns                 ShiftRun[]               @relation("ShiftRunLineLeader")
   supervisedLineShifts         LineShift[]              @relation("LineShiftSupervisor")
   ledLineShifts                LineShift[]              @relation("LineShiftLineLeader")
+  lineShiftLeaderships         LineShiftLineLeader[]
   lineShiftJobAssignments      LineShiftJobAssignment[]
   effectiveWorkingAssignments  WorkingAssignment[]      @relation("WorkingEffectiveMp")
   candidateWorkingAssignments  WorkingAssignment[]      @relation("WorkingCandidateMp")
@@ -781,6 +783,9 @@ model Part {
   normalizedPartNumber String     @db.VarChar(100)
   partName             String     @db.VarChar(200)
   normalizedPartName   String     @db.VarChar(200)
+  /// Optional supplier-internal number; partNumber is the TMMIN part number.
+  internalPartNumber           String?   @db.VarChar(100)
+  normalizedInternalPartNumber String?   @db.VarChar(100)
   active               Boolean    @default(true)
   version              Int        @default(1)
   createdAt            DateTime   @default(now()) @db.Timestamptz(3)
@@ -794,6 +799,7 @@ model Part {
   @@unique([supplierId, normalizedPartNumber])
   @@unique([id, supplierId])
   @@index([supplierId, active, normalizedPartName])
+  @@index([supplierId, normalizedInternalPartNumber])
 }
 
 model ShiftTemplate {
@@ -915,17 +921,36 @@ model LineShift {
   line               Line                     @relation(fields: [lineId, supplierId], references: [id, supplierId], onDelete: Restrict)
   shiftTemplate      ShiftTemplate            @relation(fields: [shiftTemplateId, supplierId], references: [id, supplierId], onDelete: Restrict)
   supervisor         Member?                  @relation("LineShiftSupervisor", fields: [supervisorMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  /// Compatibility mirror of the first entry in lineLeaders; authorization reads lineLeaders.
   lineLeader         Member?                  @relation("LineShiftLineLeader", fields: [lineLeaderMemberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  lineLeaders        LineShiftLineLeader[]
   jobAssignments     LineShiftJobAssignment[]
   henkatens          Henkaten[]
 
   @@unique([id, supplierId])
   @@unique([supplierId, lineId, shiftTemplateId])
   @@index([supplierId, lineId, active])
-  // A partial unique index in the migration permits one active LineShift per LL.
-  // Prisma cannot express the active-only predicate.
   @@index([supplierId, lineLeaderMemberId, active])
   @@index([supplierId, supervisorMemberId, active])
+}
+
+/// Line Leaders assigned to one LineShift. A Line Leader may lead several LineShifts and a
+/// LineShift may have several Line Leaders.
+model LineShiftLineLeader {
+  id          String    @id @default(uuid()) @db.Uuid
+  supplierId  String    @db.Uuid
+  lineShiftId String    @db.Uuid
+  memberId    String    @db.Uuid
+  position    Int
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  createdById String?   @db.Uuid
+  supplier    Supplier  @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  lineShift   LineShift @relation(fields: [lineShiftId, supplierId], references: [id, supplierId], onDelete: Restrict)
+  member      Member    @relation(fields: [memberId, supplierId], references: [id, supplierId], onDelete: Restrict)
+
+  @@unique([lineShiftId, memberId])
+  @@index([supplierId, memberId])
+  @@index([supplierId, lineShiftId])
 }
 
 model LineShiftJobAssignment {
@@ -1260,6 +1285,7 @@ model HenkatenPart {
   partNumberSnapshot           String   @db.VarChar(100)
   normalizedPartNumberSnapshot String   @db.VarChar(100)
   partNameSnapshot             String   @db.VarChar(200)
+  internalPartNumberSnapshot   String?  @db.VarChar(100)
   henkaten                     Henkaten @relation(fields: [henkatenId, supplierId], references: [id, supplierId], onDelete: Restrict)
   part                         Part?    @relation(fields: [partId, supplierId], references: [id, supplierId], onDelete: Restrict)
 

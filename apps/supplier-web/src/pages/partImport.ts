@@ -1,11 +1,25 @@
 import Papa from 'papaparse';
 
-export type PartImportRow = { partNumber: string; partName: string; sourceRow: number };
-export type PartColumnMapping = { numberIndex: number; nameIndex: number };
+export type PartImportRow = {
+  partNumber: string;
+  partName: string;
+  /** Undefined when the file has no internal part number column. */
+  internalPartNumber?: string | null;
+  sourceRow: number;
+};
+/** `internalIndex` is -1 when the internal part number is not imported. */
+export type PartColumnMapping = { numberIndex: number; nameIndex: number; internalIndex: number };
 export type PartImportSheet = { headers: string[]; matrix: unknown[][]; dataRowCount: number };
 
+const tmminNumberHeaders = new Set(['tmminpartnumber', 'tmminpartno']);
 const numberHeaders = new Set(['partnumber', 'partno', 'nomorpart', 'kodepart']);
 const nameHeaders = new Set(['partname', 'namapart']);
+const internalHeaders = new Set([
+  'internalpartnumber',
+  'internalpartno',
+  'nomorpartinternal',
+  'partnumberinternal',
+]);
 
 export const partCellText = (value: unknown) => {
   if (value === null || value === undefined) return '';
@@ -28,9 +42,14 @@ const normalizeHeader = (value: unknown) =>
     .replace(/[^a-z0-9]/g, '');
 
 export function suggestedPartMapping(headers: string[]): PartColumnMapping {
+  const find = (names: Set<string>) =>
+    headers.findIndex((cell) => names.has(normalizeHeader(cell)));
+  // An explicit TMMIN header wins over a generic "Part number" header.
+  const tmmin = find(tmminNumberHeaders);
   return {
-    numberIndex: headers.findIndex((cell) => numberHeaders.has(normalizeHeader(cell))),
-    nameIndex: headers.findIndex((cell) => nameHeaders.has(normalizeHeader(cell))),
+    numberIndex: tmmin >= 0 ? tmmin : find(numberHeaders),
+    nameIndex: find(nameHeaders),
+    internalIndex: find(internalHeaders),
   };
 }
 
@@ -64,7 +83,7 @@ export function preparePartSheet(matrix: unknown[][]): PartImportSheet {
 
 export function parsePartMatrix(matrix: unknown[][], mapping?: PartColumnMapping): PartImportRow[] {
   const sheet = preparePartSheet(matrix);
-  const { numberIndex, nameIndex } = mapping ?? suggestedPartMapping(sheet.headers);
+  const { numberIndex, nameIndex, internalIndex } = mapping ?? suggestedPartMapping(sheet.headers);
   if (
     numberIndex < 0 ||
     nameIndex < 0 ||
@@ -72,7 +91,12 @@ export function parsePartMatrix(matrix: unknown[][], mapping?: PartColumnMapping
     numberIndex >= sheet.headers.length ||
     nameIndex >= sheet.headers.length
   )
-    throw new Error('Pilih dua kolom berbeda untuk Part number dan Nama part.');
+    throw new Error('Pilih dua kolom berbeda untuk TMMIN Part Number dan Nama part.');
+  if (
+    internalIndex >= sheet.headers.length ||
+    (internalIndex >= 0 && (internalIndex === numberIndex || internalIndex === nameIndex))
+  )
+    throw new Error('Kolom Internal Part Number harus berbeda dari kolom lain.');
   const rows: PartImportRow[] = [];
   const seen = new Map<string, number>();
   for (const [index, cells] of matrix.slice(1).entries()) {
@@ -83,22 +107,33 @@ export function parsePartMatrix(matrix: unknown[][], mapping?: PartColumnMapping
       (!Number.isSafeInteger(cells[numberIndex]) || cells[numberIndex] < 0)
     )
       throw new Error(
-        `Baris ${sourceRow}: Part number harus bilangan bulat yang presisi. Untuk nomor panjang atau nol di depan, format kolom sebagai teks di Excel.`,
+        `Baris ${sourceRow}: TMMIN Part Number harus bilangan bulat yang presisi. Untuk nomor panjang atau nol di depan, format kolom sebagai teks di Excel.`,
       );
     const partNumber = selectedCellText(cells[numberIndex]).trim();
     const partName = selectedCellText(cells[nameIndex]).trim();
     if (!partNumber || !partName)
-      throw new Error(`Baris ${sourceRow}: Part number dan Nama part wajib diisi.`);
+      throw new Error(`Baris ${sourceRow}: TMMIN Part Number dan Nama part wajib diisi.`);
     if (partNumber.length > 100 || partName.length > 200)
       throw new Error(
-        `Baris ${sourceRow}: Part number maksimal 100 karakter dan Nama part maksimal 200 karakter.`,
+        `Baris ${sourceRow}: TMMIN Part Number maksimal 100 karakter dan Nama part maksimal 200 karakter.`,
       );
+    const internalPartNumber =
+      internalIndex >= 0 ? selectedCellText(cells[internalIndex]).trim() || null : undefined;
+    if (internalPartNumber && internalPartNumber.length > 100)
+      throw new Error(`Baris ${sourceRow}: Internal Part Number maksimal 100 karakter.`);
     const normalized = partNumber.normalize('NFKC').toLocaleLowerCase('en-US');
     const first = seen.get(normalized);
     if (first)
-      throw new Error(`Part number ${partNumber} muncul pada baris ${first} dan ${sourceRow}.`);
+      throw new Error(
+        `TMMIN Part Number ${partNumber} muncul pada baris ${first} dan ${sourceRow}.`,
+      );
     seen.set(normalized, sourceRow);
-    rows.push({ partNumber, partName, sourceRow });
+    rows.push({
+      partNumber,
+      partName,
+      ...(internalPartNumber !== undefined ? { internalPartNumber } : {}),
+      sourceRow,
+    });
   }
   return rows;
 }

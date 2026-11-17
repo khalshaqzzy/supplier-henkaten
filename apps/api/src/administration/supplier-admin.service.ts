@@ -10,6 +10,7 @@ import { AuditWriter } from '../persistence/audit-writer.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 import { runSerializable } from '../persistence/transaction.js';
 import type { MutationContext } from './mutation-context.js';
+import { renameUser } from './username.js';
 import { assertIanaTimezone } from '../master-data/shift-time.js';
 import { decodeCursor, encodeCursor, presentSupplier, presentUser } from './presenters.js';
 import {
@@ -313,6 +314,38 @@ export class SupplierAdminService {
           temporaryPassword: credential.temporaryPassword,
         },
       };
+    });
+  }
+
+  /** Renames the active Supplier Admin; the supplier version guards concurrent admin changes. */
+  async updateAdminUsername(
+    supplierId: string,
+    input: { expectedVersion: number; username: string },
+    context: MutationContext,
+  ) {
+    return this.prisma.$transaction(async (transaction) => {
+      const supplier = await transaction.supplier.findUnique({ where: { id: supplierId } });
+      if (!supplier) throw notFound('Supplier');
+      // The guarded version bump serializes concurrent renames of the same Supplier Admin.
+      const claimed = await transaction.supplier.updateMany({
+        where: { id: supplierId, version: input.expectedVersion },
+        data: { version: { increment: 1 }, updatedById: context.actorUserId },
+      });
+      if (claimed.count !== 1) throw versionConflict();
+      const admin = await transaction.user.findFirst({
+        where: { supplierId, role: 'SUPPLIER_ADMIN', status: 'ACTIVE' },
+      });
+      if (!admin) throw notFound('Active Supplier Admin');
+      const updated = await renameUser(transaction, admin, input.username, context.actorUserId);
+      await this.audit.write(
+        auditInput(context, 'SUPPLIER_ADMIN_USERNAME_CHANGED', admin.id, {
+          supplierId,
+          previousUsername: admin.username,
+          username: updated.username,
+        }),
+        transaction,
+      );
+      return presentUser(updated);
     });
   }
 

@@ -55,6 +55,7 @@ import {
   supplierSummarySchema,
   tmminLoginRequestSchema,
   updateSupplierRequestSchema,
+  updateUsernameRequestSchema,
   userCredentialResponseSchema,
   userPageSchema,
   userSummarySchema,
@@ -87,6 +88,7 @@ import {
   memberPageSchema,
   memberSchema,
   partPageSchema,
+  tmminPartPageSchema,
   partSchema,
   partImportPreviewRequestSchema,
   partImportPreviewResponseSchema,
@@ -295,6 +297,15 @@ export function buildOpenApiDocument(): Record<string, unknown> {
           requestParams: idPath,
           responses: { '200': json('TMMIN Quality user', userSummarySchema), '404': problem },
         },
+        patch: {
+          requestParams: idPath,
+          requestBody: body(updateUsernameRequestSchema),
+          responses: {
+            '200': json('Renamed TMMIN Quality user', userSummarySchema),
+            '404': problem,
+            '409': problem,
+          },
+        },
       },
       '/api/v1/tmmin/quality-users/{id}/deactivate': userActionPath(userSummarySchema),
       '/api/v1/tmmin/quality-users/{id}/reactivate': userActionPath(userSummarySchema),
@@ -336,6 +347,17 @@ export function buildOpenApiDocument(): Record<string, unknown> {
         expectedVersionSchema,
         supplierSummarySchema,
       ),
+      '/api/v1/tmmin/suppliers/{id}/supplier-admin': {
+        patch: {
+          requestParams: idPath,
+          requestBody: body(updateUsernameRequestSchema),
+          responses: {
+            '200': json('Renamed Supplier Admin', userSummarySchema),
+            '404': problem,
+            '409': problem,
+          },
+        },
+      },
       '/api/v1/tmmin/suppliers/{id}/supplier-admin/replace': supplierActionPath(
         replaceSupplierAdminRequestSchema,
         userCredentialResponseSchema,
@@ -1358,7 +1380,7 @@ function masterDataPaths() {
         responses: { '200': json('Hosted jobs', jobPageSchema), '404': problem },
       },
     },
-    '/api/v1/tmmin/suppliers/{supplierId}/master-data/parts': tmminListPath(partPageSchema),
+    '/api/v1/tmmin/suppliers/{supplierId}/master-data/parts': tmminListPath(tmminPartPageSchema),
     '/api/v1/tmmin/suppliers/{supplierId}/master-data/shift-templates':
       tmminListPath(shiftTemplatePageSchema),
     '/api/v1/tmmin/suppliers/{supplierId}/master-data/checklists/{category}/versions': {

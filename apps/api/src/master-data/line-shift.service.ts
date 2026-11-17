@@ -25,6 +25,10 @@ const includeLineShift = {
   shiftTemplate: true,
   supervisor: true,
   lineLeader: true,
+  lineLeaders: {
+    include: { member: true },
+    orderBy: [{ position: 'asc' }, { id: 'asc' }],
+  },
   jobAssignments: {
     include: { job: true, mp: true },
     orderBy: [{ job: { displayOrder: 'asc' } }, { id: 'asc' }],
@@ -46,7 +50,7 @@ export class LineShiftService {
         supplierId: scope.supplierId,
         ...(lineId ? { lineId } : {}),
         ...(principal?.role === 'LINE_LEADER' && principal.memberId
-          ? { lineLeaderMemberId: principal.memberId }
+          ? { lineLeaders: { some: { memberId: principal.memberId } } }
           : principal?.role === 'SUPERVISOR' && principal.memberId
             ? { supervisorMemberId: principal.memberId }
             : {}),
@@ -69,7 +73,7 @@ export class LineShiftService {
         line: { active: true },
         shiftTemplate: { active: true },
         ...(principal.role === 'LINE_LEADER' && principal.memberId
-          ? { lineLeaderMemberId: principal.memberId }
+          ? { lineLeaders: { some: { memberId: principal.memberId } } }
           : principal.role === 'SUPERVISOR' && principal.memberId
             ? { supervisorMemberId: principal.memberId }
             : {}),
@@ -153,34 +157,49 @@ export class LineShiftService {
     };
   }
 
+  /**
+   * Resolves the Line–Shift occurrence a Line Leader submits for. A Line Leader may lead several
+   * active Line–Shifts; the request then names one with `lineShiftId`.
+   */
   async resolveAssignedOccurrence(
     tx: Prisma.TransactionClient,
     scope: TenantScope,
     principal: RequestPrincipal,
+    lineShiftId?: string,
     now?: Date,
   ) {
     if (principal.role !== 'LINE_LEADER' || !principal.memberId) {
       throw missing('Assigned Line Shift');
     }
     const locked = await tx.$queryRaw<Array<{ id: string }>>`
-      SELECT id FROM "LineShift"
-      WHERE "supplierId" = ${scope.supplierId}::uuid
-        AND "lineLeaderMemberId" = ${principal.memberId}::uuid
-        AND active = true
-      FOR SHARE
+      SELECT ls.id FROM "LineShift" ls
+      JOIN "LineShiftLineLeader" leader ON leader."lineShiftId" = ls.id
+      WHERE ls."supplierId" = ${scope.supplierId}::uuid
+        AND leader."memberId" = ${principal.memberId}::uuid
+        AND ls.active = true
+      ORDER BY ls.id
+      FOR SHARE OF ls
     `;
-    if (locked.length !== 1) {
+    if (locked.length === 0) {
+      throw conflict('Line Leader belum ditugaskan pada Line–Shift aktif. Hubungi Supplier Admin.');
+    }
+    const chosen = lineShiftId
+      ? locked.find(({ id }) => id === lineShiftId)
+      : locked.length === 1
+        ? locked[0]
+        : undefined;
+    if (!chosen) {
       throw conflict(
-        locked.length === 0
-          ? 'Line Leader belum memiliki satu Line–Shift aktif. Hubungi Supplier Admin.'
-          : 'Line Leader memiliki lebih dari satu Line–Shift aktif. Hubungi Supplier Admin.',
+        lineShiftId
+          ? 'Anda tidak lagi ditugaskan pada Line–Shift ini. Pilih Line–Shift lain.'
+          : 'Pilih Line–Shift untuk Henkaten ini.',
       );
     }
     const row = await tx.lineShift.findFirst({
       where: {
-        id: locked[0]!.id,
+        id: chosen.id,
         supplierId: scope.supplierId,
-        lineLeaderMemberId: principal.memberId,
+        lineLeaders: { some: { memberId: principal.memberId } },
         active: true,
         line: { active: true },
         shiftTemplate: { active: true },
@@ -216,7 +235,7 @@ export class LineShiftService {
                 supplierId: scope.supplierId,
                 lineId,
               },
-              include: { jobAssignments: true },
+              include: { jobAssignments: true, lineLeaders: { orderBy: { position: 'asc' } } },
             })
           : Promise.resolve(null),
         tx.job.findMany({
@@ -237,13 +256,22 @@ export class LineShiftService {
           lineId,
           shiftTemplateId: shift.id,
           supervisorMemberId: source?.supervisorMemberId ?? null,
-          // A copied shift needs its own LL. Copying the source LL would violate
-          // the one-active-LineShift-per-LL invariant.
-          lineLeaderMemberId: null,
+          lineLeaderMemberId: source?.lineLeaders[0]?.memberId ?? null,
           createdById: context.actorUserId,
           updatedById: context.actorUserId,
         },
       });
+      if (source?.lineLeaders.length) {
+        await tx.lineShiftLineLeader.createMany({
+          data: source.lineLeaders.map((leader, index) => ({
+            supplierId: scope.supplierId,
+            lineShiftId: created.id,
+            memberId: leader.memberId,
+            position: index + 1,
+            createdById: context.actorUserId,
+          })),
+        });
+      }
       if (jobs.length) {
         await tx.lineShiftJobAssignment.createMany({
           data: jobs.map((job) => ({
@@ -275,111 +303,110 @@ export class LineShiftService {
     input: UpdateLineShiftAssignmentsRequest,
     context: MutationContext,
   ) {
-    try {
-      await this.prisma.$transaction(async (tx) => {
-        await lockSetupMutation(tx, scope.supplierId);
-        await tx.$queryRaw`SELECT id FROM "LineShift" WHERE id = ${id}::uuid FOR UPDATE`;
-        const current = await tx.lineShift.findFirst({
-          where: { id, supplierId: scope.supplierId },
-          include: { line: { include: { jobs: { where: { active: true } } } } },
-        });
-        if (!current) throw missing('Line Shift');
-        if (current.version !== input.expectedVersion) throw versionConflict();
-        const expectedJobs = new Set(current.line.jobs.map(({ id: jobId }) => jobId));
-        const submittedJobs = new Set(input.jobs.map(({ jobId }) => jobId));
-        if (
-          expectedJobs.size !== submittedJobs.size ||
-          [...expectedJobs].some((jobId) => !submittedJobs.has(jobId))
-        ) {
-          throw conflict('Assignment harus memuat tepat seluruh job aktif pada line.');
-        }
-        const memberIds = [
-          ...(input.supervisorMemberId ? [input.supervisorMemberId] : []),
-          ...(input.lineLeaderMemberId ? [input.lineLeaderMemberId] : []),
-          ...input.jobs.flatMap(({ mpMemberId }) => (mpMemberId ? [mpMemberId] : [])),
-        ];
-        const members = memberIds.length
-          ? await tx.member.findMany({
-              where: {
-                supplierId: scope.supplierId,
-                id: { in: [...new Set(memberIds)] },
-                active: true,
-              },
-            })
-          : [];
-        const roles = new Map(members.map((member) => [member.id, member.role]));
-        if (input.supervisorMemberId && roles.get(input.supervisorMemberId) !== 'SUPERVISOR')
-          throw missing('Active Supervisor');
-        if (input.lineLeaderMemberId && roles.get(input.lineLeaderMemberId) !== 'LINE_LEADER')
-          throw missing('Active Line Leader');
-        if (input.jobs.some(({ mpMemberId }) => mpMemberId && roles.get(mpMemberId) !== 'MP'))
-          throw missing('Active MP');
-        if (current.active && input.lineLeaderMemberId) {
-          const occupied = await tx.lineShift.findFirst({
+    await this.prisma.$transaction(async (tx) => {
+      await lockSetupMutation(tx, scope.supplierId);
+      await tx.$queryRaw`SELECT id FROM "LineShift" WHERE id = ${id}::uuid FOR UPDATE`;
+      const current = await tx.lineShift.findFirst({
+        where: { id, supplierId: scope.supplierId },
+        include: {
+          line: { include: { jobs: { where: { active: true } } } },
+          lineLeaders: { orderBy: { position: 'asc' } },
+        },
+      });
+      if (!current) throw missing('Line Shift');
+      if (current.version !== input.expectedVersion) throw versionConflict();
+      const expectedJobs = new Set(current.line.jobs.map(({ id: jobId }) => jobId));
+      const submittedJobs = new Set(input.jobs.map(({ jobId }) => jobId));
+      if (
+        expectedJobs.size !== submittedJobs.size ||
+        [...expectedJobs].some((jobId) => !submittedJobs.has(jobId))
+      ) {
+        throw conflict('Assignment harus memuat tepat seluruh job aktif pada line.');
+      }
+      const memberIds = [
+        ...(input.supervisorMemberId ? [input.supervisorMemberId] : []),
+        ...input.lineLeaderMemberIds,
+        ...input.jobs.flatMap(({ mpMemberId }) => (mpMemberId ? [mpMemberId] : [])),
+      ];
+      const members = memberIds.length
+        ? await tx.member.findMany({
             where: {
               supplierId: scope.supplierId,
-              lineLeaderMemberId: input.lineLeaderMemberId,
+              id: { in: [...new Set(memberIds)] },
               active: true,
-              id: { not: id },
             },
-            include: { line: true, shiftTemplate: true },
+          })
+        : [];
+      const roles = new Map(members.map((member) => [member.id, member.role]));
+      if (input.supervisorMemberId && roles.get(input.supervisorMemberId) !== 'SUPERVISOR')
+        throw missing('Active Supervisor');
+      if (input.lineLeaderMemberIds.some((leaderId) => roles.get(leaderId) !== 'LINE_LEADER'))
+        throw missing('Active Line Leader');
+      if (input.jobs.some(({ mpMemberId }) => mpMemberId && roles.get(mpMemberId) !== 'MP'))
+        throw missing('Active MP');
+      await tx.lineShift.update({
+        where: { id },
+        data: {
+          supervisorMemberId: input.supervisorMemberId,
+          lineLeaderMemberId: input.lineLeaderMemberIds[0] ?? null,
+          version: { increment: 1 },
+          updatedById: context.actorUserId,
+        },
+      });
+      const previousLeaders = current.lineLeaders.map(({ memberId }) => memberId);
+      const leadersChanged =
+        previousLeaders.length !== input.lineLeaderMemberIds.length ||
+        previousLeaders.some((memberId, index) => memberId !== input.lineLeaderMemberIds[index]);
+      if (leadersChanged) {
+        await tx.lineShiftLineLeader.deleteMany({
+          where: { supplierId: scope.supplierId, lineShiftId: id },
+        });
+        if (input.lineLeaderMemberIds.length) {
+          await tx.lineShiftLineLeader.createMany({
+            data: input.lineLeaderMemberIds.map((memberId, index) => ({
+              supplierId: scope.supplierId,
+              lineShiftId: id,
+              memberId,
+              position: index + 1,
+              createdById: context.actorUserId,
+            })),
           });
-          if (occupied) throw leaderConflict(occupied.line.code, occupied.shiftTemplate.name);
         }
-
-        await tx.lineShift.update({
-          where: { id },
-          data: {
-            supervisorMemberId: input.supervisorMemberId,
-            lineLeaderMemberId: input.lineLeaderMemberId,
+      }
+      for (const assignment of input.jobs) {
+        await tx.lineShiftJobAssignment.upsert({
+          where: {
+            supplierId_lineShiftId_jobId: {
+              supplierId: scope.supplierId,
+              lineShiftId: id,
+              jobId: assignment.jobId,
+            },
+          },
+          create: {
+            supplierId: scope.supplierId,
+            lineShiftId: id,
+            jobId: assignment.jobId,
+            mpMemberId: assignment.mpMemberId,
+            createdById: context.actorUserId,
+            updatedById: context.actorUserId,
+          },
+          update: {
+            mpMemberId: assignment.mpMemberId,
             version: { increment: 1 },
             updatedById: context.actorUserId,
           },
         });
-        for (const assignment of input.jobs) {
-          await tx.lineShiftJobAssignment.upsert({
-            where: {
-              supplierId_lineShiftId_jobId: {
-                supplierId: scope.supplierId,
-                lineShiftId: id,
-                jobId: assignment.jobId,
-              },
-            },
-            create: {
-              supplierId: scope.supplierId,
-              lineShiftId: id,
-              jobId: assignment.jobId,
-              mpMemberId: assignment.mpMemberId,
-              createdById: context.actorUserId,
-              updatedById: context.actorUserId,
-            },
-            update: {
-              mpMemberId: assignment.mpMemberId,
-              version: { increment: 1 },
-              updatedById: context.actorUserId,
-            },
-          });
-        }
-        await this.audit.write(
-          masterAudit(
-            context,
-            scope.supplierId,
-            'LINE_SHIFT_ASSIGNMENTS_UPDATED',
-            'LineShift',
-            id,
-            {
-              lineId: current.lineId,
-              shiftTemplateId: current.shiftTemplateId,
-              assignedJobs: input.jobs.filter(({ mpMemberId }) => mpMemberId).length,
-            },
-          ),
-          tx,
-        );
-      });
-    } catch (error) {
-      if (isLeaderUniqueViolation(error)) throw leaderConflict();
-      throw error;
-    }
+      }
+      await this.audit.write(
+        masterAudit(context, scope.supplierId, 'LINE_SHIFT_ASSIGNMENTS_UPDATED', 'LineShift', id, {
+          lineId: current.lineId,
+          shiftTemplateId: current.shiftTemplateId,
+          assignedJobs: input.jobs.filter(({ mpMemberId }) => mpMemberId).length,
+          lineLeaderMemberIds: input.lineLeaderMemberIds,
+        }),
+        tx,
+      );
+    });
     return this.get(scope, id);
   }
 
@@ -390,75 +417,57 @@ export class LineShiftService {
     active: boolean,
     context: MutationContext,
   ) {
-    try {
-      await this.prisma.$transaction(async (tx) => {
-        await lockSetupMutation(tx, scope.supplierId);
-        await tx.$queryRaw`SELECT id FROM "Supplier" WHERE id = ${scope.supplierId}::uuid FOR UPDATE`;
-        await tx.$queryRaw`SELECT id FROM "LineShift" WHERE id = ${id}::uuid FOR UPDATE`;
-        const current = await tx.lineShift.findFirst({
-          where: { id, supplierId: scope.supplierId },
-          include: includeLineShift,
-        });
-        if (!current) throw missing('Line Shift');
-        if (current.version !== expectedVersion) throw versionConflict();
-        if (active) {
-          if (!current.line.active || !current.shiftTemplate.active)
-            throw conflict('Line dan shift harus aktif.');
-          if (
-            current.supervisorMemberId &&
-            (!current.supervisor?.active || current.supervisor.role !== 'SUPERVISOR')
-          )
-            throw missing('Active Supervisor');
-          if (
-            current.lineLeaderMemberId &&
-            (!current.lineLeader?.active || current.lineLeader.role !== 'LINE_LEADER')
-          )
-            throw missing('Active Line Leader');
-          if (
-            current.jobAssignments.some(
-              ({ job, mpMemberId, mp }) =>
-                job.active && mpMemberId && (!mp?.active || mp.role !== 'MP'),
-            )
-          )
-            throw missing('Active MP');
-        }
-        if (active && !current.active && current.lineLeaderMemberId) {
-          const occupied = await tx.lineShift.findFirst({
-            where: {
-              supplierId: scope.supplierId,
-              lineLeaderMemberId: current.lineLeaderMemberId,
-              active: true,
-              id: { not: id },
-            },
-            include: { line: true, shiftTemplate: true },
-          });
-          if (occupied) throw leaderConflict(occupied.line.code, occupied.shiftTemplate.name);
-        }
-        await tx.lineShift.update({
-          where: { id },
-          data: {
-            active,
-            ...(active ? { resetArchivedAt: null } : {}),
-            version: { increment: 1 },
-            updatedById: context.actorUserId,
-          },
-        });
-        await this.audit.write(
-          masterAudit(
-            context,
-            scope.supplierId,
-            active ? 'LINE_SHIFT_ACTIVATED' : 'LINE_SHIFT_DEACTIVATED',
-            'LineShift',
-            id,
-            { lineId: current.lineId, shiftTemplateId: current.shiftTemplateId },
-          ),
-          tx,
-        );
+    await this.prisma.$transaction(async (tx) => {
+      await lockSetupMutation(tx, scope.supplierId);
+      await tx.$queryRaw`SELECT id FROM "Supplier" WHERE id = ${scope.supplierId}::uuid FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "LineShift" WHERE id = ${id}::uuid FOR UPDATE`;
+      const current = await tx.lineShift.findFirst({
+        where: { id, supplierId: scope.supplierId },
+        include: includeLineShift,
       });
-    } catch (error) {
-      if (isLeaderUniqueViolation(error)) throw leaderConflict();
-      throw error;
-    }
+      if (!current) throw missing('Line Shift');
+      if (current.version !== expectedVersion) throw versionConflict();
+      if (active) {
+        if (!current.line.active || !current.shiftTemplate.active)
+          throw conflict('Line dan shift harus aktif.');
+        if (
+          current.supervisorMemberId &&
+          (!current.supervisor?.active || current.supervisor.role !== 'SUPERVISOR')
+        )
+          throw missing('Active Supervisor');
+        if (
+          current.lineLeaders.some(({ member }) => !member.active || member.role !== 'LINE_LEADER')
+        )
+          throw missing('Active Line Leader');
+        if (
+          current.jobAssignments.some(
+            ({ job, mpMemberId, mp }) =>
+              job.active && mpMemberId && (!mp?.active || mp.role !== 'MP'),
+          )
+        )
+          throw missing('Active MP');
+      }
+      await tx.lineShift.update({
+        where: { id },
+        data: {
+          active,
+          ...(active ? { resetArchivedAt: null } : {}),
+          version: { increment: 1 },
+          updatedById: context.actorUserId,
+        },
+      });
+      await this.audit.write(
+        masterAudit(
+          context,
+          scope.supplierId,
+          active ? 'LINE_SHIFT_ACTIVATED' : 'LINE_SHIFT_DEACTIVATED',
+          'LineShift',
+          id,
+          { lineId: current.lineId, shiftTemplateId: current.shiftTemplateId },
+        ),
+        tx,
+      );
+    });
     return this.get(scope, id);
   }
 
@@ -486,8 +495,10 @@ function presentLineShift(row: IncludedLineShift) {
     crossesMidnight: row.shiftTemplate.endMinute < row.shiftTemplate.startMinute,
     supervisorMemberId: row.supervisorMemberId,
     supervisorName: row.supervisor?.fullName ?? null,
-    lineLeaderMemberId: row.lineLeaderMemberId,
-    lineLeaderName: row.lineLeader?.fullName ?? null,
+    lineLeaders: row.lineLeaders.map((leader) => ({
+      memberId: leader.memberId,
+      name: leader.member.fullName,
+    })),
     active: row.active,
     assignments: row.jobAssignments.map((assignment) => ({
       id: assignment.id,
@@ -538,18 +549,6 @@ function occurrenceFor(row: IncludedLineShift, now: Date) {
 
 function minuteToTime(value: number) {
   return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
-}
-
-function isLeaderUniqueViolation(error: unknown) {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
-}
-
-function leaderConflict(lineCode?: string, shiftName?: string) {
-  return conflict(
-    lineCode && shiftName
-      ? `Line Leader sudah ditugaskan pada ${lineCode} · ${shiftName}. Pilih LL lain atau lepaskan assignment sebelumnya.`
-      : 'Line Leader sudah ditugaskan pada Line–Shift aktif lain. Pilih LL lain atau lepaskan assignment sebelumnya.',
-  );
 }
 
 function conflict(detail: string) {

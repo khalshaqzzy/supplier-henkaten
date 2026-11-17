@@ -12,7 +12,7 @@ type LineShift = {
   id: string;
   version: number;
   assignments: Array<{ mpMemberId: string | null }>;
-  lineLeaderMemberId: string | null;
+  lineLeaders: Array<{ memberId: string; name: string }>;
 };
 type TanokoMatrix = { members: Array<{ id: string; lineIds: string[] }> };
 import {
@@ -94,7 +94,7 @@ test('Supplier operations: searchable assignments, reviewed shift rotation, Tano
     {
       expectedVersion: donor.version,
       supervisorMemberId: fixture.members.supervisor.id,
-      lineLeaderMemberId: fixture.members.donorLeader.id,
+      lineLeaderMemberIds: [fixture.members.donorLeader.id],
       jobs: [{ jobId: fixture.donorJob.id, mpMemberId: fixture.members.replacement.id }],
     },
     fixture.csrf,
@@ -114,13 +114,18 @@ test('Supplier operations: searchable assignments, reviewed shift rotation, Tano
   await page.getByRole('button', { name: /Supervisor / }).click();
   await page.getByRole('combobox', { name: 'Cari Supervisor' }).fill('REG-operations-1');
   await page.getByRole('combobox', { name: 'Cari Supervisor' }).press('Enter');
-  await page.getByRole('button', { name: /Line Leader / }).click();
-  await expect(page.getByRole('option', { name: /Ditugaskan di/ })).toHaveAttribute(
+  await page.getByRole('button', { name: 'Tambah Line Leader' }).click();
+  // A leader of another Line Shift stays selectable and shows that assignment.
+  await expect(page.getByRole('option', { name: /Juga memimpin/ })).toHaveAttribute(
     'aria-disabled',
-    'true',
+    'false',
   );
   await page.getByRole('combobox', { name: 'Cari Line Leader' }).fill('REG-operations-2');
   await page.getByRole('combobox', { name: 'Cari Line Leader' }).press('Enter');
+  await page.getByRole('button', { name: 'Selesai', exact: true }).click();
+  await expect(
+    page.getByRole('list', { name: 'Line Leader terpilih' }).getByRole('listitem'),
+  ).toHaveCount(1);
   // Review the same assignment picker at desktop, tablet and narrow-phone widths.
   for (const width of [1440, 768, 390, 320]) {
     await page.setViewportSize({ width, height: 900 });
@@ -286,7 +291,7 @@ test('Supplier operations: searchable assignments, reviewed shift rotation, Tano
     )
   ).items.find((item) => item.id === configured.id)!;
   expect(after.assignments).toEqual(assigned.assignments);
-  expect(after.lineLeaderMemberId).toBe(assigned.lineLeaderMemberId);
+  expect(after.lineLeaders).toEqual(assigned.lineLeaders);
   // All Tanoko readers receive scoped membership without master-data read permission changes.
   const matrix = await get<TanokoMatrix>(supervisor.context.request, '/api/v1/supplier/tanoko');
   expect(matrix.members.find((m) => m.id === fixture.members.replacement.id)?.lineIds).toContain(

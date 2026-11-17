@@ -7,8 +7,17 @@ import './henkaten-part-picker.css';
 
 export interface PartChoice {
   id: string;
+  /** TMMIN part number. */
   partNumber: string;
   partName: string;
+  internalPartNumber?: string | null;
+}
+
+/** Part name with the supplier-internal number, when one is recorded. */
+export function partChoiceDetail(part: PartChoice) {
+  return part.internalPartNumber
+    ? `${part.partName} · Internal ${part.internalPartNumber}`
+    : part.partName;
 }
 
 export interface PartSelection {
@@ -68,7 +77,7 @@ export function HenkatenPartPicker({
       value: part.id,
       part,
       label: part.partNumber,
-      description: part.partName,
+      description: partChoiceDetail(part),
       selected: selectedIds.has(part.id),
       disabledReason: full && !selectedIds.has(part.id) ? `Maksimal ${max} part` : undefined,
     })),
@@ -190,7 +199,7 @@ export function HenkatenPartPicker({
                 activeIndex >= 0 ? `${listId}-option-${activeIndex}` : undefined
               }
               autoComplete="off"
-              placeholder="Cari nomor atau nama part…"
+              placeholder="Cari TMMIN/internal part number atau nama…"
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value);
@@ -293,7 +302,7 @@ export function HenkatenPartPicker({
                 <SelectedRow
                   key={part.id}
                   label={part.partNumber}
-                  detail={part.partName}
+                  detail={partChoiceDetail(part)}
                   onRemove={() =>
                     onChange({
                       other: false,
@@ -333,7 +342,11 @@ function SelectedRow({
 }
 
 /** Compact part cell: the first part plus a count of the remaining ones. */
-export function PartSummary({ parts }: { parts: ReadonlyArray<{ number: string; name: string }> }) {
+export function PartSummary({
+  parts,
+}: {
+  parts: ReadonlyArray<{ number: string; name: string; internalNumber?: string | null }>;
+}) {
   const [first, ...rest] = parts;
   if (!first) return null;
   return (
@@ -350,7 +363,9 @@ export function PartSummary({ parts }: { parts: ReadonlyArray<{ number: string; 
           </span>
         )}
       </strong>
-      <small>{first.name}</small>
+      <small>
+        {first.internalNumber ? `${first.name} · Internal ${first.internalNumber}` : first.name}
+      </small>
     </div>
   );
 }

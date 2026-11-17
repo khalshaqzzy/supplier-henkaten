@@ -264,11 +264,23 @@ describe('Supplier workbook import and reset', () => {
       (await prisma.userSession.findUniqueOrThrow({ where: { id: oldSession.id } })).revokedAt,
     ).not.toBeNull();
   });
-  it('rejects invalid references, duplicate active leaders, and stale review revisions', async () => {
-    const broken = rows
-      .filter((r) => r.sheet === 'Line Shift')
-      .map((r) => ({ ...r, data: { ...r.data, leader: 'LL-01' } }));
-    expect((await service.preview(principal, broken)).issues.length).toBeGreaterThan(0);
+  it('rejects invalid references, repeated or unknown leaders, and stale review revisions', async () => {
+    const lineShiftRows = rows.filter((r) => r.sheet === 'Line Shift');
+    // One leader may lead every Line Shift; a repeated or unknown code in one cell is rejected.
+    const shared = lineShiftRows.map((r) => ({ ...r, data: { ...r.data, leader: 'LL-01' } }));
+    expect((await service.preview(principal, shared)).issues).toEqual([]);
+    const repeated = lineShiftRows.map((r) => ({
+      ...r,
+      data: { ...r.data, leader: 'LL-01, LL-01' },
+    }));
+    expect((await service.preview(principal, repeated)).issues.length).toBeGreaterThan(0);
+    const unknown = lineShiftRows.map((r) => ({
+      ...r,
+      data: { ...r.data, leader: 'LL-01, LL-404' },
+    }));
+    expect((await service.preview(principal, unknown)).issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ column: 'leader' })]),
+    );
     const invalid = [
       {
         sheet: 'Assignment MP' as const,

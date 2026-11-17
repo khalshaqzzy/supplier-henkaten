@@ -162,6 +162,9 @@ describe('Line Shift Henkaten operations', () => {
       },
     });
     lineShiftId = lineShift.id;
+    await prisma.lineShiftLineLeader.create({
+      data: { supplierId, lineShiftId, memberId: leader.memberId, position: 1 },
+    });
     const assignments = await Promise.all(
       [job1, job2].map((job) =>
         prisma.lineShiftJobAssignment.create({
@@ -237,6 +240,14 @@ describe('Line Shift Henkaten operations', () => {
       },
     });
     outsideLineShiftId = outsideConfig.id;
+    await prisma.lineShiftLineLeader.create({
+      data: {
+        supplierId,
+        lineShiftId: outsideConfig.id,
+        memberId: outsideLeader.memberId,
+        position: 1,
+      },
+    });
     const outsideAssignment = await prisma.lineShiftJobAssignment.create({
       data: {
         supplierId,
@@ -1661,6 +1672,61 @@ describe('Line Shift Henkaten operations', () => {
       csrf: login.body.csrfToken as string,
     };
   }
+
+  it('shares Henkaten between co-leaders and asks a multi-line leader to choose the Line–Shift', async () => {
+    const { memberId: outsideLeaderMemberId } = await prisma.lineShiftLineLeader.findFirstOrThrow({
+      where: { lineShiftId: outsideLineShiftId },
+    });
+    const coLeader = await prisma.lineShiftLineLeader.create({
+      data: { supplierId, lineShiftId, memberId: outsideLeaderMemberId, position: 2 },
+    });
+    try {
+      const context = await request(app.getHttpServer())
+        .get('/api/v1/supplier/master-data/line-shifts/operational-context')
+        .set('Cookie', outsideLeaderCookie);
+      expect(context.status).toBe(200);
+      expect((context.body.items as Array<{ id: string }>).map(({ id }) => id).sort()).toEqual(
+        [lineShiftId, outsideLineShiftId].sort(),
+      );
+      const ambiguous = await request(app.getHttpServer())
+        .post('/api/v1/supplier/henkatens')
+        .set('Origin', supplierOrigin)
+        .set('Cookie', outsideLeaderCookie)
+        .set('X-CSRF-Token', outsideLeaderCsrf)
+        .set('Idempotency-Key', randomUUID())
+        .send({
+          category: 'MACHINE',
+          jobId: job1Id,
+          otherPart: true,
+          affectedObject: 'Old jig',
+          replacementObject: 'New jig',
+          cause: 'Jig change',
+          detail: 'Line–Shift not chosen',
+        });
+      expect(ambiguous.status).toBe(409);
+      expect(ambiguous.body.detail).toBe('Pilih Line–Shift untuk Henkaten ini.');
+
+      const created = await createManHenkaten();
+      expect(created.status).toBe(201);
+      const listed = await request(app.getHttpServer())
+        .get('/api/v1/supplier/henkatens?limit=100')
+        .set('Cookie', outsideLeaderCookie);
+      expect(listed.status).toBe(200);
+      expect((listed.body.items as Array<{ id: string }>).map(({ id }) => id)).toContain(
+        created.body.id,
+      );
+      const withdrawn = await request(app.getHttpServer())
+        .post(`/api/v1/supplier/henkatens/${created.body.id as string}/withdraw`)
+        .set('Origin', supplierOrigin)
+        .set('Cookie', outsideLeaderCookie)
+        .set('X-CSRF-Token', outsideLeaderCsrf)
+        .set('Idempotency-Key', randomUUID())
+        .send({ expectedVersion: created.body.version, reason: 'Withdrawn by co-leader' });
+      expect(withdrawn.status).toBe(201);
+    } finally {
+      await prisma.lineShiftLineLeader.delete({ where: { id: coLeader.id } });
+    }
+  });
 
   async function createManHenkaten(
     idempotencyKey = randomUUID(),

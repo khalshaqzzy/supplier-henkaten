@@ -169,10 +169,15 @@ export const jobPageSchema = z
   .object({ items: z.array(jobSchema), pageInfo: pageInfoSchema })
   .strict();
 
+/** Optional supplier-internal part number. Blank input clears it. */
+export const internalPartNumberInputSchema = z.string().trim().max(100).nullable();
+
+/** `partNumber` is the TMMIN part number. */
 export const createPartRequestSchema = z
   .object({
     partNumber: z.string().trim().min(1).max(100),
     partName: z.string().trim().min(1).max(200),
+    internalPartNumber: internalPartNumberInputSchema.optional(),
   })
   .strict();
 export const partImportPreviewRequestSchema = z
@@ -187,10 +192,12 @@ export const partImportPreviewResponseSchema = z
         .object({
           partNumber: z.string(),
           partName: z.string(),
+          internalPartNumber: z.string().nullable(),
           existing: z
             .object({
               id: opaqueIdSchema,
               partName: z.string(),
+              internalPartNumber: z.string().nullable(),
               active: z.boolean(),
               deleted: z.boolean().default(false),
               version: optimisticVersionSchema,
@@ -231,16 +238,20 @@ export const updatePartRequestSchema = z
     expectedVersion: optimisticVersionSchema,
     partNumber: z.string().trim().min(1).max(100).optional(),
     partName: z.string().trim().min(1).max(200).optional(),
+    internalPartNumber: internalPartNumberInputSchema.optional(),
   })
   .strict()
-  .refine(({ partNumber, partName }) => partNumber !== undefined || partName !== undefined, {
-    message: 'At least one mutable field is required.',
-  });
+  .refine(
+    ({ partNumber, partName, internalPartNumber }) =>
+      partNumber !== undefined || partName !== undefined || internalPartNumber !== undefined,
+    { message: 'At least one mutable field is required.' },
+  );
 export const partSchema = z
   .object({
     id: opaqueIdSchema,
     partNumber: z.string().min(1).max(100),
     partName: z.string().min(1).max(200),
+    internalPartNumber: z.string().min(1).max(100).nullable(),
     active: z.boolean(),
     version: optimisticVersionSchema,
     createdAt: utcTimestampSchema,
@@ -249,6 +260,11 @@ export const partSchema = z
   .strict();
 export const partPageSchema = z
   .object({ items: z.array(partSchema), pageInfo: pageInfoSchema })
+  .strict();
+/** TMMIN sees the TMMIN part number only; the supplier-internal number stays private. */
+export const tmminPartSchema = partSchema.omit({ internalPartNumber: true });
+export const tmminPartPageSchema = z
+  .object({ items: z.array(tmminPartSchema), pageInfo: pageInfoSchema })
   .strict();
 
 export const createShiftTemplateRequestSchema = z
@@ -382,6 +398,13 @@ export const createLineShiftRequestSchema = z
   .strict();
 export type CreateLineShiftRequest = z.infer<typeof createLineShiftRequestSchema>;
 
+/** Line Leaders that can be assigned to one Line–Shift. */
+export const MAX_LINE_LEADERS_PER_LINE_SHIFT = 10;
+
+export const lineShiftLineLeaderSchema = z
+  .object({ memberId: opaqueIdSchema, name: nameSchema })
+  .strict();
+
 export const lineShiftAssignmentInputSchema = z
   .object({ jobId: opaqueIdSchema, mpMemberId: opaqueIdSchema.nullable() })
   .strict();
@@ -390,7 +413,12 @@ export const updateLineShiftAssignmentsRequestSchema = z
   .object({
     expectedVersion: optimisticVersionSchema,
     supervisorMemberId: opaqueIdSchema.nullable(),
-    lineLeaderMemberId: opaqueIdSchema.nullable(),
+    lineLeaderMemberIds: z
+      .array(opaqueIdSchema)
+      .max(MAX_LINE_LEADERS_PER_LINE_SHIFT)
+      .refine((ids) => new Set(ids).size === ids.length, {
+        message: 'Line Leader tidak boleh dipilih lebih dari sekali.',
+      }),
     jobs: z.array(lineShiftAssignmentInputSchema).max(500),
   })
   .strict();
@@ -425,8 +453,7 @@ export const lineShiftSchema = z
     crossesMidnight: z.boolean(),
     supervisorMemberId: opaqueIdSchema.nullable(),
     supervisorName: nameSchema.nullable(),
-    lineLeaderMemberId: opaqueIdSchema.nullable(),
-    lineLeaderName: nameSchema.nullable(),
+    lineLeaders: z.array(lineShiftLineLeaderSchema).max(MAX_LINE_LEADERS_PER_LINE_SHIFT),
     active: z.boolean(),
     assignments: z.array(lineShiftJobAssignmentSchema),
     version: optimisticVersionSchema,

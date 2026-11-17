@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   MAX_ACTIVE_LINES_PER_SUPPLIER,
   SETUP_SHEETS,
+  splitSetupLeaderCodes,
   setupNormalize as norm,
   setupRowKey,
   validateSetupRows,
@@ -48,7 +49,10 @@ export async function prepareSetupPlan(
   const rows = inputRows.map((r) => ({
     ...r,
     data: Object.fromEntries(
-      Object.entries(r.data).map(([k, v]) => [k, k === 'password' ? v : v.trim()]),
+      Object.entries(r.data).map(([k, v]) => [
+        k,
+        k === 'password' ? v : k === 'leader' ? splitSetupLeaderCodes(v).join(', ') : v.trim(),
+      ]),
     ),
   }));
   const issues = validateSetupRows(rows);
@@ -58,7 +62,13 @@ export async function prepareSetupPlan(
     tx.line.findMany({ where: { supplierId } }),
     tx.job.findMany({ where: { supplierId } }),
     tx.shiftTemplate.findMany({ where: { supplierId } }),
-    tx.lineShift.findMany({ where: { supplierId }, include: { jobAssignments: true } }),
+    tx.lineShift.findMany({
+      where: { supplierId },
+      include: {
+        jobAssignments: true,
+        lineLeaders: { orderBy: [{ position: 'asc' }, { id: 'asc' }] },
+      },
+    }),
     tx.checklistTemplate.findMany({
       where: { supplierId },
       include: {
@@ -121,7 +131,7 @@ export async function prepareSetupPlan(
       id: p.id,
       version: p.version,
       active: p.active,
-      data: { code: p.partNumber, name: p.partName },
+      data: { code: p.partNumber, name: p.partName, internal: p.internalPartNumber ?? '' },
     })),
     ...shifts.map((s): Entity => ({
       sheet: 'Shift',
@@ -147,7 +157,7 @@ export async function prepareSetupPlan(
         line: lineCode.get(s.lineId) ?? '',
         shift: shiftCode.get(s.shiftTemplateId) ?? '',
         supervisor: s.supervisorMemberId ? (memberCode.get(s.supervisorMemberId) ?? '') : '',
-        leader: s.lineLeaderMemberId ? (memberCode.get(s.lineLeaderMemberId) ?? '') : '',
+        leader: s.lineLeaders.map(({ memberId }) => memberCode.get(memberId) ?? '').join(', '),
       },
     })),
     ...lineShifts.flatMap((s) =>
@@ -304,6 +314,7 @@ export async function prepareSetupPlan(
               c.key !== 'password' &&
               c.key !== 'order' &&
               !(row.sheet === 'Part' && c.key === 'code') &&
+              !(c.key === 'internal' && !(c.key in proposed)) &&
               (items ? c.key === 'question' : true),
           )
           .flatMap((c) =>
@@ -433,7 +444,14 @@ export async function prepareSetupPlan(
       ref('shift', 'Shift', norm(d['shift'] ?? ''));
     if (p.row.sheet === 'Line Shift') {
       ref('supervisor', 'Member', norm(d['supervisor'] ?? ''), 'SUPERVISOR', true);
-      ref('leader', 'Member', norm(d['leader'] ?? ''), 'LINE_LEADER', true);
+      const leaderIds = splitSetupLeaderCodes(d['leader'] ?? '').flatMap((code) => {
+        const target = aliases.get(`Member|${norm(code)}`);
+        if (target?.active && target.data['role'] === 'LINE_LEADER' && target.userActive !== false)
+          return [target.id];
+        add(p.row, 'leader', `Referensi Member (LINE_LEADER) aktif tidak ditemukan: ${code}.`);
+        return [];
+      });
+      if (leaderIds.length) p.refs['leaders'] = leaderIds.join(',');
     }
     if (p.row.sheet === 'Assignment MP') {
       ref('lineShift', 'Line Shift', pair(d['line'] ?? '', d['shift'] ?? ''));
@@ -474,18 +492,6 @@ export async function prepareSetupPlan(
       reservedUsernames.has(norm(p.row.data['username'] ?? ''))
     )
       add(p.row, 'Username', 'Username sudah digunakan akun supplier lain.');
-  const leaders = new Map<string, string>();
-  for (const e of final.values()) {
-    if (e.sheet !== 'Line Shift' || !e.active) continue;
-    const member = aliases.get(`Member|${norm(e.data['leader'] ?? '')}`);
-    if (!member) continue;
-    const previous = leaders.get(member.id);
-    if (previous && previous !== e.id) {
-      const p = plan.find((p) => p.id === e.id) ?? plan.find((p) => p.id === previous);
-      if (p) add(p.row, 'Kode LL', 'LL hanya boleh berada pada satu Line–Shift aktif.');
-    }
-    leaders.set(member.id, e.id);
-  }
   for (const [sheet, limit] of [
     ['Member', 300],
     ['Line', MAX_ACTIVE_LINES_PER_SUPPLIER],

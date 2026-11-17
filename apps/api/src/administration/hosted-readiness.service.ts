@@ -130,12 +130,14 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
         lineId: true,
         active: true,
         supervisorMemberId: true,
-        lineLeaderMemberId: true,
         shiftTemplate: {
           select: { id: true, name: true, startMinute: true, endMinute: true, active: true },
         },
         supervisor: { select: assignedMemberSelect },
-        lineLeader: { select: assignedMemberSelect },
+        lineLeaders: {
+          orderBy: [{ position: 'asc' }, { id: 'asc' }],
+          select: { memberId: true, member: { select: assignedMemberSelect } },
+        },
         jobAssignments: {
           where: { job: { active: true } },
           select: { jobId: true, mpMemberId: true, mp: { select: assignedMemberSelect } },
@@ -290,8 +292,7 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
         ...supervisor,
       });
     }
-    const leader = assignmentGap(lineShift.lineLeaderMemberId, lineShift.lineLeader, 'LINE_LEADER');
-    if (leader) {
+    for (const leader of leaderGaps(lineShift.lineLeaders)) {
       add({
         ...context,
         code: 'LINE_SHIFT_LEADER_MISSING',
@@ -324,7 +325,7 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
     (total, item) =>
       total +
       Number(!assignmentGap(item.supervisorMemberId, item.supervisor, 'SUPERVISOR')) +
-      Number(!assignmentGap(item.lineLeaderMemberId, item.lineLeader, 'LINE_LEADER')) +
+      Number(leaderGaps(item.lineLeaders).length === 0) +
       item.jobAssignments.filter(({ mp }) => mp?.active).length,
     0,
   );
@@ -374,6 +375,15 @@ type AssignedMember = {
  * Classifies one required Line–Shift position. MP positions need an active member only;
  * Supervisor and Line Leader positions additionally need an active account in that role.
  */
+/** One gap when no Line Leader is assigned, otherwise one gap per unusable Line Leader. */
+function leaderGaps(leaders: Array<{ memberId: string; member: AssignedMember }>) {
+  if (!leaders.length) return [assignmentGap(null, null, 'LINE_LEADER')!];
+  return leaders.flatMap(({ memberId, member }) => {
+    const gap = assignmentGap(memberId, member, 'LINE_LEADER');
+    return gap ? [gap] : [];
+  });
+}
+
 function assignmentGap(
   memberId: string | null,
   member: AssignedMember | null,

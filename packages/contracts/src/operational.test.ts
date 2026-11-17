@@ -244,7 +244,7 @@ describe('operational contracts', () => {
           publishedAt: '2026-07-23T00:00:00.000Z',
           items: [{ id: id(), label: 'Replacement qualified', displayOrder: 1 }],
         },
-        parts: [{ id: id(), partNumber: 'P-01', partName: 'Door trim' }],
+        parts: [{ id: id(), partNumber: 'P-01', partName: 'Door trim', internalPartNumber: null }],
         replacementMembers: [
           {
             id: id(),

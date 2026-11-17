@@ -51,7 +51,7 @@ test('Line Leader submits one Henkaten for several parts', async ({
     {
       expectedVersion: lineShift.version,
       supervisorMemberId: fixture.members.supervisor.id,
-      lineLeaderMemberId: fixture.members.leader.id,
+      lineLeaderMemberIds: [fixture.members.leader.id],
       jobs: [{ jobId: fixture.job.id, mpMemberId: fixture.members.mp.id }],
     },
     fixture.csrf,

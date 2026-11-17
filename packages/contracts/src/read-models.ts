@@ -119,9 +119,7 @@ export const assignmentBoardSchema = z
           supervisor: z
             .object({ memberId: opaqueIdSchema.nullable(), name: z.string().nullable() })
             .strict(),
-          lineLeader: z
-            .object({ memberId: opaqueIdSchema.nullable(), name: z.string().nullable() })
-            .strict(),
+          lineLeaders: z.array(z.object({ memberId: opaqueIdSchema, name: z.string() }).strict()),
           activeOverride: z
             .object({
               reason: z.string().min(1).max(1_000),

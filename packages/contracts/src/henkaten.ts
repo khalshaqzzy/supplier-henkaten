@@ -28,8 +28,11 @@ export const MAX_HENKATEN_PARTS = 50;
 export const henkatenPartSchema = z
   .object({
     id: opaqueIdSchema.nullable(),
+    /** TMMIN part number. */
     number: z.string(),
     name: z.string(),
+    /** Supplier-internal part number captured at submission. */
+    internalNumber: z.string().nullable(),
   })
   .strict();
 export type HenkatenPart = z.infer<typeof henkatenPartSchema>;
@@ -346,6 +349,7 @@ export const henkatenFormOptionsSchema = z
           id: opaqueIdSchema,
           partNumber: z.string().min(1).max(100),
           partName: z.string().min(1).max(200),
+          internalPartNumber: z.string().min(1).max(100).nullable(),
         })
         .strict(),
     ),
@@ -420,6 +424,7 @@ export const clonePrefillSchema = z
           id: opaqueIdSchema,
           partNumber: z.string().min(1).max(100),
           partName: z.string().min(1).max(200),
+          internalPartNumber: z.string().min(1).max(100).nullable(),
         })
         .strict(),
     ),

@@ -113,7 +113,7 @@ it('retries an uncertain submission with the same key and displayed assignment c
   client.clear();
 });
 
-it('recovers an unusable shift context when the assignment is corrected', async () => {
+it('lets a leader of several Line–Shifts choose the occurrence for the Henkaten', async () => {
   vi.mocked(useSession).mockReturnValue({
     session: {
       principal: { userId: 'user', role: 'LINE_LEADER', purpose: 'NORMAL' },
@@ -123,13 +123,28 @@ it('recovers an unusable shift context when the assignment is corrected', async 
   const shift = {
     id: 'shift',
     version: 1,
-    lineName: 'Corrected Line',
+    lineCode: 'L1',
+    lineName: 'Body Line',
+    shiftName: 'Pagi',
+    startTime: '07:00',
+    endTime: '15:00',
+    current: true,
     effectiveStartAt: '2026-09-30T00:00:00Z',
-    effectiveEndAt: '2026-09-30T23:59:00Z',
-    assignments: [],
+    effectiveEndAt: '2026-09-30T08:00:00Z',
+    assignments: [{ id: 'assignment', jobId: 'job', jobName: 'Job', mpMemberId: 'mp' }],
   };
   vi.spyOn(supplierApi, 'lineShiftOperationalContext').mockResolvedValue({
-    items: [shift, { ...shift, id: 'other' }],
+    items: [
+      shift,
+      {
+        ...shift,
+        id: 'other',
+        lineCode: 'L2',
+        lineName: 'Paint Line',
+        assignments: [{ id: 'assignment-2', jobId: 'job-2', jobName: 'Spray', mpMemberId: 'mp' }],
+      },
+    ],
+    currentLineShiftIds: ['shift', 'other'],
   } as never);
   vi.spyOn(supplierApi, 'henkatenFormOptions').mockResolvedValue({
     parts: [],
@@ -144,14 +159,13 @@ it('recovers an unusable shift context when the assignment is corrected', async 
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  await screen.findByText('Assignment Line Leader perlu diperiksa oleh Supplier Admin.');
-  for (const query of client
-    .getQueryCache()
-    .findAll()
-    .filter((query) => query.queryKey.includes('line-shift-operational-context')))
-    client.setQueryData(query.queryKey, { items: [shift] });
-  await waitFor(() => expect(screen.getAllByText(/Corrected Line/).length).toBeGreaterThan(0));
+  const group = await screen.findByRole('radiogroup', { name: 'Pilih Line–Shift' });
+  expect(group.querySelectorAll('input[type="radio"]')).toHaveLength(2);
   expect(screen.queryByText('Line shift tidak tersedia')).toBeNull();
+  expect(screen.getByLabelText(/Job/)).toHaveProperty('disabled', true);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('radio', { name: /Paint Line/ }));
+  await waitFor(() => expect(screen.getByLabelText(/Job/)).toHaveProperty('disabled', false));
   client.clear();
 });
 

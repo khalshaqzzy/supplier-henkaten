@@ -432,6 +432,83 @@ describe('Phase 3 administration flows', () => {
     expect(forbidden.body.code).toBe('FORBIDDEN');
   });
 
+  it('lets a TMMIN Admin rename Quality users and the Supplier Admin', async () => {
+    const password = 'Rename-Admin-Test-Password-123';
+    const passwordHash = await app.get(PasswordService).hash(password);
+    const username = `rename-admin-${randomUUID()}`;
+    await prisma.user.create({
+      data: {
+        realm: 'TMMIN',
+        role: 'TMMIN_ADMIN',
+        username,
+        normalizedUsername: username,
+        displayName: 'Rename Admin',
+        passwordHash,
+        mustChangePassword: false,
+      },
+    });
+    const login = await tmminLogin(username, password);
+    expect(login.status).toBe(200);
+    const cookie = login.headers['set-cookie'] ?? '';
+    const csrf = login.body.csrfToken as string;
+    const send = (method: 'post' | 'patch', path: string, body: object) =>
+      request(app.getHttpServer())
+        [method](path)
+        .set('Origin', tmminOrigin)
+        .set('Cookie', cookie)
+        .set('X-CSRF-Token', csrf)
+        .send(body);
+
+    const quality = await send('post', '/api/v1/tmmin/quality-users', {
+      username: `quality-rename-${randomUUID()}`,
+      displayName: 'Quality Rename',
+    });
+    expect(quality.status).toBe(201);
+    const qualityUser = quality.body.user as { id: string; version: number };
+    const taken = await send('patch', `/api/v1/tmmin/quality-users/${qualityUser.id}`, {
+      expectedVersion: qualityUser.version,
+      username: username.toUpperCase(),
+    });
+    expect(taken.status).toBe(409);
+    expect(taken.body.detail).toBe('Username sudah digunakan akun lain.');
+    const qualityName = `quality-renamed-${randomUUID()}`;
+    const renamed = await send('patch', `/api/v1/tmmin/quality-users/${qualityUser.id}`, {
+      expectedVersion: qualityUser.version,
+      username: qualityName,
+    });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body).toMatchObject({ username: qualityName, version: qualityUser.version + 1 });
+
+    const hosted = await send('post', '/api/v1/tmmin/suppliers', {
+      sourceMode: 'HOSTED',
+      code: `RENAME-${randomUUID()}`,
+      name: 'Rename Supplier',
+      timezone: 'Asia/Jakarta',
+      supplierAdmin: { username: `rename-supplier-admin-${randomUUID()}`, displayName: 'Admin' },
+    });
+    expect(hosted.status).toBe(201);
+    const supplier = hosted.body.supplier as { id: string; version: number };
+    const adminName = `renamed-supplier-admin-${randomUUID()}`;
+    const attempts = await Promise.all(
+      [adminName, `${adminName}-b`].map((next) =>
+        send('patch', `/api/v1/tmmin/suppliers/${supplier.id}/supplier-admin`, {
+          expectedVersion: supplier.version,
+          username: next,
+        }),
+      ),
+    );
+    expect(attempts.map(({ status }) => status).sort()).toEqual([200, 409]);
+    const admin = await prisma.user.findFirstOrThrow({
+      where: { supplierId: supplier.id, role: 'SUPPLIER_ADMIN', status: 'ACTIVE' },
+    });
+    expect([adminName, `${adminName}-b`]).toContain(admin.username);
+    expect(
+      await prisma.auditEvent.count({
+        where: { action: 'SUPPLIER_ADMIN_USERNAME_CHANGED', resourceId: admin.id },
+      }),
+    ).toBe(1);
+  });
+
   it('claims outbox work once across concurrent workers and surfaces poison events', async () => {
     const outbox = app.get(OutboxService);
     const onceType = `OUTBOX_ONCE_${randomUUID()}`;

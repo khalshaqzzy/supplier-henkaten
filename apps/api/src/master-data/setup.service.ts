@@ -470,15 +470,6 @@ export class SetupService implements OnModuleInit, BeforeApplicationShutdown {
     >();
     const meta = { createdById: context.actorUserId, updatedById: context.actorUserId };
     const updateMeta = { updatedById: context.actorUserId, version: { increment: 1 } };
-    // Release affected LL assignments first so an explicitly reviewed swap remains atomic.
-    const changedLineShifts = plan
-      .filter((p) => p.apply && p.current && p.row.sheet === 'Line Shift')
-      .map((p) => p.id);
-    if (changedLineShifts.length)
-      await tx.lineShift.updateMany({
-        where: { supplierId, id: { in: changedLineShifts } },
-        data: { lineLeaderMemberId: null },
-      });
     const parts = plan.filter((p) => p.apply && !p.current && p.row.sheet === 'Part');
     for (let index = 0; index < parts.length; index += 500) {
       const batch = parts.slice(index, index + 500);
@@ -490,6 +481,10 @@ export class SetupService implements OnModuleInit, BeforeApplicationShutdown {
           normalizedPartNumber: norm(p.row.data['code']!),
           partName: p.row.data['name']!,
           normalizedPartName: norm(p.row.data['name']!),
+          internalPartNumber: p.row.data['internal'] || null,
+          normalizedInternalPartNumber: p.row.data['internal']
+            ? norm(p.row.data['internal'])
+            : null,
           ...meta,
         })),
       });
@@ -510,10 +505,13 @@ export class SetupService implements OnModuleInit, BeforeApplicationShutdown {
           id: p.id,
           name: p.row.data['name']!,
           normalized: norm(p.row.data['name']!),
+          setInternal: 'internal' in p.row.data,
+          internal: p.row.data['internal'] || null,
+          normalizedInternal: p.row.data['internal'] ? norm(p.row.data['internal']) : null,
           restore: p.restore,
         })),
       );
-      await tx.$executeRaw`UPDATE "Part" p SET "partName" = s.name, "normalizedPartName" = s.normalized, active = CASE WHEN s.restore THEN true ELSE p.active END, "resetArchivedAt" = CASE WHEN s.restore THEN NULL ELSE p."resetArchivedAt" END, "deletedAt" = CASE WHEN s.restore THEN NULL ELSE p."deletedAt" END, version = p.version + 1, "updatedAt" = CURRENT_TIMESTAMP, "updatedById" = ${context.actorUserId}::uuid FROM jsonb_to_recordset(${payload}::jsonb) AS s(id uuid, name text, normalized text, restore boolean) WHERE p.id = s.id AND p."supplierId" = ${supplierId}::uuid`;
+      await tx.$executeRaw`UPDATE "Part" p SET "partName" = s.name, "normalizedPartName" = s.normalized, "internalPartNumber" = CASE WHEN s."setInternal" THEN s.internal ELSE p."internalPartNumber" END, "normalizedInternalPartNumber" = CASE WHEN s."setInternal" THEN s."normalizedInternal" ELSE p."normalizedInternalPartNumber" END, active = CASE WHEN s.restore THEN true ELSE p.active END, "resetArchivedAt" = CASE WHEN s.restore THEN NULL ELSE p."resetArchivedAt" END, "deletedAt" = CASE WHEN s.restore THEN NULL ELSE p."deletedAt" END, version = p.version + 1, "updatedAt" = CURRENT_TIMESTAMP, "updatedById" = ${context.actorUserId}::uuid FROM jsonb_to_recordset(${payload}::jsonb) AS s(id uuid, name text, normalized text, "setInternal" boolean, internal text, "normalizedInternal" text, restore boolean) WHERE p.id = s.id AND p."supplierId" = ${supplierId}::uuid`;
       await this.audit.writeMany(
         batch.map((p) =>
           masterAudit(context, supplierId, 'PART_UPDATED', 'Part', p.id, {
@@ -637,9 +635,10 @@ export class SetupService implements OnModuleInit, BeforeApplicationShutdown {
           });
         else await tx.shiftTemplate.create({ data: { id: p.id, supplierId, ...fields, ...meta } });
       } else if (sheet === 'Line Shift') {
+        const leaderIds = p.refs['leaders']?.split(',') ?? [];
         const fields = {
           supervisorMemberId: p.refs['supervisor'] ?? null,
-          lineLeaderMemberId: p.refs['leader'] ?? null,
+          lineLeaderMemberId: leaderIds[0] ?? null,
         };
         if (p.current)
           await tx.lineShift.update({
@@ -665,6 +664,17 @@ export class SetupService implements OnModuleInit, BeforeApplicationShutdown {
             data: jobs.map((j) => ({ supplierId, lineShiftId: p.id, jobId: j.id, ...meta })),
           });
         }
+        await tx.lineShiftLineLeader.deleteMany({ where: { supplierId, lineShiftId: p.id } });
+        if (leaderIds.length)
+          await tx.lineShiftLineLeader.createMany({
+            data: leaderIds.map((memberId, index) => ({
+              supplierId,
+              lineShiftId: p.id,
+              memberId,
+              position: index + 1,
+              createdById: context.actorUserId,
+            })),
+          });
       } else if (sheet === 'Assignment MP') {
         const assignment = await tx.lineShiftJobAssignment.upsert({
           where: {
@@ -890,6 +900,7 @@ export class SetupService implements OnModuleInit, BeforeApplicationShutdown {
           where: { supplierId: scope.supplierId },
           data: { ...archive, supervisorMemberId: null, lineLeaderMemberId: null },
         });
+        await tx.lineShiftLineLeader.deleteMany({ where: { supplierId: scope.supplierId } });
         await tx.defaultLineSupervisor.deleteMany({ where: { supplierId: scope.supplierId } });
         await tx.defaultLineLeader.deleteMany({ where: { supplierId: scope.supplierId } });
         await tx.defaultJobMp.deleteMany({ where: { supplierId: scope.supplierId } });

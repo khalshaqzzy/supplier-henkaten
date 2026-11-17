@@ -34,6 +34,7 @@ import {
   presentHenkatenDetail,
   presentHenkatenSummary,
 } from './henkaten-presenters.js';
+import { lineLeaderHenkatenScope } from '../common/line-leader-scope.js';
 
 @Injectable()
 export class HenkatenService {
@@ -82,7 +83,12 @@ export class HenkatenService {
         if (retry.submissionPayloadHash !== payloadHash) throw idempotencyConflict();
         return retry.id;
       }
-      const occurrence = await this.lineShifts.resolveAssignedOccurrence(tx, scope, principal);
+      const occurrence = await this.lineShifts.resolveAssignedOccurrence(
+        tx,
+        scope,
+        principal,
+        input.lineShiftId,
+      );
       if (
         (input.lineShiftId && input.lineShiftId !== occurrence.row.id) ||
         (input.expectedEffectiveStartAt &&
@@ -145,6 +151,7 @@ export class HenkatenService {
               partNumberSnapshot: part.partNumber,
               normalizedPartNumberSnapshot: normalizeLookup(part.partNumber),
               partNameSnapshot: part.partName,
+              internalPartNumberSnapshot: part.internalPartNumber,
             };
           })
         : [
@@ -154,6 +161,7 @@ export class HenkatenService {
               partNumberSnapshot: 'Other',
               normalizedPartNumberSnapshot: `other:${henkatenId}`,
               partNameSnapshot: '',
+              internalPartNumberSnapshot: null,
             },
           ];
       const primaryPart = affectedParts[0]!;
@@ -505,10 +513,7 @@ export class HenkatenService {
           id,
           supplierId: scope.supplierId,
           status: 'OPEN',
-          OR: [
-            { lineLeaderResponsibility: { memberId } },
-            { lineLeaderResponsibility: null, shiftRun: { lineLeaderMemberId: memberId } },
-          ],
+          ...lineLeaderHenkatenScope(memberId),
         },
       });
       if (!current) throw missing('Open owned Henkaten');
@@ -567,7 +572,7 @@ export class HenkatenService {
       ...(query.pcrStatus ? { pcrAssessment: { status: query.pcrStatus } } : {}),
       ...(query.lineId ? { lineId: query.lineId } : {}),
       ...(query.shiftRunId ? { shiftRunId: query.shiftRunId } : {}),
-      ...(query.part ? henkatenPartSearch(query.part) : {}),
+      ...(query.part ? henkatenPartSearch(query.part, true) : {}),
       ...(query.from || query.to
         ? {
             occurredAt: {
@@ -724,6 +729,7 @@ export class HenkatenService {
                 OR: [
                   { normalizedPartNumber: { contains: partSearch } },
                   { normalizedPartName: { contains: partSearch } },
+                  { normalizedInternalPartNumber: { contains: partSearch } },
                 ],
               }
             : {}),
@@ -765,6 +771,7 @@ export class HenkatenService {
         id: part.id,
         partNumber: part.partNumber,
         partName: part.partName,
+        internalPartNumber: part.internalPartNumber,
       })),
       replacementMembers: members.map((member) => ({
         id: member.id,
@@ -806,7 +813,16 @@ export class HenkatenService {
     ]);
     const cloneParts = sourcePartIds.flatMap((partId) => {
       const part = activeParts.find(({ id }) => id === partId);
-      return part ? [{ id: part.id, partNumber: part.partNumber, partName: part.partName }] : [];
+      return part
+        ? [
+            {
+              id: part.id,
+              partNumber: part.partNumber,
+              partName: part.partName,
+              internalPartNumber: part.internalPartNumber,
+            },
+          ]
+        : [];
     });
     const selectable = operational.currentLineShiftIds.length
       ? operational.items.filter(({ id }) => operational.currentLineShiftIds.includes(id))
@@ -1203,12 +1219,7 @@ function roleWhere(principal?: RequestPrincipal): Prisma.HenkatenWhereInput {
           },
         ],
       }
-    : {
-        OR: [
-          { lineLeaderResponsibility: { memberId: principal.memberId } },
-          { lineLeaderResponsibility: null, shiftRun: { lineLeaderMemberId: principal.memberId } },
-        ],
-      };
+    : lineLeaderHenkatenScope(principal.memberId);
 }
 
 async function ensureAutomaticOccurrence(

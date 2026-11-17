@@ -123,7 +123,7 @@ Dependency:
 - Supplier Admin dengan session normal melihat seluruh administration dan monitoring supplier,
   tetapi tidak melihat action approve/reject atau normal Start/End Shift.
 - Supervisor hanya melihat data line yang menjadi responsibility-nya.
-- Line Leader hanya mengoperasikan line sendiri.
+- Line Leader hanya mengoperasikan Line–Shift yang ditugaskan kepadanya (bisa lebih dari satu); co-leader satu Line–Shift melihat dan dapat Withdraw Henkaten satu sama lain.
 - QC melihat seluruh line tenant dan satu shared QC approval queue.
 - TMMIN Quality tidak pernah memperoleh action yang mengubah supplier, credential, source mode,
   user, Henkaten, assignment, atau warning.
@@ -440,8 +440,8 @@ Catatan:
 - **Route:** `/henkatens`
 - **Pengguna:** seluruh normal supplier roles dengan backend-scoped result.
 - **Tujuan:** mencari, memfilter, dan menelusuri record current maupun terminal.
-- **Elements:** identifier, status, 4M, business date/occurred time, line/job, part number/name,
-  Supervisor/QC state; status/category/line/shift/part/date/approval route/status filters; cursor
+- **Elements:** identifier, status, 4M, business date/occurred time, line/job, TMMIN part number
+  (with Internal Part Number on Supplier screens)/name, Supervisor/QC state; status/category/line/shift/part/date/approval route/status filters; cursor
   pagination; create action hanya LL.
 - **Validasi dan rules:** filter server-side; terminal record immutable; scope line tidak dapat
   diperluas dari URL.
@@ -453,7 +453,9 @@ Catatan:
 #### Create Henkaten
 
 - **Route:** `/henkatens/new?shiftRunId=...&jobId=...&resolutionIssueId=...`
-- **Pengguna:** Line Leader normal session untuk own line.
+- **Pengguna:** Line Leader normal session untuk own line. When the leader is assigned to more than one
+  Line–Shift, the form shows one selectable card per Line–Shift (current or next occurrence) and the
+  submission records the chosen one.
 - **Tujuan:** membuat satu valid Henkaten 4M pada active atau planned Shift Run.
 - **Entry point:** Henkaten list, active shift, board job, atau resolution wizard.
 - **Elements umum:** resolved line/shift; category; target job; multi-select part picker (search by
@@ -615,6 +617,8 @@ Catatan:
   username only Supervisor/LL/QC.
 - **Elements detail (`/:memberId`):** identity header (photo/initials, name, breadcrumbs, role,
   member and account badges, registration/username/last-update facts shown only when present).
+  *Ubah username* (Supplier Admin) renames the account in a dialog; password and active sessions
+  are kept; a username taken in the same supplier is rejected.
   Main column: **Profil** (full name, registration number, read-only role with description and
   *Ubah role* via the role-change dialog; MP has none) and **Foto** (drag-and-drop or *Set/Ganti
   foto*, *Hapus foto*, JPG/PNG/WebP max 2 MB). Sticky rail: **Akun** (username with copy, password
@@ -650,9 +654,11 @@ Catatan:
 - **Routes:** `/master-data/parts`, `/new`, `/:partId`.
 - **Pengguna:** Supplier Admin normal/preparation.
 - **Tujuan:** mengelola searchable part master.
-- **Elements:** number, name, active, search, active filter, create/edit/activate/deactivate.
-- **Validasi dan rules:** both fields required; part number tenant-unique case-insensitive;
-  referenced data permanent.
+- **Elements:** TMMIN Part Number, Internal Part Number (opsional), name, active, search (TMMIN
+  number, internal number or name), active filter, create/edit/activate/deactivate.
+- **Validasi dan rules:** TMMIN Part Number and name required; TMMIN Part Number tenant-unique
+  case-insensitive; Internal Part Number optional, max 100, not unique and Supplier-only (never in
+  TMMIN screens, TMMIN export or External API); referenced data permanent.
 - **States:** duplicate, in use, inactive, conflict.
 - **Dependency:** `AVAILABLE`.
 
@@ -683,11 +689,13 @@ Catatan:
 
 - **Route:** `/master-data/default-assignments?lineId=...`
 - **Pengguna:** Supplier Admin normal/preparation.
-- **Tujuan:** menjaga default Supervisor, LL, dan MP uniqueness tanpa membuat Henkaten.
+- **Tujuan:** menjaga default Supervisor, Line Leader, dan MP per Line–Shift tanpa membuat Henkaten.
 - **Elements:** line/job hierarchy; assigned member; availability; assign/change/remove; explicit
   atomic move with old and new assignment; active-shift effectiveness explanation.
-- **Validasi dan rules:** one Supervisor/LL per line, one line per LL, one MP per job, one job per MP;
-  Supervisor may own many lines; changes during active shift do not change Working Assignment.
+- **Validasi dan rules:** one Supervisor per Line–Shift; 0–10 Line Leaders per Line–Shift, chosen
+  with a searchable multi-select that shows each leader's other Line–Shifts (a leader may lead
+  several Line–Shifts, including overlapping ones); one MP per job, one job per MP; Supervisor may
+  own many lines; changes during active shift do not change Working Assignment.
 - **States:** unassigned/incomplete, member already assigned, atomic move confirmation, version
   conflict, active shift notice.
 - **Dependency:** `AVAILABLE`.
@@ -888,7 +896,7 @@ Supplier equivalent dengan perbedaan berikut:
 - **Tujuan:** supplier context hub for administration and monitoring.
 - **Elements:** code/name/timezone/source/epoch/active/version/timestamps; warning/freshness summary;
   current Supplier Admin identity/status; Hosted Preparation state; edit/activate/deactivate;
-  Admin replacement/reset; links to source, credentials, Henkaten, shift, master data, board, audit.
+  Admin replacement/reset/*Ubah username* (TMMIN Admin); links to source, credentials, Henkaten, shift, master data, board, audit.
 - **Validasi dan rules:** Quality read-only; deactivation consequences; EXTERNAL activation requires
   active current-epoch credential.
 - **States:** inactive, Hosted, External unready/ready, active preparation, stale version.
@@ -985,7 +993,7 @@ Supplier equivalent dengan perbedaan berikut:
 - **Pengguna:** TMMIN Admin only.
 - **Tujuan:** manage privileged monitoring accounts.
 - **Elements:** username/display name/status/must-change-password/version; create, deactivate,
-  reactivate, reset password; one-time credential.
+  reactivate, reset password, *Ubah username*; one-time credential.
 - **Validasi dan rules:** TMMIN realm only; protected bootstrap account restrictions respected;
   version on mutations.
 - **States:** no users, inactive, conflict, credential acknowledgement.

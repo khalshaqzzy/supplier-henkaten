@@ -8,6 +8,7 @@ import { PrismaService } from '../persistence/prisma.service.js';
 import { AuditWriter } from '../persistence/audit-writer.js';
 import type { MutationContext } from './mutation-context.js';
 import { decodeCursor, encodeCursor, presentUser } from './presenters.js';
+import { renameUser } from './username.js';
 import type { QualityUserListQuery } from '@tmmin-henkaten/contracts';
 
 @Injectable()
@@ -113,6 +114,17 @@ export class UserAdminService {
         data: { status: 'REVOKED', revokedAt: new Date(), version: { increment: 1 } },
       });
       return { response: presentUser(updated), action: active ? 'REACTIVATED' : 'DEACTIVATED' };
+    });
+  }
+
+  updateQualityUsername(
+    id: string,
+    input: { expectedVersion: number; username: string },
+    context: MutationContext,
+  ) {
+    return this.mutateQuality(id, input.expectedVersion, context, async (transaction, user) => {
+      const updated = await renameUser(transaction, user, input.username, context.actorUserId);
+      return { response: presentUser(updated), action: 'USERNAME_CHANGED' };
     });
   }
 

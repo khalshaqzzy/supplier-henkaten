@@ -218,7 +218,7 @@ export function OverviewPage() {
                 <span>Part</span>
                 <Input
                   value={draft.get('part') ?? ''}
-                  placeholder="Nomor atau nama"
+                  placeholder="TMMIN/internal part number atau nama"
                   onChange={(event) => updateDraft(draft, setDraft, 'part', event.target.value)}
                 />
               </label>

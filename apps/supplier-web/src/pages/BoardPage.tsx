@@ -214,7 +214,7 @@ export function BoardPage() {
                 ...shiftOptions.map((line) => ({
                   value: line.shiftRunId,
                   label: line.shiftName,
-                  description: `${line.businessDate} · ${line.lineLeader.name ?? 'Tanpa LL'}`,
+                  description: `${line.businessDate} · ${leaderNames(line.lineLeaders) || 'Tanpa LL'}`,
                 })),
               ]}
               onValueChange={(nextValue) => {
@@ -373,8 +373,8 @@ export function BoardPage() {
                           <dd>{line.supervisor.name ?? 'Kosong'}</dd>
                         </div>
                         <div>
-                          <dt>Line Leader</dt>
-                          <dd>{line.lineLeader.name ?? 'Kosong'}</dd>
+                          <dt>{line.lineLeaders.length > 1 ? 'Line Leaders' : 'Line Leader'}</dt>
+                          <dd>{leaderNames(line.lineLeaders) || 'Kosong'}</dd>
                         </div>
                       </dl>
                     </header>
@@ -431,8 +431,8 @@ export function BoardPage() {
                   value={contextLine.supervisor.name ?? 'Belum assigned'}
                 />
                 <FactItem
-                  label="Line Leader"
-                  value={contextLine.lineLeader.name ?? 'Belum assigned'}
+                  label={contextLine.lineLeaders.length > 1 ? 'Line Leaders' : 'Line Leader'}
+                  value={leaderNames(contextLine.lineLeaders) || 'Belum assigned'}
                 />
               </FactStrip>
             )}
@@ -536,4 +536,8 @@ function humanize(value: string) {
     .toLowerCase()
     .replaceAll('_', ' ')
     .replace(/(^|\s)\w/g, (letter) => letter.toUpperCase());
+}
+
+function leaderNames(leaders: ReadonlyArray<{ name: string }>) {
+  return leaders.map(({ name }) => name).join(', ');
 }

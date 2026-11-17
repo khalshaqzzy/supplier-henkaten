@@ -50,7 +50,7 @@ test('Supplier Admin changes roles with handover and separately activates restor
     {
       expectedVersion: ls.version,
       supervisorMemberId: fixture.members.supervisor.id,
-      lineLeaderMemberId: source.id,
+      lineLeaderMemberIds: [source.id],
       jobs: [{ jobId: fixture.job.id, mpMemberId: fixture.members.mp.id }],
     },
     fixture.csrf,

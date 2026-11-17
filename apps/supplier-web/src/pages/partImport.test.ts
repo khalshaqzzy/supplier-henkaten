@@ -58,13 +58,17 @@ describe('part import rows', () => {
       ['Catatan', 'Kode produksi', 'Deskripsi', 'Tanggal'],
       ['A', 123456789, 'Bracket', new Date('2026-09-26T00:00:00Z')],
     ]);
-    expect(suggestedPartMapping(sheet.headers)).toEqual({ numberIndex: -1, nameIndex: -1 });
-    expect(parsePartMatrix(sheet.matrix, { numberIndex: 1, nameIndex: 2 })).toEqual([
-      { partNumber: '123456789', partName: 'Bracket', sourceRow: 2 },
-    ]);
-    expect(() => parsePartMatrix(sheet.matrix, { numberIndex: 1, nameIndex: 1 })).toThrow(
-      /dua kolom berbeda/,
-    );
+    expect(suggestedPartMapping(sheet.headers)).toEqual({
+      numberIndex: -1,
+      nameIndex: -1,
+      internalIndex: -1,
+    });
+    expect(
+      parsePartMatrix(sheet.matrix, { numberIndex: 1, nameIndex: 2, internalIndex: -1 }),
+    ).toEqual([{ partNumber: '123456789', partName: 'Bracket', sourceRow: 2 }]);
+    expect(() =>
+      parsePartMatrix(sheet.matrix, { numberIndex: 1, nameIndex: 1, internalIndex: -1 }),
+    ).toThrow(/dua kolom berbeda/);
   });
 
   it('reads CSV and rejects files larger than 50 MB', async () => {
@@ -81,8 +85,27 @@ describe('part import rows', () => {
       ['Number', 'Name'],
       ...Array.from({ length: 50_000 }, (_, index) => [String(index + 1), `Part ${index + 1}`]),
     ];
-    expect(parsePartMatrix(matrix, { numberIndex: 0, nameIndex: 1 })).toHaveLength(50_000);
+    expect(
+      parsePartMatrix(matrix, { numberIndex: 0, nameIndex: 1, internalIndex: -1 }),
+    ).toHaveLength(50_000);
     matrix.push(['50001', 'Part 50001']);
     expect(() => preparePartSheet(matrix)).toThrow(/50.000 baris/);
+  });
+
+  it('maps TMMIN and internal part number columns and clears a blank internal number', () => {
+    const matrix = [
+      ['Part number', 'TMMIN Part Number', 'Nama part', 'Internal Part Number'],
+      ['legacy', 'TM-1', 'Bracket', 'INT-1'],
+      ['legacy', 'TM-2', 'Clip', ''],
+    ];
+    const mapping = suggestedPartMapping(preparePartSheet(matrix).headers);
+    expect(mapping).toEqual({ numberIndex: 1, nameIndex: 2, internalIndex: 3 });
+    expect(parsePartMatrix(matrix, mapping)).toEqual([
+      { partNumber: 'TM-1', partName: 'Bracket', internalPartNumber: 'INT-1', sourceRow: 2 },
+      { partNumber: 'TM-2', partName: 'Clip', internalPartNumber: null, sourceRow: 3 },
+    ]);
+    expect(() => parsePartMatrix(matrix, { ...mapping, internalIndex: 1 })).toThrow(
+      /Internal Part Number/,
+    );
   });
 });

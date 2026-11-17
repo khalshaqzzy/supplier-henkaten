@@ -89,6 +89,18 @@ export const presentPart = (part: Part) => ({
   id: part.id,
   partNumber: part.partNumber,
   partName: part.partName,
+  internalPartNumber: part.internalPartNumber,
+  active: part.active,
+  version: part.version,
+  createdAt: part.createdAt.toISOString(),
+  updatedAt: part.updatedAt.toISOString(),
+});
+
+/** TMMIN view of a Part; the supplier-internal number is not exposed. */
+export const presentTmminPart = (part: Part) => ({
+  id: part.id,
+  partNumber: part.partNumber,
+  partName: part.partName,
   active: part.active,
   version: part.version,
   createdAt: part.createdAt.toISOString(),

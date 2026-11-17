@@ -135,7 +135,7 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
   await expect(supplier.getByText('Install Component')).toBeVisible();
 
   await createResource(supplier, 'parts', {
-    'Part number': 'PART-ONBOARD',
+    'TMMIN Part Number': 'PART-ONBOARD',
     'Nama part': 'Onboarding Part',
   });
   await createResource(supplier, 'shifts', {
@@ -202,9 +202,10 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
   await supplier.getByRole('button', { name: /^Supervisor / }).click();
   await supplier.getByRole('combobox', { name: 'Cari Supervisor' }).fill('REG-ONBOARD-1');
   await supplier.getByRole('combobox', { name: 'Cari Supervisor' }).press('Enter');
-  await supplier.getByRole('button', { name: /^Line Leader / }).click();
+  await supplier.getByRole('button', { name: 'Tambah Line Leader' }).click();
   await supplier.getByRole('combobox', { name: 'Cari Line Leader' }).fill('REG-ONBOARD-2');
   await supplier.getByRole('combobox', { name: 'Cari Line Leader' }).press('Enter');
+  await supplier.getByRole('button', { name: 'Selesai', exact: true }).click();
   await supplier.getByRole('button', { name: /MP · Install Component/ }).click();
   await supplier
     .getByRole('combobox', { name: 'Cari MP · Install Component' })
@@ -214,9 +215,9 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
   await expect(
     supplier.getByRole('button', { name: /^Supervisor Supervisor Onboarding/ }),
   ).toBeVisible();
-  await expect(
-    supplier.getByRole('button', { name: /^Line Leader Line Leader Onboarding/ }),
-  ).toBeVisible();
+  await expect(supplier.getByRole('list', { name: 'Line Leader terpilih' })).toContainText(
+    'Line Leader Onboarding',
+  );
 
   await supplier.goto(`${runtime.supplierOrigin}/setup`);
   await expect(supplier.getByText('Siap beroperasi')).toBeVisible();

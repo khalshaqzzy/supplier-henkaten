@@ -9,18 +9,19 @@ export async function operationalLineScope(
 ) {
   if (!principal.memberId) return [];
   const memberId = principal.memberId;
-  const role =
-    principal.role === 'SUPERVISOR'
-      ? { supervisorMemberId: memberId }
-      : { lineLeaderMemberId: memberId };
+  const supervisor = principal.role === 'SUPERVISOR';
+  const runRole = supervisor ? { supervisorMemberId: memberId } : { lineLeaderMemberId: memberId };
+  const assignmentRole = supervisor
+    ? { supervisorMemberId: memberId }
+    : { lineLeaders: { some: { memberId } } };
   const [runs, assignments, responsibilities] = await Promise.all([
     prisma.shiftRun.findMany({
-      where: { supplierId, ...role },
+      where: { supplierId, ...runRole },
       distinct: ['lineId'],
       select: { lineId: true },
     }),
     prisma.lineShift.findMany({
-      where: { supplierId, active: true, ...role },
+      where: { supplierId, active: true, ...assignmentRole },
       distinct: ['lineId'],
       select: { lineId: true },
     }),

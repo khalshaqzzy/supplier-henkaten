@@ -38,7 +38,7 @@ export async function createSetupTemplate(timezone: string) {
     ],
     [
       'Supervisor dan LL',
-      'Supervisor dapat mengisi beberapa Line Shift. Satu LL hanya boleh mengisi satu Line Shift aktif.',
+      'Supervisor dan LL dapat mengisi beberapa Line Shift. Satu Line Shift dapat memiliki beberapa LL; pisahkan kode LL dengan koma.',
     ],
     [
       'Assignment MP',
@@ -129,16 +129,16 @@ export async function createSetupTemplate(timezone: string) {
       ['LINE-02', 'JOB-02', 'Packing', '2', 'LOW'],
     ],
     Part: [
-      ['001234567890', 'Bracket contoh'],
-      ['PART-002', 'Housing contoh'],
-      ['PART-003', 'Shaft contoh'],
+      ['001234567890', 'Bracket contoh', 'INT-BR-01'],
+      ['PART-002', 'Housing contoh', ''],
+      ['PART-003', 'Shaft contoh', 'INT-SH-03'],
     ],
     Shift: [
       ['PAGI', 'Pagi', '07:00', '15:00', '1', timezone],
       ['MALAM', 'Malam', '23:00', '07:00', '2', timezone],
     ],
     'Line Shift': [
-      ['LINE-01', 'PAGI', 'GL-01', 'LL-01'],
+      ['LINE-01', 'PAGI', 'GL-01', 'LL-01, LL-03'],
       ['LINE-01', 'MALAM', 'GL-01', 'LL-02'],
       ['LINE-02', 'PAGI', 'GL-01', 'LL-03'],
       ['LINE-02', 'MALAM', 'GL-01', 'LL-04'],
@@ -172,7 +172,7 @@ export async function createSetupTemplate(timezone: string) {
     const descriptions: Record<string, string> = {
       code:
         sheet === 'Part'
-          ? 'Nomor part unik; simpan sebagai teks agar nol di depan dan nomor panjang tetap utuh.'
+          ? 'TMMIN part number unik; simpan sebagai teks agar nol di depan dan nomor panjang tetap utuh.'
           : sheet === 'Job'
             ? 'Kode tetap, unik dalam satu line; simpan sebagai teks.'
             : 'Kode tetap dan unik pada sheet ini; gunakan kode yang sama pada import berikutnya.',
@@ -192,7 +192,8 @@ export async function createSetupTemplate(timezone: string) {
       supervisor:
         'Kode member dengan role SUPERVISOR. Boleh kosong; lengkapi assignment melalui Line Setup.',
       leader:
-        'Kode member dengan role LINE_LEADER. Satu LL hanya boleh berada pada satu Line Shift aktif.',
+        'Kode member dengan role LINE_LEADER. Pisahkan beberapa LL dengan koma, maksimal 10. Boleh kosong.',
+      internal: 'Nomor part internal supplier. Boleh kosong dan boleh sama dengan part lain.',
       job: 'Kode job pada sheet Job; harus berasal dari kode line pada baris yang sama.',
       mp: 'Kode member dengan role MP. Boleh kosong untuk mengosongkan assignment saat Update.',
       start: 'Jam mulai HH:mm, misalnya 07:00; teks atau sel jam Excel.',
@@ -225,7 +226,14 @@ export async function createSetupTemplate(timezone: string) {
     sheet.columns = spec.columns.map((c) => ({
       header: c.label,
       key: c.key,
-      width: c.key === 'question' ? 68 : c.key === 'name' ? 28 : c.key === 'password' ? 26 : 22,
+      width:
+        c.key === 'question'
+          ? 68
+          : ['name', 'leader'].includes(c.key)
+            ? 28
+            : c.key === 'password'
+              ? 26
+              : 22,
       ...(c.text ? { style: { numFmt: '@' } } : {}),
     }));
     sheet.addRows(examples[spec.name]);
@@ -288,7 +296,10 @@ export async function createSetupTemplate(timezone: string) {
             showErrorMessage: false,
             showInputMessage: true,
             promptTitle: 'Kode referensi',
-            prompt: 'Pilih dari sheet sumber atau ketik kode setup existing.',
+            prompt:
+              column.key === 'leader'
+                ? 'Pilih satu kode, atau ketik beberapa kode LL dipisah koma (maksimal 10).'
+                : 'Pilih dari sheet sumber atau ketik kode setup existing.',
             errorTitle: 'Kode tidak ditemukan',
             error: 'Gunakan kode dari sheet referensi.',
           };

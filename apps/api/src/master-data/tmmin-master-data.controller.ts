@@ -129,7 +129,7 @@ export class TmminMasterDataController {
     @Req() request: ContextRequest,
   ) {
     const scope = await this.scope(supplierId, request, 'PART_LIST_VIEWED');
-    return this.catalog.listParts(scope, query);
+    return this.catalog.listParts(scope, query, { internal: false });
   }
 
   @RequireCapabilities('TMMIN_MASTER_DATA_READ')

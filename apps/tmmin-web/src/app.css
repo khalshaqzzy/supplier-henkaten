@@ -1204,6 +1204,13 @@ textarea {
   grid-template-columns: 1fr 1fr;
   gap: 15px;
 }
+.tmmin-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 16px;
+}
 .tmmin-inline-form {
   display: grid;
   grid-template-columns: 1fr 1.3fr auto;

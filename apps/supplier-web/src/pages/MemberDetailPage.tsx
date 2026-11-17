@@ -5,6 +5,7 @@ import {
   Copy,
   ImageUp,
   KeyRound,
+  PencilLine,
   RotateCcw,
   ShieldCheck,
   Trash2,
@@ -24,6 +25,7 @@ import {
   Input,
   Skeleton,
   StatusBadge,
+  UsernameDialog,
   toast,
 } from '@tmmin-henkaten/ui';
 
@@ -509,6 +511,36 @@ function MemberAccountPanel({
                 <dd>{account.mustChangePassword ? 'Sementara' : 'Sudah diganti'}</dd>
               </div>
             </dl>
+            <UsernameDialog
+              owner={member.fullName}
+              username={account.username}
+              describeError={masterMutationProblem}
+              onSubmit={async (username) => {
+                setProblem(null);
+                await supplierApi.renameMemberAccount(member.id, {
+                  expectedVersion: account.version,
+                  username,
+                });
+                await Promise.all([
+                  queryClient.invalidateQueries({
+                    queryKey: scopedKey(scope, 'master-members-detail', member.id),
+                  }),
+                  queryClient.invalidateQueries({
+                    queryKey: scopedKey(scope, 'master-members').slice(0, -1),
+                  }),
+                ]);
+                toast.success('Username diperbarui');
+              }}
+              trigger={
+                <Button
+                  variant="secondary"
+                  className="member-card__action"
+                  leadingIcon={<PencilLine />}
+                >
+                  Ubah username
+                </Button>
+              }
+            />
             {account.status === 'ACTIVE' ? (
               <AlertDialog
                 title="Reset password member?"
