@@ -17548,6 +17548,7 @@ export interface paths {
         query?: {
           lineId?: string;
           shiftStatus?: 'CURRENT' | 'OTHER' | 'ALL';
+          includeSchedule?: 'true' | 'false';
         };
         header?: never;
         path?: never;
@@ -17573,6 +17574,10 @@ export interface paths {
                 lineCode: string;
                 lineName: string;
                 shiftName: string;
+                startTime?: string;
+                endTime?: string;
+                crossesMidnight?: boolean;
+                timezone?: string;
                 isCurrent: boolean;
                 /** Format: date */
                 businessDate: string;
@@ -18571,6 +18576,7 @@ export interface paths {
         query?: {
           lineId?: string;
           shiftStatus?: 'CURRENT' | 'OTHER' | 'ALL';
+          includeSchedule?: 'true' | 'false';
         };
         header?: never;
         path?: never;
@@ -18773,6 +18779,7 @@ export interface paths {
         query?: {
           lineId?: string;
           shiftStatus?: 'CURRENT' | 'OTHER' | 'ALL';
+          includeSchedule?: 'true' | 'false';
         };
         header?: never;
         path: {
@@ -18800,6 +18807,10 @@ export interface paths {
                 lineCode: string;
                 lineName: string;
                 shiftName: string;
+                startTime?: string;
+                endTime?: string;
+                crossesMidnight?: boolean;
+                timezone?: string;
                 isCurrent: boolean;
                 /** Format: date */
                 businessDate: string;

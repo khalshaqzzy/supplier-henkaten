@@ -28,6 +28,7 @@ overrides:
   deepmerge-ts@<8.0.0: 8.0.0
   nanoid@<3.3.18: 3.3.18
   undici@>=7.0.0 <7.30.1: 7.30.1
+  effect@>=3.0.0 <3.22.4: 3.22.4
 
 minimumReleaseAgeExclude:
   - lucide-react@1.26.0

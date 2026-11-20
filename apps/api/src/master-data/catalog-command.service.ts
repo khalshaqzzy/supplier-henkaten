@@ -9,6 +9,7 @@ import { assertCurrentPrincipal } from '../auth/current-principal.js';
 import { ProblemException } from '../common/problem.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 import { AuditWriter } from '../persistence/audit-writer.js';
+import { OutboxService } from '../persistence/outbox.service.js';
 import { runSerializable } from '../persistence/transaction.js';
 import { lockSetupMutation } from './setup-lock.js';
 import { masterAudit } from './master-data-audit.js';
@@ -26,6 +27,7 @@ export class CatalogCommandService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriter,
+    private readonly outbox: OutboxService,
   ) {}
 
   async deletePreview(supplierId: string) {
@@ -144,6 +146,24 @@ export class CatalogCommandService {
           secondId: second.id,
           ...result,
         }),
+        tx,
+      );
+      await this.outbox.enqueue(
+        {
+          eventType: 'SHIFT_TIMES_SWAPPED',
+          aggregateType: 'ShiftTemplate',
+          aggregateId: first.id,
+          aggregateVersion: first.version + 1,
+          supplierId,
+          actor: { userId: principal.userId, role: principal.role },
+          correlationId: context.correlationId,
+          payload: {
+            firstId: first.id,
+            secondId: second.id,
+            affectedLines: result.affectedLines,
+            refresh: ['assignment-board', 'dashboard'],
+          },
+        },
         tx,
       );
       await this.finish(tx, principal, key, { kind: 'SWAP_SHIFT_TIMES', input }, result);

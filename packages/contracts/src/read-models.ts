@@ -83,6 +83,10 @@ export const boardQuerySchema = z
   .object({
     lineId: opaqueIdSchema.optional(),
     shiftStatus: z.enum(['CURRENT', 'OTHER', 'ALL']).optional(),
+    includeSchedule: z
+      .enum(['true', 'false'])
+      .transform((value) => value === 'true')
+      .optional(),
   })
   .strict();
 export type BoardQuery = z.infer<typeof boardQuerySchema>;
@@ -102,6 +106,8 @@ export const boardIndicatorSchema = z
   })
   .strict();
 
+const clockTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+
 export const assignmentBoardSchema = z
   .object({
     version: z.string().min(1),
@@ -114,6 +120,10 @@ export const assignmentBoardSchema = z
           lineCode: z.string(),
           lineName: z.string(),
           shiftName: z.string(),
+          startTime: clockTimeSchema.optional(),
+          endTime: clockTimeSchema.optional(),
+          crossesMidnight: z.boolean().optional(),
+          timezone: z.string().min(1).max(100).optional(),
           isCurrent: z.boolean(),
           businessDate: z.string().date(),
           supervisor: z

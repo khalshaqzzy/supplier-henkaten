@@ -63,7 +63,7 @@ import {
   type UpdateSupplierRequest,
 } from '@tmmin-henkaten/contracts';
 
-import { ApiClient, type QueryRecord } from './core';
+import { ApiClient, ApiProblemError, type QueryRecord } from './core';
 
 export class TmminApi {
   henkatenDeletionPreview(supplierId: string) {
@@ -437,11 +437,25 @@ export class TmminApi {
     });
   }
 
-  assignmentBoard(supplierId: string, lineId?: string) {
-    return this.client.request(`/api/v1/tmmin/suppliers/${supplierId}/assignment-board`, {
-      query: { lineId },
-      responseSchema: assignmentBoardSchema,
-    });
+  async assignmentBoard(supplierId: string, lineId?: string) {
+    try {
+      return await this.client.request(`/api/v1/tmmin/suppliers/${supplierId}/assignment-board`, {
+        query: { lineId, includeSchedule: true },
+        responseSchema: assignmentBoardSchema,
+      });
+    } catch (error) {
+      if (
+        error instanceof ApiProblemError &&
+        error.problem.status === 400 &&
+        error.problem.code === 'VALIDATION_FAILED'
+      ) {
+        return this.client.request(`/api/v1/tmmin/suppliers/${supplierId}/assignment-board`, {
+          query: { lineId },
+          responseSchema: assignmentBoardSchema,
+        });
+      }
+      throw error;
+    }
   }
 
   assignmentBoardLayout(supplierId: string, lineId: string) {

@@ -1728,6 +1728,193 @@ describe('Line Shift Henkaten operations', () => {
     }
   });
 
+  it('retains active mid-shift MAN overrides across overlapping swaps and restores them when a post-swap override is withdrawn', async () => {
+    const existingAdmin = await prisma.user.findFirst({
+      where: { supplierId, role: 'SUPPLIER_ADMIN', status: 'ACTIVE' },
+    });
+    const adminUsername = existingAdmin?.username ?? `swap-admin-${randomUUID()}`;
+    if (!existingAdmin) {
+      await prisma.user.create({
+        data: {
+          realm: 'SUPPLIER',
+          supplierId,
+          role: 'SUPPLIER_ADMIN',
+          username: adminUsername,
+          normalizedUsername: adminUsername.toLowerCase(),
+          displayName: 'Swap Supplier Admin',
+          passwordHash: await app.get(PasswordService).hash(password),
+          mustChangePassword: false,
+        },
+      });
+    }
+    const admin = await supplierLogin(adminUsername);
+    const secondReplacementMpId = await createMp('Post-Swap Replacement MP');
+    await prisma.tanokoMapping.create({
+      data: { supplierId, memberId: secondReplacementMpId, jobId: job1Id, level: 3 },
+    });
+    const currentLineShift = await prisma.lineShift.findUniqueOrThrow({
+      where: { id: lineShiftId },
+      include: { shiftTemplate: true },
+    });
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: currentLineShift.shiftTemplate.timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(new Date());
+    const localMinute =
+      Number(parts.find(({ type }) => type === 'hour')!.value) * 60 +
+      Number(parts.find(({ type }) => type === 'minute')!.value);
+    const [altStart, altEnd] = localMinute < 1_410 ? [0, 1_410] : [60, 1_439];
+    const partnerTemplate = await prisma.shiftTemplate.create({
+      data: {
+        supplierId,
+        name: `Swap Partner ${randomUUID().slice(0, 6)}`,
+        displayOrder: 99,
+        startMinute: altStart,
+        endMinute: altEnd,
+        timezone: currentLineShift.shiftTemplate.timezone,
+      },
+    });
+    const preSwap = await createManHenkaten(randomUUID());
+    expect(preSwap.status).toBe(201);
+    const preSwapId = preSwap.body.id as string;
+    const preSwapShiftRunId = preSwap.body.shiftRunId as string;
+    let swapped = false;
+    try {
+      const swapResponse = await request(app.getHttpServer())
+        .post('/api/v1/supplier/master-data/shift-templates/swap-times')
+        .set('Origin', supplierOrigin)
+        .set('Cookie', admin.cookie)
+        .set('X-CSRF-Token', admin.csrf)
+        .set('Idempotency-Key', randomUUID())
+        .send({
+          first: {
+            id: currentLineShift.shiftTemplate.id,
+            expectedVersion: currentLineShift.shiftTemplate.version,
+          },
+          second: { id: partnerTemplate.id, expectedVersion: partnerTemplate.version },
+        });
+      expect(swapResponse.status).toBe(201);
+      swapped = true;
+
+      // Active mid-shift MAN override and 4M indicator stay visible while now is within its window.
+      const contextAfter = await request(app.getHttpServer())
+        .get('/api/v1/supplier/master-data/line-shifts/operational-context')
+        .set('Cookie', leaderCookie);
+      expect(contextAfter.status).toBe(200);
+      const itemAfter = (
+        contextAfter.body.items as Array<{
+          id: string;
+          startTime: string;
+          endTime: string;
+          current: boolean;
+          assignments: Array<{ jobId: string; mpMemberId: string | null }>;
+        }>
+      ).find((item) => item.id === lineShiftId)!;
+      expect(itemAfter.current).toBe(true);
+      expect(itemAfter.assignments.find((a) => a.jobId === job1Id)?.mpMemberId).toBe(
+        replacementMpId,
+      );
+
+      const boardAfter = await request(app.getHttpServer())
+        .get('/api/v1/supplier/assignment-board?shiftStatus=CURRENT&includeSchedule=true')
+        .set('Cookie', leaderCookie);
+      expect(boardAfter.status).toBe(200);
+      const boardLine = (
+        boardAfter.body.lines as Array<{
+          shiftRunId: string;
+          startTime?: string;
+          endTime?: string;
+          jobs: Array<{
+            jobId: string;
+            mp: { memberId: string | null };
+            indicators: Array<{ henkatenId: string }>;
+          }>;
+        }>
+      ).find((item) => item.shiftRunId === lineShiftId)!;
+      expect([boardLine.startTime, boardLine.endTime]).toEqual([
+        itemAfter.startTime,
+        itemAfter.endTime,
+      ]);
+      const boardJob1 = boardLine.jobs.find((job) => job.jobId === job1Id)!;
+      expect(boardJob1.mp.memberId).toBe(replacementMpId);
+      expect(boardJob1.indicators.some((ind) => ind.henkatenId === preSwapId)).toBe(true);
+
+      // A chained post-swap MAN submission sees the still-active pre-swap replacement MP.
+      const postSwap = await request(app.getHttpServer())
+        .post('/api/v1/supplier/henkatens')
+        .set('Origin', supplierOrigin)
+        .set('Cookie', leaderCookie)
+        .set('X-CSRF-Token', leaderCsrf)
+        .set('Idempotency-Key', randomUUID())
+        .send({
+          category: 'MAN',
+          lineShiftId,
+          lineShiftJobAssignmentId: job1AssignmentId,
+          jobId: job1Id,
+          partId,
+          replacementMpMemberId: secondReplacementMpId,
+          expectedReplacedMpMemberId: replacementMpId,
+          cause: 'Post-swap replacement',
+          detail: 'Submitted under swapped schedule window',
+          checklistVersionId,
+          checklistAnswers: [{ itemId: checklistItemId, answer: 'YES' }],
+        });
+      expect(postSwap.status).toBe(201);
+      const postSwapId = postSwap.body.id as string;
+      const postSwapShiftRunId = postSwap.body.shiftRunId as string;
+
+      // Withdrawing the post-swap Henkaten must restore the still-active pre-swap MAN override
+      // rather than falling back to the default MP.
+      const withdrawnPost = await request(app.getHttpServer())
+        .post(`/api/v1/supplier/henkatens/${postSwapId}/withdraw`)
+        .set('Origin', supplierOrigin)
+        .set('Cookie', leaderCookie)
+        .set('X-CSRF-Token', leaderCsrf)
+        .set('Idempotency-Key', randomUUID())
+        .send({ expectedVersion: postSwap.body.version, reason: 'Withdrawn post-swap record' });
+      expect(withdrawnPost.status).toBe(201);
+
+      const workingAfterWithdraw = await prisma.workingAssignment.findUniqueOrThrow({
+        where: { shiftRunId_jobId: { shiftRunId: postSwapShiftRunId, jobId: job1Id } },
+      });
+      expect(workingAfterWithdraw.effectiveMpMemberId).toBe(replacementMpId);
+
+      // Expand-phase migration keeps the legacy 4-column index alongside the new window index.
+      const indexes = await prisma.$queryRaw<Array<{ indexname: string }>>`
+        SELECT indexname FROM pg_indexes WHERE tablename = 'ShiftRun'
+      `;
+      const indexNames = indexes.map(({ indexname }) => indexname);
+      expect(indexNames).toContain('ShiftRun_supplierId_lineId_shiftTemplateId_businessDate_key');
+      expect(indexNames).toContain('ShiftRun_occurrence_window_key');
+      expect(preSwapShiftRunId).toBe(postSwapShiftRunId);
+    } finally {
+      if (swapped) {
+        const [firstNow, secondNow] = await Promise.all([
+          prisma.shiftTemplate.findUniqueOrThrow({
+            where: { id: currentLineShift.shiftTemplate.id },
+          }),
+          prisma.shiftTemplate.findUniqueOrThrow({ where: { id: partnerTemplate.id } }),
+        ]);
+        await request(app.getHttpServer())
+          .post('/api/v1/supplier/master-data/shift-templates/swap-times')
+          .set('Origin', supplierOrigin)
+          .set('Cookie', admin.cookie)
+          .set('X-CSRF-Token', admin.csrf)
+          .set('Idempotency-Key', randomUUID())
+          .send({
+            first: { id: firstNow.id, expectedVersion: firstNow.version },
+            second: { id: secondNow.id, expectedVersion: secondNow.version },
+          });
+      }
+      await prisma.shiftTemplate.update({
+        where: { id: partnerTemplate.id },
+        data: { active: false },
+      });
+    }
+  });
+
   async function createManHenkaten(
     idempotencyKey = randomUUID(),
     otherPart = false,

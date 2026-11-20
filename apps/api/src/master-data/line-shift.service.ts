@@ -16,7 +16,7 @@ import { TenantScope } from '../common/scope.js';
 import { AuditWriter } from '../persistence/audit-writer.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 import { databaseDate, shiftBoundaries } from '../shifts/shift-time.js';
-import { businessDateForInstant } from './shift-time.js';
+import { businessDateForInstant, occurrenceHenkatenWindowWhere } from './shift-time.js';
 import { masterAudit } from './master-data-audit.js';
 import { missing } from './member.service.js';
 
@@ -97,8 +97,7 @@ export class LineShiftService {
             lineShiftId: occurrence.row.id,
             category: 'MAN',
             status: { in: ['OPEN', 'APPROVED'] },
-            effectiveStartAt: occurrence.start,
-            effectiveEndAt: occurrence.end,
+            ...occurrenceHenkatenWindowWhere(occurrence, now),
             manDetail: { lineShiftJobAssignmentId: { not: null } },
           },
           select: {

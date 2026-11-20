@@ -842,6 +842,42 @@ describe('supplier master data', () => {
     expect(
       (await prisma.lineShift.findUniqueOrThrow({ where: { id: shift.body.id } })).version,
     ).toBe(shift.body.version + 1);
+    const swapEvent = await prisma.outboxEvent.findFirst({
+      where: { supplierId, eventType: 'SHIFT_TIMES_SWAPPED', aggregateId: first.body.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(swapEvent).not.toBeNull();
+    const legacyBoard = await request(app.getHttpServer())
+      .get('/api/v1/supplier/assignment-board?shiftStatus=ALL')
+      .set('Cookie', supplierCookie);
+    expect(legacyBoard.status).toBe(200);
+    const legacyBoardShift = (
+      legacyBoard.body as { lines: Array<Record<string, unknown>> }
+    ).lines.find((item) => item['shiftRunId'] === shift.body.id);
+    expect(legacyBoardShift).toBeDefined();
+    expect(legacyBoardShift).not.toHaveProperty('startTime');
+    expect(legacyBoardShift).not.toHaveProperty('timezone');
+    const swappedBoard = await request(app.getHttpServer())
+      .get('/api/v1/supplier/assignment-board?shiftStatus=ALL&includeSchedule=true')
+      .set('Cookie', supplierCookie);
+    expect(swappedBoard.status).toBe(200);
+    const boardShift = (
+      swappedBoard.body as {
+        lines: Array<{
+          shiftRunId: string;
+          startTime?: string;
+          endTime?: string;
+          crossesMidnight?: boolean;
+          timezone?: string;
+        }>;
+      }
+    ).lines.find((item) => item.shiftRunId === shift.body.id);
+    expect(boardShift).toMatchObject({
+      startTime: '18:00',
+      endTime: '06:00',
+      crossesMidnight: true,
+      timezone: 'Asia/Jakarta',
+    });
     const retry = await supplierPost(`${base}/swap-times`, input).set('Idempotency-Key', key);
     expect(retry.status).toBe(201);
     expect(retry.body).toEqual(result.body);
@@ -867,6 +903,21 @@ describe('supplier master data', () => {
         }).set('Idempotency-Key', key)
       ).status,
     ).toBe(409);
+    // Manual Shift Template time edit also increments LineShift.version and enqueues Outbox invalidation.
+    const edited = await supplierPatch(`${base}/${first.body.id}`, {
+      expectedVersion: 2,
+      startTime: '19:00',
+      endTime: '07:00',
+    });
+    expect(edited.status).toBe(200);
+    expect(
+      (await prisma.lineShift.findUniqueOrThrow({ where: { id: shift.body.id } })).version,
+    ).toBe(shift.body.version + 2);
+    const editEvent = await prisma.outboxEvent.findFirst({
+      where: { supplierId, eventType: 'SHIFT_TEMPLATE_UPDATED', aggregateId: first.body.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(editEvent).not.toBeNull();
   });
 
   it('returns deduplicated assigned line membership in the Tanoko snapshot', async () => {

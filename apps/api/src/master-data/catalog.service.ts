@@ -15,6 +15,7 @@ import type { MutationContext } from '../administration/mutation-context.js';
 import { decodeCursor, encodeCursor } from '../administration/presenters.js';
 import { versionConflict } from '../administration/user-admin.service.js';
 import { AuditWriter } from '../persistence/audit-writer.js';
+import { OutboxService } from '../persistence/outbox.service.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 import { masterAudit } from './master-data-audit.js';
 import {
@@ -32,6 +33,7 @@ export class CatalogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriter,
+    private readonly outbox: OutboxService,
   ) {}
 
   async listLines(scope: TenantScope, query: MasterListQuery) {
@@ -806,6 +808,11 @@ export class CatalogService {
         input.endTime ?? minuteString(current.endMinute),
         input.timezone ?? current.timezone,
       );
+      const scheduleChanged =
+        times.startMinute !== current.startMinute ||
+        times.endMinute !== current.endMinute ||
+        times.timezone !== current.timezone;
+      const nameChanged = Boolean(input.name && input.name.trim() !== current.name);
       const updated = await tx.shiftTemplate.update({
         where: { id },
         data: {
@@ -815,10 +822,36 @@ export class CatalogService {
           updatedById: context.actorUserId,
         },
       });
+      if (scheduleChanged || nameChanged) {
+        await tx.lineShift.updateMany({
+          where: { supplierId: scope.supplierId, shiftTemplateId: id },
+          data: { version: { increment: 1 }, updatedById: context.actorUserId },
+        });
+      }
       await this.audit.write(
         masterAudit(context, scope.supplierId, 'SHIFT_TEMPLATE_UPDATED', 'ShiftTemplate', id),
         tx,
       );
+      if (scheduleChanged || nameChanged) {
+        await this.outbox.enqueue(
+          {
+            eventType: 'SHIFT_TEMPLATE_UPDATED',
+            aggregateType: 'ShiftTemplate',
+            aggregateId: id,
+            aggregateVersion: updated.version,
+            supplierId: scope.supplierId,
+            actor: { userId: context.actorUserId, role: context.actorRole },
+            correlationId: context.correlationId,
+            payload: {
+              shiftTemplateId: id,
+              scheduleChanged,
+              nameChanged,
+              refresh: ['assignment-board', 'dashboard'],
+            },
+          },
+          tx,
+        );
+      }
       return updated;
     });
     return presentShiftTemplate(row);

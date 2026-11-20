@@ -1,6 +1,7 @@
 import { assertCurrentPrincipal } from '../auth/current-principal.js';
 import { assertTanokoEligible } from '../master-data/tanoko-eligibility.js';
 import { LineShiftService } from '../master-data/line-shift.service.js';
+import { occurrenceHenkatenWindowWhere } from '../master-data/shift-time.js';
 import { createHash, randomUUID } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
@@ -83,11 +84,13 @@ export class HenkatenService {
         if (retry.submissionPayloadHash !== payloadHash) throw idempotencyConflict();
         return retry.id;
       }
+      const now = new Date();
       const occurrence = await this.lineShifts.resolveAssignedOccurrence(
         tx,
         scope,
         principal,
         input.lineShiftId,
+        now,
       );
       if (
         (input.lineShiftId && input.lineShiftId !== occurrence.row.id) ||
@@ -223,8 +226,7 @@ export class HenkatenService {
             jobId: job.id,
             category: 'MAN',
             status: { in: ['OPEN', 'APPROVED'] },
-            effectiveStartAt: occurrence.start,
-            effectiveEndAt: occurrence.end,
+            ...occurrenceHenkatenWindowWhere(occurrence, now),
             manDetail: { lineShiftJobAssignmentId: assignment.id },
           },
           include: { manDetail: { include: { replacementMp: true } } },
@@ -257,7 +259,6 @@ export class HenkatenService {
       const identifier = `HEN-${supplier.code}-${occurrence.businessDate.replaceAll('-', '')}-${sequence
         .toString()
         .padStart(4, '0')}`;
-      const now = new Date();
       const created = await tx.henkaten.create({
         data: {
           id: henkatenId,
@@ -678,6 +679,27 @@ export class HenkatenService {
     const detail = target?.manDetail;
     const assignment = detail?.lineShiftJobAssignment;
     if (!target || !detail || !assignment) return;
+    const now = new Date();
+    const isTargetWindowCurrent = Boolean(
+      target.effectiveStartAt &&
+      target.effectiveEndAt &&
+      target.effectiveStartAt <= now &&
+      now < target.effectiveEndAt,
+    );
+    const windowWhere =
+      target.effectiveStartAt && target.effectiveEndAt
+        ? occurrenceHenkatenWindowWhere(
+            {
+              start: target.effectiveStartAt,
+              end: target.effectiveEndAt,
+              current: isTargetWindowCurrent,
+            },
+            now,
+          )
+        : {
+            effectiveStartAt: target.effectiveStartAt,
+            effectiveEndAt: target.effectiveEndAt,
+          };
     const fallback = await tx.henkaten.findFirst({
       where: {
         id: { not: target.id },
@@ -686,8 +708,7 @@ export class HenkatenService {
         jobId: target.jobId,
         category: 'MAN',
         status: { in: ['OPEN', 'APPROVED'] },
-        effectiveStartAt: target.effectiveStartAt,
-        effectiveEndAt: target.effectiveEndAt,
+        ...windowWhere,
         manDetail: { lineShiftJobAssignmentId: assignment.id },
       },
       include: { manDetail: { include: { replacementMp: true } } },
@@ -1232,15 +1253,31 @@ async function ensureAutomaticOccurrence(
   end: Date,
   actorUserId: string,
 ) {
-  const existing = await tx.shiftRun.findFirst({
-    where: {
-      supplierId,
-      lineId: lineShift.lineId,
-      shiftTemplateId: lineShift.shiftTemplateId,
-      businessDate: new Date(`${businessDate}T00:00:00.000Z`),
-    },
-    include: { workingAssignments: true },
-  });
+  const businessDateValue = new Date(`${businessDate}T00:00:00.000Z`);
+  // Prefer the full occurrence-window lookup so the follow-up contract release can safely drop
+  // the legacy 4-column unique index; fall back to the legacy key while both indexes coexist.
+  const existing =
+    (await tx.shiftRun.findFirst({
+      where: {
+        supplierId,
+        lineId: lineShift.lineId,
+        shiftTemplateId: lineShift.shiftTemplateId,
+        businessDate: businessDateValue,
+        scheduledStartAt: start,
+        scheduledEndAt: end,
+      },
+      include: { workingAssignments: true },
+    })) ??
+    (await tx.shiftRun.findFirst({
+      where: {
+        supplierId,
+        lineId: lineShift.lineId,
+        shiftTemplateId: lineShift.shiftTemplateId,
+        businessDate: businessDateValue,
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      include: { workingAssignments: true },
+    }));
   const created =
     existing ??
     (await tx.shiftRun.create({

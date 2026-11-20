@@ -292,6 +292,8 @@ test('Supplier operations: searchable assignments, reviewed shift rotation, Tano
   ).items.find((item) => item.id === configured.id)!;
   expect(after.assignments).toEqual(assigned.assignments);
   expect(after.lineLeaders).toEqual(assigned.lineLeaders);
+  await page.goto(`${runtime.supplierOrigin}/board?shiftStatus=ALL`);
+  await expect(page.getByText(`${morning.name} · 18:00–06:00 (+1)`)).toBeVisible();
   // All Tanoko readers receive scoped membership without master-data read permission changes.
   const matrix = await get<TanokoMatrix>(supervisor.context.request, '/api/v1/supplier/tanoko');
   expect(matrix.members.find((m) => m.id === fixture.members.replacement.id)?.lineIds).toContain(
