@@ -1,6 +1,7 @@
 import { assertCurrentPrincipal } from '../auth/current-principal.js';
 import { assertTanokoEligible } from '../master-data/tanoko-eligibility.js';
 import { LineShiftService } from '../master-data/line-shift.service.js';
+import { occurrenceHenkatenWindowWhere } from '../master-data/shift-time.js';
 import { createHash, randomUUID } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
@@ -83,11 +84,13 @@ export class HenkatenService {
         if (retry.submissionPayloadHash !== payloadHash) throw idempotencyConflict();
         return retry.id;
       }
+      const now = new Date();
       const occurrence = await this.lineShifts.resolveAssignedOccurrence(
         tx,
         scope,
         principal,
         input.lineShiftId,
+        now,
       );
       if (
         (input.lineShiftId && input.lineShiftId !== occurrence.row.id) ||
@@ -223,8 +226,7 @@ export class HenkatenService {
             jobId: job.id,
             category: 'MAN',
             status: { in: ['OPEN', 'APPROVED'] },
-            effectiveStartAt: occurrence.start,
-            effectiveEndAt: occurrence.end,
+            ...occurrenceHenkatenWindowWhere(occurrence, now),
             manDetail: { lineShiftJobAssignmentId: assignment.id },
           },
           include: { manDetail: { include: { replacementMp: true } } },
@@ -257,7 +259,6 @@ export class HenkatenService {
       const identifier = `HEN-${supplier.code}-${occurrence.businessDate.replaceAll('-', '')}-${sequence
         .toString()
         .padStart(4, '0')}`;
-      const now = new Date();
       const created = await tx.henkaten.create({
         data: {
           id: henkatenId,
@@ -1238,6 +1239,8 @@ async function ensureAutomaticOccurrence(
       lineId: lineShift.lineId,
       shiftTemplateId: lineShift.shiftTemplateId,
       businessDate: new Date(`${businessDate}T00:00:00.000Z`),
+      scheduledStartAt: start,
+      scheduledEndAt: end,
     },
     include: { workingAssignments: true },
   });

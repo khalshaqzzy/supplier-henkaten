@@ -1,3 +1,18 @@
+## Shift swap occurrence isolation, realtime sync and board hours — 20 November 2026
+
+Implementation on `fix/shift-swap-occurrence-and-sync`: replaces the `ShiftRun` unique index via
+additive migration `20261120002600_shift_run_occurrence_window` (declared drop-index policy) to
+key materialized occurrences by `(supplierId, lineId, shiftTemplateId, businessDate, scheduledStartAt, scheduledEndAt)`;
+retains active overlapping mid-shift MAN overrides and 4M indicators on `operationalContext`,
+Assignment Board and chained MAN submissions while preserving exact-window matching for future
+occurrences; emits `SHIFT_TIMES_SWAPPED` and `SHIFT_TEMPLATE_UPDATED` Outbox events and increments
+`LineShift.version` on manual Shift Template updates; auto-syncs untouched Create Henkaten forms
+and surfaces a non-blocking 1-click *Perbarui jadwal* banner preserving inputs once edited;
+invalidates downstream caches after Shift Template edits; and exposes `startTime`, `endTime`,
+`crossesMidnight` and `timezone` on the Supplier and TMMIN Assignment Boards. See
+[ADR 0049](../docs/adr/0049-supplier-shift-rotation-and-catalog-deletion.md) and the current
+handoff. Phase 15 remains the sole current `in_progress` phase; staging/device/UAT is unchanged.
+
 ## Several Line Leaders, username changes and internal part numbers — 17 November 2026
 
 Implementation on `feat/multi-leader-username-part-numbers`: Line–Shift leaders move to the new

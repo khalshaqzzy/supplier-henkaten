@@ -1,3 +1,36 @@
+## Amendment — 20 November 2026: Shift swap occurrence isolation, realtime sync and board hours
+
+Swapping or editing Shift Template schedules keeps supplier operations synchronized without
+blocking active workflows:
+
+- **Per-occurrence ShiftRun isolation.** Materialized `ShiftRun` snapshots are keyed by
+  `(supplierId, lineId, shiftTemplateId, businessDate, scheduledStartAt, scheduledEndAt)`.
+  Swapping or editing a shift on the same business date after an earlier Henkaten preserves the
+  historical `ShiftRun` snapshot and creates a separate `ShiftRun` and `WorkingAssignment` set for
+  the new swapped time window, preventing cross-occurrence assignment corruption on Withdraw or
+  Reject.
+- **Active mid-shift MAN overrides.** For a currently running Line–Shift (`current = true`),
+  `OPEN` and `APPROVED` MAN overrides and 4M board indicators whose effective window still covers
+  the current instant remain active even when the shift's time window is adjusted or swapped with
+  an overlapping shift; future/next occurrences keep exact window matching so prior overrides never
+  leak forward.
+- **Immediate sync across screens.** Both *Tukar waktu shift* and manual Shift Template schedule or
+  name updates increment affected `LineShift.version` values and enqueue Outbox events
+  (`SHIFT_TIMES_SWAPPED` / `SHIFT_TEMPLATE_UPDATED`) so connected Assignment Boards refresh over
+  SSE immediately, and Supplier Master Data edits invalidate downstream caches without losing the
+  saved detail record.
+- **Non-blocking Henkaten form updates.** While the Create Henkaten form is untouched, updated
+  shift schedules sync automatically; once the Line Leader starts entering data, a non-blocking
+  warning banner offers a one-click *Perbarui jadwal* action that updates the shift context while
+  preserving typed inputs.
+- **Board shift hours.** The Supplier and TMMIN Assignment Boards include and display each shift's
+  `startTime`, `endTime`, `crossesMidnight` indicator and `timezone` alongside the shift name.
+
+See the 20 November 2026 amendment in
+[ADR 0049](../docs/adr/0049-supplier-shift-rotation-and-catalog-deletion.md).
+
+---
+
 ## Amendment — 17 November 2026: Several Line Leaders per Line–Shift, username changes and internal part numbers
 
 **Line Leaders.** One Line–Shift may have **0–10 Line Leaders**, and one Line Leader may lead any

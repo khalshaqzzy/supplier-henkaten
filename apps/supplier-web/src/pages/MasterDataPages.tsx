@@ -444,7 +444,13 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
         queryClient.setQueryData(scopedKey(scope, `master-${kind}-detail`, resourceId), resource);
       }
       await queryClient.invalidateQueries({
-        queryKey: scopedKey(scope, `master-${kind}`).slice(0, -1),
+        queryKey: scopedKey(scope, '').slice(0, 4),
+        predicate: (query) =>
+          !(
+            editing &&
+            query.queryKey[4] === `master-${kind}-detail` &&
+            query.queryKey[5] === resourceId
+          ),
       });
       toast.success(editing ? 'Perubahan disimpan' : `${resources[kind].title} ditambahkan`);
       if (editing) {
@@ -551,7 +557,7 @@ function ResourceLifecycle({
     onSuccess: () =>
       queryClient
         .invalidateQueries({
-          queryKey: scopedKey(scope, `master-${kind}-detail`, resource.id),
+          queryKey: scopedKey(scope, '').slice(0, 4),
         })
         .then(() => toast.success(active ? 'Data dinonaktifkan' : 'Data diaktifkan')),
     onError: (error) => setProblem(masterMutationProblem(error)),

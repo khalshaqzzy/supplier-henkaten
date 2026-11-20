@@ -128,3 +128,62 @@ screenshots taken only after selection. The change is frontend-only and retains 
 The correction passed both browser engines, the 24 shared UI and 108 Supplier unit tests, typing,
 lint, formatting and production frontend builds. Popover spacing reuses existing component token
 metadata. No API/database or dependency change was required.
+
+## Shift swap occurrence isolation, realtime propagation and board schedule visibility — 20 November 2026
+
+### Context
+
+Although recurring `LineShift` assignments dynamically read schedule boundaries from `ShiftTemplate`,
+five synchronization gaps remained around shift-time swaps and manual schedule edits:
+
+1. `ShiftRun` uniqueness was keyed only by `(supplierId, lineId, shiftTemplateId, businessDate)`.
+   When a Henkaten was submitted before a shift swap and another was submitted after the swap on
+   the same business date, `ensureAutomaticOccurrence` reused the pre-swap `ShiftRun` snapshot
+   (preserving the old `scheduledStartAt`/`scheduledEndAt` and minute snapshots) and shared the
+   same `WorkingAssignment` rows across both occurrences, allowing withdrawal or rejection of the
+   pre-swap Henkaten to overwrite the post-swap occurrence's `WorkingAssignment`.
+2. `CatalogCommandService.swap` and `CatalogService.updateShiftTemplate` did not enqueue Outbox
+   events, delaying Assignment Board updates on connected SSE clients until fallback polling.
+   `updateShiftTemplate` also did not increment referencing `LineShift.version` values, and the
+   master-data form invalidated only `master-shifts`, leaving Line Setup and Board caches stale
+   within the 20-second `staleTime`.
+3. `HenkatenCreatePage` kept `shownContext` frozen whenever the selected `LineShift.id` remained
+   present, leaving an already-open form displaying old shift hours until a 409 conflict on submit.
+4. Mid-shift swaps between overlapping shifts dropped active `OPEN`/`APPROVED` MAN overrides and 4M
+   board indicators immediately because override queries required exact equality against the new
+   occurrence's `effectiveStartAt`/`effectiveEndAt`.
+5. Assignment Board responses omitted `startTime`, `endTime`, `crossesMidnight` and `timezone`,
+   preventing operators from visually verifying swapped hours on the board.
+
+### Decision
+
+- **Per-occurrence `ShiftRun` uniqueness**: Additive migration
+  `20261120002600_shift_run_occurrence_window` drops
+  `ShiftRun_supplierId_lineId_shiftTemplateId_businessDate_key` under the declared drop-index
+  policy and replaces it with `ShiftRun_occurrence_window_key` over
+  `(supplierId, lineId, shiftTemplateId, businessDate, scheduledStartAt, scheduledEndAt)`.
+  `ensureAutomaticOccurrence` and `ShiftService.prepare` look up occurrences by the full window
+  key, keeping historical snapshots immutable while isolating post-swap `ShiftRun` and
+  `WorkingAssignment` rows on the same business date.
+- **Active-window override retention**: Shared helper `occurrenceHenkatenWindowWhere` matches
+  `OPEN`/`APPROVED` Henkaten for currently running shifts (`current = true`) when either the exact
+  window matches or `effectiveStartAt <= now < effectiveEndAt`. Future occurrences (`current = false`)
+  continue to match the exact scheduled window only so prior overrides never leak forward.
+- **Realtime and manual-edit parity**: `CatalogCommandService.swap` enqueues `SHIFT_TIMES_SWAPPED`
+  and `CatalogService.updateShiftTemplate` increments affected `LineShift.version` values and
+  enqueues `SHIFT_TEMPLATE_UPDATED` (without a `lineId` restriction so supplier-wide SSE clients
+  invalidate immediately). Supplier master-data edits invalidate supplier-scoped caches while
+  preserving the freshly updated detail cache entry.
+- **Non-blocking Henkaten form sync**: `HenkatenCreatePage` auto-syncs `shownContext` whenever the
+  form is untouched; once edited, a non-blocking warning banner presents a one-click
+  *Perbarui jadwal* button that refreshes the schedule context while keeping typed fields intact.
+- **Board shift hours**: `assignmentBoardSchema` adds `startTime`, `endTime`, `crossesMidnight`
+  and `timezone` to each board line, rendered in both Supplier and TMMIN Assignment Board views.
+
+### Consequences and validation
+
+Existing `ShiftRun` records and historical snapshots are untouched; rollback to an older binary
+would not rely on the narrower unique index if two same-day occurrences exist for one template,
+so forward-only migration applies. Contract, unit, component, PostgreSQL integration, migration
+upgrade and browser E2E checks validate all paths; exact verification results are recorded in
+`.agent/sessionHandoff.md`.

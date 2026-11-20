@@ -17573,6 +17573,10 @@ export interface paths {
                 lineCode: string;
                 lineName: string;
                 shiftName: string;
+                startTime: string;
+                endTime: string;
+                crossesMidnight: boolean;
+                timezone: string;
                 isCurrent: boolean;
                 /** Format: date */
                 businessDate: string;
@@ -18800,6 +18804,10 @@ export interface paths {
                 lineCode: string;
                 lineName: string;
                 shiftName: string;
+                startTime: string;
+                endTime: string;
+                crossesMidnight: boolean;
+                timezone: string;
                 isCurrent: boolean;
                 /** Format: date */
                 businessDate: string;

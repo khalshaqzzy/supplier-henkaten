@@ -164,7 +164,7 @@ export function AssignmentBoardPage() {
             <Panel
               key={line.shiftRunId}
               title={`${line.lineCode} · ${line.lineName}`}
-              description={`${line.shiftName} · ${line.businessDate}`}
+              description={`${line.shiftName} · ${line.startTime}–${line.endTime}${line.crossesMidnight ? ' (+1)' : ''} · ${line.businessDate}`}
             >
               {line.activeOverride && (
                 <Alert tone="warning" title="Shift dimulai dengan override">

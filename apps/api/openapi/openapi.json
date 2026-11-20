@@ -45924,6 +45924,22 @@
                           "shiftName": {
                             "type": "string"
                           },
+                          "startTime": {
+                            "type": "string",
+                            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                          },
+                          "endTime": {
+                            "type": "string",
+                            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                          },
+                          "crossesMidnight": {
+                            "type": "boolean"
+                          },
+                          "timezone": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
                           "isCurrent": {
                             "type": "boolean"
                           },
@@ -46222,6 +46238,10 @@
                           "lineCode",
                           "lineName",
                           "shiftName",
+                          "startTime",
+                          "endTime",
+                          "crossesMidnight",
+                          "timezone",
                           "isCurrent",
                           "businessDate",
                           "supervisor",
@@ -50380,6 +50400,22 @@
                           "shiftName": {
                             "type": "string"
                           },
+                          "startTime": {
+                            "type": "string",
+                            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                          },
+                          "endTime": {
+                            "type": "string",
+                            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                          },
+                          "crossesMidnight": {
+                            "type": "boolean"
+                          },
+                          "timezone": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
                           "isCurrent": {
                             "type": "boolean"
                           },
@@ -50678,6 +50714,10 @@
                           "lineCode",
                           "lineName",
                           "shiftName",
+                          "startTime",
+                          "endTime",
+                          "crossesMidnight",
+                          "timezone",
                           "isCurrent",
                           "businessDate",
                           "supervisor",

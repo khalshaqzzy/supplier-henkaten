@@ -342,3 +342,107 @@ it('submits several selected parts in the order they were chosen', async () => {
   expect(submit.mock.calls[0]![0]).not.toHaveProperty('partId');
   client.clear();
 });
+
+it('auto-syncs swapped shift times while the form is untouched, and prompts without losing inputs once edited', async () => {
+  vi.mocked(useSession).mockReturnValue({
+    session: {
+      principal: { userId: 'user', role: 'LINE_LEADER', purpose: 'NORMAL' },
+      supplier: { id: 'supplier' },
+    },
+  } as ReturnType<typeof useSession>);
+  const beforeSwap = {
+    items: [
+      {
+        id: 'shift',
+        version: 1,
+        lineCode: 'L1',
+        lineName: 'Body Line',
+        shiftName: 'Shift 1',
+        startTime: '07:00',
+        endTime: '15:00',
+        crossesMidnight: false,
+        current: true,
+        businessDate: '2026-11-20',
+        effectiveStartAt: '2026-11-20T00:00:00Z',
+        effectiveEndAt: '2026-11-20T08:00:00Z',
+        assignments: [{ id: 'assignment', jobId: 'job', jobName: 'Job 1', mpMemberId: 'mp' }],
+      },
+    ],
+    currentLineShiftIds: ['shift'],
+  };
+  const afterFirstSwap = {
+    items: [
+      {
+        ...beforeSwap.items[0]!,
+        version: 2,
+        startTime: '19:00',
+        endTime: '07:00',
+        crossesMidnight: true,
+        current: false,
+        effectiveStartAt: '2026-11-20T12:00:00Z',
+        effectiveEndAt: '2026-11-21T00:00:00Z',
+      },
+    ],
+    currentLineShiftIds: [],
+  };
+  const afterSecondSwap = {
+    items: [
+      {
+        ...beforeSwap.items[0]!,
+        version: 3,
+        startTime: '08:00',
+        endTime: '16:00',
+        crossesMidnight: false,
+        current: true,
+        effectiveStartAt: '2026-11-20T01:00:00Z',
+        effectiveEndAt: '2026-11-20T09:00:00Z',
+      },
+    ],
+    currentLineShiftIds: ['shift'],
+  };
+  vi.spyOn(supplierApi, 'lineShiftOperationalContext').mockResolvedValue(beforeSwap as never);
+  vi.spyOn(supplierApi, 'henkatenFormOptions').mockResolvedValue({
+    parts: [],
+    replacementMembers: [],
+    checklist: null,
+  } as never);
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <HenkatenCreatePage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  await screen.findByText(/Shift 1 · 07:00–15:00/);
+
+  const updateContextCache = (next: typeof beforeSwap) => {
+    for (const query of client
+      .getQueryCache()
+      .findAll()
+      .filter((item) => item.queryKey.includes('line-shift-operational-context'))) {
+      client.setQueryData(query.queryKey, next);
+    }
+  };
+
+  // While the form is untouched, swapped shift times sync automatically with no blocking banner.
+  updateContextCache(afterFirstSwap);
+  await screen.findByText(/Shift 1 · 19:00–07:00/);
+  expect(screen.queryByRole('button', { name: 'Perbarui jadwal' })).toBeNull();
+
+  // Once the Line Leader starts filling inputs, a schedule change shows a 1-click refresh banner
+  // that updates shift times while keeping all typed fields intact.
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText(/Penyebab/), 'Rotasi operator');
+  updateContextCache(afterSecondSwap);
+  const refreshButton = await screen.findByRole('button', { name: 'Perbarui jadwal' });
+  expect(screen.getByText(/Shift 1 · 19:00–07:00/)).toBeTruthy();
+
+  await user.click(refreshButton);
+  await screen.findByText(/Shift 1 · 08:00–16:00/);
+  expect(screen.queryByRole('button', { name: 'Perbarui jadwal' })).toBeNull();
+  expect(screen.getByLabelText<HTMLTextAreaElement>(/Penyebab/).value).toBe('Rotasi operator');
+  client.clear();
+});

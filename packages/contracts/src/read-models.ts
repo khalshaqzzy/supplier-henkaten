@@ -102,6 +102,8 @@ export const boardIndicatorSchema = z
   })
   .strict();
 
+const clockTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+
 export const assignmentBoardSchema = z
   .object({
     version: z.string().min(1),
@@ -114,6 +116,10 @@ export const assignmentBoardSchema = z
           lineCode: z.string(),
           lineName: z.string(),
           shiftName: z.string(),
+          startTime: clockTimeSchema,
+          endTime: clockTimeSchema,
+          crossesMidnight: z.boolean(),
+          timezone: z.string().min(1).max(100),
           isCurrent: z.boolean(),
           businessDate: z.string().date(),
           supervisor: z

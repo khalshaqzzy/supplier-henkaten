@@ -12,6 +12,7 @@ import { TenantScope } from '../common/scope.js';
 import { AuditWriter } from '../persistence/audit-writer.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 import { LineShiftService } from '../master-data/line-shift.service.js';
+import { occurrenceHenkatenWindowWhere } from '../master-data/shift-time.js';
 import { henkatenPartSearch } from '../henkaten/henkaten-presenters.js';
 import { lineLeaderHenkatenScope, lineLeaderShiftRunScope } from '../common/line-leader-scope.js';
 
@@ -30,6 +31,7 @@ export class ReadModelService {
     shiftStatus: 'CURRENT' | 'OTHER' | 'ALL' = 'CURRENT',
   ) {
     const context = await this.lineShifts.operationalContext(scope, principal);
+    const boardNow = new Date(context.generatedAt);
     const occurrences = context.items.filter(
       (item) =>
         (shiftStatus === 'ALL' || (shiftStatus === 'CURRENT' ? item.current : !item.current)) &&
@@ -67,8 +69,14 @@ export class ReadModelService {
               status: { in: ['OPEN', 'APPROVED'] },
               OR: occurrences.map((item) => ({
                 lineShiftId: item.id,
-                effectiveStartAt: new Date(item.effectiveStartAt),
-                effectiveEndAt: new Date(item.effectiveEndAt),
+                ...occurrenceHenkatenWindowWhere(
+                  {
+                    start: new Date(item.effectiveStartAt),
+                    end: new Date(item.effectiveEndAt),
+                    current: item.current,
+                  },
+                  boardNow,
+                ),
               })),
             },
             include: { approvalRoutes: true },
@@ -108,6 +116,10 @@ export class ReadModelService {
         lineCode: item.lineCode,
         lineName: item.lineName,
         shiftName: item.shiftName,
+        startTime: item.startTime,
+        endTime: item.endTime,
+        crossesMidnight: item.crossesMidnight,
+        timezone: item.timezone,
         isCurrent: item.current,
         businessDate: item.businessDate,
         supervisor: { memberId: item.supervisorMemberId, name: item.supervisorName },

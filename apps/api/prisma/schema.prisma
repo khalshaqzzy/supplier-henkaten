@@ -1086,7 +1086,7 @@ model ShiftRun {
   sourceMovements             AssignmentMovement[] @relation("AssignmentMovementSourceShift")
 
   @@unique([id, supplierId])
-  @@unique([supplierId, lineId, shiftTemplateId, businessDate])
+  @@unique([supplierId, lineId, shiftTemplateId, businessDate, scheduledStartAt, scheduledEndAt], map: "ShiftRun_occurrence_window_key")
   @@index([supplierId, status, businessDate(sort: Desc), id(sort: Desc)])
   @@index([supplierId, lineId, status])
   @@index([supplierId, lineLeaderMemberId, status])

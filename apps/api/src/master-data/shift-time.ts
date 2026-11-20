@@ -38,3 +38,14 @@ export function businessDateForInstant(
   }
   return localDate;
 }
+
+export function occurrenceHenkatenWindowWhere(
+  occurrence: { start: Date; end: Date; current: boolean },
+  now: Date,
+) {
+  const exact = { effectiveStartAt: occurrence.start, effectiveEndAt: occurrence.end };
+  if (!occurrence.current) return exact;
+  return {
+    OR: [exact, { effectiveStartAt: { lte: now }, effectiveEndAt: { gt: now } }],
+  };
+}

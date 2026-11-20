@@ -52,7 +52,7 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
   const context = useQuery({
     queryKey: scopedKey(scope, 'line-shift-operational-context'),
     queryFn: () => supplierApi.lineShiftOperationalContext(),
-    refetchInterval: 30_000,
+    refetchInterval: 15_000,
     refetchOnWindowFocus: true,
   });
   const clonePrefill = useQuery({
@@ -109,10 +109,28 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
         : '';
   const effectiveShiftId = lineShiftId || defaultShiftId;
   const selectedShift = shiftItems.find(({ id }) => id === effectiveShiftId);
-  // The chosen occurrence stays fixed while the form is filled; it refreshes after a conflict.
+  const formDirty = Boolean(
+    jobId ||
+    partSelection.other ||
+    partSelection.parts.length > 0 ||
+    replacementMpId ||
+    cause.trim() ||
+    detail.trim() ||
+    affectedObject.trim() ||
+    replacementObject.trim() ||
+    Object.keys(answers).length > 0 ||
+    (lineShiftId && lineShiftId !== defaultShiftId),
+  );
+  const contextChanged = Boolean(
+    shownContext &&
+    context.data &&
+    contextSignature(shownContext) !== contextSignature(context.data),
+  );
+  // Keep a clean form synced with schedule changes; once edited, prompt before refreshing.
   useEffect(() => {
-    if (context.data && (!shownContext || !selectedShift)) setShownContext(context.data);
-  }, [shownContext, selectedShift, context.data]);
+    if (!context.data || submittedIntent) return;
+    if (!shownContext || !selectedShift || !formDirty) setShownContext(context.data);
+  }, [shownContext, selectedShift, formDirty, submittedIntent, context.data]);
   useEffect(() => {
     if (
       selectedShift &&
@@ -215,6 +233,23 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
       {problem && (
         <Alert tone="danger" title="Submission gagal">
           {problem}
+        </Alert>
+      )}
+      {contextChanged && !submittedIntent && (
+        <Alert tone="warning" title="Jadwal atau assignment shift berubah">
+          Perbarui konteks shift sebelum mengirim. Isian form tetap tersimpan.
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              if (!context.data) return;
+              setShownContext(context.data);
+              setProblem(null);
+            }}
+          >
+            Perbarui jadwal
+          </Button>
         </Alert>
       )}
       {!context.isLoading && !shiftItems.length && (
@@ -473,6 +508,30 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
         </aside>
       </form>
     </div>
+  );
+}
+
+function contextSignature(
+  data: Awaited<ReturnType<typeof supplierApi.lineShiftOperationalContext>> | undefined,
+) {
+  if (!data) return '';
+  return JSON.stringify(
+    data.items.map((item) => ({
+      id: item.id,
+      version: item.version,
+      shiftName: item.shiftName,
+      startTime: item.startTime,
+      endTime: item.endTime,
+      current: item.current,
+      businessDate: item.businessDate,
+      effectiveStartAt: item.effectiveStartAt,
+      effectiveEndAt: item.effectiveEndAt,
+      assignments: item.assignments.map((assignment) => [
+        assignment.id,
+        assignment.jobId,
+        assignment.mpMemberId ?? '',
+      ]),
+    })),
   );
 }
 

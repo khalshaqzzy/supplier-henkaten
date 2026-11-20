@@ -214,7 +214,7 @@ export function BoardPage() {
                 ...shiftOptions.map((line) => ({
                   value: line.shiftRunId,
                   label: line.shiftName,
-                  description: `${line.businessDate} · ${leaderNames(line.lineLeaders) || 'Tanpa LL'}`,
+                  description: `${formatShiftHours(line)} · ${line.businessDate} · ${leaderNames(line.lineLeaders) || 'Tanpa LL'}`,
                 })),
               ]}
               onValueChange={(nextValue) => {
@@ -359,7 +359,7 @@ export function BoardPage() {
                         <span>{line.lineCode}</span>
                         <h2>{line.lineName}</h2>
                         <p>
-                          {line.shiftName} · {line.businessDate}
+                          {line.shiftName} · {formatShiftHours(line)} · {line.businessDate}
                           <span
                             className={`board-shift-badge ${line.isCurrent ? 'is-current' : ''}`}
                           >
@@ -424,7 +424,11 @@ export function BoardPage() {
             {contextLine && (
               <FactStrip label="Shift berjalan">
                 <FactItem label="Line" value={contextLine.lineCode} detail={contextLine.lineName} />
-                <FactItem label="Shift" value={contextLine.shiftName} />
+                <FactItem
+                  label="Shift"
+                  value={contextLine.shiftName}
+                  detail={`${formatShiftHours(contextLine)} · ${contextLine.timezone}`}
+                />
                 <FactItem label="Business date" value={contextLine.businessDate} />
                 <FactItem
                   label="Supervisor"
@@ -536,6 +540,10 @@ function humanize(value: string) {
     .toLowerCase()
     .replaceAll('_', ' ')
     .replace(/(^|\s)\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatShiftHours(line: { startTime: string; endTime: string; crossesMidnight: boolean }) {
+  return `${line.startTime}–${line.endTime}${line.crossesMidnight ? ' (+1)' : ''}`;
 }
 
 function leaderNames(leaders: ReadonlyArray<{ name: string }>) {
