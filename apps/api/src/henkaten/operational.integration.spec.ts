@@ -1728,7 +1728,7 @@ describe('Line Shift Henkaten operations', () => {
     }
   });
 
-  it('isolates same-day ShiftRuns and retains active mid-shift MAN overrides after swapping overlapping shifts', async () => {
+  it('retains active mid-shift MAN overrides across overlapping swaps and restores them when a post-swap override is withdrawn', async () => {
     const existingAdmin = await prisma.user.findFirst({
       where: { supplierId, role: 'SUPPLIER_ADMIN', status: 'ACTIVE' },
     });
@@ -1748,6 +1748,10 @@ describe('Line Shift Henkaten operations', () => {
       });
     }
     const admin = await supplierLogin(adminUsername);
+    const secondReplacementMpId = await createMp('Post-Swap Replacement MP');
+    await prisma.tanokoMapping.create({
+      data: { supplierId, memberId: secondReplacementMpId, jobId: job1Id, level: 3 },
+    });
     const currentLineShift = await prisma.lineShift.findUniqueOrThrow({
       where: { id: lineShiftId },
       include: { shiftTemplate: true },
@@ -1814,14 +1818,14 @@ describe('Line Shift Henkaten operations', () => {
       );
 
       const boardAfter = await request(app.getHttpServer())
-        .get('/api/v1/supplier/assignment-board?shiftStatus=CURRENT')
+        .get('/api/v1/supplier/assignment-board?shiftStatus=CURRENT&includeSchedule=true')
         .set('Cookie', leaderCookie);
       expect(boardAfter.status).toBe(200);
       const boardLine = (
         boardAfter.body.lines as Array<{
           shiftRunId: string;
-          startTime: string;
-          endTime: string;
+          startTime?: string;
+          endTime?: string;
           jobs: Array<{
             jobId: string;
             mp: { memberId: string | null };
@@ -1837,8 +1841,7 @@ describe('Line Shift Henkaten operations', () => {
       expect(boardJob1.mp.memberId).toBe(replacementMpId);
       expect(boardJob1.indicators.some((ind) => ind.henkatenId === preSwapId)).toBe(true);
 
-      // A post-swap submission on the same business date materializes an isolated ShiftRun with
-      // the new swapped window instead of reusing the pre-swap ShiftRun snapshot.
+      // A chained post-swap MAN submission sees the still-active pre-swap replacement MP.
       const postSwap = await request(app.getHttpServer())
         .post('/api/v1/supplier/henkatens')
         .set('Origin', supplierOrigin)
@@ -1851,7 +1854,7 @@ describe('Line Shift Henkaten operations', () => {
           lineShiftJobAssignmentId: job1AssignmentId,
           jobId: job1Id,
           partId,
-          replacementMpMemberId: replacementMpId,
+          replacementMpMemberId: secondReplacementMpId,
           expectedReplacedMpMemberId: replacementMpId,
           cause: 'Post-swap replacement',
           detail: 'Submitted under swapped schedule window',
@@ -1859,36 +1862,33 @@ describe('Line Shift Henkaten operations', () => {
           checklistAnswers: [{ itemId: checklistItemId, answer: 'YES' }],
         });
       expect(postSwap.status).toBe(201);
+      const postSwapId = postSwap.body.id as string;
       const postSwapShiftRunId = postSwap.body.shiftRunId as string;
-      expect(postSwapShiftRunId).not.toBe(preSwapShiftRunId);
 
-      const [oldRun, newRun] = await Promise.all([
-        prisma.shiftRun.findUniqueOrThrow({ where: { id: preSwapShiftRunId } }),
-        prisma.shiftRun.findUniqueOrThrow({ where: { id: postSwapShiftRunId } }),
-      ]);
-      expect([oldRun.shiftStartMinuteSnapshot, oldRun.shiftEndMinuteSnapshot]).toEqual([
-        currentLineShift.shiftTemplate.startMinute,
-        currentLineShift.shiftTemplate.endMinute,
-      ]);
-      expect([newRun.shiftStartMinuteSnapshot, newRun.shiftEndMinuteSnapshot]).toEqual([
-        altStart,
-        altEnd,
-      ]);
-
-      // Withdrawing the pre-swap Henkaten must not clobber the post-swap occurrence's WorkingAssignment.
-      const withdrawn = await request(app.getHttpServer())
-        .post(`/api/v1/supplier/henkatens/${preSwapId}/withdraw`)
+      // Withdrawing the post-swap Henkaten must restore the still-active pre-swap MAN override
+      // rather than falling back to the default MP.
+      const withdrawnPost = await request(app.getHttpServer())
+        .post(`/api/v1/supplier/henkatens/${postSwapId}/withdraw`)
         .set('Origin', supplierOrigin)
         .set('Cookie', leaderCookie)
         .set('X-CSRF-Token', leaderCsrf)
         .set('Idempotency-Key', randomUUID())
-        .send({ expectedVersion: preSwap.body.version, reason: 'Withdrawn pre-swap record' });
-      expect(withdrawn.status).toBe(201);
+        .send({ expectedVersion: postSwap.body.version, reason: 'Withdrawn post-swap record' });
+      expect(withdrawnPost.status).toBe(201);
 
-      const postSwapWorking = await prisma.workingAssignment.findUniqueOrThrow({
+      const workingAfterWithdraw = await prisma.workingAssignment.findUniqueOrThrow({
         where: { shiftRunId_jobId: { shiftRunId: postSwapShiftRunId, jobId: job1Id } },
       });
-      expect(postSwapWorking.effectiveMpMemberId).toBe(replacementMpId);
+      expect(workingAfterWithdraw.effectiveMpMemberId).toBe(replacementMpId);
+
+      // Expand-phase migration keeps the legacy 4-column index alongside the new window index.
+      const indexes = await prisma.$queryRaw<Array<{ indexname: string }>>`
+        SELECT indexname FROM pg_indexes WHERE tablename = 'ShiftRun'
+      `;
+      const indexNames = indexes.map(({ indexname }) => indexname);
+      expect(indexNames).toContain('ShiftRun_supplierId_lineId_shiftTemplateId_businessDate_key');
+      expect(indexNames).toContain('ShiftRun_occurrence_window_key');
+      expect(preSwapShiftRunId).toBe(postSwapShiftRunId);
     } finally {
       if (swapped) {
         const [firstNow, secondNow] = await Promise.all([

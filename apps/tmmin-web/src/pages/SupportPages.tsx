@@ -160,43 +160,51 @@ export function AssignmentBoardPage() {
         <QueryState empty="No active Hosted shifts." />
       ) : (
         <div className="tmmin-board">
-          {result.data.lines.map((line) => (
-            <Panel
-              key={line.shiftRunId}
-              title={`${line.lineCode} · ${line.lineName}`}
-              description={`${line.shiftName} · ${line.startTime}–${line.endTime}${line.crossesMidnight ? ' (+1)' : ''} · ${line.businessDate}`}
-            >
-              {line.activeOverride && (
-                <Alert tone="warning" title="Shift dimulai dengan override">
-                  {line.activeOverride.reason}
-                </Alert>
-              )}
-              <div className="tmmin-board-grid">
-                {line.jobs.map((job) => (
-                  <Card key={job.assignmentId}>
-                    <div>
-                      <span>{job.displayOrder.toString().padStart(2, '0')}</span>
-                      <StatusBadge tone={job.state === 'ASSIGNED' ? 'success' : 'warning'}>
-                        {job.state}
-                      </StatusBadge>
-                    </div>
-                    <h3>{job.jobName}</h3>
-                    <p>
-                      {job.mp.name ?? 'Vacant'}
-                      <small>{job.state}</small>
-                    </p>
-                    <div>
-                      {job.indicators.map((indicator) => (
-                        <StatusBadge key={indicator.henkatenId} tone="warning">
-                          {indicator.category} · {indicator.status}
+          {result.data.lines.map((line) => {
+            const schedule =
+              line.startTime && line.endTime
+                ? `${line.startTime}–${line.endTime}${line.crossesMidnight ? ' (+1)' : ''}`
+                : null;
+            return (
+              <Panel
+                key={line.shiftRunId}
+                title={`${line.lineCode} · ${line.lineName}`}
+                description={[line.shiftName, schedule, line.timezone, line.businessDate]
+                  .filter(Boolean)
+                  .join(' · ')}
+              >
+                {line.activeOverride && (
+                  <Alert tone="warning" title="Shift dimulai dengan override">
+                    {line.activeOverride.reason}
+                  </Alert>
+                )}
+                <div className="tmmin-board-grid">
+                  {line.jobs.map((job) => (
+                    <Card key={job.assignmentId}>
+                      <div>
+                        <span>{job.displayOrder.toString().padStart(2, '0')}</span>
+                        <StatusBadge tone={job.state === 'ASSIGNED' ? 'success' : 'warning'}>
+                          {job.state}
                         </StatusBadge>
-                      ))}
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </Panel>
-          ))}
+                      </div>
+                      <h3>{job.jobName}</h3>
+                      <p>
+                        {job.mp.name ?? 'Vacant'}
+                        <small>{job.state}</small>
+                      </p>
+                      <div>
+                        {job.indicators.map((indicator) => (
+                          <StatusBadge key={indicator.henkatenId} tone="warning">
+                            {indicator.category} · {indicator.status}
+                          </StatusBadge>
+                        ))}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </Panel>
+            );
+          })}
         </div>
       )}
     </>

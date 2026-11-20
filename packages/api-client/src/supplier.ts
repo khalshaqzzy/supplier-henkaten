@@ -76,7 +76,7 @@ import {
   type SetupCommit,
 } from '@tmmin-henkaten/contracts';
 
-import { ApiClient } from './core';
+import { ApiClient, ApiProblemError } from './core';
 
 const versionsSchema = z.object({ items: z.array(checklistVersionSchema) }).strict();
 const transitionsSchema = z.array(henkatenTransitionSchema);
@@ -219,11 +219,31 @@ export class SupplierApi {
     });
   }
 
-  board(query: BoardQuery = {}) {
-    return this.client.request('/api/v1/supplier/assignment-board', {
-      query,
-      responseSchema: assignmentBoardSchema,
-    });
+  async board(query: BoardQuery = {}) {
+    const requested = { ...query, includeSchedule: query.includeSchedule ?? true };
+    try {
+      return await this.client.request('/api/v1/supplier/assignment-board', {
+        query: requested,
+        responseSchema: assignmentBoardSchema,
+      });
+    } catch (error) {
+      if (
+        requested.includeSchedule &&
+        error instanceof ApiProblemError &&
+        error.problem.status === 400 &&
+        error.problem.code === 'VALIDATION_FAILED'
+      ) {
+        const legacyQuery: BoardQuery = {
+          ...(requested.lineId ? { lineId: requested.lineId } : {}),
+          ...(requested.shiftStatus ? { shiftStatus: requested.shiftStatus } : {}),
+        };
+        return this.client.request('/api/v1/supplier/assignment-board', {
+          query: legacyQuery,
+          responseSchema: assignmentBoardSchema,
+        });
+      }
+      throw error;
+    }
   }
 
   boardLayout(lineId: string) {

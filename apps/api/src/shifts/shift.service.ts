@@ -72,13 +72,11 @@ export class ShiftService {
         source.shift.timezone,
       );
       const slot = {
-        supplierId_lineId_shiftTemplateId_businessDate_scheduledStartAt_scheduledEndAt: {
+        supplierId_lineId_shiftTemplateId_businessDate: {
           supplierId: scope.supplierId,
           lineId: input.lineId,
           shiftTemplateId: input.shiftTemplateId,
           businessDate: new Date(`${input.businessDate}T00:00:00.000Z`),
-          scheduledStartAt: boundaries.start,
-          scheduledEndAt: boundaries.end,
         },
       };
       const current = await tx.shiftRun.findUnique({ where: slot });

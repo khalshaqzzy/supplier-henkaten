@@ -29,6 +29,7 @@ export class ReadModelService {
     principal: RequestPrincipal,
     requestedLineId?: string,
     shiftStatus: 'CURRENT' | 'OTHER' | 'ALL' = 'CURRENT',
+    includeSchedule = false,
   ) {
     const context = await this.lineShifts.operationalContext(scope, principal);
     const boardNow = new Date(context.generatedAt);
@@ -116,10 +117,14 @@ export class ReadModelService {
         lineCode: item.lineCode,
         lineName: item.lineName,
         shiftName: item.shiftName,
-        startTime: item.startTime,
-        endTime: item.endTime,
-        crossesMidnight: item.crossesMidnight,
-        timezone: item.timezone,
+        ...(includeSchedule
+          ? {
+              startTime: item.startTime,
+              endTime: item.endTime,
+              crossesMidnight: item.crossesMidnight,
+              timezone: item.timezone,
+            }
+          : {}),
         isCurrent: item.current,
         businessDate: item.businessDate,
         supervisor: { memberId: item.supervisorMemberId, name: item.supervisorName },

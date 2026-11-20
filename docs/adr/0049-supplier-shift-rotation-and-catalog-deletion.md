@@ -157,18 +157,22 @@ five synchronization gaps remained around shift-time swaps and manual schedule e
 
 ### Decision
 
-- **Per-occurrence `ShiftRun` uniqueness**: Additive migration
-  `20261120002600_shift_run_occurrence_window` drops
-  `ShiftRun_supplierId_lineId_shiftTemplateId_businessDate_key` under the declared drop-index
-  policy and replaces it with `ShiftRun_occurrence_window_key` over
-  `(supplierId, lineId, shiftTemplateId, businessDate, scheduledStartAt, scheduledEndAt)`.
-  `ensureAutomaticOccurrence` and `ShiftService.prepare` look up occurrences by the full window
-  key, keeping historical snapshots immutable while isolating post-swap `ShiftRun` and
-  `WorkingAssignment` rows on the same business date.
-- **Active-window override retention**: Shared helper `occurrenceHenkatenWindowWhere` matches
-  `OPEN`/`APPROVED` Henkaten for currently running shifts (`current = true`) when either the exact
-  window matches or `effectiveStartAt <= now < effectiveEndAt`. Future occurrences (`current = false`)
-  continue to match the exact scheduled window only so prior overrides never leak forward.
+- **Staged per-occurrence `ShiftRun` uniqueness (Expand/Contract)**: Additive migration
+  `20261120002600_shift_run_occurrence_window` adds `ShiftRun_occurrence_window_key` over
+  `(supplierId, lineId, shiftTemplateId, businessDate, scheduledStartAt, scheduledEndAt)` without
+  dropping `ShiftRun_supplierId_lineId_shiftTemplateId_businessDate_key`.
+  `ensureAutomaticOccurrence` queries the full 6-column occurrence window first and falls back to
+  the 4-column legacy slot while both indexes coexist, keeping code-only rollback to the prior
+  release completely safe. A follow-up contract release will drop the legacy 4-column index and
+  remove the fallback once this release is deployed as the rollback target.
+- **Active-window override retention and restoration**: Shared helper
+  `occurrenceHenkatenWindowWhere` matches `OPEN`/`APPROVED` Henkaten for currently running shifts
+  (`current = true`) when either the exact window matches or `effectiveStartAt <= now < effectiveEndAt`.
+  It is applied consistently across `LineShiftService.operationalContext`, `ReadModelService.board`,
+  `HenkatenService.createForLineShift`, and `HenkatenService.restoreLineShiftAssignment`, so
+  withdrawing or rejecting a post-swap MAN override restores a still-active pre-swap override.
+  Future occurrences (`current = false`) continue to match the exact scheduled window only so prior
+  overrides never leak forward.
 - **Realtime and manual-edit parity**: `CatalogCommandService.swap` enqueues `SHIFT_TIMES_SWAPPED`
   and `CatalogService.updateShiftTemplate` increments affected `LineShift.version` values and
   enqueues `SHIFT_TEMPLATE_UPDATED` (without a `lineId` restriction so supplier-wide SSE clients
@@ -176,14 +180,20 @@ five synchronization gaps remained around shift-time swaps and manual schedule e
   preserving the freshly updated detail cache entry.
 - **Non-blocking Henkaten form sync**: `HenkatenCreatePage` auto-syncs `shownContext` whenever the
   form is untouched; once edited, a non-blocking warning banner presents a one-click
-  *Perbarui jadwal* button that refreshes the schedule context while keeping typed fields intact.
-- **Board shift hours**: `assignmentBoardSchema` adds `startTime`, `endTime`, `crossesMidnight`
-  and `timezone` to each board line, rendered in both Supplier and TMMIN Assignment Board views.
+  *Perbarui jadwal* button that refreshes the schedule context while keeping typed fields intact,
+  pinning the previously selected `LineShift` when it remains available and requiring an explicit
+  choice when that `LineShift` disappears.
+- **Rollout-safe board shift hours**: `boardQuerySchema` adds opt-in `includeSchedule=true` and
+  `assignmentBoardSchema` marks `startTime`, `endTime`, `crossesMidnight` and `timezone` optional.
+  Clients without `includeSchedule` continue receiving the legacy strict payload; updated Supplier
+  and TMMIN clients request `includeSchedule=true`, fall back automatically on `400 VALIDATION_FAILED`
+  during API rollback, and render both hours and timezone when present.
 
 ### Consequences and validation
 
-Existing `ShiftRun` records and historical snapshots are untouched; rollback to an older binary
-would not rely on the narrower unique index if two same-day occurrences exist for one template,
-so forward-only migration applies. Contract, unit, component, PostgreSQL integration, migration
-upgrade and browser E2E checks validate all paths; exact verification results are recorded in
-`.agent/sessionHandoff.md`.
+Because the migration is purely additive and board schedule fields are opt-in/optional, both
+rolling deploys and code-only rollbacks remain safe in both directions. Follow-up work: after this
+release is deployed and becomes the rollback target, remove the legacy 4-column `ShiftRun` unique
+index and fallback lookup in a contract migration. Contract, unit, component, PostgreSQL
+integration, migration upgrade and browser E2E checks validate all paths; exact verification
+results are recorded in `.agent/sessionHandoff.md`.

@@ -99,12 +99,14 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
     setReplacementObject(prefill.replacementObject ?? '');
   }, [clonePrefill.data]);
   const [shownContext, setShownContext] = useState<typeof context.data>();
+  const [requireExplicitShiftChoice, setRequireExplicitShiftChoice] = useState(false);
   const shiftItems = shownContext?.items ?? [];
-  // One Line–Shift, or a single current one, is chosen automatically.
+  // One Line–Shift, or a single current one, is chosen automatically unless a draft's previous
+  // selection disappeared and the leader must choose explicitly.
   const defaultShiftId =
     shiftItems.length === 1
       ? shiftItems[0]!.id
-      : shownContext?.currentLineShiftIds.length === 1
+      : !requireExplicitShiftChoice && shownContext?.currentLineShiftIds.length === 1
         ? shownContext.currentLineShiftIds[0]!
         : '';
   const effectiveShiftId = lineShiftId || defaultShiftId;
@@ -129,8 +131,8 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
   // Keep a clean form synced with schedule changes; once edited, prompt before refreshing.
   useEffect(() => {
     if (!context.data || submittedIntent) return;
-    if (!shownContext || !selectedShift || !formDirty) setShownContext(context.data);
-  }, [shownContext, selectedShift, formDirty, submittedIntent, context.data]);
+    if (!shownContext || !formDirty) setShownContext(context.data);
+  }, [shownContext, formDirty, submittedIntent, context.data]);
   useEffect(() => {
     if (
       selectedShift &&
@@ -244,7 +246,20 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
             variant="secondary"
             onClick={() => {
               if (!context.data) return;
+              const previousSelectedId = effectiveShiftId;
               setShownContext(context.data);
+              if (
+                previousSelectedId &&
+                context.data.items.some(({ id }) => id === previousSelectedId)
+              ) {
+                setLineShiftId(previousSelectedId);
+                setRequireExplicitShiftChoice(false);
+              } else if (previousSelectedId) {
+                setLineShiftId('');
+                setJobId('');
+                setReplacementMpId('');
+                setRequireExplicitShiftChoice(context.data.items.length > 1);
+              }
               setProblem(null);
             }}
           >
@@ -286,7 +301,10 @@ export function HenkatenCreatePage({ clone = false }: { clone?: boolean }) {
                         name="line-shift"
                         value={item.id}
                         checked={checked}
-                        onChange={() => setLineShiftId(item.id)}
+                        onChange={() => {
+                          setLineShiftId(item.id);
+                          setRequireExplicitShiftChoice(false);
+                        }}
                       />
                       <span className="henkaten-shift-option__body">
                         <span className="henkaten-shift-option__top">

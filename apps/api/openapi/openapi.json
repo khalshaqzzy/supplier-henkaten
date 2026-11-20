@@ -45881,6 +45881,17 @@
                 "ALL"
               ]
             }
+          },
+          {
+            "in": "query",
+            "name": "includeSchedule",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
           }
         ],
         "responses": {
@@ -46238,10 +46249,6 @@
                           "lineCode",
                           "lineName",
                           "shiftName",
-                          "startTime",
-                          "endTime",
-                          "crossesMidnight",
-                          "timezone",
                           "isCurrent",
                           "businessDate",
                           "supervisor",
@@ -49570,6 +49577,17 @@
                 "ALL"
               ]
             }
+          },
+          {
+            "in": "query",
+            "name": "includeSchedule",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
           }
         ],
         "responses": {
@@ -50357,6 +50375,17 @@
                 "ALL"
               ]
             }
+          },
+          {
+            "in": "query",
+            "name": "includeSchedule",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
           }
         ],
         "responses": {
@@ -50714,10 +50743,6 @@
                           "lineCode",
                           "lineName",
                           "shiftName",
-                          "startTime",
-                          "endTime",
-                          "crossesMidnight",
-                          "timezone",
                           "isCurrent",
                           "businessDate",
                           "supervisor",

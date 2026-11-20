@@ -214,7 +214,13 @@ export function BoardPage() {
                 ...shiftOptions.map((line) => ({
                   value: line.shiftRunId,
                   label: line.shiftName,
-                  description: `${formatShiftHours(line)} · ${line.businessDate} · ${leaderNames(line.lineLeaders) || 'Tanpa LL'}`,
+                  description: [
+                    formatShiftHours(line),
+                    line.businessDate,
+                    leaderNames(line.lineLeaders) || 'Tanpa LL',
+                  ]
+                    .filter(Boolean)
+                    .join(' · '),
                 })),
               ]}
               onValueChange={(nextValue) => {
@@ -359,7 +365,9 @@ export function BoardPage() {
                         <span>{line.lineCode}</span>
                         <h2>{line.lineName}</h2>
                         <p>
-                          {line.shiftName} · {formatShiftHours(line)} · {line.businessDate}
+                          {[line.shiftName, formatShiftHours(line), line.businessDate]
+                            .filter(Boolean)
+                            .join(' · ')}
                           <span
                             className={`board-shift-badge ${line.isCurrent ? 'is-current' : ''}`}
                           >
@@ -427,7 +435,11 @@ export function BoardPage() {
                 <FactItem
                   label="Shift"
                   value={contextLine.shiftName}
-                  detail={`${formatShiftHours(contextLine)} · ${contextLine.timezone}`}
+                  detail={
+                    [formatShiftHours(contextLine), contextLine.timezone]
+                      .filter(Boolean)
+                      .join(' · ') || undefined
+                  }
                 />
                 <FactItem label="Business date" value={contextLine.businessDate} />
                 <FactItem
@@ -542,7 +554,12 @@ function humanize(value: string) {
     .replace(/(^|\s)\w/g, (letter) => letter.toUpperCase());
 }
 
-function formatShiftHours(line: { startTime: string; endTime: string; crossesMidnight: boolean }) {
+function formatShiftHours(line: {
+  startTime?: string | undefined;
+  endTime?: string | undefined;
+  crossesMidnight?: boolean | undefined;
+}) {
+  if (!line.startTime || !line.endTime) return null;
   return `${line.startTime}–${line.endTime}${line.crossesMidnight ? ' (+1)' : ''}`;
 }
 

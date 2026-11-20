@@ -80,6 +80,7 @@ export class SupplierReadModelController {
       this.access.principal(request),
       query.lineId,
       query.shiftStatus,
+      Boolean(query.includeSchedule),
     );
   }
 
@@ -216,7 +217,13 @@ export class TmminReadModelController {
       parseWithSchema(opaqueIdSchema, supplierId),
       principal,
     );
-    return this.reads.board(scope, principal, query.lineId, query.shiftStatus);
+    return this.reads.board(
+      scope,
+      principal,
+      query.lineId,
+      query.shiftStatus,
+      Boolean(query.includeSchedule),
+    );
   }
 
   @RequireCapabilities('TMMIN_SHIFT_READ')

@@ -847,18 +847,28 @@ describe('supplier master data', () => {
       orderBy: { createdAt: 'desc' },
     });
     expect(swapEvent).not.toBeNull();
-    const swappedBoard = await request(app.getHttpServer())
+    const legacyBoard = await request(app.getHttpServer())
       .get('/api/v1/supplier/assignment-board?shiftStatus=ALL')
+      .set('Cookie', supplierCookie);
+    expect(legacyBoard.status).toBe(200);
+    const legacyBoardShift = (
+      legacyBoard.body as { lines: Array<Record<string, unknown>> }
+    ).lines.find((item) => item['shiftRunId'] === shift.body.id);
+    expect(legacyBoardShift).toBeDefined();
+    expect(legacyBoardShift).not.toHaveProperty('startTime');
+    expect(legacyBoardShift).not.toHaveProperty('timezone');
+    const swappedBoard = await request(app.getHttpServer())
+      .get('/api/v1/supplier/assignment-board?shiftStatus=ALL&includeSchedule=true')
       .set('Cookie', supplierCookie);
     expect(swappedBoard.status).toBe(200);
     const boardShift = (
       swappedBoard.body as {
         lines: Array<{
           shiftRunId: string;
-          startTime: string;
-          endTime: string;
-          crossesMidnight: boolean;
-          timezone: string;
+          startTime?: string;
+          endTime?: string;
+          crossesMidnight?: boolean;
+          timezone?: string;
         }>;
       }
     ).lines.find((item) => item.shiftRunId === shift.body.id);

@@ -1,15 +1,17 @@
 ## Shift swap occurrence isolation, realtime sync and board hours — 20 November 2026
 
-Implementation on `fix/shift-swap-occurrence-and-sync`: replaces the `ShiftRun` unique index via
-additive migration `20261120002600_shift_run_occurrence_window` (declared drop-index policy) to
-key materialized occurrences by `(supplierId, lineId, shiftTemplateId, businessDate, scheduledStartAt, scheduledEndAt)`;
-retains active overlapping mid-shift MAN overrides and 4M indicators on `operationalContext`,
-Assignment Board and chained MAN submissions while preserving exact-window matching for future
+Implementation on `fix/shift-swap-occurrence-and-sync`: adds the Expand-phase unique index
+`ShiftRun_occurrence_window_key` via purely additive migration
+`20261120002600_shift_run_occurrence_window` (retaining the legacy 4-column index for one release
+so code-only rollback remains safe, with full-window lookup first); retains active overlapping
+mid-shift MAN overrides and 4M indicators on `operationalContext`, Assignment Board, chained MAN
+submissions, and `restoreLineShiftAssignment` while preserving exact-window matching for future
 occurrences; emits `SHIFT_TIMES_SWAPPED` and `SHIFT_TEMPLATE_UPDATED` Outbox events and increments
 `LineShift.version` on manual Shift Template updates; auto-syncs untouched Create Henkaten forms
-and surfaces a non-blocking 1-click *Perbarui jadwal* banner preserving inputs once edited;
-invalidates downstream caches after Shift Template edits; and exposes `startTime`, `endTime`,
-`crossesMidnight` and `timezone` on the Supplier and TMMIN Assignment Boards. See
+and surfaces a non-blocking 1-click *Perbarui jadwal* banner preserving inputs and the drafted
+Line–Shift selection once edited; invalidates downstream caches after Shift Template edits; and
+exposes rollout-safe optional `startTime`, `endTime`, `crossesMidnight` and `timezone` via
+`includeSchedule=true` (with legacy 400 fallback) on both Supplier and TMMIN Assignment Boards. See
 [ADR 0049](../docs/adr/0049-supplier-shift-rotation-and-catalog-deletion.md) and the current
 handoff. Phase 15 remains the sole current `in_progress` phase; staging/device/UAT is unchanged.
 

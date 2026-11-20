@@ -679,6 +679,27 @@ export class HenkatenService {
     const detail = target?.manDetail;
     const assignment = detail?.lineShiftJobAssignment;
     if (!target || !detail || !assignment) return;
+    const now = new Date();
+    const isTargetWindowCurrent = Boolean(
+      target.effectiveStartAt &&
+      target.effectiveEndAt &&
+      target.effectiveStartAt <= now &&
+      now < target.effectiveEndAt,
+    );
+    const windowWhere =
+      target.effectiveStartAt && target.effectiveEndAt
+        ? occurrenceHenkatenWindowWhere(
+            {
+              start: target.effectiveStartAt,
+              end: target.effectiveEndAt,
+              current: isTargetWindowCurrent,
+            },
+            now,
+          )
+        : {
+            effectiveStartAt: target.effectiveStartAt,
+            effectiveEndAt: target.effectiveEndAt,
+          };
     const fallback = await tx.henkaten.findFirst({
       where: {
         id: { not: target.id },
@@ -687,8 +708,7 @@ export class HenkatenService {
         jobId: target.jobId,
         category: 'MAN',
         status: { in: ['OPEN', 'APPROVED'] },
-        effectiveStartAt: target.effectiveStartAt,
-        effectiveEndAt: target.effectiveEndAt,
+        ...windowWhere,
         manDetail: { lineShiftJobAssignmentId: assignment.id },
       },
       include: { manDetail: { include: { replacementMp: true } } },
@@ -1233,17 +1253,31 @@ async function ensureAutomaticOccurrence(
   end: Date,
   actorUserId: string,
 ) {
-  const existing = await tx.shiftRun.findFirst({
-    where: {
-      supplierId,
-      lineId: lineShift.lineId,
-      shiftTemplateId: lineShift.shiftTemplateId,
-      businessDate: new Date(`${businessDate}T00:00:00.000Z`),
-      scheduledStartAt: start,
-      scheduledEndAt: end,
-    },
-    include: { workingAssignments: true },
-  });
+  const businessDateValue = new Date(`${businessDate}T00:00:00.000Z`);
+  // Prefer the full occurrence-window lookup so the follow-up contract release can safely drop
+  // the legacy 4-column unique index; fall back to the legacy key while both indexes coexist.
+  const existing =
+    (await tx.shiftRun.findFirst({
+      where: {
+        supplierId,
+        lineId: lineShift.lineId,
+        shiftTemplateId: lineShift.shiftTemplateId,
+        businessDate: businessDateValue,
+        scheduledStartAt: start,
+        scheduledEndAt: end,
+      },
+      include: { workingAssignments: true },
+    })) ??
+    (await tx.shiftRun.findFirst({
+      where: {
+        supplierId,
+        lineId: lineShift.lineId,
+        shiftTemplateId: lineShift.shiftTemplateId,
+        businessDate: businessDateValue,
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      include: { workingAssignments: true },
+    }));
   const created =
     existing ??
     (await tx.shiftRun.create({
