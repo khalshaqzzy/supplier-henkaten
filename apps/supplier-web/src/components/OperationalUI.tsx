@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { SegmentedControl } from '@tmmin-henkaten/ui';
 
 export function SummaryStrip({
   children,
@@ -91,6 +92,30 @@ export function FactItem({
       <span>{label}</span>
       <strong>{value}</strong>
       {detail && <small>{detail}</small>}
+    </div>
+  );
+}
+
+export function LineScopeToggle({
+  value,
+  onChange,
+}: {
+  value: 'ALL' | 'ASSIGNED';
+  onChange: (next: 'ALL' | 'ASSIGNED') => void;
+}) {
+  return (
+    <div className="line-scope-toggle">
+      <SegmentedControl
+        label="Cakupan line"
+        value={value}
+        onValueChange={(next) => {
+          if (next && next !== value) onChange(next as 'ALL' | 'ASSIGNED');
+        }}
+        options={[
+          { value: 'ALL', label: 'Semua line' },
+          { value: 'ASSIGNED', label: 'Line saya' },
+        ]}
+      />
     </div>
   );
 }

@@ -37,6 +37,7 @@ export class MemberService {
     const rows = await this.prisma.member.findMany({
       where: {
         supplierId: scope.supplierId,
+        deletedAt: null,
         ...(query.active === 'ACTIVE'
           ? { active: true }
           : query.active === 'INACTIVE'
@@ -73,7 +74,7 @@ export class MemberService {
 
   async get(scope: TenantScope, id: string, includeAccount = true, photoBase?: string) {
     const member = await this.prisma.member.findFirst({
-      where: { id, supplierId: scope.supplierId },
+      where: { id, supplierId: scope.supplierId, deletedAt: null },
       include: { users: { where: { realm: 'SUPPLIER' }, take: 1 }, photos: true },
     });
     if (!member) throw missing('Member');
@@ -150,7 +151,7 @@ export class MemberService {
     await this.prisma.$transaction(async (transaction) => {
       await lockSetupMutation(transaction, scope.supplierId);
       const current = await transaction.member.findFirst({
-        where: { id, supplierId: scope.supplierId },
+        where: { id, supplierId: scope.supplierId, deletedAt: null },
       });
       if (!current) throw missing('Member');
       if (current.version !== input.expectedVersion) throw versionConflict();
@@ -213,7 +214,7 @@ export class MemberService {
     await this.prisma.$transaction(async (transaction) => {
       await lockSupplier(transaction, scope.supplierId);
       const member = await transaction.member.findFirst({
-        where: { id, supplierId: scope.supplierId },
+        where: { id, supplierId: scope.supplierId, deletedAt: null },
       });
       if (!member) throw missing('Member');
       if (member.version !== expectedVersion) throw versionConflict();
@@ -351,7 +352,7 @@ export class MemberService {
       await lockSetupMutation(transaction, scope.supplierId);
       await assertCurrentPrincipal(transaction, principal);
       const member = await transaction.member.findFirst({
-        where: { id: memberId, supplierId: scope.supplierId },
+        where: { id: memberId, supplierId: scope.supplierId, deletedAt: null },
       });
       if (!member) throw missing('Member');
       if (active && !member.active)
@@ -450,7 +451,7 @@ async function requireOperationalUser(
   memberId: string,
 ) {
   const user = await transaction.user.findFirst({
-    where: { memberId, supplierId: scope.supplierId, realm: 'SUPPLIER' },
+    where: { memberId, supplierId: scope.supplierId, realm: 'SUPPLIER', deletedAt: null },
   });
   if (!user) throw missing('Member account');
   return user;

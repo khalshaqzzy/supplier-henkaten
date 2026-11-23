@@ -594,3 +594,8 @@
     transition: none;
   }
 }
+
+.member-card__actions {
+  display: grid;
+  gap: 8px;
+}

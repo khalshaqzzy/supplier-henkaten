@@ -1,5 +1,4 @@
 import { lockSetupMutation } from './setup-lock.js';
-import { Temporal } from '@js-temporal/polyfill';
 import { Injectable } from '@nestjs/common';
 
 import type {
@@ -15,8 +14,8 @@ import type { RequestPrincipal } from '../common/request-context.js';
 import { TenantScope } from '../common/scope.js';
 import { AuditWriter } from '../persistence/audit-writer.js';
 import { PrismaService } from '../persistence/prisma.service.js';
-import { databaseDate, shiftBoundaries } from '../shifts/shift-time.js';
-import { businessDateForInstant, occurrenceHenkatenWindowWhere } from './shift-time.js';
+import { occurrenceHenkatenWindowWhere } from './shift-time.js';
+import { presentWeeklySchedule, resolveShiftOccurrence } from './shift-schedule.js';
 import { masterAudit } from './master-data-audit.js';
 import { missing } from './member.service.js';
 
@@ -30,6 +29,7 @@ const includeLineShift = {
     orderBy: [{ position: 'asc' }, { id: 'asc' }],
   },
   jobAssignments: {
+    where: { job: { active: true } },
     include: { job: true, mp: true },
     orderBy: [{ job: { displayOrder: 'asc' } }, { id: 'asc' }],
   },
@@ -48,6 +48,9 @@ export class LineShiftService {
     const rows = await this.prisma.lineShift.findMany({
       where: {
         supplierId: scope.supplierId,
+        deletedAt: null,
+        line: { deletedAt: null },
+        shiftTemplate: { deletedAt: null },
         ...(lineId ? { lineId } : {}),
         ...(principal?.role === 'LINE_LEADER' && principal.memberId
           ? { lineLeaders: { some: { memberId: principal.memberId } } }
@@ -65,18 +68,25 @@ export class LineShiftService {
     return { items: rows.map(presentLineShift) };
   }
 
-  async operationalContext(scope: TenantScope, principal: RequestPrincipal, now = new Date()) {
+  /**
+   * Current or next occurrence of every active Line–Shift in scope. Supervisors and Line Leaders
+   * see their assigned Line–Shifts; with `allLines` they see every Line–Shift of the supplier
+   * read-only, and `assigned` tells which ones they are responsible for.
+   */
+  async operationalContext(
+    scope: TenantScope,
+    principal: RequestPrincipal,
+    now = new Date(),
+    { allLines = false }: { allLines?: boolean } = {},
+  ) {
+    const assignment = assignmentWhere(principal);
     const rows = await this.prisma.lineShift.findMany({
       where: {
         supplierId: scope.supplierId,
         active: true,
         line: { active: true },
         shiftTemplate: { active: true },
-        ...(principal.role === 'LINE_LEADER' && principal.memberId
-          ? { lineLeaders: { some: { memberId: principal.memberId } } }
-          : principal.role === 'SUPERVISOR' && principal.memberId
-            ? { supervisorMemberId: principal.memberId }
-            : {}),
+        ...(allLines ? {} : assignment),
       },
       include: includeLineShift,
       orderBy: [
@@ -85,6 +95,20 @@ export class LineShiftService {
         { id: 'asc' },
       ],
     });
+    const assignedIds = new Set(
+      Object.keys(assignment).length && allLines
+        ? (
+            await this.prisma.lineShift.findMany({
+              where: {
+                supplierId: scope.supplierId,
+                id: { in: rows.map(({ id }) => id) },
+                ...assignment,
+              },
+              select: { id: true },
+            })
+          ).map(({ id }) => id)
+        : rows.map(({ id }) => id),
+    );
     const occurrences = rows.map((row) => occurrenceFor(row, now));
     const current = occurrences.filter((item) => item.current);
     const items = await Promise.all(
@@ -130,6 +154,10 @@ export class LineShiftService {
         const base = presentLineShift(occurrence.row);
         return {
           ...base,
+          startTime: minuteToTime(occurrence.startMinute),
+          endTime: minuteToTime(occurrence.endMinute),
+          crossesMidnight: occurrence.endMinute < occurrence.startMinute,
+          assigned: assignedIds.has(occurrence.row.id),
           businessDate: occurrence.businessDate,
           effectiveStartAt: occurrence.start.toISOString(),
           effectiveEndAt: occurrence.end.toISOString(),
@@ -148,10 +176,11 @@ export class LineShiftService {
         };
       }),
     );
+    const currentAssigned = current.filter(({ row }) => assignedIds.has(row.id));
     return {
       generatedAt: now.toISOString(),
-      currentLineShiftId: current[0]?.row.id ?? null,
-      currentLineShiftIds: current.map(({ row }) => row.id),
+      currentLineShiftId: currentAssigned[0]?.row.id ?? null,
+      currentLineShiftIds: currentAssigned.map(({ row }) => row.id),
       items,
     };
   }
@@ -492,6 +521,7 @@ function presentLineShift(row: IncludedLineShift) {
     endTime: minuteToTime(row.shiftTemplate.endMinute),
     timezone: row.shiftTemplate.timezone,
     crossesMidnight: row.shiftTemplate.endMinute < row.shiftTemplate.startMinute,
+    ...presentWeeklySchedule(row.shiftTemplate),
     supervisorMemberId: row.supervisorMemberId,
     supervisorName: row.supervisor?.fullName ?? null,
     lineLeaders: row.lineLeaders.map((leader) => ({
@@ -514,37 +544,19 @@ function presentLineShift(row: IncludedLineShift) {
 }
 
 function occurrenceFor(row: IncludedLineShift, now: Date) {
-  const candidateDate = businessDateForInstant(
-    now,
-    row.shiftTemplate.timezone,
-    row.shiftTemplate.startMinute,
-    row.shiftTemplate.endMinute,
-  );
-  let boundaries = shiftBoundaries(
-    candidateDate,
-    row.shiftTemplate.startMinute,
-    row.shiftTemplate.endMinute,
-    row.shiftTemplate.timezone,
-  );
-  let businessDate = candidateDate;
-  const current = boundaries.start <= now && now < boundaries.end;
-  if (!current && now >= boundaries.start) {
-    businessDate = Temporal.PlainDate.from(candidateDate).add({ days: 1 }).toString();
-    boundaries = shiftBoundaries(
-      businessDate,
-      row.shiftTemplate.startMinute,
-      row.shiftTemplate.endMinute,
-      row.shiftTemplate.timezone,
-    );
-  }
-  return {
-    row,
-    businessDate: databaseDate(businessDate),
-    start: boundaries.start,
-    end: boundaries.end,
-    current,
-  };
+  const occurrence = resolveShiftOccurrence(row.shiftTemplate, now);
+  return { row, ...occurrence };
 }
+
+function assignmentWhere(principal: RequestPrincipal): Prisma.LineShiftWhereInput {
+  if (principal.role === 'LINE_LEADER')
+    return { lineLeaders: { some: { memberId: principal.memberId ?? impossibleId } } };
+  if (principal.role === 'SUPERVISOR')
+    return { supervisorMemberId: principal.memberId ?? impossibleId };
+  return {};
+}
+
+const impossibleId = '00000000-0000-0000-0000-000000000000';
 
 function minuteToTime(value: number) {
   return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;

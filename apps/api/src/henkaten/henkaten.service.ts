@@ -187,6 +187,7 @@ export class HenkatenService {
         occurrence.businessDate,
         occurrence.start,
         occurrence.end,
+        { startMinute: occurrence.startMinute, endMinute: occurrence.endMinute },
         principal.userId,
       );
       const targetWorking = legacyShift.workingAssignments.find(
@@ -592,7 +593,8 @@ export class HenkatenService {
             },
           }
         : {}),
-      ...roleWhere(principal),
+      // Supplier users read every line by default; ASSIGNED narrows to their own records.
+      ...(query.scope === 'ASSIGNED' ? roleWhere(principal) : {}),
     };
     const buckets = priorityBuckets(query.status, query.pcrStatus);
     const rows: Array<{
@@ -646,11 +648,19 @@ export class HenkatenService {
 
   async get(scope: TenantScope, id: string, principal?: RequestPrincipal) {
     const row = await this.prisma.henkaten.findFirst({
-      where: { deletedAt: null, id, supplierId: scope.supplierId, ...roleWhere(principal) },
+      where: { deletedAt: null, id, supplierId: scope.supplierId },
       include: henkatenDetailInclude,
     });
     if (!row) throw missing('Henkaten');
-    return presentHenkatenDetail(row);
+    const assigned = principal
+      ? (await this.prisma.henkaten.count({
+          where: { deletedAt: null, id, supplierId: scope.supplierId, ...roleWhere(principal) },
+        })) > 0
+      : false;
+    return {
+      ...presentHenkatenDetail(row),
+      permissions: henkatenPermissions(row, principal, assigned),
+    };
   }
 
   async restoreLineShiftAssignment(
@@ -1218,6 +1228,50 @@ export class HenkatenService {
   }
 }
 
+/** What the caller may do on one record; viewers outside the record's lines only read. */
+function henkatenPermissions(
+  row: {
+    status: string;
+    approvalRoutes: Array<{
+      route: string;
+      status: string;
+      currentResponsibleMemberId: string | null;
+      decision: unknown;
+    }>;
+  },
+  principal: RequestPrincipal | undefined,
+  assigned: boolean,
+) {
+  if (!principal || principal.realm !== 'SUPPLIER')
+    return {
+      assigned: false,
+      canDecide: false,
+      canWithdraw: false,
+      canClone: false,
+      canReroute: false,
+    };
+  const open = row.status === 'OPEN';
+  const pending = (route: string) =>
+    row.approvalRoutes.find(
+      (item) => item.route === route && item.status === 'PENDING' && !item.decision,
+    );
+  const supervisorRoute = pending('SUPERVISOR');
+  const canDecide =
+    open &&
+    Boolean(principal.memberId) &&
+    ((principal.role === 'SUPERVISOR' &&
+      supervisorRoute?.currentResponsibleMemberId === principal.memberId) ||
+      (principal.role === 'QC' && Boolean(pending('QC'))));
+  const lineLeader = principal.role === 'LINE_LEADER' && assigned;
+  return {
+    assigned,
+    canDecide,
+    canWithdraw: lineLeader && open,
+    canClone: lineLeader,
+    canReroute: principal.role === 'SUPPLIER_ADMIN' && open && Boolean(supervisorRoute),
+  };
+}
+
 function roleWhere(principal?: RequestPrincipal): Prisma.HenkatenWhereInput {
   if (
     !principal ||
@@ -1251,6 +1305,7 @@ async function ensureAutomaticOccurrence(
   businessDate: string,
   start: Date,
   end: Date,
+  minutes: { startMinute: number; endMinute: number },
   actorUserId: string,
 ) {
   const businessDateValue = new Date(`${businessDate}T00:00:00.000Z`);
@@ -1293,8 +1348,8 @@ async function ensureAutomaticOccurrence(
         lineCodeSnapshot: lineShift.line.code,
         lineNameSnapshot: lineShift.line.name,
         shiftNameSnapshot: lineShift.shiftTemplate.name,
-        shiftStartMinuteSnapshot: lineShift.shiftTemplate.startMinute,
-        shiftEndMinuteSnapshot: lineShift.shiftTemplate.endMinute,
+        shiftStartMinuteSnapshot: minutes.startMinute,
+        shiftEndMinuteSnapshot: minutes.endMinute,
         defaultAssignmentSetVersion: lineShift.version,
         sourceEpoch,
         supervisorMemberId: lineShift.supervisorMemberId,

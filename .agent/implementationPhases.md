@@ -1,3 +1,18 @@
+## Delete modes, weekly shift schedules, rotation and cross-line visibility — 23 November 2026
+
+Implementation on `feat/delete-modes-shift-schedule-rotation-visibility`: Archive vs Permanent
+delete with consent for Lines, Jobs, Members, Parts and Shift Templates (tombstones with partial
+unique indexes; Line delete cascades Jobs, Line–Shifts and assignments and is blocked only by Open
+Henkaten); per-day Shift Template hours with off days (`weeklySchedule`); weekly automatic shift
+rotation schedules with an in-process worker, history and manual run; read-only cross-line
+visibility for Supervisors and Line Leaders (`scope=ALL|ASSIGNED`, per-record `permissions`) on
+Henkaten, Assignment Board and Overview; Supervisor board-layout editing. Additive migration
+`20261123002700_delete_modes_shift_schedules_rotation` with declared index replacements; API,
+OpenAPI (174 paths / 195 operations), client and Supplier pages changed. See
+[ADR 0055](../docs/adr/0055-delete-modes-weekly-shift-schedules-rotation-visibility.md) and the
+current handoff. Phase 15 remains the sole current `in_progress` phase; staging/device/UAT is
+unchanged.
+
 ## Shift swap occurrence isolation, realtime sync and board hours — 20 November 2026
 
 Implementation on `fix/shift-swap-occurrence-and-sync`: adds the Expand-phase unique index

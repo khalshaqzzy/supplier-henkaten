@@ -4432,6 +4432,2135 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/supplier/master-data/lines/{id}/delete-preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Delete impact and blockers */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {string} */
+              kind: 'LINE' | 'JOB' | 'MEMBER' | 'PART' | 'SHIFT_TEMPLATE';
+              resource: {
+                /** Format: uuid */
+                id: string;
+                label: string;
+                active: boolean;
+                version: number;
+              };
+              canArchive: boolean;
+              canDelete: boolean;
+              openHenkatenTotal: number;
+              openHenkatens: {
+                /** Format: uuid */
+                id: string;
+                identifier: string;
+                /** @enum {string} */
+                category: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
+                lineCode: string;
+                shiftName: string;
+                jobName: string;
+                /** Format: date-time */
+                occurredAt: string;
+              }[];
+              impact: {
+                jobs: number;
+                lineShifts: number;
+                lineShiftLabels: string[];
+                clearedAssignments: number;
+                rotationSchedules: {
+                  /** Format: uuid */
+                  id: string;
+                  name: string;
+                }[];
+                accountUsername: string | null;
+                boardLayout: boolean;
+              };
+            };
+          };
+        };
+        /** @description Problem Details */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/lines/{id}/delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number;
+            /** @enum {string} */
+            mode: 'ARCHIVE' | 'PERMANENT';
+          };
+        };
+      };
+      responses: {
+        /** @description Archived or permanently deleted */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {string} */
+              kind: 'LINE' | 'JOB' | 'MEMBER' | 'PART' | 'SHIFT_TEMPLATE';
+              /** Format: uuid */
+              id: string;
+              /** @enum {string} */
+              mode: 'ARCHIVE' | 'PERMANENT';
+              impact: {
+                jobs: number;
+                lineShifts: number;
+                lineShiftLabels: string[];
+                clearedAssignments: number;
+                rotationSchedules: {
+                  /** Format: uuid */
+                  id: string;
+                  name: string;
+                }[];
+                accountUsername: string | null;
+                boardLayout: boolean;
+              };
+            };
+          };
+        };
+        /** @description Problem Details */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/lines/{lineId}/jobs/{id}/delete-preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          lineId: string;
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Delete impact and blockers */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {string} */
+              kind: 'LINE' | 'JOB' | 'MEMBER' | 'PART' | 'SHIFT_TEMPLATE';
+              resource: {
+                /** Format: uuid */
+                id: string;
+                label: string;
+                active: boolean;
+                version: number;
+              };
+              canArchive: boolean;
+              canDelete: boolean;
+              openHenkatenTotal: number;
+              openHenkatens: {
+                /** Format: uuid */
+                id: string;
+                identifier: string;
+                /** @enum {string} */
+                category: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
+                lineCode: string;
+                shiftName: string;
+                jobName: string;
+                /** Format: date-time */
+                occurredAt: string;
+              }[];
+              impact: {
+                jobs: number;
+                lineShifts: number;
+                lineShiftLabels: string[];
+                clearedAssignments: number;
+                rotationSchedules: {
+                  /** Format: uuid */
+                  id: string;
+                  name: string;
+                }[];
+                accountUsername: string | null;
+                boardLayout: boolean;
+              };
+            };
+          };
+        };
+        /** @description Problem Details */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/lines/{lineId}/jobs/{id}/delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          lineId: string;
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number;
+            /** @enum {string} */
+            mode: 'ARCHIVE' | 'PERMANENT';
+          };
+        };
+      };
+      responses: {
+        /** @description Archived or permanently deleted */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {string} */
+              kind: 'LINE' | 'JOB' | 'MEMBER' | 'PART' | 'SHIFT_TEMPLATE';
+              /** Format: uuid */
+              id: string;
+              /** @enum {string} */
+              mode: 'ARCHIVE' | 'PERMANENT';
+              impact: {
+                jobs: number;
+                lineShifts: number;
+                lineShiftLabels: string[];
+                clearedAssignments: number;
+                rotationSchedules: {
+                  /** Format: uuid */
+                  id: string;
+                  name: string;
+                }[];
+                accountUsername: string | null;
+                boardLayout: boolean;
+              };
+            };
+          };
+        };
+        /** @description Problem Details */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/members/{id}/delete-preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Delete impact and blockers */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {string} */
+              kind: 'LINE' | 'JOB' | 'MEMBER' | 'PART' | 'SHIFT_TEMPLATE';
+              resource: {
+                /** Format: uuid */
+                id: string;
+                label: string;
+                active: boolean;
+                version: number;
+              };
+              canArchive: boolean;
+              canDelete: boolean;
+              openHenkatenTotal: number;
+              openHenkatens: {
+                /** Format: uuid */
+                id: string;
+                identifier: string;
+                /** @enum {string} */
+                category: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
+                lineCode: string;
+                shiftName: string;
+                jobName: string;
+                /** Format: date-time */
+                occurredAt: string;
+              }[];
+              impact: {
+                jobs: number;
+                lineShifts: number;
+                lineShiftLabels: string[];
+                clearedAssignments: number;
+                rotationSchedules: {
+                  /** Format: uuid */
+                  id: string;
+                  name: string;
+                }[];
+                accountUsername: string | null;
+                boardLayout: boolean;
+              };
+            };
+          };
+        };
+        /** @description Problem Details */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/members/{id}/delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number;
+            /** @enum {string} */
+            mode: 'ARCHIVE' | 'PERMANENT';
+          };
+        };
+      };
+      responses: {
+        /** @description Archived or permanently deleted */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {string} */
+              kind: 'LINE' | 'JOB' | 'MEMBER' | 'PART' | 'SHIFT_TEMPLATE';
+              /** Format: uuid */
+              id: string;
+              /** @enum {string} */
+              mode: 'ARCHIVE' | 'PERMANENT';
+              impact: {
+                jobs: number;
+                lineShifts: number;
+                lineShiftLabels: string[];
+                clearedAssignments: number;
+                rotationSchedules: {
+                  /** Format: uuid */
+                  id: string;
+                  name: string;
+                }[];
+                accountUsername: string | null;
+                boardLayout: boolean;
+              };
+            };
+          };
+        };
+        /** @description Problem Details */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/parts/{id}/delete-preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Delete impact and blockers */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {string} */
+              kind: 'LINE' | 'JOB' | 'MEMBER' | 'PART' | 'SHIFT_TEMPLATE';
+              resource: {
+                /** Format: uuid */
+                id: string;
+                label: string;
+                active: boolean;
+                version: number;
+              };
+              canArchive: boolean;
+              canDelete: boolean;
+              openHenkatenTotal: number;
+              openHenkatens: {
+                /** Format: uuid */
+                id: string;
+                identifier: string;
+                /** @enum {string} */
+                category: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
+                lineCode: string;
+                shiftName: string;
+                jobName: string;
+                /** Format: date-time */
+                occurredAt: string;
+              }[];
+              impact: {
+                jobs: number;
+                lineShifts: number;
+                lineShiftLabels: string[];
+                clearedAssignments: number;
+                rotationSchedules: {
+                  /** Format: uuid */
+                  id: string;
+                  name: string;
+                }[];
+                accountUsername: string | null;
+                boardLayout: boolean;
+              };
+            };
+          };
+        };
+        /** @description Problem Details */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/parts/{id}/delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number;
+            /** @enum {string} */
+            mode: 'ARCHIVE' | 'PERMANENT';
+          };
+        };
+      };
+      responses: {
+        /** @description Archived or permanently deleted */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {string} */
+              kind: 'LINE' | 'JOB' | 'MEMBER' | 'PART' | 'SHIFT_TEMPLATE';
+              /** Format: uuid */
+              id: string;
+              /** @enum {string} */
+              mode: 'ARCHIVE' | 'PERMANENT';
+              impact: {
+                jobs: number;
+                lineShifts: number;
+                lineShiftLabels: string[];
+                clearedAssignments: number;
+                rotationSchedules: {
+                  /** Format: uuid */
+                  id: string;
+                  name: string;
+                }[];
+                accountUsername: string | null;
+                boardLayout: boolean;
+              };
+            };
+          };
+        };
+        /** @description Problem Details */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/shift-templates/{id}/delete-preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Delete impact and blockers */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {string} */
+              kind: 'LINE' | 'JOB' | 'MEMBER' | 'PART' | 'SHIFT_TEMPLATE';
+              resource: {
+                /** Format: uuid */
+                id: string;
+                label: string;
+                active: boolean;
+                version: number;
+              };
+              canArchive: boolean;
+              canDelete: boolean;
+              openHenkatenTotal: number;
+              openHenkatens: {
+                /** Format: uuid */
+                id: string;
+                identifier: string;
+                /** @enum {string} */
+                category: 'MAN' | 'MACHINE' | 'MATERIAL' | 'METHOD';
+                lineCode: string;
+                shiftName: string;
+                jobName: string;
+                /** Format: date-time */
+                occurredAt: string;
+              }[];
+              impact: {
+                jobs: number;
+                lineShifts: number;
+                lineShiftLabels: string[];
+                clearedAssignments: number;
+                rotationSchedules: {
+                  /** Format: uuid */
+                  id: string;
+                  name: string;
+                }[];
+                accountUsername: string | null;
+                boardLayout: boolean;
+              };
+            };
+          };
+        };
+        /** @description Problem Details */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/shift-templates/{id}/delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number;
+            /** @enum {string} */
+            mode: 'ARCHIVE' | 'PERMANENT';
+          };
+        };
+      };
+      responses: {
+        /** @description Archived or permanently deleted */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @enum {string} */
+              kind: 'LINE' | 'JOB' | 'MEMBER' | 'PART' | 'SHIFT_TEMPLATE';
+              /** Format: uuid */
+              id: string;
+              /** @enum {string} */
+              mode: 'ARCHIVE' | 'PERMANENT';
+              impact: {
+                jobs: number;
+                lineShifts: number;
+                lineShiftLabels: string[];
+                clearedAssignments: number;
+                rotationSchedules: {
+                  /** Format: uuid */
+                  id: string;
+                  name: string;
+                }[];
+                accountUsername: string | null;
+                boardLayout: boolean;
+              };
+            };
+          };
+        };
+        /** @description Problem Details */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/shift-rotations': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Shift rotation schedules */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              items: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                enabled: boolean;
+                shifts: {
+                  /** Format: uuid */
+                  id: string;
+                  name: string;
+                  active: boolean;
+                  available: boolean;
+                }[];
+                dayOfWeek: number;
+                executeTime: string;
+                timezone: string;
+                nextRunAt: string | null;
+                lastRunAt: string | null;
+                lastRunStatus: ('SUCCESS' | 'SKIPPED') | null;
+                lastRunMessage: string | null;
+                executions: {
+                  /** Format: uuid */
+                  id: string;
+                  /** Format: date-time */
+                  scheduledForAt: string;
+                  /** Format: date-time */
+                  executedAt: string;
+                  /** @enum {string} */
+                  status: 'SUCCESS' | 'SKIPPED';
+                  /** @enum {string} */
+                  trigger: 'SCHEDULE' | 'MANUAL';
+                  affectedLines: number;
+                  message: string | null;
+                }[];
+                version: number;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            name: string;
+            shiftTemplateIds: string[];
+            dayOfWeek: number;
+            executeTime: string;
+            timezone: string;
+            /** @default true */
+            enabled?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Created shift rotation */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: uuid */
+              id: string;
+              name: string;
+              enabled: boolean;
+              shifts: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                active: boolean;
+                available: boolean;
+              }[];
+              dayOfWeek: number;
+              executeTime: string;
+              timezone: string;
+              nextRunAt: string | null;
+              lastRunAt: string | null;
+              lastRunStatus: ('SUCCESS' | 'SKIPPED') | null;
+              lastRunMessage: string | null;
+              executions: {
+                /** Format: uuid */
+                id: string;
+                /** Format: date-time */
+                scheduledForAt: string;
+                /** Format: date-time */
+                executedAt: string;
+                /** @enum {string} */
+                status: 'SUCCESS' | 'SKIPPED';
+                /** @enum {string} */
+                trigger: 'SCHEDULE' | 'MANUAL';
+                affectedLines: number;
+                message: string | null;
+              }[];
+              version: number;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Problem Details */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/shift-rotations/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number;
+            name?: string;
+            shiftTemplateIds?: string[];
+            dayOfWeek?: number;
+            executeTime?: string;
+            timezone?: string;
+            enabled?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Updated shift rotation */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** Format: uuid */
+              id: string;
+              name: string;
+              enabled: boolean;
+              shifts: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                active: boolean;
+                available: boolean;
+              }[];
+              dayOfWeek: number;
+              executeTime: string;
+              timezone: string;
+              nextRunAt: string | null;
+              lastRunAt: string | null;
+              lastRunStatus: ('SUCCESS' | 'SKIPPED') | null;
+              lastRunMessage: string | null;
+              executions: {
+                /** Format: uuid */
+                id: string;
+                /** Format: date-time */
+                scheduledForAt: string;
+                /** Format: date-time */
+                executedAt: string;
+                /** @enum {string} */
+                status: 'SUCCESS' | 'SKIPPED';
+                /** @enum {string} */
+                trigger: 'SCHEDULE' | 'MANUAL';
+                affectedLines: number;
+                message: string | null;
+              }[];
+              version: number;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Problem Details */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/shift-rotations/{id}/run': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Rotation applied */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              rotation: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                enabled: boolean;
+                shifts: {
+                  /** Format: uuid */
+                  id: string;
+                  name: string;
+                  active: boolean;
+                  available: boolean;
+                }[];
+                dayOfWeek: number;
+                executeTime: string;
+                timezone: string;
+                nextRunAt: string | null;
+                lastRunAt: string | null;
+                lastRunStatus: ('SUCCESS' | 'SKIPPED') | null;
+                lastRunMessage: string | null;
+                executions: {
+                  /** Format: uuid */
+                  id: string;
+                  /** Format: date-time */
+                  scheduledForAt: string;
+                  /** Format: date-time */
+                  executedAt: string;
+                  /** @enum {string} */
+                  status: 'SUCCESS' | 'SKIPPED';
+                  /** @enum {string} */
+                  trigger: 'SCHEDULE' | 'MANUAL';
+                  affectedLines: number;
+                  message: string | null;
+                }[];
+                version: number;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+              };
+              execution: {
+                /** Format: uuid */
+                id: string;
+                /** Format: date-time */
+                scheduledForAt: string;
+                /** Format: date-time */
+                executedAt: string;
+                /** @enum {string} */
+                status: 'SUCCESS' | 'SKIPPED';
+                /** @enum {string} */
+                trigger: 'SCHEDULE' | 'MANUAL';
+                affectedLines: number;
+                message: string | null;
+              };
+            };
+          };
+        };
+        /** @description Problem Details */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supplier/master-data/shift-rotations/{id}/delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            expectedVersion: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Shift rotation deleted */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Problem Details */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+        /** @description Problem Details */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/problem+json': {
+              /** Format: uri */
+              type: string;
+              title: string;
+              status: number;
+              detail: string;
+              /** @enum {string} */
+              code:
+                | 'VALIDATION_FAILED'
+                | 'AUTHENTICATION_FAILED'
+                | 'SESSION_EXPIRED'
+                | 'FORBIDDEN'
+                | 'RESOURCE_NOT_FOUND'
+                | 'HENKATEN_DELETED'
+                | 'VERSION_CONFLICT'
+                | 'STATE_CONFLICT'
+                | 'IDEMPOTENCY_CONFLICT'
+                | 'RESERVATION_CONFLICT'
+                | 'INVALID_TRANSITION'
+                | 'SOURCE_VERSION_OUT_OF_ORDER'
+                | 'SOURCE_MODE_MISMATCH'
+                | 'PAYLOAD_TOO_LARGE'
+                | 'RATE_LIMITED'
+                | 'NOT_READY'
+                | 'INTERNAL_ERROR'
+                | 'CAPACITY_EXCEEDED'
+                | 'RESOURCE_IN_USE'
+                | 'IMMUTABLE_FIELD'
+                | 'INVALID_IMAGE'
+                | 'CHECKLIST_NOT_PUBLISHED'
+                | 'PUSH_SUBSCRIPTION_REQUIRED';
+              correlationId: string;
+              fieldErrors?: {
+                path: string;
+                code: string;
+                message: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/supplier/master-data/members': {
     parameters: {
       query?: never;
@@ -6692,6 +8821,14 @@ export interface paths {
                 endTime: string;
                 timezone: string;
                 crossesMidnight: boolean;
+                weeklySchedule: {
+                  dayOfWeek: number;
+                  isOff: boolean;
+                  startTime: string | null;
+                  endTime: string | null;
+                  crossesMidnight: boolean;
+                }[];
+                isUniform: boolean;
                 supervisorMemberId: string | null;
                 supervisorName: string | null;
                 lineLeaders: {
@@ -6760,6 +8897,14 @@ export interface paths {
               endTime: string;
               timezone: string;
               crossesMidnight: boolean;
+              weeklySchedule: {
+                dayOfWeek: number;
+                isOff: boolean;
+                startTime: string | null;
+                endTime: string | null;
+                crossesMidnight: boolean;
+              }[];
+              isUniform: boolean;
               supervisorMemberId: string | null;
               supervisorName: string | null;
               lineLeaders: {
@@ -6875,6 +9020,14 @@ export interface paths {
                 endTime: string;
                 timezone: string;
                 crossesMidnight: boolean;
+                weeklySchedule: {
+                  dayOfWeek: number;
+                  isOff: boolean;
+                  startTime: string | null;
+                  endTime: string | null;
+                  crossesMidnight: boolean;
+                }[];
+                isUniform: boolean;
                 supervisorMemberId: string | null;
                 supervisorName: string | null;
                 lineLeaders: {
@@ -6951,6 +9104,14 @@ export interface paths {
                 endTime: string;
                 timezone: string;
                 crossesMidnight: boolean;
+                weeklySchedule: {
+                  dayOfWeek: number;
+                  isOff: boolean;
+                  startTime: string | null;
+                  endTime: string | null;
+                  crossesMidnight: boolean;
+                }[];
+                isUniform: boolean;
                 supervisorMemberId: string | null;
                 supervisorName: string | null;
                 lineLeaders: {
@@ -6979,6 +9140,7 @@ export interface paths {
                 /** Format: date-time */
                 effectiveEndAt: string;
                 current: boolean;
+                assigned: boolean;
               }[];
             };
           };
@@ -7050,6 +9212,14 @@ export interface paths {
               endTime: string;
               timezone: string;
               crossesMidnight: boolean;
+              weeklySchedule: {
+                dayOfWeek: number;
+                isOff: boolean;
+                startTime: string | null;
+                endTime: string | null;
+                crossesMidnight: boolean;
+              }[];
+              isUniform: boolean;
               supervisorMemberId: string | null;
               supervisorName: string | null;
               lineLeaders: {
@@ -7170,6 +9340,14 @@ export interface paths {
               endTime: string;
               timezone: string;
               crossesMidnight: boolean;
+              weeklySchedule: {
+                dayOfWeek: number;
+                isOff: boolean;
+                startTime: string | null;
+                endTime: string | null;
+                crossesMidnight: boolean;
+              }[];
+              isUniform: boolean;
               supervisorMemberId: string | null;
               supervisorName: string | null;
               lineLeaders: {
@@ -7294,6 +9472,14 @@ export interface paths {
               endTime: string;
               timezone: string;
               crossesMidnight: boolean;
+              weeklySchedule: {
+                dayOfWeek: number;
+                isOff: boolean;
+                startTime: string | null;
+                endTime: string | null;
+                crossesMidnight: boolean;
+              }[];
+              isUniform: boolean;
               supervisorMemberId: string | null;
               supervisorName: string | null;
               lineLeaders: {
@@ -10584,6 +12770,14 @@ export interface paths {
                 endTime: string;
                 timezone: string;
                 crossesMidnight: boolean;
+                weeklySchedule: {
+                  dayOfWeek: number;
+                  isOff: boolean;
+                  startTime: string | null;
+                  endTime: string | null;
+                  crossesMidnight: boolean;
+                }[];
+                isUniform: boolean;
                 active: boolean;
                 version: number;
                 /** Format: date-time */
@@ -10612,8 +12806,22 @@ export interface paths {
         content: {
           'application/json': {
             name: string;
-            startTime: string;
-            endTime: string;
+            startTime?: string;
+            endTime?: string;
+            weeklySchedule?: (
+              | {
+                  dayOfWeek: number;
+                  /** @constant */
+                  isOff: true;
+                }
+              | {
+                  dayOfWeek: number;
+                  /** @constant */
+                  isOff: false;
+                  startTime: string;
+                  endTime: string;
+                }
+            )[];
             timezone: string;
           };
         };
@@ -10634,6 +12842,14 @@ export interface paths {
               endTime: string;
               timezone: string;
               crossesMidnight: boolean;
+              weeklySchedule: {
+                dayOfWeek: number;
+                isOff: boolean;
+                startTime: string | null;
+                endTime: string | null;
+                crossesMidnight: boolean;
+              }[];
+              isUniform: boolean;
               active: boolean;
               version: number;
               /** Format: date-time */
@@ -10730,6 +12946,14 @@ export interface paths {
               endTime: string;
               timezone: string;
               crossesMidnight: boolean;
+              weeklySchedule: {
+                dayOfWeek: number;
+                isOff: boolean;
+                startTime: string | null;
+                endTime: string | null;
+                crossesMidnight: boolean;
+              }[];
+              isUniform: boolean;
               active: boolean;
               version: number;
               /** Format: date-time */
@@ -10808,6 +13032,20 @@ export interface paths {
             name?: string;
             startTime?: string;
             endTime?: string;
+            weeklySchedule?: (
+              | {
+                  dayOfWeek: number;
+                  /** @constant */
+                  isOff: true;
+                }
+              | {
+                  dayOfWeek: number;
+                  /** @constant */
+                  isOff: false;
+                  startTime: string;
+                  endTime: string;
+                }
+            )[];
             timezone?: string;
           };
         };
@@ -10828,6 +13066,14 @@ export interface paths {
               endTime: string;
               timezone: string;
               crossesMidnight: boolean;
+              weeklySchedule: {
+                dayOfWeek: number;
+                isOff: boolean;
+                startTime: string | null;
+                endTime: string | null;
+                crossesMidnight: boolean;
+              }[];
+              isUniform: boolean;
               active: boolean;
               version: number;
               /** Format: date-time */
@@ -10928,6 +13174,14 @@ export interface paths {
               endTime: string;
               timezone: string;
               crossesMidnight: boolean;
+              weeklySchedule: {
+                dayOfWeek: number;
+                isOff: boolean;
+                startTime: string | null;
+                endTime: string | null;
+                crossesMidnight: boolean;
+              }[];
+              isUniform: boolean;
               active: boolean;
               version: number;
               /** Format: date-time */
@@ -11032,6 +13286,14 @@ export interface paths {
               endTime: string;
               timezone: string;
               crossesMidnight: boolean;
+              weeklySchedule: {
+                dayOfWeek: number;
+                isOff: boolean;
+                startTime: string | null;
+                endTime: string | null;
+                crossesMidnight: boolean;
+              }[];
+              isUniform: boolean;
               active: boolean;
               version: number;
               /** Format: date-time */
@@ -13153,6 +15415,14 @@ export interface paths {
                 endTime: string;
                 timezone: string;
                 crossesMidnight: boolean;
+                weeklySchedule: {
+                  dayOfWeek: number;
+                  isOff: boolean;
+                  startTime: string | null;
+                  endTime: string | null;
+                  crossesMidnight: boolean;
+                }[];
+                isUniform: boolean;
                 active: boolean;
                 version: number;
                 /** Format: date-time */
@@ -13816,6 +16086,7 @@ export interface paths {
           approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NOT_REQUIRED';
           approvalRoute?: 'SUPERVISOR' | 'QC';
           pcrStatus?: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+          scope?: 'ALL' | 'ASSIGNED';
         };
         header?: never;
         path?: never;
@@ -14265,6 +16536,13 @@ export interface paths {
                 /** Format: date-time */
                 occurredAt: string;
               }[];
+              permissions?: {
+                assigned: boolean;
+                canDecide: boolean;
+                canWithdraw: boolean;
+                canClone: boolean;
+                canReroute: boolean;
+              };
             };
           };
         };
@@ -14906,6 +17184,13 @@ export interface paths {
                 /** Format: date-time */
                 occurredAt: string;
               }[];
+              permissions?: {
+                assigned: boolean;
+                canDecide: boolean;
+                canWithdraw: boolean;
+                canClone: boolean;
+                canReroute: boolean;
+              };
             };
           };
         };
@@ -15227,6 +17512,13 @@ export interface paths {
                 /** Format: date-time */
                 occurredAt: string;
               }[];
+              permissions?: {
+                assigned: boolean;
+                canDecide: boolean;
+                canWithdraw: boolean;
+                canClone: boolean;
+                canReroute: boolean;
+              };
             };
           };
         };
@@ -15498,6 +17790,13 @@ export interface paths {
                 /** Format: date-time */
                 occurredAt: string;
               }[];
+              permissions?: {
+                assigned: boolean;
+                canDecide: boolean;
+                canWithdraw: boolean;
+                canClone: boolean;
+                canReroute: boolean;
+              };
             };
           };
         };
@@ -15768,6 +18067,13 @@ export interface paths {
                 /** Format: date-time */
                 occurredAt: string;
               }[];
+              permissions?: {
+                assigned: boolean;
+                canDecide: boolean;
+                canWithdraw: boolean;
+                canClone: boolean;
+                canReroute: boolean;
+              };
             };
           };
         };
@@ -15983,6 +18289,7 @@ export interface paths {
           approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NOT_REQUIRED';
           approvalRoute?: 'SUPERVISOR' | 'QC';
           pcrStatus?: 'PENDING' | 'PCR' | 'NO_PCR' | 'REVIEW';
+          scope?: 'ALL' | 'ASSIGNED';
         };
         header?: never;
         path: {
@@ -16861,6 +19168,13 @@ export interface paths {
                 /** Format: date-time */
                 occurredAt: string;
               }[];
+              permissions?: {
+                assigned: boolean;
+                canDecide: boolean;
+                canWithdraw: boolean;
+                canClone: boolean;
+                canReroute: boolean;
+              };
             };
           };
         };
@@ -17549,6 +19863,7 @@ export interface paths {
           lineId?: string;
           shiftStatus?: 'CURRENT' | 'OTHER' | 'ALL';
           includeSchedule?: 'true' | 'false';
+          scope?: 'ALL' | 'ASSIGNED';
         };
         header?: never;
         path?: never;
@@ -17579,6 +19894,7 @@ export interface paths {
                 crossesMidnight?: boolean;
                 timezone?: string;
                 isCurrent: boolean;
+                assigned?: boolean;
                 /** Format: date */
                 businessDate: string;
                 supervisor: {
@@ -18213,6 +20529,7 @@ export interface paths {
           approvalRoute?: 'SUPERVISOR' | 'QC';
           approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NOT_REQUIRED';
           granularity?: 'DAY' | 'WEEK' | 'MONTH';
+          scope?: 'ALL' | 'ASSIGNED';
         };
         header?: never;
         path?: never;
@@ -18577,6 +20894,7 @@ export interface paths {
           lineId?: string;
           shiftStatus?: 'CURRENT' | 'OTHER' | 'ALL';
           includeSchedule?: 'true' | 'false';
+          scope?: 'ALL' | 'ASSIGNED';
         };
         header?: never;
         path?: never;
@@ -18780,6 +21098,7 @@ export interface paths {
           lineId?: string;
           shiftStatus?: 'CURRENT' | 'OTHER' | 'ALL';
           includeSchedule?: 'true' | 'false';
+          scope?: 'ALL' | 'ASSIGNED';
         };
         header?: never;
         path: {
@@ -18812,6 +21131,7 @@ export interface paths {
                 crossesMidnight?: boolean;
                 timezone?: string;
                 isCurrent: boolean;
+                assigned?: boolean;
                 /** Format: date */
                 businessDate: string;
                 supervisor: {

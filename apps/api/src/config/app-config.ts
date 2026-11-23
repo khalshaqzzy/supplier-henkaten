@@ -23,6 +23,8 @@ const environmentSchema = z
     DB_CONNECTION_TIMEOUT_MS: z.coerce.number().int().min(100).default(5_000),
     DB_IDLE_TIMEOUT_MS: z.coerce.number().int().min(100).default(30_000),
     OUTBOX_ENABLED: booleanEnvironmentSchema('true'),
+    SHIFT_ROTATION_ENABLED: booleanEnvironmentSchema('true'),
+    SHIFT_ROTATION_POLL_MS: z.coerce.number().int().min(1_000).default(30_000),
     OUTBOX_POLL_MS: z.coerce.number().int().min(100).default(1_000),
     OUTBOX_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(50),
     OUTBOX_LOCK_LEASE_MS: z.coerce.number().int().min(1_000).default(30_000),
@@ -127,6 +129,8 @@ export type AppConfig = {
   dbConnectionTimeoutMs: number;
   dbIdleTimeoutMs: number;
   outboxEnabled: boolean;
+  shiftRotationEnabled: boolean;
+  shiftRotationPollMs: number;
   outboxPollMs: number;
   outboxBatchSize: number;
   outboxLockLeaseMs: number;
@@ -181,6 +185,8 @@ export function loadAppConfig(environment: NodeJS.ProcessEnv = process.env): App
     dbConnectionTimeoutMs: parsed.DB_CONNECTION_TIMEOUT_MS,
     dbIdleTimeoutMs: parsed.DB_IDLE_TIMEOUT_MS,
     outboxEnabled: parsed.OUTBOX_ENABLED,
+    shiftRotationEnabled: parsed.SHIFT_ROTATION_ENABLED,
+    shiftRotationPollMs: parsed.SHIFT_ROTATION_POLL_MS,
     outboxPollMs: parsed.OUTBOX_POLL_MS,
     outboxBatchSize: parsed.OUTBOX_BATCH_SIZE,
     outboxLockLeaseMs: parsed.OUTBOX_LOCK_LEASE_MS,

@@ -1,4 +1,14 @@
 import {
+  masterDeletePreviewSchema,
+  masterDeleteResultSchema,
+  runShiftRotationResultSchema,
+  shiftRotationListSchema,
+  shiftRotationSchema,
+  type CreateShiftRotationRequest,
+  type MasterDeleteRequest,
+  type UpdateShiftRotationRequest,
+} from '@tmmin-henkaten/contracts';
+import {
   deletePartsPreviewSchema,
   deletePartsResultSchema,
   swapShiftTimesResultSchema,
@@ -80,6 +90,26 @@ import { ApiClient, ApiProblemError } from './core';
 
 const versionsSchema = z.object({ items: z.array(checklistVersionSchema) }).strict();
 const transitionsSchema = z.array(henkatenTransitionSchema);
+export type MasterDeleteTarget =
+  | { kind: 'LINE' | 'MEMBER' | 'PART' | 'SHIFT_TEMPLATE'; id: string }
+  | { kind: 'JOB'; id: string; lineId: string };
+
+function masterDeletePath(target: MasterDeleteTarget) {
+  const base = '/api/v1/supplier/master-data';
+  switch (target.kind) {
+    case 'LINE':
+      return `${base}/lines/${target.id}`;
+    case 'JOB':
+      return `${base}/lines/${target.lineId}/jobs/${target.id}`;
+    case 'MEMBER':
+      return `${base}/members/${target.id}`;
+    case 'PART':
+      return `${base}/parts/${target.id}`;
+    case 'SHIFT_TEMPLATE':
+      return `${base}/shift-templates/${target.id}`;
+  }
+}
+
 export class SupplierApi {
   constructor(private readonly client: ApiClient) {}
 
@@ -516,6 +546,59 @@ export class SupplierApi {
       responseSchema: deletePartsResultSchema,
     });
   }
+  /** Impact and blockers of archiving or permanently deleting a master record. */
+  deletePreview(target: MasterDeleteTarget) {
+    return this.client.request(`${masterDeletePath(target)}/delete-preview`, {
+      responseSchema: masterDeletePreviewSchema,
+    });
+  }
+
+  deleteMaster(target: MasterDeleteTarget, body: MasterDeleteRequest) {
+    return this.client.request(`${masterDeletePath(target)}/delete`, {
+      method: 'POST',
+      body,
+      responseSchema: masterDeleteResultSchema,
+    });
+  }
+
+  shiftRotations() {
+    return this.client.request('/api/v1/supplier/master-data/shift-rotations', {
+      responseSchema: shiftRotationListSchema,
+    });
+  }
+
+  createShiftRotation(body: CreateShiftRotationRequest) {
+    return this.client.request('/api/v1/supplier/master-data/shift-rotations', {
+      method: 'POST',
+      body,
+      responseSchema: shiftRotationSchema,
+    });
+  }
+
+  updateShiftRotation(id: string, body: UpdateShiftRotationRequest) {
+    return this.client.request(`/api/v1/supplier/master-data/shift-rotations/${id}`, {
+      method: 'PATCH',
+      body,
+      responseSchema: shiftRotationSchema,
+    });
+  }
+
+  runShiftRotation(id: string, expectedVersion: number) {
+    return this.client.request(`/api/v1/supplier/master-data/shift-rotations/${id}/run`, {
+      method: 'POST',
+      body: { expectedVersion },
+      responseSchema: runShiftRotationResultSchema,
+    });
+  }
+
+  deleteShiftRotation(id: string, expectedVersion: number): Promise<void> {
+    return this.client.request(`/api/v1/supplier/master-data/shift-rotations/${id}/delete`, {
+      method: 'POST',
+      body: { expectedVersion },
+      responseType: 'void',
+    });
+  }
+
   swapShiftTimes(body: SwapShiftTimesRequest, idempotencyKey: string) {
     return this.client.request('/api/v1/supplier/master-data/shift-templates/swap-times', {
       method: 'POST',

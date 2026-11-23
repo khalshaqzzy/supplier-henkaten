@@ -17,6 +17,7 @@ describe('audit isolation and passive session validation', () => {
   let userId: string;
   beforeAll(async () => {
     process.env['OUTBOX_ENABLED'] = 'false';
+    process.env['SHIFT_ROTATION_ENABLED'] = 'false';
     process.env['PCR_WORKER_ENABLED'] = 'false';
     app = (
       await Test.createTestingModule({ imports: [AppModule] }).compile()

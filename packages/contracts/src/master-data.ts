@@ -267,40 +267,90 @@ export const tmminPartPageSchema = z
   .object({ items: z.array(tmminPartSchema), pageInfo: pageInfoSchema })
   .strict();
 
+/** ISO weekday: 1 = Monday ... 7 = Sunday. */
+export const isoWeekdaySchema = z.number().int().min(1).max(7);
+export const shiftDayScheduleInputSchema = z.discriminatedUnion('isOff', [
+  z.object({ dayOfWeek: isoWeekdaySchema, isOff: z.literal(true) }).strict(),
+  z
+    .object({
+      dayOfWeek: isoWeekdaySchema,
+      isOff: z.literal(false),
+      startTime: timeSchema,
+      endTime: timeSchema,
+    })
+    .strict()
+    .refine(({ startTime, endTime }) => startTime !== endTime, {
+      message: 'Jam mulai dan selesai tidak boleh sama.',
+    }),
+]);
+export const weeklyScheduleInputSchema = z
+  .array(shiftDayScheduleInputSchema)
+  .length(7)
+  .refine((days) => new Set(days.map(({ dayOfWeek }) => dayOfWeek)).size === 7, {
+    message: 'Setiap hari harus diisi tepat satu kali.',
+  })
+  .refine((days) => days.some(({ isOff }) => !isOff), {
+    message: 'Minimal satu hari kerja.',
+  });
+export type WeeklyScheduleInput = z.infer<typeof weeklyScheduleInputSchema>;
+
 export const createShiftTemplateRequestSchema = z
   .object({
     name: nameSchema,
-    startTime: timeSchema,
-    endTime: timeSchema,
+    startTime: timeSchema.optional(),
+    endTime: timeSchema.optional(),
+    weeklySchedule: weeklyScheduleInputSchema.optional(),
     timezone: z.string().trim().min(1).max(100),
   })
-  .strict();
+  .strict()
+  .refine(
+    ({ startTime, endTime, weeklySchedule }) =>
+      weeklySchedule !== undefined || (startTime !== undefined && endTime !== undefined),
+    { message: 'Isi jam mulai dan selesai, atau jadwal per hari.' },
+  );
+export type CreateShiftTemplateRequest = z.infer<typeof createShiftTemplateRequestSchema>;
 export const updateShiftTemplateRequestSchema = z
   .object({
     expectedVersion: optimisticVersionSchema,
     name: nameSchema.optional(),
     startTime: timeSchema.optional(),
     endTime: timeSchema.optional(),
+    weeklySchedule: weeklyScheduleInputSchema.optional(),
     timezone: z.string().trim().min(1).max(100).optional(),
   })
   .strict()
   .refine(
-    ({ name, startTime, endTime, timezone }) =>
+    ({ name, startTime, endTime, timezone, weeklySchedule }) =>
       name !== undefined ||
       startTime !== undefined ||
       endTime !== undefined ||
-      timezone !== undefined,
+      timezone !== undefined ||
+      weeklySchedule !== undefined,
     { message: 'At least one mutable field is required.' },
   );
+export type UpdateShiftTemplateRequest = z.infer<typeof updateShiftTemplateRequestSchema>;
+export const shiftDayScheduleSchema = z
+  .object({
+    dayOfWeek: isoWeekdaySchema,
+    isOff: z.boolean(),
+    startTime: timeSchema.nullable(),
+    endTime: timeSchema.nullable(),
+    crossesMidnight: z.boolean(),
+  })
+  .strict();
+export type ShiftDaySchedule = z.infer<typeof shiftDayScheduleSchema>;
 export const shiftTemplateSchema = z
   .object({
     id: opaqueIdSchema,
     name: nameSchema,
     displayOrder: displayOrderSchema,
+    /** Representative times: the first working day of the week. */
     startTime: timeSchema,
     endTime: timeSchema,
     timezone: z.string().min(1).max(100),
     crossesMidnight: z.boolean(),
+    weeklySchedule: z.array(shiftDayScheduleSchema).length(7),
+    isUniform: z.boolean(),
     active: z.boolean(),
     version: optimisticVersionSchema,
     createdAt: utcTimestampSchema,
@@ -451,6 +501,8 @@ export const lineShiftSchema = z
     endTime: timeSchema,
     timezone: z.string().min(1).max(100),
     crossesMidnight: z.boolean(),
+    weeklySchedule: z.array(shiftDayScheduleSchema).length(7),
+    isUniform: z.boolean(),
     supervisorMemberId: opaqueIdSchema.nullable(),
     supervisorName: nameSchema.nullable(),
     lineLeaders: z.array(lineShiftLineLeaderSchema).max(MAX_LINE_LEADERS_PER_LINE_SHIFT),
@@ -469,6 +521,8 @@ export const lineShiftOccurrenceSchema = lineShiftSchema
     effectiveStartAt: utcTimestampSchema,
     effectiveEndAt: utcTimestampSchema,
     current: z.boolean(),
+    /** False when the Line–Shift is visible to the viewer only read-only. */
+    assigned: z.boolean(),
   })
   .strict();
 

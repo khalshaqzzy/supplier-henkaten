@@ -168,21 +168,17 @@ export class BoardLayoutService {
     principal: RequestPrincipal,
     lineId: string,
   ): Promise<{ jobs: BoardJob[]; canEdit: boolean }> {
-    const unrestricted =
-      principal.realm === 'TMMIN' || ['SUPPLIER_ADMIN', 'QC'].includes(principal.role);
-    const lineShiftScope =
+    // Every supplier role may read any active line's layout; editing stays with the line's
+    // assigned Supervisor or Line Leaders and Supplier Admin.
+    const memberId = principal.memberId ?? impossibleId;
+    const responsibility =
       principal.role === 'SUPERVISOR'
-        ? { supervisorMemberId: principal.memberId ?? impossibleId }
+        ? { supervisorMemberId: memberId }
         : principal.role === 'LINE_LEADER'
-          ? { lineLeaders: { some: { memberId: principal.memberId ?? impossibleId } } }
+          ? { lineLeaders: { some: { memberId } } }
           : { id: impossibleId };
     const line = await client.line.findFirst({
-      where: {
-        id: lineId,
-        supplierId: scope.supplierId,
-        active: true,
-        ...(unrestricted ? {} : { lineShifts: { some: { active: true, ...lineShiftScope } } }),
-      },
+      where: { id: lineId, supplierId: scope.supplierId, active: true, deletedAt: null },
       select: {
         jobs: {
           where: { active: true },
@@ -190,10 +186,7 @@ export class BoardLayoutService {
           select: { id: true, displayOrder: true },
         },
         lineShifts: {
-          where: {
-            active: true,
-            lineLeaders: { some: { memberId: principal.memberId ?? impossibleId } },
-          },
+          where: { active: true, ...responsibility },
           select: { id: true },
         },
       },
@@ -203,7 +196,7 @@ export class BoardLayoutService {
       principal.realm === 'SUPPLIER' &&
       principal.purpose === 'NORMAL' &&
       (principal.role === 'SUPPLIER_ADMIN' ||
-        (principal.role === 'LINE_LEADER' && line.lineShifts.length > 0));
+        (['SUPERVISOR', 'LINE_LEADER'].includes(principal.role) && line.lineShifts.length > 0));
     return {
       jobs: line.jobs.map((job) => ({
         jobId: job.id,
@@ -305,6 +298,7 @@ function forbiddenEdit(): ProblemException {
     status: 403,
     code: 'FORBIDDEN',
     title: 'Board layout is read-only',
-    detail: 'Only an assigned Line Leader or Supplier Admin may edit this line layout.',
+    detail:
+      'Hanya Supervisor, Line Leader yang ditugaskan, atau Supplier Admin yang dapat mengubah layout line ini.',
   });
 }

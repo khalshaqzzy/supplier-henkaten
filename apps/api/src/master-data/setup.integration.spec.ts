@@ -31,6 +31,7 @@ describe('Supplier workbook import and reset', () => {
     process.env['SESSION_CSRF_SECRET'] = 'integration-test-csrf-secret-at-least-32';
     process.env['AUTH_THROTTLE_SECRET'] = 'integration-test-throttle-secret-32';
     process.env['OUTBOX_ENABLED'] = 'false';
+    process.env['SHIFT_ROTATION_ENABLED'] = 'false';
     process.env['PCR_WORKER_ENABLED'] = 'false';
     app = (
       await Test.createTestingModule({ imports: [AppModule] }).compile()

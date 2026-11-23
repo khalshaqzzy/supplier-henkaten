@@ -58,12 +58,15 @@ export async function prepareSetupPlan(
   const issues = validateSetupRows(rows);
   const [supplier, members, lines, jobs, shifts, lineShifts, templates] = await Promise.all([
     tx.supplier.findUniqueOrThrow({ where: { id: supplierId } }),
-    tx.member.findMany({ where: { supplierId }, include: { users: true } }),
-    tx.line.findMany({ where: { supplierId } }),
-    tx.job.findMany({ where: { supplierId } }),
-    tx.shiftTemplate.findMany({ where: { supplierId } }),
+    tx.member.findMany({
+      where: { supplierId, deletedAt: null },
+      include: { users: { where: { deletedAt: null } } },
+    }),
+    tx.line.findMany({ where: { supplierId, deletedAt: null } }),
+    tx.job.findMany({ where: { supplierId, deletedAt: null } }),
+    tx.shiftTemplate.findMany({ where: { supplierId, deletedAt: null } }),
     tx.lineShift.findMany({
-      where: { supplierId },
+      where: { supplierId, deletedAt: null },
       include: {
         jobAssignments: true,
         lineLeaders: { orderBy: [{ position: 'asc' }, { id: 'asc' }] },
@@ -77,14 +80,27 @@ export async function prepareSetupPlan(
       },
     }),
   ]);
-  const parts = [] as Awaited<ReturnType<typeof tx.part.findMany>>;
+  const partRows = [] as Awaited<ReturnType<typeof tx.part.findMany>>;
   const numbers = rows.filter((r) => r.sheet === 'Part').map((r) => norm(r.data['code'] ?? ''));
   for (let i = 0; i < numbers.length; i += 1000)
-    parts.push(
+    partRows.push(
       ...(await tx.part.findMany({
         where: { supplierId, normalizedPartNumber: { in: numbers.slice(i, i + 1000) } },
+        orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
       })),
     );
+  // A live part wins over deleted ones with the same number; otherwise the latest deleted part
+  // is offered for restore.
+  const parts = [
+    ...partRows
+      .reduce((byNumber, part) => {
+        const current = byNumber.get(part.normalizedPartNumber);
+        if (!current || (current.deletedAt && !part.deletedAt))
+          byNumber.set(part.normalizedPartNumber, part);
+        return byNumber;
+      }, new Map<string, (typeof partRows)[number]>())
+      .values(),
+  ];
   const lineCode = new Map(lines.map((l) => [l.id, l.code]));
   const memberCode = new Map(members.map((m) => [m.id, m.importCode ?? m.id]));
   const jobCode = new Map(jobs.map((j) => [j.id, j.importCode ?? j.name]));

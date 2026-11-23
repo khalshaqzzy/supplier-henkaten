@@ -628,12 +628,22 @@ export class SetupService implements OnModuleInit, BeforeApplicationShutdown {
           displayOrder: Number(d['order']),
           timezone: d['timezone']!,
         };
-        if (p.current)
+        if (p.current) {
+          const stored = await tx.shiftTemplate.findUniqueOrThrow({ where: { id: p.id } });
+          // Changed workbook times replace a per-day schedule with the uniform workbook times.
+          const timesChanged =
+            stored.startMinute !== fields.startMinute || stored.endMinute !== fields.endMinute;
           await tx.shiftTemplate.update({
             where: { id: p.id },
-            data: { ...fields, ...restored, ...updateMeta },
+            data: {
+              ...fields,
+              ...(timesChanged ? { weeklySchedule: Prisma.DbNull } : {}),
+              ...restored,
+              ...updateMeta,
+            },
           });
-        else await tx.shiftTemplate.create({ data: { id: p.id, supplierId, ...fields, ...meta } });
+        } else
+          await tx.shiftTemplate.create({ data: { id: p.id, supplierId, ...fields, ...meta } });
       } else if (sheet === 'Line Shift') {
         const leaderIds = p.refs['leaders']?.split(',') ?? [];
         const fields = {
@@ -780,12 +790,12 @@ export class SetupService implements OnModuleInit, BeforeApplicationShutdown {
       await Promise.all([
         tx.supplier.findUniqueOrThrow({ where: { id: supplierId } }),
         tx.henkaten.count({ where: { deletedAt: null, supplierId, status: 'OPEN' } }),
-        tx.member.count({ where: { supplierId, resetArchivedAt: null } }),
-        tx.line.count({ where: { supplierId, resetArchivedAt: null } }),
-        tx.job.count({ where: { supplierId, resetArchivedAt: null } }),
+        tx.member.count({ where: { supplierId, resetArchivedAt: null, deletedAt: null } }),
+        tx.line.count({ where: { supplierId, resetArchivedAt: null, deletedAt: null } }),
+        tx.job.count({ where: { supplierId, resetArchivedAt: null, deletedAt: null } }),
         tx.part.count({ where: { supplierId, resetArchivedAt: null } }),
-        tx.shiftTemplate.count({ where: { supplierId, resetArchivedAt: null } }),
-        tx.lineShift.count({ where: { supplierId, resetArchivedAt: null } }),
+        tx.shiftTemplate.count({ where: { supplierId, resetArchivedAt: null, deletedAt: null } }),
+        tx.lineShift.count({ where: { supplierId, resetArchivedAt: null, deletedAt: null } }),
         tx.checklistTemplate.count({
           where: {
             supplierId,
@@ -796,7 +806,8 @@ export class SetupService implements OnModuleInit, BeforeApplicationShutdown {
           where: {
             supplierId,
             role: { in: ['SUPERVISOR', 'LINE_LEADER', 'QC'] },
-            member: { resetArchivedAt: null },
+            deletedAt: null,
+            member: { resetArchivedAt: null, deletedAt: null },
           },
         }),
       ]);

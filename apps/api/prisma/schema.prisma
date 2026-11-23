@@ -246,6 +246,8 @@ model Supplier {
   pushSubscriptions       PushSubscription[]
   pushDeliveries          PushDelivery[]
   boardLayouts            LineBoardLayout[]
+  shiftRotationSchedules  ShiftRotationSchedule[]
+  shiftRotationExecutions ShiftRotationExecution[]
 
   @@unique([normalizedCode], map: "Supplier_normalizedCode_key")
   @@index([sourceMode, active])
@@ -253,6 +255,7 @@ model Supplier {
 
 model User {
   catalogCommands CatalogCommand[]
+  deletedAt                  DateTime?           @db.Timestamptz(3)
   id                         String              @id @default(uuid()) @db.Uuid
   realm                      IdentityRealm
   supplierId                 String?             @db.Uuid
@@ -613,6 +616,8 @@ model ExternalHenkatenProjection {
 }
 
 model Member {
+  /// Permanently deleted (not archived); the row is kept for historical references only.
+  deletedAt                    DateTime?                @db.Timestamptz(3)
   resetArchivedAt              DateTime?                @db.Timestamptz(3)
   importCode                   String?                  @db.VarChar(100)
   normalizedImportCode         String?                  @db.VarChar(100)
@@ -655,9 +660,9 @@ model Member {
   movedAssignmentMovements     AssignmentMovement[]     @relation("AssignmentMovementMp")
   replacedAssignmentMovements  AssignmentMovement[]     @relation("AssignmentMovementReplacedMp")
 
-  @@unique([supplierId, normalizedRegistrationNumber])
+  // Partial unique indexes WHERE "deletedAt" IS NULL are managed in SQL migrations:
+  // Member_supplierId_registration_key and Member_supplierId_normalizedImportCode_key.
   @@unique([id, supplierId])
-  @@unique([supplierId, normalizedImportCode])
   @@index([supplierId, active, role])
   @@index([supplierId, fullName])
   @@index([supplierId, active, fullName, id])
@@ -689,6 +694,7 @@ model MemberPhoto {
 }
 
 model Line {
+  deletedAt          DateTime?              @db.Timestamptz(3)
   resetArchivedAt    DateTime?              @db.Timestamptz(3)
   id                 String                 @id @default(uuid()) @db.Uuid
   supplierId         String                 @db.Uuid
@@ -715,7 +721,7 @@ model Line {
   sourceMovements    AssignmentMovement[]   @relation("AssignmentMovementSourceLine")
   boardLayout        LineBoardLayout?
 
-  @@unique([supplierId, normalizedCode])
+  // Line_supplier_code_key is a partial unique index WHERE "deletedAt" IS NULL (SQL migration).
   @@unique([id, supplierId])
   @@index([supplierId, active, displayOrder])
 }
@@ -740,6 +746,7 @@ model LineBoardLayout {
 }
 
 model Job {
+  deletedAt            DateTime?                @db.Timestamptz(3)
   resetArchivedAt      DateTime?                @db.Timestamptz(3)
   importCode           String?                  @db.VarChar(100)
   normalizedImportCode String?                  @db.VarChar(100)
@@ -767,9 +774,9 @@ model Job {
   targetMovements      AssignmentMovement[]     @relation("AssignmentMovementTargetJob")
   sourceMovements      AssignmentMovement[]     @relation("AssignmentMovementSourceJob")
 
-  @@unique([lineId, normalizedName])
+  // Job_line_name_key and Job_lineId_normalizedImportCode_key are partial unique indexes
+  // WHERE "deletedAt" IS NULL (SQL migration).
   @@unique([id, supplierId])
-  @@unique([lineId, normalizedImportCode])
   @@index([supplierId, lineId, active, displayOrder])
   @@index([supplierId, lineId, active, displayOrder, id])
 }
@@ -796,13 +803,17 @@ model Part {
   henkatens            Henkaten[]
   henkatenParts        HenkatenPart[]
 
-  @@unique([supplierId, normalizedPartNumber])
+  // Part_supplier_number_key is a partial unique index WHERE "deletedAt" IS NULL (SQL migration).
   @@unique([id, supplierId])
   @@index([supplierId, active, normalizedPartName])
   @@index([supplierId, normalizedInternalPartNumber])
 }
 
 model ShiftTemplate {
+  deletedAt            DateTime?   @db.Timestamptz(3)
+  /// Seven ISO weekdays ({ dayOfWeek, isOff, startMinute, endMinute }); null = every day uses
+  /// startMinute/endMinute. startMinute/endMinute mirror the first working day.
+  weeklySchedule       Json?
   resetArchivedAt      DateTime?   @db.Timestamptz(3)
   importCode           String?     @db.VarChar(100)
   normalizedImportCode String?     @db.VarChar(100)
@@ -823,8 +834,9 @@ model ShiftTemplate {
   shiftRuns            ShiftRun[]
   lineShifts           LineShift[]
 
+  // ShiftTemplate_supplierId_normalizedImportCode_key is a partial unique index
+  // WHERE "deletedAt" IS NULL (SQL migration).
   @@unique([id, supplierId])
-  @@unique([supplierId, normalizedImportCode])
   @@index([supplierId, active, displayOrder])
 }
 
@@ -904,6 +916,7 @@ model DefaultAssignmentSet {
 /// Recurring shift configuration for one production line. It has no runtime
 /// start/end lifecycle; schedule boundaries are derived from ShiftTemplate.
 model LineShift {
+  deletedAt          DateTime?                @db.Timestamptz(3)
   resetArchivedAt    DateTime?                @db.Timestamptz(3)
   id                 String                   @id @default(uuid()) @db.Uuid
   supplierId         String                   @db.Uuid
@@ -1700,4 +1713,53 @@ model CatalogCommand {
 
   @@unique([supplierId, actorUserId, key])
   @@index([supplierId, createdAt])
+}
+
+/// Weekly automatic shift rotation: each run, every shift in shiftTemplateIds takes the working
+/// times of the next shift in the list (two shifts swap; three or more rotate cyclically).
+model ShiftRotationSchedule {
+  id               String                   @id @default(uuid()) @db.Uuid
+  supplierId       String                   @db.Uuid
+  name             String                   @db.VarChar(150)
+  enabled          Boolean                  @default(true)
+  shiftTemplateIds String[]                 @db.Uuid
+  /// ISO weekday 1 = Monday ... 7 = Sunday.
+  dayOfWeek        Int
+  executeMinute    Int
+  timezone         String                   @db.VarChar(100)
+  nextRunAt        DateTime?                @db.Timestamptz(3)
+  lastRunAt        DateTime?                @db.Timestamptz(3)
+  lastRunStatus    String?                  @db.VarChar(30)
+  lastRunMessage   String?                  @db.VarChar(500)
+  version          Int                      @default(1)
+  createdAt        DateTime                 @default(now()) @db.Timestamptz(3)
+  createdById      String?                  @db.Uuid
+  updatedAt        DateTime                 @updatedAt @db.Timestamptz(3)
+  updatedById      String?                  @db.Uuid
+  supplier         Supplier                 @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  executions       ShiftRotationExecution[]
+
+  @@unique([id, supplierId])
+  @@index([enabled, nextRunAt])
+  @@index([supplierId, createdAt])
+}
+
+model ShiftRotationExecution {
+  id             String                @id @default(uuid()) @db.Uuid
+  supplierId     String                @db.Uuid
+  scheduleId     String                @db.Uuid
+  scheduledForAt DateTime              @db.Timestamptz(3)
+  executedAt     DateTime              @default(now()) @db.Timestamptz(3)
+  /// SUCCESS | SKIPPED
+  status         String                @db.VarChar(30)
+  /// SCHEDULE | MANUAL
+  trigger        String                @default("SCHEDULE") @db.VarChar(30)
+  affectedLines  Int                   @default(0)
+  message        String?               @db.VarChar(500)
+  summary        Json?
+  supplier       Supplier              @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  schedule       ShiftRotationSchedule @relation(fields: [scheduleId, supplierId], references: [id, supplierId], onDelete: Cascade)
+
+  @@unique([scheduleId, scheduledForAt])
+  @@index([supplierId, executedAt(sort: Desc)])
 }

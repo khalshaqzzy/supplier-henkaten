@@ -87,6 +87,7 @@ export const boardQuerySchema = z
       .enum(['true', 'false'])
       .transform((value) => value === 'true')
       .optional(),
+    scope: z.enum(['ALL', 'ASSIGNED']).optional(),
   })
   .strict();
 export type BoardQuery = z.infer<typeof boardQuerySchema>;
@@ -125,6 +126,11 @@ export const assignmentBoardSchema = z
           crossesMidnight: z.boolean().optional(),
           timezone: z.string().min(1).max(100).optional(),
           isCurrent: z.boolean(),
+          /**
+           * True when the requesting Supervisor or Line Leader is assigned to this Line–Shift.
+           * Optional for rollout compatibility: an older API omits it and only returns assigned lines.
+           */
+          assigned: z.boolean().optional(),
           businessDate: z.string().date(),
           supervisor: z
             .object({ memberId: opaqueIdSchema.nullable(), name: z.string().nullable() })
@@ -187,6 +193,7 @@ export const dashboardQuerySchema = z
     approvalRoute: approvalRouteSchema.optional(),
     approvalStatus: approvalRouteStatusSchema.optional(),
     granularity: z.enum(['DAY', 'WEEK', 'MONTH']).default('DAY'),
+    scope: z.enum(['ALL', 'ASSIGNED']).optional(),
   })
   .strict();
 export type DashboardQuery = z.infer<typeof dashboardQuerySchema>;

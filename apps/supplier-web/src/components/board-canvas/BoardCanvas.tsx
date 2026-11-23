@@ -17,6 +17,7 @@ import {
   Box,
   Copy,
   Expand,
+  Eye,
   Focus,
   Hand,
   Lock,
@@ -95,9 +96,12 @@ export function layoutJobCardIndicators(width: number, count: number) {
 export default function BoardCanvas({
   line,
   onDirtyChange,
+  viewOnly = false,
 }: {
   line: BoardLine;
   onDirtyChange?: (dirty: boolean) => void;
+  /** Marks the canvas read-only for an unassigned viewer, unless the layout itself is editable. */
+  viewOnly?: boolean;
 }) {
   const { session } = useSession();
   const queryClient = useQueryClient();
@@ -612,6 +616,11 @@ export default function BoardCanvas({
           >
             {isFullscreen ? 'Keluar fullscreen' : 'Fullscreen'}
           </Button>
+          {viewOnly && !layoutData.canEdit && (
+            <span className="view-only-pill">
+              <Eye aria-hidden="true" /> Hanya lihat
+            </span>
+          )}
           {layoutData.canEdit && editorViewport && !editing && (
             <Button size="sm" leadingIcon={<MousePointer2 />} onClick={() => setEditing(true)}>
               Edit layout

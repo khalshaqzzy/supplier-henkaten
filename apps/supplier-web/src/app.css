@@ -6931,3 +6931,108 @@ a.overview-activity-identifier:hover {
 [data-focus-target][tabindex='-1']:focus {
   outline: none;
 }
+
+/* Master data lifecycle: archive / permanent delete */
+.resource-form-card--wide {
+  width: min(100%, 880px);
+}
+.lifecycle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hds-space-3);
+  flex-wrap: wrap;
+}
+.lifecycle-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--hds-text-secondary);
+}
+.lifecycle-state::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hds-text-tertiary);
+}
+.lifecycle-state.is-active {
+  color: var(--hds-state-success-fg);
+}
+.lifecycle-state.is-active::before {
+  background: var(--hds-state-success-fg);
+}
+.hds-button.lifecycle-delete,
+.hds-button.master-row-delete {
+  color: var(--hds-state-danger-fg);
+}
+.master-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.master-row-delete svg,
+.job-list .lifecycle-delete svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Read-only cross-line visibility */
+.line-scope-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--hds-space-3);
+}
+.view-only-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: var(--hds-radius-full);
+  background: var(--hds-state-neutral-bg);
+  color: var(--hds-state-neutral-fg);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.view-only-pill svg,
+.view-only-note svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+.view-only-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--hds-text-secondary);
+}
+.line-scope-toggle .hds-segmented__item {
+  white-space: nowrap;
+}
+.henkaten-view-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hds-space-3);
+}
+/* On the board line header the marker matches the shift badge beside it. */
+.board-line > header .view-only-pill {
+  min-height: 0;
+  margin-left: 0.4rem;
+  padding: 0.16rem 0.48rem;
+  font-size: 0.69rem;
+  font-weight: 750;
+  vertical-align: middle;
+}
+/* Switches keep their track shape; the whole labelled row is the touch target. */
+.product-shell button.hds-switch {
+  min-width: var(--hds-control-lg);
+  min-height: 0;
+}

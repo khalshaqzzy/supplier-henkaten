@@ -374,3 +374,10 @@
   min-width: 44px;
   min-height: 44px;
 }
+
+.catalog-time-row__times span.is-weekly {
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: normal;
+  letter-spacing: 0;
+}

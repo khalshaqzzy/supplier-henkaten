@@ -19,6 +19,7 @@ export async function renameUser(
       id: { not: user.id },
       realm: user.realm,
       normalizedUsername,
+      deletedAt: null,
       ...(user.realm === 'SUPPLIER' ? { supplierId: user.supplierId } : {}),
     },
     select: { id: true },

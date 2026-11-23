@@ -2,3 +2,5 @@
 DS-0002
 # Caddy internal PKI only; no upstream v3 patch, reviewed scope/expiry in registry.
 CVE-2026-116587
+# Debian libssl3 QUIC DoS; no fixed bookworm build, API does not use QUIC; reviewed scope/expiry in registry.
+CVE-2026-107494

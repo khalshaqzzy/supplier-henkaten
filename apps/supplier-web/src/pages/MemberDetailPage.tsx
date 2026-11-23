@@ -34,6 +34,7 @@ import { supplierApi, supplierAssetUrl } from '../app/api';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { MasterBackLink, OneTimeCredential, masterMutationProblem } from './MasterDataPages';
+import { MasterDeleteDialog } from './MasterDeleteDialog';
 import { MemberRoleDialog } from './MemberRoleDialog';
 import { memberRoleDescriptions, memberRoleLabels } from './memberRoles';
 import './member-detail.css';
@@ -605,22 +606,22 @@ function MemberStatusPanel({ member, scope }: { member: Member; scope: Scope }) 
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [problem, setProblem] = useState<string | null>(null);
-  const toggle = useMutation({
-    mutationFn: () =>
-      supplierApi.memberAction(member.id, member.active ? 'deactivate' : 'activate', {
-        expectedVersion: member.version,
+  const [deleting, setDeleting] = useState(false);
+  const refresh = () =>
+    Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: scopedKey(scope, 'master-members-detail', member.id),
       }),
+      queryClient.invalidateQueries({
+        queryKey: scopedKey(scope, 'master-members').slice(0, -1),
+      }),
+    ]);
+  const restore = useMutation({
+    mutationFn: () =>
+      supplierApi.memberAction(member.id, 'activate', { expectedVersion: member.version }),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: scopedKey(scope, 'master-members-detail', member.id),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: scopedKey(scope, 'master-members').slice(0, -1),
-        }),
-      ]);
-      toast.success(member.active ? 'Member dipindahkan ke arsip' : 'Member diaktifkan');
-      if (member.active) void navigate('/master-data/members', { replace: true });
+      await refresh();
+      toast.success('Member diaktifkan');
     },
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
@@ -650,31 +651,59 @@ function MemberStatusPanel({ member, scope }: { member: Member; scope: Scope }) 
             </dd>
           </div>
         </dl>
-        <AlertDialog
-          title={member.active ? 'Hapus member dari daftar aktif?' : 'Pulihkan member?'}
-          description={
-            member.active
-              ? `${member.fullName} akan dipindahkan ke Arsip. Riwayatnya tetap tersedia.`
-              : `${member.fullName} akan kembali ke daftar member aktif.`
-          }
-          confirmLabel={member.active ? 'Hapus member' : 'Pulihkan member'}
-          destructive={member.active}
-          onConfirm={() => {
-            setProblem(null);
-            toggle.mutate();
-          }}
-          trigger={
-            <Button
-              variant="secondary"
-              className={`member-card__action${member.active ? ' member-card__action--danger' : ''}`}
-              leadingIcon={member.active ? <Trash2 /> : <ArchiveRestore />}
-              loading={toggle.isPending}
-              data-focus-initial
-            >
-              {member.active ? 'Hapus member' : 'Pulihkan member'}
-            </Button>
-          }
-        />
+        <div className="member-card__actions">
+          {!member.active && (
+            <AlertDialog
+              title="Pulihkan member?"
+              description={`${member.fullName} akan kembali ke daftar member aktif.`}
+              confirmLabel="Pulihkan member"
+              onConfirm={() => {
+                setProblem(null);
+                restore.mutate();
+              }}
+              trigger={
+                <Button
+                  variant="secondary"
+                  className="member-card__action"
+                  leadingIcon={<ArchiveRestore />}
+                  loading={restore.isPending}
+                  data-focus-initial
+                >
+                  Pulihkan member
+                </Button>
+              }
+            />
+          )}
+          <Button
+            variant="secondary"
+            className="member-card__action member-card__action--danger"
+            leadingIcon={<Trash2 />}
+            {...(member.active ? { 'data-focus-initial': true } : {})}
+            onClick={() => {
+              setProblem(null);
+              setDeleting(true);
+            }}
+          >
+            {member.active ? 'Hapus member' : 'Hapus permanen'}
+          </Button>
+        </div>
+        {deleting && (
+          <MasterDeleteDialog
+            target={{ kind: 'MEMBER', id: member.id }}
+            initialMode={member.active ? 'ARCHIVE' : 'PERMANENT'}
+            onClose={() => setDeleting(false)}
+            onDeleted={async (result) => {
+              setDeleting(false);
+              await refresh();
+              void navigate(
+                result.mode === 'ARCHIVE'
+                  ? '/master-data/members?active=INACTIVE'
+                  : '/master-data/members',
+                { replace: true },
+              );
+            }}
+          />
+        )}
       </div>
     </section>
   );
