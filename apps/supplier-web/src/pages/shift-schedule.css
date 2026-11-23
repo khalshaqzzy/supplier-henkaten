@@ -17,7 +17,7 @@
 }
 .shift-strip {
   display: inline-grid;
-  grid-template-columns: repeat(7, 22px);
+  grid-template-columns: repeat(7, 24px);
   gap: 2px;
 }
 .shift-strip__day {
@@ -25,9 +25,9 @@
   place-items: center;
   height: 20px;
   border-radius: 4px;
-  background: var(--hds-brand-accent);
+  background: var(--hds-action-primary);
   color: var(--hds-text-inverse);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 650;
   line-height: 1;
 }
@@ -154,8 +154,8 @@
   font-size: 11px;
 }
 .shift-day-pill.is-on {
-  border-color: var(--hds-brand-accent);
-  background: var(--hds-brand-accent);
+  border-color: var(--hds-action-primary);
+  background: var(--hds-action-primary);
   color: var(--hds-text-inverse);
 }
 .shift-day-pill:focus-visible,
@@ -250,7 +250,8 @@
 }
 .shift-editor__rows > li {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr) minmax(120px, 0.8fr);
+  /* The time group (two time inputs, duration, copy) takes the free width; the 24h track is fixed. */
+  grid-template-columns: 140px minmax(0, 1fr) 160px;
   gap: 16px;
   align-items: center;
   padding: 10px 14px;
@@ -281,7 +282,7 @@
 }
 .shift-editor__row-times {
   display: grid;
-  grid-template-columns: minmax(96px, 1fr) 10px minmax(96px, 1fr) minmax(64px, auto) 36px;
+  grid-template-columns: minmax(118px, 1fr) 10px minmax(118px, 1fr) 88px 36px;
   gap: 8px;
   align-items: center;
 }
@@ -420,7 +421,7 @@
 }
 @media (max-width: 360px) {
   .shift-strip {
-    grid-template-columns: repeat(7, 19px);
+    grid-template-columns: repeat(7, 20px);
   }
   .shift-editor__days {
     gap: 4px;

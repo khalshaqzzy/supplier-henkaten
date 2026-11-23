@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowDown,
@@ -6,7 +6,6 @@ import {
   ArrowUp,
   CalendarClock,
   CalendarSync,
-  CircleAlert,
   History,
   Pencil,
   Play,
@@ -98,12 +97,16 @@ export function ShiftRotationPanel({ canManage }: { canManage: boolean }) {
         <div>
           <h2 id="rotation-panel-title">Jadwal pergantian shift</h2>
           <small>
-            {items.length
-              ? `${items.filter((item) => item.enabled).length} aktif · ${items.length} jadwal`
-              : 'Belum ada jadwal'}
+            {rotations.isPending
+              ? 'Memuat jadwal…'
+              : rotations.isError
+                ? '—'
+                : items.length
+                  ? `${items.filter((item) => item.enabled).length} aktif · ${items.length} jadwal`
+                  : 'Belum ada jadwal'}
           </small>
         </div>
-        {canManage && (
+        {canManage && items.length > 0 && (
           <Button
             variant="secondary"
             leadingIcon={<Plus aria-hidden="true" />}
@@ -132,7 +135,11 @@ export function ShiftRotationPanel({ canManage }: { canManage: boolean }) {
             <span>Pilih shift, hari, dan jam pergantian.</span>
           </div>
           {canManage && (
-            <Button size="sm" onClick={() => setEditing('new')}>
+            <Button
+              variant="primary"
+              leadingIcon={<Plus aria-hidden="true" />}
+              onClick={() => setEditing('new')}
+            >
               Buat jadwal
             </Button>
           )}
@@ -374,6 +381,7 @@ function RotationCard({
               variant="ghost"
               className="rotation-card__delete"
               aria-label={`Hapus ${rotation.name}`}
+              title="Hapus jadwal"
               onClick={() => setConfirm('delete')}
             >
               <Trash2 aria-hidden="true" />
@@ -388,7 +396,7 @@ function RotationCard({
             if (!open && !run.isPending && !remove.isPending) setConfirm(null);
           }}
           dismissible={!run.isPending && !remove.isPending}
-          className="catalog-delete-dialog rotation-confirm"
+          className={`catalog-delete-dialog rotation-confirm${confirm === 'run' ? ' rotation-confirm--run' : ''}`}
           title={confirm === 'run' ? 'Rotasi jam shift sekarang?' : 'Hapus jadwal ini?'}
           description={rotation.name}
           headerAdornment={
@@ -422,7 +430,9 @@ function RotationCard({
               </p>
             </>
           ) : (
-            <p className="catalog-delete-note">Jam shift saat ini tidak berubah.</p>
+            <p className="catalog-delete-note">
+              Jadwal dan riwayat pelaksanaannya dihapus permanen. Jam shift saat ini tetap berlaku.
+            </p>
           )}
         </Dialog>
       )}
@@ -461,12 +471,17 @@ function RotationSheet({
   const [timezone, setTimezone] = useState(rotation?.timezone ?? defaultTimezone());
   const [enabled, setEnabled] = useState(rotation?.enabled ?? true);
   const [problem, setProblem] = useState<string | null>(null);
+  const problemRef = useRef<HTMLDivElement>(null);
+  const dayName = useId();
   const byId = useMemo(
     () => new Map((shifts.data ?? []).map((shift) => [shift.id, shift] as const)),
     [shifts.data],
   );
   const chosen = ids.map((id) => byId.get(id));
-  const complete = ids.every(Boolean) && new Set(ids).size === ids.length;
+  // A saved shift that was archived or deleted is not in the active list: it must be replaced.
+  const missing = !shifts.isPending && ids.some((id) => Boolean(id) && !byId.has(id));
+  const complete =
+    ids.every((id) => Boolean(id) && byId.has(id)) && new Set(ids).size === ids.length;
   const save = useMutation({
     mutationFn: () => {
       const body = {
@@ -488,7 +503,10 @@ function RotationSheet({
       toast.success(rotation ? 'Jadwal disimpan' : 'Jadwal dibuat');
       await onSaved();
     },
-    onError: (error) => setProblem(problemText(error)),
+    onError: (error) => {
+      setProblem(problemText(error));
+      requestAnimationFrame(() => problemRef.current?.focus());
+    },
   });
   const move = (index: number, delta: number) => {
     const next = [...ids];
@@ -517,7 +535,6 @@ function RotationSheet({
       dismissible={!save.isPending}
       className="catalog-sheet rotation-sheet"
       title={rotation ? 'Ubah jadwal pergantian' : 'Jadwal pergantian shift'}
-      description="Shift bertukar jam kerja secara otomatis setiap minggu."
       headerAdornment={<CalendarSync aria-hidden="true" />}
       footer={
         <>
@@ -525,6 +542,7 @@ function RotationSheet({
             Batal
           </Button>
           <Button
+            variant="primary"
             loading={save.isPending}
             disabled={!complete || !name.trim() || !executeTime || !timezone.trim() || identical}
             onClick={() => {
@@ -538,9 +556,11 @@ function RotationSheet({
       }
     >
       {problem && (
-        <Alert tone="danger" title="Jadwal belum disimpan">
-          {problem}
-        </Alert>
+        <div ref={problemRef} tabIndex={-1} className="rotation-problem">
+          <Alert tone="danger" title="Jadwal belum disimpan">
+            {problem}
+          </Alert>
+        </div>
       )}
       <label className="rotation-field">
         <span>Nama jadwal</span>
@@ -571,7 +591,7 @@ function RotationSheet({
                 <span className="rotation-slots__index">{index + 1}</span>
                 <Select
                   label={`Shift ${index + 1}`}
-                  value={id}
+                  value={byId.has(id) ? id : ''}
                   placeholder="Pilih shift"
                   onValueChange={(value) =>
                     setIds(ids.map((current, other) => (other === index ? value : current)))
@@ -608,6 +628,11 @@ function RotationSheet({
             ))}
           </ol>
         )}
+        {missing && (
+          <Alert tone="warning" title="Shift tidak aktif">
+            Pilih pengganti untuk shift yang diarsipkan atau dihapus.
+          </Alert>
+        )}
         {shifts.data && ids.length < Math.min(10, shifts.data.length) && (
           <Button
             variant="ghost"
@@ -622,21 +647,25 @@ function RotationSheet({
 
       <section className="rotation-section">
         <h3>Waktu pergantian</h3>
-        <div className="rotation-days" role="radiogroup" aria-label="Hari pergantian">
+        <fieldset className="rotation-days">
+          <legend className="hds-sr-only">Hari pergantian</legend>
           {DAY_SHORT.map((label, index) => (
-            <button
+            <label
               key={label}
-              type="button"
-              role="radio"
-              aria-checked={dayOfWeek === index + 1}
-              aria-label={DAY_FULL[index]}
               className={dayOfWeek === index + 1 ? 'shift-chip is-selected' : 'shift-chip'}
-              onClick={() => setDayOfWeek(index + 1)}
             >
-              {label}
-            </button>
+              <input
+                type="radio"
+                name={dayName}
+                value={index + 1}
+                checked={dayOfWeek === index + 1}
+                aria-label={DAY_FULL[index]}
+                onChange={() => setDayOfWeek(index + 1)}
+              />
+              <span aria-hidden="true">{label}</span>
+            </label>
           ))}
-        </div>
+        </fieldset>
         <div className="rotation-time">
           <label className="rotation-field">
             <span>Jam</span>
@@ -690,11 +719,6 @@ function RotationSheet({
           onCheckedChange={setEnabled}
         />
       </div>
-      {rotation && rotation.shifts.some((shift) => !shift.available) && (
-        <Alert tone="warning" title="Shift dihapus">
-          <CircleAlert aria-hidden="true" /> Ganti shift yang sudah dihapus sebelum menyimpan.
-        </Alert>
-      )}
     </Dialog>
   );
 }

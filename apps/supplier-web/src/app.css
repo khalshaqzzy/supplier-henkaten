@@ -7015,6 +7015,25 @@ a.overview-activity-identifier:hover {
 .line-scope-toggle .hds-segmented__item {
   white-space: nowrap;
 }
+.board-canvas-view-only {
+  margin: 0;
+}
+.henkaten-view-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hds-space-3);
+}
+/* On the board line header the marker matches the shift badge beside it. */
+.board-line > header .view-only-pill {
+  min-height: 0;
+  margin-left: 0.4rem;
+  padding: 0.16rem 0.48rem;
+  font-size: 0.69rem;
+  font-weight: 750;
+  vertical-align: middle;
+}
 /* Switches keep their track shape; the whole labelled row is the touch target. */
 .product-shell button.hds-switch {
   min-width: var(--hds-control-lg);

@@ -397,7 +397,9 @@ function MasterRow({
               size="sm"
               variant="ghost"
               className="master-row-delete"
-              aria-label="Hapus permanen"
+              aria-label={
+                typeof values[0] === 'string' ? `Hapus permanen ${values[0]}` : 'Hapus permanen'
+              }
               title="Hapus permanen"
               onClick={() => setDeleting(true)}
             >
@@ -667,7 +669,7 @@ function ResourceLifecycle({
         )}
         <div className="lifecycle-row">
           <span className={active ? 'lifecycle-state is-active' : 'lifecycle-state'}>
-            {active ? 'Aktif' : 'Di arsip'}
+            {active ? 'Aktif' : 'Arsip'}
           </span>
           <div className="lifecycle-actions">
             {!active && (

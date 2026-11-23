@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { CalendarDays, CopyCheck, Moon } from 'lucide-react';
 import type { ShiftDaySchedule, WeeklyScheduleInput } from '@tmmin-henkaten/contracts';
 import { Input, SegmentedControl, Switch } from '@tmmin-henkaten/ui';
@@ -158,7 +159,7 @@ export function ShiftScheduleCell({
   return (
     <span className="shift-schedule-cell">
       <ShiftDayStrip days={days} />
-      <span className="shift-schedule-cell__text">
+      <span className="shift-schedule-cell__text" title={scheduleLabel(days)}>
         {first && (isUniform || sameTimes) ? (
           <>
             <strong>
@@ -212,10 +213,15 @@ export function ShiftWeeklyScheduleEditor({
 }) {
   const days = scheduleFromDraft(value);
   const working = days.filter((day) => !day.isOff);
+  const allValid = working.every(
+    (day) => day.startTime && day.endTime && day.startTime !== day.endTime,
+  );
   const weeklyMinutes = working.reduce(
     (sum, day) => sum + (day.isOff ? 0 : durationMinutes(day.startTime, day.endTime)),
     0,
   );
+  // Per-day hours set before switching to "Jam sama", restored when switching back unchanged.
+  const perDayStash = useRef<{ days: DayDraft[]; startTime: string; endTime: string } | null>(null);
   const activePreset = presets.find(
     (preset) =>
       preset.working.length === working.length &&
@@ -233,18 +239,32 @@ export function ShiftWeeklyScheduleEditor({
     });
   const switchMode = (mode: string) => {
     if (mode === value.mode) return;
-    if (mode === 'PER_DAY')
+    if (mode === 'PER_DAY') {
+      const stash = perDayStash.current;
+      const restore =
+        stash && stash.startTime === value.startTime && stash.endTime === value.endTime;
+      perDayStash.current = null;
       onChange({
         ...value,
         mode: 'PER_DAY',
-        days: value.days.map((day) => ({
-          ...day,
-          startTime: value.startTime,
-          endTime: value.endTime,
-        })),
+        days: value.days.map((day) => {
+          const saved = restore
+            ? stash.days.find((item) => item.dayOfWeek === day.dayOfWeek)
+            : null;
+          return {
+            ...day,
+            startTime: saved?.startTime ?? value.startTime,
+            endTime: saved?.endTime ?? value.endTime,
+          };
+        }),
       });
-    else {
+    } else {
       const first = value.days.find((day) => !day.isOff) ?? value.days[0]!;
+      perDayStash.current = {
+        days: value.days,
+        startTime: first.startTime,
+        endTime: first.endTime,
+      };
       onChange({ ...value, mode: 'UNIFORM', startTime: first.startTime, endTime: first.endTime });
     }
   };
@@ -349,7 +369,16 @@ export function ShiftWeeklyScheduleEditor({
                 )}
             </div>
           </div>
-          <DayTrack start={value.startTime} end={value.endTime} off={false} />
+          <DayTrack
+            start={value.startTime}
+            end={value.endTime}
+            off={
+              working.length === 0 ||
+              !value.startTime ||
+              !value.endTime ||
+              value.startTime === value.endTime
+            }
+          />
           <TrackAxis />
         </div>
       ) : (
@@ -390,7 +419,9 @@ export function ShiftWeeklyScheduleEditor({
                     <span className="shift-editor__row-meta">
                       {valid ? formatDuration(durationMinutes(day.startTime, day.endTime)) : '—'}
                       {valid && crosses(day.startTime, day.endTime) && (
-                        <em className="shift-pill">+1</em>
+                        <em className="shift-pill" title="Selesai hari berikutnya">
+                          +1<span className="hds-sr-only"> hari</span>
+                        </em>
                       )}
                     </span>
                     <button
@@ -424,7 +455,7 @@ export function ShiftWeeklyScheduleEditor({
         </div>
         <div>
           <span>Total per minggu</span>
-          <strong>{working.length ? formatDuration(weeklyMinutes) : '—'}</strong>
+          <strong>{working.length && allValid ? formatDuration(weeklyMinutes) : '—'}</strong>
         </div>
         <div>
           <span>Libur</span>

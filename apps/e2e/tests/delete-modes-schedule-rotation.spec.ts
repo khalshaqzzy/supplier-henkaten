@@ -277,7 +277,7 @@ test('per-day shift hours, weekly rotation, read-only cross-line visibility and 
   await confirm.getByText('Arsipkan', { exact: true }).first().click();
   await confirm.getByRole('checkbox').click();
   await confirm.getByRole('button', { name: 'Arsipkan' }).click();
-  await expect(page.locator('.lifecycle-state')).toHaveText('Di arsip');
+  await expect(page.locator('.lifecycle-state')).toHaveText('Arsip');
 
   // 7. From the archive the line is removed permanently and its code is free again.
   await page.goto(`${runtime.supplierOrigin}/master-data/lines?active=INACTIVE`);

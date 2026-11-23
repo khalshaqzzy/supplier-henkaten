@@ -1,5 +1,9 @@
 .hds-dialog.master-delete-dialog {
-  width: min(560px, calc(100vw - 32px));
+  width: min(640px, calc(100vw - 32px));
+}
+.catalog-delete-dialog.master-delete-dialog--archive .hds-dialog__adornment {
+  background: var(--hds-surface-inset);
+  color: var(--hds-text-secondary);
 }
 .master-delete-dialog .hds-dialog__body {
   gap: 20px;
@@ -217,8 +221,15 @@
   width: 16px;
   height: 16px;
 }
-.master-delete__tags span {
-  background: var(--hds-surface-inset);
+.master-delete__impact-label {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.master-delete__impact-label small {
+  font-size: 12px;
+  color: var(--hds-text-secondary);
+  overflow-wrap: anywhere;
 }
 .master-delete__consent {
   padding: 12px 14px;

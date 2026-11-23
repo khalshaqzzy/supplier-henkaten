@@ -204,11 +204,11 @@ export function BoardPage() {
           />
         </label>
         <label>
-          <span>Line dalam scope</span>
+          <span>Line</span>
           <Select
             value={lineId ?? ''}
             options={[
-              { value: '', label: 'Semua line' },
+              { value: '', label: visibility === 'ASSIGNED' ? 'Semua line saya' : 'Semua line' },
               ...lineOptions.map((line) => ({
                 value: line.lineId,
                 label: `${line.lineCode} · ${line.lineName}`,
@@ -382,6 +382,13 @@ export function BoardPage() {
                   </div>
                 }
               >
+                {scopedRole && contextLine.assigned === false && (
+                  <p className="board-canvas-view-only">
+                    <span className="view-only-pill">
+                      <Eye aria-hidden="true" /> Hanya lihat
+                    </span>
+                  </p>
+                )}
                 <BoardCanvas line={contextLine} onDirtyChange={setCanvasDirty} />
               </Suspense>
             ) : (

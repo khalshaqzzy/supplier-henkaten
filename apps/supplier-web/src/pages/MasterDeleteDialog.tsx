@@ -79,7 +79,8 @@ export function MasterDeleteDialog({
   useEffect(() => {
     if (data && !data.canArchive && data.canDelete) setMode('PERMANENT');
   }, [data]);
-  useEffect(() => setConsent(false), [mode]);
+  // Consent applies to the mode and impact on screen; a refreshed preview needs it again.
+  useEffect(() => setConsent(false), [mode, data]);
 
   const remove = useMutation({
     mutationFn: () =>
@@ -120,10 +121,20 @@ export function MasterDeleteDialog({
         if (!next && !busy) onClose();
       }}
       dismissible={!busy}
-      className="catalog-delete-dialog master-delete-dialog"
+      className={`catalog-delete-dialog master-delete-dialog${
+        !blocked && mode === 'ARCHIVE' ? ' master-delete-dialog--archive' : ''
+      }`}
       title={title}
       {...(data ? { description: data.resource.label } : {})}
-      headerAdornment={blocked ? <CircleAlert aria-hidden="true" /> : <Trash2 aria-hidden="true" />}
+      headerAdornment={
+        blocked ? (
+          <CircleAlert aria-hidden="true" />
+        ) : mode === 'ARCHIVE' ? (
+          <Archive aria-hidden="true" />
+        ) : (
+          <Trash2 aria-hidden="true" />
+        )
+      }
       footer={
         blocked ? (
           <>
@@ -131,7 +142,7 @@ export function MasterDeleteDialog({
               Tutup
             </Button>
             <Button
-              variant="secondary"
+              variant="primary"
               leadingIcon={<RefreshCw aria-hidden="true" />}
               loading={preview.isFetching}
               onClick={() => {
@@ -148,7 +159,7 @@ export function MasterDeleteDialog({
               Batal
             </Button>
             <Button
-              variant="danger"
+              variant={mode === 'ARCHIVE' ? 'primary' : 'danger'}
               loading={busy}
               disabled={!data || !consent || preview.isFetching}
               leadingIcon={
@@ -189,6 +200,7 @@ export function MasterDeleteDialog({
       ) : (
         <>
           <ModePicker
+            kind={target.kind}
             mode={mode}
             onChange={setMode}
             canArchive={preview.data.canArchive}
@@ -214,13 +226,24 @@ export function MasterDeleteDialog({
   );
 }
 
+/** What a permanent delete frees for reuse, per kind. Shift Templates reserve nothing visible. */
+const reusable: Record<MasterDeleteTarget['kind'], string | null> = {
+  LINE: 'Kode line',
+  JOB: 'Nama job',
+  MEMBER: 'No. registrasi & username',
+  PART: 'Part number',
+  SHIFT_TEMPLATE: null,
+};
+
 function ModePicker({
+  kind,
   mode,
   onChange,
   canArchive,
   archived,
   disabled,
 }: {
+  kind: MasterDeleteTarget['kind'];
   mode: MasterDeleteMode;
   onChange: (mode: MasterDeleteMode) => void;
   canArchive: boolean;
@@ -239,14 +262,21 @@ function ModePicker({
       value: 'ARCHIVE',
       icon: <Archive aria-hidden="true" />,
       title: 'Arsipkan',
-      points: ['Dapat diaktifkan kembali', 'Kode tetap terpakai'],
-      ...(canArchive ? {} : { unavailable: archived ? 'Sudah di arsip' : 'Tidak tersedia' }),
+      points: [
+        'Dapat diaktifkan kembali',
+        ...(reusable[kind] ? [`${reusable[kind]} tetap terpakai`] : []),
+      ],
+      ...(canArchive ? {} : { unavailable: archived ? 'Sudah diarsipkan' : 'Tidak tersedia' }),
     },
     {
       value: 'PERMANENT',
       icon: <Trash2 aria-hidden="true" />,
       title: 'Hapus permanen',
-      points: ['Tidak dapat dipulihkan', 'Kode dapat dipakai lagi', 'Riwayat Henkaten tetap ada'],
+      points: [
+        'Tidak dapat dipulihkan',
+        ...(reusable[kind] ? [`${reusable[kind]} dapat dipakai lagi`] : []),
+        'Riwayat Henkaten tetap ada',
+      ],
     },
   ];
   return (
@@ -306,7 +336,13 @@ function ImpactSummary({
   mode: MasterDeleteMode;
 }) {
   const { impact } = preview;
-  const rows: Array<{ key: string; icon: ReactNode; label: string; value: ReactNode }> = [];
+  const rows: Array<{
+    key: string;
+    icon: ReactNode;
+    label: string;
+    detail?: string;
+    value: ReactNode;
+  }> = [];
   if (impact.jobs > 0)
     rows.push({
       key: 'jobs',
@@ -319,6 +355,7 @@ function ImpactSummary({
       key: 'line-shifts',
       icon: <Unlink aria-hidden="true" />,
       label: 'Line–Shift dilepas',
+      ...(impact.lineShiftLabels.length ? { detail: impact.lineShiftLabels.join(', ') } : {}),
       value: impact.lineShifts,
     });
   if (impact.clearedAssignments > 0)
@@ -361,18 +398,14 @@ function ImpactSummary({
           {rows.map((row) => (
             <li key={row.key}>
               <span className="master-delete__impact-icon">{row.icon}</span>
-              <span>{row.label}</span>
+              <span className="master-delete__impact-label">
+                {row.label}
+                {row.detail && <small>{row.detail}</small>}
+              </span>
               <strong>{row.value}</strong>
             </li>
           ))}
         </ul>
-      )}
-      {impact.lineShiftLabels.length > 0 && (
-        <div className="catalog-line-tags master-delete__tags">
-          {impact.lineShiftLabels.map((label) => (
-            <span key={label}>{label}</span>
-          ))}
-        </div>
       )}
     </section>
   );

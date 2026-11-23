@@ -11,7 +11,7 @@ import { Alert, Button, Dialog, ErrorState, Select, Skeleton, toast } from '@tmm
 import { supplierApi } from '../app/api';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
-import { scheduleLabel } from './ShiftSchedule';
+import { ShiftDayStrip, scheduleLabel } from './ShiftSchedule';
 import './catalog-actions.css';
 
 type Scope = { userId: string; supplierId: string; purpose: string };
@@ -327,7 +327,7 @@ function TimeChange({ shift, next }: { shift: ShiftTemplate; next: ShiftTemplate
           <small>{next.timezone}</small>
         </div>
       </div>
-      <TimeTrack shift={next} />
+      {next.isUniform ? <TimeTrack shift={next} /> : <ShiftDayStrip days={next.weeklySchedule} />}
     </div>
   );
 }

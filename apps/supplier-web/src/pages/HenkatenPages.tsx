@@ -95,6 +95,14 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
     next.delete('cursor');
     setParams(next, { replace: true });
   };
+  // Semua/PCR tabs keep the chosen line scope.
+  const tabHref = (pcr: boolean) => {
+    const next = new URLSearchParams();
+    if (pcr) next.set('pcr', 'PCR');
+    if (mineOnly) next.set('scope', 'ASSIGNED');
+    const query = next.toString();
+    return query ? `/henkatens?${query}` : '/henkatens';
+  };
   const advancedKeys = approvalQueue
     ? ['from', 'to']
     : ['from', 'to', 'approvalRoute', 'approvalStatus'];
@@ -117,21 +125,30 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
           ) : undefined
         }
       />
-      {!approvalQueue && scopedRole && (
-        <LineScopeToggle
-          value={mineOnly ? 'ASSIGNED' : 'ALL'}
-          onChange={(next) => update('scope', next === 'ASSIGNED' ? 'ASSIGNED' : '')}
-        />
-      )}
       {!approvalQueue && (
-        <nav className="pcr-tabs" aria-label="Tampilan Henkaten">
-          <Link className={params.get('pcr') !== 'PCR' ? 'is-current' : ''} to="/henkatens">
-            Semua
-          </Link>
-          <Link className={params.get('pcr') === 'PCR' ? 'is-current' : ''} to="/henkatens?pcr=PCR">
-            PCR
-          </Link>
-        </nav>
+        <div className="henkaten-view-bar">
+          <nav className="pcr-tabs" aria-label="Tampilan Henkaten">
+            <Link className={params.get('pcr') !== 'PCR' ? 'is-current' : ''} to={tabHref(false)}>
+              Semua
+            </Link>
+            <Link className={params.get('pcr') === 'PCR' ? 'is-current' : ''} to={tabHref(true)}>
+              PCR
+            </Link>
+          </nav>
+          {scopedRole && (
+            <LineScopeToggle
+              value={mineOnly ? 'ASSIGNED' : 'ALL'}
+              onChange={(next) => {
+                const query = new URLSearchParams(params);
+                if (next === 'ASSIGNED') query.set('scope', 'ASSIGNED');
+                else query.delete('scope');
+                query.delete('lineId');
+                query.delete('cursor');
+                setParams(query, { replace: true });
+              }}
+            />
+          )}
+        </div>
       )}
       <FilterBar>
         {approvalQueue && (
