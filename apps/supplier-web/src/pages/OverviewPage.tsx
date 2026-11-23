@@ -37,7 +37,7 @@ import {
   RankedDistribution,
   RecentActivityFeed,
 } from '../components/OverviewDashboard';
-import { SummaryMetric, SummaryStrip } from '../components/OperationalUI';
+import { LineScopeToggle, SummaryMetric, SummaryStrip } from '../components/OperationalUI';
 
 export function OverviewPage() {
   const { session, hasCapability } = useSession();
@@ -46,6 +46,8 @@ export function OverviewPage() {
   const [activityExpanded, setActivityExpanded] = useState(false);
   const identity = session!.principal;
   const supplier = session!.supplier!;
+  const scopedRole = identity.role === 'SUPERVISOR' || identity.role === 'LINE_LEADER';
+  const visibility = scopedRole && params.get('scope') === 'ASSIGNED' ? 'ASSIGNED' : 'ALL';
   const from = params.get('from');
   const to = params.get('to');
   const query: DashboardQuery = {
@@ -65,6 +67,7 @@ export function OverviewPage() {
       ? { approvalStatus: params.get('approvalStatus') as DashboardQuery['approvalStatus'] }
       : {}),
     granularity: (params.get('granularity') as DashboardQuery['granularity']) || 'DAY',
+    ...(visibility === 'ASSIGNED' ? { scope: 'ASSIGNED' as const } : {}),
   };
   const dashboard = useQuery({
     queryKey: scopedKey(
@@ -102,6 +105,19 @@ export function OverviewPage() {
           ) : undefined
         }
       />
+      {scopedRole && (
+        <LineScopeToggle
+          value={visibility}
+          onChange={(nextValue) => {
+            const next = new URLSearchParams(params);
+            if (nextValue === 'ASSIGNED') next.set('scope', 'ASSIGNED');
+            else next.delete('scope');
+            next.delete('lineId');
+            next.delete('shiftTemplateId');
+            setParams(next, { replace: true });
+          }}
+        />
+      )}
       <div className="overview-filter-shell">
         <FilterBar>
           <Popover

@@ -1,5 +1,5 @@
 import { SupplierHenkatenExport } from './SupplierHenkatenExport';
-import { ArrowRight, Check, Copy, ShieldCheck, XCircle } from 'lucide-react';
+import { ArrowRight, Check, Copy, Eye, ShieldCheck, XCircle } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
@@ -26,7 +26,7 @@ import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { CursorPager } from '../components/CursorPager';
 import { PageHeader } from '../components/layout';
-import { FactItem, FactStrip } from '../components/OperationalUI';
+import { FactItem, FactStrip, LineScopeToggle } from '../components/OperationalUI';
 import { PartSummary } from './HenkatenPartPicker';
 import {
   ApprovalTimeline,
@@ -66,6 +66,11 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
       : {}),
     ...(!approvalQueue && params.get('pcr') === 'PCR' ? { pcrStatus: 'PCR' as const } : {}),
   };
+  const role = session!.principal.role;
+  const scopedRole = role === 'SUPERVISOR' || role === 'LINE_LEADER';
+  const mineOnly = params.get('scope') === 'ASSIGNED';
+  // The approval queue always lists the caller's own work; the register reads every line.
+  if (approvalQueue || (scopedRole && mineOnly)) query.scope = 'ASSIGNED';
   if (approvalQueue) {
     query.approvalRoute =
       (params.get('route') as HenkatenListQuery['approvalRoute']) ??
@@ -112,6 +117,12 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
           ) : undefined
         }
       />
+      {!approvalQueue && scopedRole && (
+        <LineScopeToggle
+          value={mineOnly ? 'ASSIGNED' : 'ALL'}
+          onChange={(next) => update('scope', next === 'ASSIGNED' ? 'ASSIGNED' : '')}
+        />
+      )}
       {!approvalQueue && (
         <nav className="pcr-tabs" aria-label="Tampilan Henkaten">
           <Link className={params.get('pcr') !== 'PCR' ? 'is-current' : ''} to="/henkatens">
@@ -426,20 +437,31 @@ export function HenkatenDetailPage() {
   const item = record.data;
   const role = session!.principal.role;
   const route = role === 'QC' ? item.routes.qc : item.routes.supervisor;
-  const canDecide = canDecideHenkaten({
-    hasCapability: hasCapability('SUPPLIER_HENKATEN_DECIDE'),
-    status: item.status,
-    routeStatus: route.status,
-    role,
-    responsibleMemberId: route.currentResponsibleMemberId,
-    ...(session!.principal.memberId ? { memberId: session!.principal.memberId } : {}),
-  });
-  const canWithdraw = role === 'LINE_LEADER' && item.status === 'OPEN';
+  // An older API omits permissions and only serves records on the viewer's own lines.
+  const permissions = item.permissions ?? {
+    assigned: true,
+    canDecide: true,
+    canWithdraw: role === 'LINE_LEADER' && item.status === 'OPEN',
+    canClone: true,
+    canReroute: item.status === 'OPEN',
+  };
+  const canDecide =
+    permissions.canDecide &&
+    canDecideHenkaten({
+      hasCapability: hasCapability('SUPPLIER_HENKATEN_DECIDE'),
+      status: item.status,
+      routeStatus: route.status,
+      role,
+      responsibleMemberId: route.currentResponsibleMemberId,
+      ...(session!.principal.memberId ? { memberId: session!.principal.memberId } : {}),
+    });
+  const canWithdraw = hasCapability('SUPPLIER_HENKATEN_WITHDRAW') && permissions.canWithdraw;
   const canReroute =
     hasCapability('SUPPLIER_APPROVAL_REROUTE') &&
-    item.status === 'OPEN' &&
+    permissions.canReroute &&
     item.routes.supervisor.status === 'PENDING';
-  const canClone = role === 'LINE_LEADER';
+  const canClone = role === 'LINE_LEADER' && permissions.canClone;
+  const viewOnly = (role === 'SUPERVISOR' || role === 'LINE_LEADER') && !permissions.assigned;
   return (
     <div className="product-page henkaten-detail">
       <PageHeader
@@ -467,6 +489,11 @@ export function HenkatenDetailPage() {
             <span className={`category-badge is-${item.category.toLowerCase()}`}>
               {humanize(item.category)}
             </span>
+            {viewOnly && (
+              <span className="view-only-pill">
+                <Eye aria-hidden="true" /> Hanya lihat
+              </span>
+            )}
           </div>
         }
         meta={
@@ -631,7 +658,18 @@ export function HenkatenDetailPage() {
         </div>
         <aside className="detail-action-rail" aria-label="Tindakan Henkaten">
           <span className="product-eyebrow">Konteks tindakan</span>
-          <h2>{canDecide ? `Keputusan ${routeLabel(route.route)}` : 'Tindakan record'}</h2>
+          <h2>
+            {canDecide
+              ? `Keputusan ${routeLabel(route.route)}`
+              : viewOnly
+                ? 'Hanya lihat'
+                : 'Tindakan record'}
+          </h2>
+          {viewOnly && (
+            <p className="view-only-note">
+              <Eye aria-hidden="true" /> Line ini bukan tanggung jawab Anda.
+            </p>
+          )}
           <div className="route-pills">
             <span>Supervisor</span>
             <RouteStatus value={item.routes.supervisor.status} />

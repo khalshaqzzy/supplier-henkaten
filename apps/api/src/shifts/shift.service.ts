@@ -1,3 +1,4 @@
+import { scheduleForBusinessDate } from '../master-data/shift-schedule.js';
 import { Injectable } from '@nestjs/common';
 
 import type {
@@ -65,10 +66,15 @@ export class ShiftService {
       ) {
         throw forbidden();
       }
+      // An off day falls back to the representative hours so preparation stays possible.
+      const dayMinutes = scheduleForBusinessDate(source.shift, input.businessDate) ?? {
+        startMinute: source.shift.startMinute,
+        endMinute: source.shift.endMinute,
+      };
       const boundaries = shiftBoundaries(
         input.businessDate,
-        source.shift.startMinute,
-        source.shift.endMinute,
+        dayMinutes.startMinute,
+        dayMinutes.endMinute,
         source.shift.timezone,
       );
       const slot = {
@@ -102,8 +108,8 @@ export class ShiftService {
               lineCodeSnapshot: source.line.code,
               lineNameSnapshot: source.line.name,
               shiftNameSnapshot: source.shift.name,
-              shiftStartMinuteSnapshot: source.shift.startMinute,
-              shiftEndMinuteSnapshot: source.shift.endMinute,
+              shiftStartMinuteSnapshot: dayMinutes.startMinute,
+              shiftEndMinuteSnapshot: dayMinutes.endMinute,
               defaultAssignmentSetVersion: source.assignmentSetVersion,
               sourceEpoch: source.sourceEpoch,
               supervisorMemberId: source.supervisor?.id ?? null,
@@ -128,8 +134,8 @@ export class ShiftService {
               lineCodeSnapshot: source.line.code,
               lineNameSnapshot: source.line.name,
               shiftNameSnapshot: source.shift.name,
-              shiftStartMinuteSnapshot: source.shift.startMinute,
-              shiftEndMinuteSnapshot: source.shift.endMinute,
+              shiftStartMinuteSnapshot: dayMinutes.startMinute,
+              shiftEndMinuteSnapshot: dayMinutes.endMinute,
               defaultAssignmentSetVersion: source.assignmentSetVersion,
               sourceEpoch: source.sourceEpoch,
               ...(source.supervisor

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import type { DeletePartsRequest, SwapShiftTimesRequest } from '@tmmin-henkaten/contracts';
 import { deletePartsResultSchema, swapShiftTimesResultSchema } from '@tmmin-henkaten/contracts';
-import type { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '../generated/prisma/client.js';
 import type { RequestPrincipal } from '../common/request-context.js';
 import type { MutationContext } from '../administration/mutation-context.js';
 import { assertCurrentPrincipal } from '../auth/current-principal.js';
@@ -13,6 +13,7 @@ import { OutboxService } from '../persistence/outbox.service.js';
 import { runSerializable } from '../persistence/transaction.js';
 import { lockSetupMutation } from './setup-lock.js';
 import { masterAudit } from './master-data-audit.js';
+import { weeklyScheduleOf } from './shift-schedule.js';
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const conflict = (detail: string) =>
@@ -94,7 +95,12 @@ export class CatalogCommandService {
       if (previous) return swapShiftTimesResultSchema.parse(previous.result);
       const supplierId = principal.supplierId!;
       const shifts = await tx.shiftTemplate.findMany({
-        where: { supplierId, id: { in: [input.first.id, input.second.id] }, active: true },
+        where: {
+          supplierId,
+          id: { in: [input.first.id, input.second.id] },
+          active: true,
+          deletedAt: null,
+        },
       });
       const first = shifts.find((s) => s.id === input.first.id);
       const second = shifts.find((s) => s.id === input.second.id);
@@ -107,13 +113,12 @@ export class CatalogCommandService {
       )
         throw conflict('Shift berubah atau tidak tersedia. Muat ulang lalu pilih kembali.');
       if (
-        first.startMinute === second.startMinute &&
-        first.endMinute === second.endMinute &&
-        first.timezone === second.timezone
+        first.timezone === second.timezone &&
+        JSON.stringify(weeklyScheduleOf(first)) === JSON.stringify(weeklyScheduleOf(second))
       )
         throw conflict('Kedua shift memiliki waktu yang sama. Pilih pasangan lain.');
       const lines = await tx.lineShift.findMany({
-        where: { supplierId, shiftTemplateId: { in: [first.id, second.id] } },
+        where: { supplierId, shiftTemplateId: { in: [first.id, second.id] }, deletedAt: null },
         select: { lineId: true },
       });
       for (const [target, source] of [
@@ -126,6 +131,10 @@ export class CatalogCommandService {
             startMinute: source.startMinute,
             endMinute: source.endMinute,
             timezone: source.timezone,
+            weeklySchedule:
+              source.weeklySchedule === null
+                ? Prisma.DbNull
+                : (source.weeklySchedule as Prisma.InputJsonValue),
             version: { increment: 1 },
             updatedById: principal.userId,
           },

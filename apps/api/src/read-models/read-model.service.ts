@@ -30,8 +30,11 @@ export class ReadModelService {
     requestedLineId?: string,
     shiftStatus: 'CURRENT' | 'OTHER' | 'ALL' = 'CURRENT',
     includeSchedule = false,
+    visibility: 'ALL' | 'ASSIGNED' = 'ALL',
   ) {
-    const context = await this.lineShifts.operationalContext(scope, principal);
+    const context = await this.lineShifts.operationalContext(scope, principal, new Date(), {
+      allLines: visibility === 'ALL',
+    });
     const boardNow = new Date(context.generatedAt);
     const occurrences = context.items.filter(
       (item) =>
@@ -117,6 +120,7 @@ export class ReadModelService {
         lineCode: item.lineCode,
         lineName: item.lineName,
         shiftName: item.shiftName,
+        assigned: item.assigned,
         ...(includeSchedule
           ? {
               startTime: item.startTime,
@@ -170,7 +174,9 @@ export class ReadModelService {
 
   async supplierDashboard(scope: TenantScope, principal: RequestPrincipal, query: DashboardQuery) {
     const auditLineIds = await this.auditLineScope(scope, principal);
-    const roleShiftScope = shiftScope(principal);
+    // Every supplier role reads all lines unless it narrows to its own (ASSIGNED).
+    const allLines = query.scope !== 'ASSIGNED';
+    const roleShiftScope = allLines ? {} : shiftScope(principal);
     const [lineOptions, shiftTemplateOptions] = await Promise.all([
       this.prisma.line.findMany({
         where: {
@@ -193,7 +199,7 @@ export class ReadModelService {
     ]);
     const scopedShiftWhere: Prisma.ShiftRunWhereInput = {
       supplierId: scope.supplierId,
-      ...shiftScope(principal),
+      ...roleShiftScope,
       ...(query.lineId ? { lineId: query.lineId } : {}),
       ...(query.shiftTemplateId ? { shiftTemplateId: query.shiftTemplateId } : {}),
       ...(query.from || query.to
@@ -208,7 +214,7 @@ export class ReadModelService {
     const where: Prisma.HenkatenWhereInput = {
       deletedAt: null,
       supplierId: scope.supplierId,
-      ...henkatenScope(principal),
+      ...(allLines ? {} : henkatenScope(principal)),
       ...(query.from || query.to
         ? {
             occurredAt: {

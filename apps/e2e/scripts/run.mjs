@@ -186,6 +186,7 @@ function baseEnvironment(extra) {
     AUTH_IP_LOGIN_LIMIT: '500',
     AUTH_GLOBAL_LIMIT_PER_MINUTE: '2000',
     OUTBOX_ENABLED: 'true',
+    SHIFT_ROTATION_ENABLED: 'false',
     OUTBOX_POLL_MS: '100',
     REALTIME_POLL_MS: '100',
     TMMIN_BOOTSTRAP_USERNAME: 'e2e.bootstrap',

@@ -19,6 +19,12 @@ import { MasterDataAccessService } from './master-data-access.service.js';
 import { MemberService } from './member.service.js';
 import { PhotoService } from './photo.service.js';
 import { LineShiftService } from './line-shift.service.js';
+import {
+  SupplierMasterDeleteController,
+  SupplierShiftRotationController,
+} from './master-delete.controller.js';
+import { MasterDeleteService } from './master-delete.service.js';
+import { ShiftRotationService } from './shift-rotation.service.js';
 import { TmminMasterDataController } from './tmmin-master-data.controller.js';
 
 @Module({
@@ -30,6 +36,8 @@ import { TmminMasterDataController } from './tmmin-master-data.controller.js';
     SupplierCatalogController,
     SupplierConfigurationController,
     TmminMasterDataController,
+    SupplierMasterDeleteController,
+    SupplierShiftRotationController,
   ],
   providers: [
     SetupService,
@@ -43,6 +51,8 @@ import { TmminMasterDataController } from './tmmin-master-data.controller.js';
     AssignmentService,
     PhotoService,
     LineShiftService,
+    MasterDeleteService,
+    ShiftRotationService,
   ],
   exports: [
     MasterDataAccessService,

@@ -3,8 +3,11 @@ import { Injectable } from '@nestjs/common';
 
 import {
   MAX_ACTIVE_LINES_PER_SUPPLIER,
+  type CreateShiftTemplateRequest,
   type MasterListQuery,
   type PartImportCommitRequest,
+  type UpdateShiftTemplateRequest,
+  type WeeklyScheduleInput,
 } from '@tmmin-henkaten/contracts';
 
 import type { Prisma } from '../generated/prisma/client.js';
@@ -27,6 +30,15 @@ import {
 } from './master-data-presenters.js';
 import { capacity, missing, resourceInUse } from './member.service.js';
 import { assertIanaTimezone, timeToMinute } from './shift-time.js';
+import {
+  isUniformSchedule,
+  minuteToTime,
+  normalizeWeeklySchedule,
+  scheduleColumns,
+  uniformWeeklySchedule,
+  weeklyScheduleOf,
+  type ShiftScheduleSource,
+} from './shift-schedule.js';
 
 @Injectable()
 export class CatalogService {
@@ -41,6 +53,7 @@ export class CatalogService {
     const rows = await this.prisma.line.findMany({
       where: {
         supplierId: scope.supplierId,
+        deletedAt: null,
         ...activeWhere(query.active),
         ...(query.search
           ? {
@@ -60,7 +73,7 @@ export class CatalogService {
 
   async getLine(scope: TenantScope, id: string) {
     const row = await this.prisma.line.findFirst({
-      where: { id, supplierId: scope.supplierId },
+      where: { id, supplierId: scope.supplierId, deletedAt: null },
     });
     if (!row) throw missing('Line');
     return presentLine(row);
@@ -114,7 +127,9 @@ export class CatalogService {
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
       await lockSetupMutation(tx, scope.supplierId);
-      const current = await tx.line.findFirst({ where: { id, supplierId: scope.supplierId } });
+      const current = await tx.line.findFirst({
+        where: { id, supplierId: scope.supplierId, deletedAt: null },
+      });
       if (!current) throw missing('Line');
       if (current.version !== input.expectedVersion) throw versionConflict();
       const updated = await tx.line.update({
@@ -146,7 +161,9 @@ export class CatalogService {
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
       await lockSupplier(tx, scope.supplierId);
-      const current = await tx.line.findFirst({ where: { id, supplierId: scope.supplierId } });
+      const current = await tx.line.findFirst({
+        where: { id, supplierId: scope.supplierId, deletedAt: null },
+      });
       if (!current) throw missing('Line');
       if (current.version !== expectedVersion) throw versionConflict();
       if (!active) {
@@ -196,6 +213,7 @@ export class CatalogService {
       where: {
         supplierId: scope.supplierId,
         lineId,
+        deletedAt: null,
         ...activeWhere(query.active),
         ...(query.search ? { name: { contains: query.search, mode: 'insensitive' } } : {}),
       },
@@ -262,7 +280,7 @@ export class CatalogService {
 
   async getJob(scope: TenantScope, lineId: string, id: string) {
     const row = await this.prisma.job.findFirst({
-      where: { id, lineId, supplierId: scope.supplierId },
+      where: { id, lineId, supplierId: scope.supplierId, deletedAt: null },
     });
     if (!row) throw missing('Job');
     return presentJob(row);
@@ -278,7 +296,7 @@ export class CatalogService {
     const row = await this.prisma.$transaction(async (tx) => {
       await lockSetupMutation(tx, scope.supplierId);
       const current = await tx.job.findFirst({
-        where: { id, lineId, supplierId: scope.supplierId },
+        where: { id, lineId, supplierId: scope.supplierId, deletedAt: null },
       });
       if (!current) throw missing('Job');
       if (current.version !== input.expectedVersion) throw versionConflict();
@@ -309,7 +327,7 @@ export class CatalogService {
     const row = await this.prisma.$transaction(async (tx) => {
       await lockSupplier(tx, scope.supplierId);
       const current = await tx.job.findFirst({
-        where: { id, lineId, supplierId: scope.supplierId },
+        where: { id, lineId, supplierId: scope.supplierId, deletedAt: null },
       });
       if (!current) throw missing('Job');
       if (current.version !== expectedVersion) throw versionConflict();
@@ -448,7 +466,7 @@ export class CatalogService {
         })),
       );
     }
-    const byNumber = new Map(existing.map((part) => [part.normalizedPartNumber, part]));
+    const byNumber = preferLiveParts(existing);
     return {
       rows: rows.map((row) => {
         const part = byNumber.get(normalizeLookup(row.partNumber));
@@ -495,7 +513,7 @@ export class CatalogService {
             })),
           );
         }
-        const byNumber = new Map(existing.map((part) => [part.normalizedPartNumber, part]));
+        const byNumber = preferLiveParts(existing);
         const creates: PartImportCommitRequest['rows'] = [];
         const updates: {
           id: string;
@@ -726,6 +744,7 @@ export class CatalogService {
     const rows = await this.prisma.shiftTemplate.findMany({
       where: {
         supplierId: scope.supplierId,
+        deletedAt: null,
         ...activeWhere(query.active),
         ...(query.search ? { name: { contains: query.search, mode: 'insensitive' } } : {}),
       },
@@ -738,10 +757,10 @@ export class CatalogService {
 
   async createShiftTemplate(
     scope: TenantScope,
-    input: { name: string; startTime: string; endTime: string; timezone: string },
+    input: CreateShiftTemplateRequest,
     context: MutationContext,
   ) {
-    const times = parseShiftTimes(input.startTime, input.endTime, input.timezone);
+    const times = parseShiftSchedule(input, null);
     const row = await this.prisma.$transaction(async (tx) => {
       await lockSetupMutation(tx, scope.supplierId);
       const displayOrder =
@@ -756,7 +775,10 @@ export class CatalogService {
           supplierId: scope.supplierId,
           name: input.name.trim(),
           displayOrder: displayOrder + 1,
-          ...times,
+          startMinute: times.startMinute,
+          endMinute: times.endMinute,
+          timezone: times.timezone,
+          weeklySchedule: times.weeklySchedule,
           createdById: context.actorUserId,
           updatedById: context.actorUserId,
         },
@@ -778,7 +800,7 @@ export class CatalogService {
 
   async getShiftTemplate(scope: TenantScope, id: string) {
     const row = await this.prisma.shiftTemplate.findFirst({
-      where: { id, supplierId: scope.supplierId },
+      where: { id, supplierId: scope.supplierId, deletedAt: null },
     });
     if (!row) throw missing('Shift Template');
     return presentShiftTemplate(row);
@@ -787,37 +809,32 @@ export class CatalogService {
   async updateShiftTemplate(
     scope: TenantScope,
     id: string,
-    input: {
-      expectedVersion: number;
-      name?: string;
-      startTime?: string;
-      endTime?: string;
-      timezone?: string;
-    },
+    input: UpdateShiftTemplateRequest,
     context: MutationContext,
   ) {
     const row = await this.prisma.$transaction(async (tx) => {
       await lockSetupMutation(tx, scope.supplierId);
       const current = await tx.shiftTemplate.findFirst({
-        where: { id, supplierId: scope.supplierId },
+        where: { id, supplierId: scope.supplierId, deletedAt: null },
       });
       if (!current) throw missing('Shift Template');
       if (current.version !== input.expectedVersion) throw versionConflict();
-      const times = parseShiftTimes(
-        input.startTime ?? minuteString(current.startMinute),
-        input.endTime ?? minuteString(current.endMinute),
-        input.timezone ?? current.timezone,
-      );
+      const times = parseShiftSchedule(input, current);
       const scheduleChanged =
         times.startMinute !== current.startMinute ||
         times.endMinute !== current.endMinute ||
-        times.timezone !== current.timezone;
+        times.timezone !== current.timezone ||
+        JSON.stringify(weeklyScheduleOf(current)) !==
+          JSON.stringify(weeklyScheduleOf({ ...times, weeklySchedule: times.storedSchedule }));
       const nameChanged = Boolean(input.name && input.name.trim() !== current.name);
       const updated = await tx.shiftTemplate.update({
         where: { id },
         data: {
           ...(input.name ? { name: input.name.trim() } : {}),
-          ...times,
+          startMinute: times.startMinute,
+          endMinute: times.endMinute,
+          timezone: times.timezone,
+          weeklySchedule: times.weeklySchedule,
           version: { increment: 1 },
           updatedById: context.actorUserId,
         },
@@ -867,7 +884,7 @@ export class CatalogService {
     const row = await this.prisma.$transaction(async (tx) => {
       await lockSetupMutation(tx, scope.supplierId);
       const current = await tx.shiftTemplate.findFirst({
-        where: { id, supplierId: scope.supplierId },
+        where: { id, supplierId: scope.supplierId, deletedAt: null },
       });
       if (!current) throw missing('Shift Template');
       if (current.version !== expectedVersion) throw versionConflict();
@@ -916,7 +933,7 @@ export class CatalogService {
       if (kind === 'line') {
         await tx.$queryRaw`SELECT id FROM "Line" WHERE id = ANY(${ids}::uuid[]) ORDER BY id FOR UPDATE`;
         const current = await tx.line.findMany({
-          where: { supplierId: scope.supplierId, id: { in: ids } },
+          where: { supplierId: scope.supplierId, id: { in: ids }, deletedAt: null },
         });
         verifyReorder(current, items);
         for (const [index, item] of items.entries()) {
@@ -982,10 +999,28 @@ export class CatalogService {
   }
 
   private async requireLine(scope: TenantScope, id: string) {
-    const line = await this.prisma.line.findFirst({ where: { id, supplierId: scope.supplierId } });
+    const line = await this.prisma.line.findFirst({
+      where: { id, supplierId: scope.supplierId, deletedAt: null },
+    });
     if (!line) throw missing('Line');
     return line;
   }
+}
+
+/**
+ * Maps part numbers to the live part, or to the most recently updated deleted part (which an
+ * import may restore) when no live part has that number.
+ */
+function preferLiveParts<T extends { normalizedPartNumber: string; deletedAt: Date | null }>(
+  parts: T[],
+) {
+  const byNumber = new Map<string, T>();
+  for (const part of parts) {
+    const current = byNumber.get(part.normalizedPartNumber);
+    if (!current || (current.deletedAt && !part.deletedAt))
+      byNumber.set(part.normalizedPartNumber, part);
+  }
+  return byNumber;
 }
 
 function activeWhere(active: MasterListQuery['active']) {
@@ -1043,27 +1078,59 @@ async function lockSupplier(tx: Prisma.TransactionClient, supplierId: string) {
   await lockSetupMutation(tx, supplierId);
 }
 
-function parseShiftTimes(startTime: string, endTime: string, timezone: string) {
+/**
+ * Resolves the stored schedule from a create/update request. A weekly schedule wins; plain
+ * start/end times set every day to the same hours; omitted fields keep the current schedule.
+ */
+function parseShiftSchedule(
+  input: {
+    startTime?: string | undefined;
+    endTime?: string | undefined;
+    timezone?: string | undefined;
+    weeklySchedule?: WeeklyScheduleInput | undefined;
+  },
+  current: ShiftScheduleSource | null,
+) {
   try {
+    const timezone = input.timezone ?? current?.timezone;
+    if (!timezone) throw new Error('MissingTimezone');
     assertIanaTimezone(timezone);
-    const startMinute = timeToMinute(startTime);
-    const endMinute = timeToMinute(endTime);
-    if (startMinute === endMinute) throw new Error('EqualShiftTimes');
-    return { startMinute, endMinute, timezone };
+    let days;
+    if (input.weeklySchedule) {
+      days = normalizeWeeklySchedule(
+        input.weeklySchedule.map((day) =>
+          day.isOff
+            ? { dayOfWeek: day.dayOfWeek, isOff: true }
+            : {
+                dayOfWeek: day.dayOfWeek,
+                isOff: false,
+                startMinute: timeToMinute(day.startTime),
+                endMinute: timeToMinute(day.endTime),
+              },
+        ),
+      );
+    } else if (input.startTime !== undefined || input.endTime !== undefined || !current) {
+      const startMinute = timeToMinute(input.startTime ?? minuteToTime(current!.startMinute));
+      const endMinute = timeToMinute(input.endTime ?? minuteToTime(current!.endMinute));
+      if (startMinute === endMinute) throw new Error('EqualShiftTimes');
+      days = uniformWeeklySchedule(startMinute, endMinute);
+    } else {
+      days = weeklyScheduleOf(current);
+    }
+    const columns = scheduleColumns(days);
+    return {
+      ...columns,
+      timezone,
+      storedSchedule: isUniformSchedule(days) ? null : (days as unknown as Prisma.JsonValue),
+    };
   } catch {
     throw new ProblemException({
       status: 400,
       code: 'VALIDATION_FAILED',
       title: 'Validation failed',
-      detail: 'Shift time or IANA timezone is invalid.',
+      detail: 'Jam shift atau timezone IANA tidak valid.',
     });
   }
-}
-
-function minuteString(minute: number) {
-  return `${Math.floor(minute / 60)
-    .toString()
-    .padStart(2, '0')}:${(minute % 60).toString().padStart(2, '0')}`;
 }
 
 function verifyReorder(

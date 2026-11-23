@@ -45,12 +45,17 @@ export class TanokoService {
     const [members, jobs, mappings, assignments] = await this.prisma.$transaction(
       [
         this.prisma.member.findMany({
-          where: { supplierId, role: 'MP', resetArchivedAt: null },
+          where: { supplierId, role: 'MP', resetArchivedAt: null, deletedAt: null },
           select: { id: true, fullName: true, active: true },
           orderBy: [{ fullName: 'asc' }, { id: 'asc' }],
         }),
         this.prisma.job.findMany({
-          where: { supplierId, resetArchivedAt: null, line: { resetArchivedAt: null } },
+          where: {
+            supplierId,
+            resetArchivedAt: null,
+            deletedAt: null,
+            line: { resetArchivedAt: null, deletedAt: null },
+          },
           include: { line: true },
           orderBy: [{ line: { displayOrder: 'asc' } }, { displayOrder: 'asc' }, { id: 'asc' }],
         }),

@@ -1,4 +1,3 @@
-import { operationalLineScope } from './operational-line-scope.js';
 import { Injectable } from '@nestjs/common';
 import {
   defer,
@@ -195,15 +194,16 @@ export class RealtimeService {
     return typeof lineId === 'string' ? lineId : undefined;
   }
 
-  private async allowedLines(scope: TenantScope, principal: RequestPrincipal): Promise<string[]> {
-    if (['SUPPLIER_ADMIN', 'QC'].includes(principal.role)) {
-      return (
-        await this.prisma.line.findMany({
-          where: { supplierId: scope.supplierId },
-          select: { id: true },
-        })
-      ).map(({ id }) => id);
-    }
-    return operationalLineScope(this.prisma, scope.supplierId, principal);
+  /**
+   * Supplier roles read every line (actions stay limited to their own lines), so invalidations
+   * for all supplier lines reach them. The principal is still re-validated on each event.
+   */
+  private async allowedLines(scope: TenantScope, _principal: RequestPrincipal): Promise<string[]> {
+    return (
+      await this.prisma.line.findMany({
+        where: { supplierId: scope.supplierId },
+        select: { id: true },
+      })
+    ).map(({ id }) => id);
   }
 }

@@ -207,6 +207,21 @@ export const henkatenTransitionSchema = z
   })
   .strict();
 
+/** ALL = every line of the supplier (read-only where not assigned); ASSIGNED = own lines. */
+export const visibilityScopeSchema = z.enum(['ALL', 'ASSIGNED']);
+export type VisibilityScope = z.infer<typeof visibilityScopeSchema>;
+
+export const henkatenPermissionsSchema = z
+  .object({
+    assigned: z.boolean(),
+    canDecide: z.boolean(),
+    canWithdraw: z.boolean(),
+    canClone: z.boolean(),
+    canReroute: z.boolean(),
+  })
+  .strict();
+export type HenkatenPermissions = z.infer<typeof henkatenPermissionsSchema>;
+
 export const henkatenDetailSchema = henkatenSummarySchema
   .extend({
     timezone: z.string(),
@@ -256,6 +271,11 @@ export const henkatenDetailSchema = henkatenSummarySchema
       .strict()
       .nullable(),
     history: z.array(henkatenTransitionSchema),
+    /**
+     * Actions the requesting account may take; false for read-only (non-assigned) viewers.
+     * Optional for rollout compatibility: an older API omits it and only serves assigned records.
+     */
+    permissions: henkatenPermissionsSchema.optional(),
   })
   .strict();
 
@@ -273,6 +293,7 @@ export const henkatenListQuerySchema = z
     approvalStatus: approvalRouteStatusSchema.optional(),
     approvalRoute: approvalRouteSchema.optional(),
     pcrStatus: pcrStatusSchema.optional(),
+    scope: visibilityScopeSchema.optional(),
   })
   .strict();
 export type HenkatenListQuery = z.infer<typeof henkatenListQuerySchema>;

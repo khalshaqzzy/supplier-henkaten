@@ -1,3 +1,29 @@
+## Amendment — 23 November 2026: Delete modes, weekly shift schedules, automatic rotation and cross-line visibility
+
+- **Hapus: Arsipkan atau Hapus permanen.** Deleting a Line, Job, Member, Part or Shift Template
+  opens one dialog that offers *Arsipkan* (inactive, restorable with *Aktifkan kembali*, code stays
+  reserved) or *Hapus permanen* (removed from every list, code/number/username can be reused,
+  history stays), shows the impact and requires a consent checkbox. Archived records can be deleted
+  permanently from the archive.
+- **Line delete does not block on configuration.** Jobs are archived or removed with the Line,
+  Line–Shifts are released and assignments cleared automatically. The only blocker is an Open
+  Henkaten; the dialog lists them with links and the instruction to close them first, then re-check.
+- **Jam shift per hari.** A Shift Template uses the same hours every day (*Jam sama*) or its own
+  hours per day with off days (*Per hari*). Existing templates are treated as the same hours every
+  day. Off days produce no occurrence; the Shift Template list shows the week at a glance.
+- **Jadwal pergantian shift.** A Supplier Admin schedules a weekly automatic swap on a chosen day,
+  time and timezone for two shifts, or a cycle of three or more. Several schedules may exist; a
+  shift belongs to one enabled schedule. Each schedule shows the next and last run, history and
+  *Jalankan sekarang*. A missed run executes once when the service resumes.
+- **Lihat line lain.** Supervisors and Line Leaders can read Henkaten, the Assignment Board and the
+  Overview of every line of their supplier (*Semua line | Line saya*). On lines they are not
+  assigned to they see *Hanya lihat* and cannot decide, withdraw, clone or reroute. The approval
+  queue, notifications and activity feed remain limited to their own lines.
+- **Board layout by Supervisor.** The assigned Supervisor (or Line Leader) of a line may edit its
+  board layout, in addition to the Supplier Admin.
+
+See [ADR 0055](../docs/adr/0055-delete-modes-weekly-shift-schedules-rotation-visibility.md).
+
 ## Amendment — 20 November 2026: Shift swap occurrence isolation, realtime sync and board hours
 
 Swapping or editing Shift Template schedules keeps supplier operations synchronized without

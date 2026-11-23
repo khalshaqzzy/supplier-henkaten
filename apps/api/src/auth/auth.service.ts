@@ -166,6 +166,7 @@ export class AuthService {
           ? {
               realm,
               normalizedUsername,
+              deletedAt: null,
               supplier: { normalizedCode: normalizedSupplierCode },
             }
           : { id: '__invalid_supplier_login__' };

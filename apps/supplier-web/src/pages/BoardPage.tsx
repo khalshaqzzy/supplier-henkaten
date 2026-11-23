@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  Eye,
   Radio,
   RefreshCw,
   UserRound,
@@ -36,6 +37,7 @@ import {
   ContextRail,
   FactItem,
   FactStrip,
+  LineScopeToggle,
   SummaryMetric,
   SummaryStrip,
 } from '../components/OperationalUI';
@@ -55,6 +57,9 @@ export function BoardPage() {
       ? (params.get('shiftStatus') as 'OTHER' | 'ALL')
       : 'CURRENT';
   const view = params.get('view') === 'canvas' ? 'canvas' : 'default';
+  const role = session!.principal.role;
+  const scopedRole = role === 'SUPERVISOR' || role === 'LINE_LEADER';
+  const visibility = scopedRole && params.get('scope') === 'ASSIGNED' ? 'ASSIGNED' : 'ALL';
   const scope = {
     userId: session!.principal.userId,
     supplierId: session!.supplier!.id,
@@ -65,8 +70,12 @@ export function BoardPage() {
     [scope.purpose, scope.supplierId, scope.userId],
   );
   const board = useQuery({
-    queryKey: [...boardKey, shiftStatus],
-    queryFn: () => supplierApi.board({ shiftStatus }),
+    queryKey: [...boardKey, shiftStatus, visibility],
+    queryFn: () =>
+      supplierApi.board({
+        shiftStatus,
+        ...(visibility === 'ASSIGNED' ? { scope: 'ASSIGNED' } : {}),
+      }),
   });
   const realtime = useMemo(
     () =>
@@ -148,6 +157,25 @@ export function BoardPage() {
             </Button>
           )}
         </Alert>
+      )}
+      {scopedRole && (
+        <LineScopeToggle
+          value={visibility}
+          onChange={(nextValue) => {
+            if (
+              canvasDirty &&
+              !window.confirm('Ganti cakupan line dan buang perubahan Canvas yang belum disimpan?')
+            )
+              return;
+            const next = new URLSearchParams(params);
+            if (nextValue === 'ASSIGNED') next.set('scope', 'ASSIGNED');
+            else next.delete('scope');
+            next.delete('lineId');
+            next.delete('lineShiftId');
+            next.delete('view');
+            setParams(next, { replace: true });
+          }}
+        />
       )}
       <div className="board-toolbar">
         <label>
@@ -373,6 +401,11 @@ export function BoardPage() {
                           >
                             {line.isCurrent ? 'Sedang aktif' : 'Shift berikutnya'}
                           </span>
+                          {scopedRole && line.assigned === false && (
+                            <span className="view-only-pill">
+                              <Eye aria-hidden="true" /> Hanya lihat
+                            </span>
+                          )}
                         </p>
                       </div>
                       <dl>

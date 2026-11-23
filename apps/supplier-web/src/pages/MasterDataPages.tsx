@@ -1,8 +1,21 @@
 import { SwapShiftTimesAction, DeleteAllPartsAction } from './CatalogActions';
+import { MasterDeleteDialog } from './MasterDeleteDialog';
+import { ShiftRotationPanel } from './ShiftRotationPanel';
+import {
+  ShiftScheduleCell,
+  ShiftWeeklyScheduleEditor,
+  defaultScheduleDraft,
+  draftFromSchedule,
+  scheduleFromDraft,
+  scheduleProblem,
+  type ScheduleDraft,
+} from './ShiftSchedule';
+import type { MasterDeleteTarget } from '@tmmin-henkaten/api-client';
 import { memberRoleDescriptions, memberRoleLabels } from './memberRoles';
 import { SetupImportDialog } from './SetupImportDialog';
 import {
   ArrowLeft,
+  ArchiveRestore,
   ArrowRight,
   Check,
   Clipboard,
@@ -62,7 +75,7 @@ const resources = {
     title: 'Shift Template',
     description: '',
     createLabel: 'Tambah template',
-    columns: ['Template', 'Jam', 'Timezone', 'Status'],
+    columns: ['Template', 'Jadwal', 'Timezone', 'Status'],
   },
 } as const;
 
@@ -197,6 +210,9 @@ export function MasterListPage({ kind }: { kind: ResourceKind }) {
           </div>
         }
       />
+      {kind === 'shifts' && (
+        <ShiftRotationPanel canManage={session?.principal.role === 'SUPPLIER_ADMIN'} />
+      )}
       <FilterBar>
         <label className="filter-search">
           <span>Cari</span>
@@ -213,7 +229,7 @@ export function MasterListPage({ kind }: { kind: ResourceKind }) {
             onValueChange={(next) => update('active', next)}
             options={[
               { value: 'ACTIVE', label: 'Aktif' },
-              { value: 'INACTIVE', label: kind === 'members' ? 'Arsip' : 'Nonaktif' },
+              { value: 'INACTIVE', label: 'Arsip' },
               { value: 'ALL', label: 'Semua' },
             ]}
           />
@@ -262,7 +278,13 @@ export function MasterListPage({ kind }: { kind: ResourceKind }) {
               </thead>
               <tbody>
                 {query.data.items.map((item) => (
-                  <MasterRow key={item.id} kind={kind} item={item} columns={meta.columns} />
+                  <MasterRow
+                    key={item.id}
+                    kind={kind}
+                    item={item}
+                    columns={meta.columns}
+                    canDelete={session?.principal.role === 'SUPPLIER_ADMIN'}
+                  />
                 ))}
               </tbody>
             </table>
@@ -289,15 +311,37 @@ type MasterPage = {
   pageInfo: { nextCursor: string | null; hasNextPage: boolean };
 };
 
+export function deleteTargetOf(
+  kind: ResourceKind,
+  id: string,
+): Exclude<MasterDeleteTarget, { kind: 'JOB' }> {
+  return {
+    kind:
+      kind === 'members'
+        ? 'MEMBER'
+        : kind === 'lines'
+          ? 'LINE'
+          : kind === 'parts'
+            ? 'PART'
+            : 'SHIFT_TEMPLATE',
+    id,
+  };
+}
+
 function MasterRow({
   kind,
   item,
   columns,
+  canDelete,
 }: {
   kind: ResourceKind;
   item: MasterItem;
   columns: readonly string[];
+  canDelete: boolean;
 }) {
+  const { session } = useSession();
+  const queryClient = useQueryClient();
+  const [deleting, setDeleting] = useState(false);
   const values =
     kind === 'members' && 'fullName' in item
       ? [
@@ -315,23 +359,27 @@ function MasterRow({
           label(item.role),
           item.account?.username ?? '—',
           item.account?.status ?? 'Tanpa akun',
-          item.active ? 'Aktif' : 'Nonaktif',
+          item.active ? 'Aktif' : 'Arsip',
         ]
       : kind === 'lines' && 'code' in item
-        ? [item.code, item.name, item.displayOrder, item.active ? 'Aktif' : 'Nonaktif']
+        ? [item.code, item.name, item.displayOrder, item.active ? 'Aktif' : 'Arsip']
         : kind === 'parts' && 'partNumber' in item
           ? [
               item.partNumber,
               item.internalPartNumber ?? '—',
               item.partName,
-              item.active ? 'Aktif' : 'Nonaktif',
+              item.active ? 'Aktif' : 'Arsip',
             ]
           : 'startTime' in item
             ? [
                 item.name,
-                `${item.startTime} - ${item.endTime}${item.crossesMidnight ? ' (+1)' : ''}`,
+                <ShiftScheduleCell
+                  key="schedule"
+                  days={item.weeklySchedule}
+                  isUniform={item.isUniform}
+                />,
                 item.timezone,
-                item.active ? 'Aktif' : 'Nonaktif',
+                item.active ? 'Aktif' : 'Arsip',
               ]
             : [];
   return (
@@ -342,7 +390,34 @@ function MasterRow({
         </td>
       ))}
       <td data-label="Aksi">
-        <Link to={`/master-data/${kind}/${item.id}`}>Buka</Link>
+        <span className="master-row-actions">
+          <Link to={`/master-data/${kind}/${item.id}`}>Buka</Link>
+          {canDelete && !item.active && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="master-row-delete"
+              aria-label="Hapus permanen"
+              title="Hapus permanen"
+              onClick={() => setDeleting(true)}
+            >
+              <Trash2 aria-hidden="true" />
+            </Button>
+          )}
+        </span>
+        {deleting && session && (
+          <MasterDeleteDialog
+            target={deleteTargetOf(kind, item.id)}
+            initialMode="PERMANENT"
+            onClose={() => setDeleting(false)}
+            onDeleted={async () => {
+              setDeleting(false);
+              await queryClient.invalidateQueries({
+                queryKey: scopedKey(scopeOf(session), '').slice(0, 4),
+              });
+            }}
+          />
+        )}
       </td>
     </tr>
   );
@@ -359,6 +434,7 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
     null,
   );
   const [values, setValues] = useState<Record<string, string>>(() => initialValues(kind));
+  const [schedule, setSchedule] = useState<ScheduleDraft>(() => defaultScheduleDraft());
   const scope = scopeOf(session!);
   const detail = useQuery<MasterItem>({
     queryKey: scopedKey(scope, `master-${kind}-detail`, resourceId),
@@ -377,7 +453,10 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
   });
 
   useEffect(() => {
-    if (detail.data) setValues(valuesFromResource(kind, detail.data));
+    if (!detail.data) return;
+    setValues(valuesFromResource(kind, detail.data));
+    if ('weeklySchedule' in detail.data)
+      setSchedule(draftFromSchedule(detail.data.weeklySchedule, detail.data));
   }, [detail.data, kind]);
   useFocusTarget(!editing || Boolean(detail.data));
 
@@ -428,8 +507,7 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
       }
       const body = {
         name: values.name,
-        startTime: values.startTime,
-        endTime: values.endTime,
+        weeklySchedule: scheduleFromDraft(schedule),
         timezone: values.timezone,
       };
       return editing
@@ -481,6 +559,13 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setProblem(null);
+    if (kind === 'shifts') {
+      const invalid = scheduleProblem(schedule);
+      if (invalid) {
+        setProblem(invalid);
+        return;
+      }
+    }
     save.mutate();
   };
 
@@ -506,9 +591,20 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
           }}
         />
       ) : (
-        <Card className="resource-form-card">
+        <Card
+          className={
+            kind === 'shifts' ? 'resource-form-card resource-form-card--wide' : 'resource-form-card'
+          }
+        >
           <form onSubmit={submit}>
             <MasterFields kind={kind} values={values} setValues={setValues} editing={editing} />
+            {kind === 'shifts' && (
+              <ShiftWeeklyScheduleEditor
+                value={schedule}
+                onChange={setSchedule}
+                disabled={save.isPending}
+              />
+            )}
             <div className="form-actions">
               <Button type="submit" loading={save.isPending}>
                 {editing ? 'Simpan perubahan' : 'Buat data'}
@@ -544,22 +640,21 @@ function ResourceLifecycle({
   scope: ReturnType<typeof scopeOf>;
 }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const active = resource.active;
   const [problem, setProblem] = useState<string | null>(null);
-  const action = useMutation<unknown, Error>({
+  const [deleting, setDeleting] = useState(false);
+  const restore = useMutation<unknown, Error>({
     mutationFn: () => {
-      const next = active ? 'deactivate' : 'activate';
       const body = { expectedVersion: resource.version };
-      if (kind === 'lines') return supplierApi.lineAction(resource.id, next, body);
-      if (kind === 'parts') return supplierApi.partAction(resource.id, next, body);
-      return supplierApi.shiftTemplateAction(resource.id, next, body);
+      if (kind === 'lines') return supplierApi.lineAction(resource.id, 'activate', body);
+      if (kind === 'parts') return supplierApi.partAction(resource.id, 'activate', body);
+      return supplierApi.shiftTemplateAction(resource.id, 'activate', body);
     },
     onSuccess: () =>
       queryClient
-        .invalidateQueries({
-          queryKey: scopedKey(scope, '').slice(0, 4),
-        })
-        .then(() => toast.success(active ? 'Data dinonaktifkan' : 'Data diaktifkan')),
+        .invalidateQueries({ queryKey: scopedKey(scope, '').slice(0, 4) })
+        .then(() => toast.success('Data diaktifkan kembali')),
     onError: (error) => setProblem(masterMutationProblem(error)),
   });
   return (
@@ -570,18 +665,51 @@ function ResourceLifecycle({
             {problem}
           </Alert>
         )}
-        <Button
-          variant="secondary"
-          loading={action.isPending}
-          onClick={() => {
-            setProblem(null);
-            if (window.confirm(`${active ? 'Nonaktifkan' : 'Aktifkan'} resource ini?`))
-              action.mutate();
-          }}
-        >
-          {active ? 'Nonaktifkan' : 'Aktifkan'}
-        </Button>
+        <div className="lifecycle-row">
+          <span className={active ? 'lifecycle-state is-active' : 'lifecycle-state'}>
+            {active ? 'Aktif' : 'Di arsip'}
+          </span>
+          <div className="lifecycle-actions">
+            {!active && (
+              <Button
+                variant="secondary"
+                leadingIcon={<ArchiveRestore aria-hidden="true" />}
+                loading={restore.isPending}
+                onClick={() => {
+                  setProblem(null);
+                  restore.mutate();
+                }}
+              >
+                Aktifkan kembali
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              className="lifecycle-delete"
+              leadingIcon={<Trash2 aria-hidden="true" />}
+              onClick={() => {
+                setProblem(null);
+                setDeleting(true);
+              }}
+            >
+              {active ? 'Hapus' : 'Hapus permanen'}
+            </Button>
+          </div>
+        </div>
       </Panel>
+      {deleting && (
+        <MasterDeleteDialog
+          target={deleteTargetOf(kind, resource.id)}
+          initialMode={active ? 'ARCHIVE' : 'PERMANENT'}
+          onClose={() => setDeleting(false)}
+          onDeleted={async (result) => {
+            setDeleting(false);
+            await queryClient.invalidateQueries({ queryKey: scopedKey(scope, '').slice(0, 4) });
+            if (result.mode === 'PERMANENT')
+              void navigate(`/master-data/${kind}`, { replace: true });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -684,26 +812,6 @@ function MasterFields({
             required
           />
         </Field>
-        <div className="form-grid">
-          <Field label="Mulai" htmlFor="startTime" required>
-            <Input
-              id="startTime"
-              type="time"
-              value={values.startTime}
-              onChange={(event) => field('startTime', event.target.value)}
-              required
-            />
-          </Field>
-          <Field label="Selesai" htmlFor="endTime" required>
-            <Input
-              id="endTime"
-              type="time"
-              value={values.endTime}
-              onChange={(event) => field('endTime', event.target.value)}
-              required
-            />
-          </Field>
-        </div>
         <Field label="IANA timezone" htmlFor="timezone" required>
           <Input
             id="timezone"
@@ -762,6 +870,7 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
   const [editingJobName, setEditingJobName] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
+  const [deletingJob, setDeletingJob] = useState<{ id: string; active: boolean } | null>(null);
   const jobs = useQuery({
     queryKey: scopedKey(scope, 'line-jobs', lineId),
     queryFn: () => supplierApi.jobs(lineId, { limit: 100, active: 'ALL' }),
@@ -966,7 +1075,7 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
                 }
                 options={skillCategoryOptions}
               />
-              <small>{job.active ? 'Aktif' : 'Nonaktif'}</small>
+              <small>{job.active ? 'Aktif' : 'Arsip'}</small>
               <div>
                 {editingJobId !== job.id && (
                   <Button
@@ -1009,23 +1118,49 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
                 >
                   Turun
                 </Button>
+                {!job.active && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={change.isPending || editingJobId !== null}
+                    onClick={() => {
+                      setProblem(null);
+                      change.mutate({ jobId: job.id, kind: 'toggle', index });
+                    }}
+                  >
+                    Aktifkan
+                  </Button>
+                )}
                 <Button
                   size="sm"
-                  variant="secondary"
+                  variant="ghost"
+                  className="lifecycle-delete"
+                  aria-label={`${job.active ? 'Hapus' : 'Hapus permanen'} job ${job.name}`}
+                  title={job.active ? 'Hapus' : 'Hapus permanen'}
                   disabled={change.isPending || editingJobId !== null}
                   onClick={() => {
                     setProblem(null);
-                    if (window.confirm(`${job.active ? 'Nonaktifkan' : 'Aktifkan'} job ini?`))
-                      change.mutate({ jobId: job.id, kind: 'toggle', index });
+                    setDeletingJob({ id: job.id, active: job.active });
                   }}
                 >
-                  {job.active ? 'Nonaktifkan' : 'Aktifkan'}
+                  <Trash2 aria-hidden="true" />
                 </Button>
               </div>
             </li>
           ))}
         </ol>
       </Panel>
+      {deletingJob && (
+        <MasterDeleteDialog
+          target={{ kind: 'JOB', id: deletingJob.id, lineId }}
+          initialMode={deletingJob.active ? 'ARCHIVE' : 'PERMANENT'}
+          onClose={() => setDeletingJob(null)}
+          onDeleted={async () => {
+            setDeletingJob(null);
+            await refreshJobViews();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1294,8 +1429,7 @@ function TableSkeleton() {
 function initialValues(kind: ResourceKind) {
   if (kind === 'members') return { fullName: '', registrationNumber: '', role: 'MP', username: '' };
   if (kind === 'parts') return { partNumber: '', partName: '', internalPartNumber: '' };
-  if (kind === 'shifts')
-    return { name: '', startTime: '08:00', endTime: '17:00', timezone: 'Asia/Jakarta' };
+  if (kind === 'shifts') return { name: '', timezone: 'Asia/Jakarta' };
   return { code: '', name: '' };
 }
 
@@ -1314,12 +1448,7 @@ function valuesFromResource(kind: ResourceKind, resource: MasterItem) {
       internalPartNumber: resource.internalPartNumber ?? '',
     };
   if (kind === 'shifts' && 'startTime' in resource)
-    return {
-      name: resource.name,
-      startTime: resource.startTime,
-      endTime: resource.endTime,
-      timezone: resource.timezone,
-    };
+    return { name: resource.name, timezone: resource.timezone };
   if ('code' in resource) return { code: resource.code, name: resource.name };
   return initialValues(kind);
 }

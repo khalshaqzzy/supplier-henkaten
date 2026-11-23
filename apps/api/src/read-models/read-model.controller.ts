@@ -81,6 +81,7 @@ export class SupplierReadModelController {
       query.lineId,
       query.shiftStatus,
       Boolean(query.includeSchedule),
+      query.scope ?? 'ALL',
     );
   }
 

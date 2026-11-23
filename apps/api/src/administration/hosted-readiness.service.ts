@@ -9,6 +9,7 @@ import type {
 
 import type { Prisma } from '../generated/prisma/client.js';
 import { minuteToTime } from '../master-data/master-data-presenters.js';
+import { weeklyScheduleLabel } from '../master-data/shift-schedule.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 
 type ReadinessClient = PrismaService | Prisma.TransactionClient;
@@ -119,7 +120,7 @@ export async function evaluateHostedReadiness(client: ReadinessClient, supplierI
     // Every Line–Shift of an active line is read so an inactive shift can be named as the
     // reason a line has no operational shift. Readiness counts use the active subset only.
     client.lineShift.findMany({
-      where: { supplierId, line: { active: true } },
+      where: { supplierId, deletedAt: null, line: { active: true } },
       orderBy: [
         { line: { displayOrder: 'asc' } },
         { shiftTemplate: { displayOrder: 'asc' } },
@@ -456,14 +457,21 @@ async function inactiveCandidates(
 ): Promise<CandidateSet> {
   const take = READINESS_CANDIDATE_LIMIT;
   if (kind === 'SHIFT_TEMPLATE') {
-    const where = { supplierId, active: false };
+    const where = { supplierId, active: false, deletedAt: null };
     const [total, rows] = await Promise.all([
       client.shiftTemplate.count({ where }),
       client.shiftTemplate.findMany({
         where,
         orderBy: [{ displayOrder: 'asc' }, { id: 'asc' }],
         take,
-        select: { id: true, name: true, startMinute: true, endMinute: true },
+        select: {
+          id: true,
+          name: true,
+          startMinute: true,
+          endMinute: true,
+          timezone: true,
+          weeklySchedule: true,
+        },
       }),
     ]);
     return {
@@ -472,12 +480,12 @@ async function inactiveCandidates(
         kind,
         id: row.id,
         label: row.name,
-        detail: `${minuteToTime(row.startMinute)}–${minuteToTime(row.endMinute)}`,
+        detail: weeklyScheduleLabel(row),
       })),
     };
   }
   if (kind === 'MEMBER') {
-    const where = { supplierId, active: false };
+    const where = { supplierId, active: false, deletedAt: null };
     const [total, rows] = await Promise.all([
       client.member.count({ where }),
       client.member.findMany({
@@ -498,7 +506,7 @@ async function inactiveCandidates(
       })),
     };
   }
-  const where = { supplierId, active: false };
+  const where = { supplierId, active: false, deletedAt: null };
   const [total, rows] = await Promise.all([
     client.line.count({ where }),
     client.line.findMany({

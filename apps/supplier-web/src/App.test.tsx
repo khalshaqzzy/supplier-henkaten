@@ -432,6 +432,13 @@ describe('Supplier application foundation', () => {
       },
       man: null,
       movement: null,
+      permissions: {
+        assigned: true,
+        canDecide: true,
+        canWithdraw: false,
+        canClone: false,
+        canReroute: false,
+      },
       history: [
         {
           id: '00000000-0000-4000-8000-000000000017',

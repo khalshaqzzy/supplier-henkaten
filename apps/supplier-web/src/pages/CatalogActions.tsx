@@ -11,6 +11,7 @@ import { Alert, Button, Dialog, ErrorState, Select, Skeleton, toast } from '@tmm
 import { supplierApi } from '../app/api';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
+import { scheduleLabel } from './ShiftSchedule';
 import './catalog-actions.css';
 
 type Scope = { userId: string; supplierId: string; purpose: string };
@@ -49,7 +50,7 @@ export function SwapShiftTimesAction() {
     </>
   );
 }
-async function loadShiftTemplates() {
+export async function loadShiftTemplates() {
   const items: ShiftTemplate[] = [];
   let cursor: string | null = null;
   do {
@@ -99,9 +100,8 @@ function SwapShiftTimesSheet({ onClose }: { onClose: () => void }) {
   const sameTimes =
     first &&
     second &&
-    first.startTime === second.startTime &&
-    first.endTime === second.endTime &&
-    first.timezone === second.timezone;
+    first.timezone === second.timezone &&
+    JSON.stringify(first.weeklySchedule) === JSON.stringify(second.weeklySchedule);
   const save = useMutation({
     mutationFn: () => {
       pending.current ??= {
@@ -240,7 +240,7 @@ function SwapShiftTimesSheet({ onClose }: { onClose: () => void }) {
                         options={shifts.data.map((shift) => ({
                           value: shift.id,
                           label: shift.name,
-                          description: `${shift.startTime}–${shift.endTime}${shift.crossesMidnight ? ' · +1 hari' : ''} · ${shift.timezone}`,
+                          description: `${shiftTimes(shift)} · ${shift.timezone}`,
                           disabled: shift.id === secondId,
                         }))}
                       />
@@ -257,7 +257,7 @@ function SwapShiftTimesSheet({ onClose }: { onClose: () => void }) {
                         options={shifts.data.map((shift) => ({
                           value: shift.id,
                           label: shift.name,
-                          description: `${shift.startTime}–${shift.endTime}${shift.crossesMidnight ? ' · +1 hari' : ''} · ${shift.timezone}`,
+                          description: `${shiftTimes(shift)} · ${shift.timezone}`,
                           disabled: shift.id === firstId,
                         }))}
                       />
@@ -315,25 +315,26 @@ function TimeChange({ shift, next }: { shift: ShiftTemplate; next: ShiftTemplate
       <div className="catalog-time-row__times">
         <div>
           <small>Saat ini</small>
-          <span>
-            {shift.startTime}–{shift.endTime}
-          </span>
-          {shift.crossesMidnight && <small>Hingga hari berikutnya</small>}
+          <span className={shift.isUniform ? undefined : 'is-weekly'}>{shiftTimes(shift)}</span>
+          {shift.isUniform && shift.crossesMidnight && <small>Hingga hari berikutnya</small>}
           <small>{shift.timezone}</small>
         </div>
         <ArrowRight aria-hidden="true" />
         <div className="catalog-time-row__next">
           <small>Setelah ditukar</small>
-          <span>
-            {next.startTime}–{next.endTime}
-          </span>
-          {next.crossesMidnight && <small>Hingga hari berikutnya</small>}
+          <span className={next.isUniform ? undefined : 'is-weekly'}>{shiftTimes(next)}</span>
+          {next.isUniform && next.crossesMidnight && <small>Hingga hari berikutnya</small>}
           <small>{next.timezone}</small>
         </div>
       </div>
       <TimeTrack shift={next} />
     </div>
   );
+}
+function shiftTimes(shift: ShiftTemplate) {
+  return shift.isUniform
+    ? `${shift.startTime}–${shift.endTime}${shift.crossesMidnight ? ' · +1 hari' : ''}`
+    : scheduleLabel(shift.weeklySchedule);
 }
 function TimeTrack({ shift }: { shift: ShiftTemplate }) {
   const minute = (time: string) => {

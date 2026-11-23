@@ -20,3 +20,5 @@ export * from './henkaten-deletion.js';
 export * from './member-role.js';
 
 export * from './catalog-commands.js';
+export * from './master-delete.js';
+export * from './shift-rotation.js';

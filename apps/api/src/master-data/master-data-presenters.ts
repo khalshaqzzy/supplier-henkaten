@@ -11,6 +11,7 @@ import type {
   ShiftTemplate,
   User,
 } from '../generated/prisma/client.js';
+import { presentWeeklySchedule } from './shift-schedule.js';
 
 export function initials(name: string): string {
   return name
@@ -120,6 +121,7 @@ export const presentShiftTemplate = (shift: ShiftTemplate) => ({
   endTime: minuteToTime(shift.endMinute),
   timezone: shift.timezone,
   crossesMidnight: shift.endMinute < shift.startMinute,
+  ...presentWeeklySchedule(shift),
   active: shift.active,
   version: shift.version,
   createdAt: shift.createdAt.toISOString(),

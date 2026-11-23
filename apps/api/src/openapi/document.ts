@@ -1,4 +1,13 @@
 import {
+  createShiftRotationRequestSchema,
+  masterDeletePreviewSchema,
+  masterDeleteRequestSchema,
+  masterDeleteResultSchema,
+  runShiftRotationRequestSchema,
+  runShiftRotationResultSchema,
+  shiftRotationListSchema,
+  shiftRotationSchema,
+  updateShiftRotationRequestSchema,
   deletePartsPreviewSchema,
   deletePartsRequestSchema,
   deletePartsResultSchema,
@@ -971,7 +980,79 @@ function masterDataPaths() {
       responses: { '200': json('Action completed', response), '409': problem },
     },
   });
+  const deletePaths = (prefix: string, params: { path: z.ZodType }) => ({
+    [`${prefix}/delete-preview`]: {
+      get: {
+        requestParams: params,
+        responses: {
+          '200': json('Delete impact and blockers', masterDeletePreviewSchema),
+          '404': problem,
+        },
+      },
+    },
+    [`${prefix}/delete`]: {
+      post: {
+        requestParams: params,
+        requestBody: body(masterDeleteRequestSchema),
+        responses: {
+          '201': json('Archived or permanently deleted', masterDeleteResultSchema),
+          '404': problem,
+          '409': problem,
+        },
+      },
+    },
+  });
+  const rotationPath = { path: z.object({ id: z.string().uuid() }) };
   return {
+    ...deletePaths('/api/v1/supplier/master-data/lines/{id}', memberPath),
+    ...deletePaths('/api/v1/supplier/master-data/lines/{lineId}/jobs/{id}', jobPath),
+    ...deletePaths('/api/v1/supplier/master-data/members/{id}', memberPath),
+    ...deletePaths('/api/v1/supplier/master-data/parts/{id}', memberPath),
+    ...deletePaths('/api/v1/supplier/master-data/shift-templates/{id}', memberPath),
+    '/api/v1/supplier/master-data/shift-rotations': {
+      get: { responses: { '200': json('Shift rotation schedules', shiftRotationListSchema) } },
+      post: {
+        requestBody: body(createShiftRotationRequestSchema),
+        responses: {
+          '201': json('Created shift rotation', shiftRotationSchema),
+          '400': problem,
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/master-data/shift-rotations/{id}': {
+      patch: {
+        requestParams: rotationPath,
+        requestBody: body(updateShiftRotationRequestSchema),
+        responses: {
+          '200': json('Updated shift rotation', shiftRotationSchema),
+          '404': problem,
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/master-data/shift-rotations/{id}/run': {
+      post: {
+        requestParams: rotationPath,
+        requestBody: body(runShiftRotationRequestSchema),
+        responses: {
+          '201': json('Rotation applied', runShiftRotationResultSchema),
+          '404': problem,
+          '409': problem,
+        },
+      },
+    },
+    '/api/v1/supplier/master-data/shift-rotations/{id}/delete': {
+      post: {
+        requestParams: rotationPath,
+        requestBody: body(runShiftRotationRequestSchema),
+        responses: {
+          '204': { description: 'Shift rotation deleted' },
+          '404': problem,
+          '409': problem,
+        },
+      },
+    },
     '/api/v1/supplier/master-data/members': {
       get: {
         requestParams: listParams,

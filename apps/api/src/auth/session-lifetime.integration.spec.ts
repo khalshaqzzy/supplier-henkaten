@@ -28,6 +28,7 @@ describe('persistent browser sessions', () => {
 
   beforeAll(async () => {
     process.env['OUTBOX_ENABLED'] = 'false';
+    process.env['SHIFT_ROTATION_ENABLED'] = 'false';
     process.env['PCR_WORKER_ENABLED'] = 'false';
     const module = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(CLOCK)
