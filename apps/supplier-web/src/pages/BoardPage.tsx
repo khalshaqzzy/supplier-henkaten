@@ -382,14 +382,11 @@ export function BoardPage() {
                   </div>
                 }
               >
-                {scopedRole && contextLine.assigned === false && (
-                  <p className="board-canvas-view-only">
-                    <span className="view-only-pill">
-                      <Eye aria-hidden="true" /> Hanya lihat
-                    </span>
-                  </p>
-                )}
-                <BoardCanvas line={contextLine} onDirtyChange={setCanvasDirty} />
+                <BoardCanvas
+                  line={contextLine}
+                  onDirtyChange={setCanvasDirty}
+                  viewOnly={scopedRole && contextLine.assigned === false}
+                />
               </Suspense>
             ) : (
               <div className="board-lines">

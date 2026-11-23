@@ -342,6 +342,14 @@ function MasterRow({
   const { session } = useSession();
   const queryClient = useQueryClient();
   const [deleting, setDeleting] = useState(false);
+  const itemName =
+    'fullName' in item
+      ? item.fullName
+      : 'partNumber' in item
+        ? item.partNumber
+        : 'code' in item
+          ? item.code
+          : item.name;
   const values =
     kind === 'members' && 'fullName' in item
       ? [
@@ -397,9 +405,7 @@ function MasterRow({
               size="sm"
               variant="ghost"
               className="master-row-delete"
-              aria-label={
-                typeof values[0] === 'string' ? `Hapus permanen ${values[0]}` : 'Hapus permanen'
-              }
+              aria-label={`Hapus permanen ${itemName}`}
               title="Hapus permanen"
               onClick={() => setDeleting(true)}
             >

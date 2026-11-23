@@ -108,7 +108,9 @@ export function LineScopeToggle({
       <SegmentedControl
         label="Cakupan line"
         value={value}
-        onValueChange={(next) => onChange(next as 'ALL' | 'ASSIGNED')}
+        onValueChange={(next) => {
+          if (next && next !== value) onChange(next as 'ALL' | 'ASSIGNED');
+        }}
         options={[
           { value: 'ALL', label: 'Semua line' },
           { value: 'ASSIGNED', label: 'Line saya' },

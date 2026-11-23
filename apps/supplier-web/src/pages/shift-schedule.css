@@ -282,7 +282,7 @@
 }
 .shift-editor__row-times {
   display: grid;
-  grid-template-columns: minmax(118px, 1fr) 10px minmax(118px, 1fr) 88px 36px;
+  grid-template-columns: minmax(118px, 1fr) 10px minmax(118px, 1fr) 104px 36px;
   gap: 8px;
   align-items: center;
 }

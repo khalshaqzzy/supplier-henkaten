@@ -7015,9 +7015,6 @@ a.overview-activity-identifier:hover {
 .line-scope-toggle .hds-segmented__item {
   white-space: nowrap;
 }
-.board-canvas-view-only {
-  margin: 0;
-}
 .henkaten-view-bar {
   display: flex;
   flex-wrap: wrap;

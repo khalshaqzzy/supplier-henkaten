@@ -85,8 +85,12 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
     queryFn: () => supplierApi.henkatens(query),
   });
   const filterOptions = useQuery({
-    queryKey: scopedKey(scope, 'henkaten-filter-options'),
-    queryFn: () => supplierApi.dashboard({ granularity: 'DAY' }),
+    queryKey: scopedKey(scope, 'henkaten-filter-options', query.scope ?? 'ALL'),
+    queryFn: () =>
+      supplierApi.dashboard({
+        granularity: 'DAY',
+        ...(query.scope === 'ASSIGNED' ? { scope: 'ASSIGNED' } : {}),
+      }),
   });
   const update = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -207,7 +211,7 @@ export function HenkatenListPage({ approvalQueue = false }: { approvalQueue?: bo
             value={params.get('lineId') ?? ''}
             onValueChange={(next) => update('lineId', next)}
             options={[
-              { value: '', label: 'Semua line' },
+              { value: '', label: query.scope === 'ASSIGNED' ? 'Semua line saya' : 'Semua line' },
               ...(filterOptions.data?.filterOptions.lines ?? []).map((line) => ({
                 value: line.id,
                 label: `${line.code} · ${line.name}`,

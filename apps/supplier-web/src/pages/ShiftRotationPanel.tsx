@@ -33,6 +33,7 @@ import { supplierApi } from '../app/api';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { loadShiftTemplates } from './CatalogActions';
+import { useRestoreFocus } from './MasterDeleteDialog';
 import { DAY_FULL, DAY_SHORT, scheduleLabel } from './ShiftSchedule';
 import './catalog-actions.css';
 import './shift-rotation.css';
@@ -425,8 +426,8 @@ function RotationCard({
             <>
               <CycleChips rotation={rotation} />
               <p className="catalog-delete-note">
-                Jam baru langsung berlaku di semua line yang memakai shift ini. Jadwal berikutnya
-                tetap {next ? next.text : '—'}.
+                Jam baru langsung berlaku di semua line yang memakai shift ini.
+                {next ? ` Jadwal berikutnya tetap ${next.text}.` : ''}
               </p>
             </>
           ) : (
@@ -472,6 +473,7 @@ function RotationSheet({
   const [enabled, setEnabled] = useState(rotation?.enabled ?? true);
   const [problem, setProblem] = useState<string | null>(null);
   const problemRef = useRef<HTMLDivElement>(null);
+  useRestoreFocus();
   const dayName = useId();
   const byId = useMemo(
     () => new Map((shifts.data ?? []).map((shift) => [shift.id, shift] as const)),
@@ -479,7 +481,7 @@ function RotationSheet({
   );
   const chosen = ids.map((id) => byId.get(id));
   // A saved shift that was archived or deleted is not in the active list: it must be replaced.
-  const missing = !shifts.isPending && ids.some((id) => Boolean(id) && !byId.has(id));
+  const missing = (shifts.data?.length ?? 0) >= 2 && ids.some((id) => Boolean(id) && !byId.has(id));
   const complete =
     ids.every((id) => Boolean(id) && byId.has(id)) && new Set(ids).size === ids.length;
   const save = useMutation({
@@ -521,6 +523,7 @@ function RotationSheet({
       description: scheduleLabel(shift.weeklySchedule),
       disabled: ids.some((id, other) => other !== index && id === shift.id),
     }));
+  const mixedZones = complete && new Set(chosen.map((shift) => shift!.timezone)).size > 1;
   const identical =
     complete &&
     new Set(chosen.map((shift) => JSON.stringify([shift!.timezone, shift!.weeklySchedule])))
@@ -696,9 +699,9 @@ function RotationSheet({
               return (
                 <li key={shift!.id}>
                   <strong>{shift!.name}</strong>
-                  <span className="rotation-preview__from">{label(shift!)}</span>
+                  <span className="rotation-preview__from">{label(shift!, mixedZones)}</span>
                   <ArrowRight aria-hidden="true" />
-                  <span className="rotation-preview__to">{label(source)}</span>
+                  <span className="rotation-preview__to">{label(source, mixedZones)}</span>
                 </li>
               );
             })}
@@ -723,6 +726,8 @@ function RotationSheet({
   );
 }
 
-function label(shift: ShiftTemplate) {
-  return scheduleLabel(shift.weeklySchedule);
+/** Rotation also swaps timezones, so the zone is shown whenever the shifts use different ones. */
+function label(shift: ShiftTemplate, withZone: boolean) {
+  const hours = scheduleLabel(shift.weeklySchedule);
+  return withZone ? `${hours} (${shift.timezone})` : hours;
 }

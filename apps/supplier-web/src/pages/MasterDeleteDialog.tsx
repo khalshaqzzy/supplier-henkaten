@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Trash2,
   Unlink,
+  UserMinus,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ApiProblemError, type MasterDeleteTarget } from '@tmmin-henkaten/api-client';
@@ -79,8 +80,9 @@ export function MasterDeleteDialog({
   useEffect(() => {
     if (data && !data.canArchive && data.canDelete) setMode('PERMANENT');
   }, [data]);
-  // Consent applies to the mode and impact on screen; a refreshed preview needs it again.
-  useEffect(() => setConsent(false), [mode, data]);
+  // Consent applies to the mode and impact on screen; a refreshed or failed preview needs it again.
+  useEffect(() => setConsent(false), [mode, data, preview.isError]);
+  useRestoreFocus();
 
   const remove = useMutation({
     mutationFn: () =>
@@ -110,9 +112,9 @@ export function MasterDeleteDialog({
   const busy = remove.isPending;
   const title = blocked
     ? `${capitalize(noun)} belum bisa dihapus`
-    : data && !data.resource.active
-      ? `Hapus permanen ${noun}?`
-      : `Hapus ${noun}?`;
+    : mode === 'ARCHIVE'
+      ? `Arsipkan ${noun}?`
+      : `Hapus permanen ${noun}?`;
 
   return (
     <Dialog
@@ -121,6 +123,7 @@ export function MasterDeleteDialog({
         if (!next && !busy) onClose();
       }}
       dismissible={!busy}
+      size="lg"
       className={`catalog-delete-dialog master-delete-dialog${
         !blocked && mode === 'ARCHIVE' ? ' master-delete-dialog--archive' : ''
       }`}
@@ -161,7 +164,7 @@ export function MasterDeleteDialog({
             <Button
               variant={mode === 'ARCHIVE' ? 'primary' : 'danger'}
               loading={busy}
-              disabled={!data || !consent || preview.isFetching}
+              disabled={!data || !consent || preview.isFetching || preview.isError}
               leadingIcon={
                 mode === 'ARCHIVE' ? <Archive aria-hidden="true" /> : <Trash2 aria-hidden="true" />
               }
@@ -234,6 +237,21 @@ const reusable: Record<MasterDeleteTarget['kind'], string | null> = {
   PART: 'Part number',
   SHIFT_TEMPLATE: null,
 };
+
+/**
+ * Returns focus to the control that opened a dialog rendered without an HDS trigger, so keyboard
+ * users keep their place. Does nothing when that control is gone (for example a deleted row).
+ */
+export function useRestoreFocus() {
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return () => {
+      requestAnimationFrame(() => {
+        if (opener?.isConnected) opener.focus();
+      });
+    };
+  }, []);
+}
 
 function ModePicker({
   kind,
@@ -361,7 +379,7 @@ function ImpactSummary({
   if (impact.clearedAssignments > 0)
     rows.push({
       key: 'assignments',
-      icon: <Unlink aria-hidden="true" />,
+      icon: <UserMinus aria-hidden="true" />,
       label: 'Assignment dikosongkan',
       value: impact.clearedAssignments,
     });

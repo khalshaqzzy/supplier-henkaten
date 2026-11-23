@@ -259,7 +259,9 @@ test('per-day shift hours, weekly rotation, read-only cross-line visibility and 
     leader.csrf,
   );
   await blocked.getByRole('button', { name: 'Periksa lagi' }).click();
-  const confirm = page.getByRole('dialog', { name: 'Hapus line?' });
+  // The title follows the selected mode, so the dialog is located by its class.
+  const confirm = page.locator('.master-delete-dialog');
+  await expect(confirm.getByRole('heading', { name: 'Arsipkan line?' })).toBeVisible();
   await expect(confirm.getByRole('radio', { name: /Arsipkan/ })).toBeChecked();
   await expect(confirm).toContainText('Line–Shift dilepas');
   await expect(confirm.getByRole('button', { name: 'Arsipkan' })).toBeDisabled();
@@ -273,6 +275,7 @@ test('per-day shift hours, weekly rotation, read-only cross-line visibility and 
   ).toEqual([]);
   await review(page, testInfo, 'line-delete-archive', false);
   await confirm.getByText('Hapus permanen', { exact: true }).click();
+  await expect(confirm.getByRole('heading', { name: 'Hapus permanen line?' })).toBeVisible();
   await review(page, testInfo, 'line-delete-permanent', false);
   await confirm.getByText('Arsipkan', { exact: true }).first().click();
   await confirm.getByRole('checkbox').click();
