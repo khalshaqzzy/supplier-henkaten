@@ -30,10 +30,11 @@ import {
 } from '@tmmin-henkaten/ui';
 
 import { supplierApi } from '../app/api';
+import { RestoreFocus, useRestoreFocus } from '../app/restore-focus';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { loadShiftTemplates } from './CatalogActions';
-import { useRestoreFocus } from './MasterDeleteDialog';
+
 import { DAY_FULL, DAY_SHORT, scheduleLabel } from './ShiftSchedule';
 import './catalog-actions.css';
 import './shift-rotation.css';
@@ -96,7 +97,9 @@ export function ShiftRotationPanel({ canManage }: { canManage: boolean }) {
           <CalendarSync aria-hidden="true" />
         </span>
         <div>
-          <h2 id="rotation-panel-title">Jadwal pergantian shift</h2>
+          <h2 id="rotation-panel-title" tabIndex={-1}>
+            Jadwal pergantian shift
+          </h2>
           <small>
             {rotations.isPending
               ? 'Memuat jadwal…'
@@ -390,6 +393,7 @@ function RotationCard({
           </>
         )}
       </footer>
+      {confirm && <RestoreFocus fallbackId="rotation-panel-title" />}
       {confirm && (
         <Dialog
           open
@@ -482,8 +486,12 @@ function RotationSheet({
   const chosen = ids.map((id) => byId.get(id));
   // A saved shift that was archived or deleted is not in the active list: it must be replaced.
   const missing = (shifts.data?.length ?? 0) >= 2 && ids.some((id) => Boolean(id) && !byId.has(id));
+  // Preview and save rely on a successful, current shift list, never on stale cached data.
   const complete =
-    ids.every((id) => Boolean(id) && byId.has(id)) && new Set(ids).size === ids.length;
+    shifts.isSuccess &&
+    !shifts.isFetching &&
+    ids.every((id) => Boolean(id) && byId.has(id)) &&
+    new Set(ids).size === ids.length;
   const save = useMutation({
     mutationFn: () => {
       const body = {

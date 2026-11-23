@@ -33,6 +33,7 @@ import {
 } from '@tmmin-henkaten/ui';
 
 import { supplierApi } from '../app/api';
+import { useRestoreFocus } from '../app/restore-focus';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import './catalog-actions.css';
@@ -112,9 +113,11 @@ export function MasterDeleteDialog({
   const busy = remove.isPending;
   const title = blocked
     ? `${capitalize(noun)} belum bisa dihapus`
-    : mode === 'ARCHIVE'
-      ? `Arsipkan ${noun}?`
-      : `Hapus permanen ${noun}?`;
+    : !data
+      ? `Hapus ${noun}?`
+      : mode === 'ARCHIVE'
+        ? `Arsipkan ${noun}?`
+        : `Hapus permanen ${noun}?`;
 
   return (
     <Dialog
@@ -237,21 +240,6 @@ const reusable: Record<MasterDeleteTarget['kind'], string | null> = {
   PART: 'Part number',
   SHIFT_TEMPLATE: null,
 };
-
-/**
- * Returns focus to the control that opened a dialog rendered without an HDS trigger, so keyboard
- * users keep their place. Does nothing when that control is gone (for example a deleted row).
- */
-export function useRestoreFocus() {
-  useEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    return () => {
-      requestAnimationFrame(() => {
-        if (opener?.isConnected) opener.focus();
-      });
-    };
-  }, []);
-}
 
 function ModePicker({
   kind,

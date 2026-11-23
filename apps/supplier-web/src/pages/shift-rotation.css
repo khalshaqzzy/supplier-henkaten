@@ -443,3 +443,7 @@
     gap: 4px;
   }
 }
+/* Focus lands on the heading programmatically after a schedule is deleted. */
+#rotation-panel-title:focus {
+  outline: none;
+}
