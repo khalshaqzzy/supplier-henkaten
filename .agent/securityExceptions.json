@@ -40,5 +40,11 @@
     "id": "CVE-2026-116587",
     "rationale": "Re-reviewed 2026-11-17: GHSA-mgcc-cww5-fp2q still lists no patched go-jose/v3 release (v3.0.5 is the latest tag). The finding is go-jose/v3 v3.0.5 in the Caddy v2.11.4 build through modules/standard -> modules/caddypki -> smallstep/certificates/authority, which imports go-jose/v3 directly; smallstep/certificates v0.30.2 is the latest release and Caddy v2.11.9 still requires it. go.step.sm/crypto v0.92.0 moved to go-jose/v4, but forcing it fails to compile smallstep/certificates v0.30.2, so no upgrade removes v3. The committed Caddyfile is unchanged: admin API off, only reverse proxies for the three validated public domains, no internal PKI/ACME server and no JWK provisioning, so the vulnerable private-RSA JWK parser is outside the configured request path. go-jose/v4 is patched and asserted at v4.1.6. Remove or re-review before enabling internal PKI, ACME-server/provisioner/JWK features, when smallstep/certificates ships a v4-only release, or at expiry. Upstream: https://github.com/go-jose/go-jose/security/advisories/GHSA-mgcc-cww5-fp2q",
     "expiresOn": "2026-11-30"
+  },
+  {
+    "scanner": "trivy",
+    "id": "CVE-2026-107494",
+    "rationale": "Reviewed 2026-11-23: Debian bookworm lists no fixed libssl3 build (3.0.22-1~deb12u2 is the newest and is already overlaid into the distroless API runtime by apps/api/Dockerfile). The flaw is a denial of service through unbounded QUIC frame queueing; the API serves plain HTTP/1.1 behind Caddy, and neither Node nor Prisma in the API container opens QUIC connections (Node uses its bundled OpenSSL for TLS). Remove when Debian publishes a fixed libssl3, bump the pinned version in apps/api/Dockerfile, or re-review at expiry.",
+    "expiresOn": "2026-11-30"
   }
 ]
