@@ -12,7 +12,12 @@ import { useSession } from '../app/session';
 import { PageHeader } from '../components/layout';
 import { ContextRail, SummaryMetric, SummaryStrip } from '../components/OperationalUI';
 import { SetupBlockerPanel, areaSectionId } from './SetupBlockerPanel';
-import { groupSetupBlockers, setupAreaMeta, type BlockerAreaGroup } from './setupBlockers';
+import {
+  groupSetupBlockers,
+  setupAreaMeta,
+  setupAreaStatus,
+  type BlockerAreaGroup,
+} from './setupBlockers';
 import './setup-blockers.css';
 
 const OPEN_PARAM = 'open';
@@ -168,8 +173,8 @@ function SetupReadiness({ data, timezone }: { data: SupplierSetupReadiness; time
             {data.areas.map((area, index) => {
               const meta = setupAreaMeta[area.area];
               const group = groups.find((item) => item.area === area.area);
-              const optional = area.requiredCount === 0;
-              const status = optional ? 'optional' : area.ready ? 'ready' : 'pending';
+              const { status, summary } = setupAreaStatus(area);
+              const optional = status === 'optional';
               return (
                 <li key={area.area} className={`setup-area-row is-${status}`}>
                   <span className="setup-area-row__marker" aria-hidden="true">
@@ -177,13 +182,7 @@ function SetupReadiness({ data, timezone }: { data: SupplierSetupReadiness; time
                   </span>
                   <Link className="setup-area-row__link" to={meta.to}>
                     <strong>{meta.label}</strong>
-                    <small>
-                      {optional
-                        ? `${area.activeCount} ${area.area === 'CHECKLISTS' ? 'kategori' : 'part'} · opsional`
-                        : area.ready
-                          ? `${area.activeCount} data aktif · lengkap`
-                          : `${area.activeCount}/${area.requiredCount} minimum`}
-                    </small>
+                    <small>{summary}</small>
                   </Link>
                   {group ? (
                     <button

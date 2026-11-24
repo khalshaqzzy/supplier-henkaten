@@ -32,6 +32,7 @@
 .rotation-panel__head h2 {
   margin: 0;
   font-size: 16px;
+  font-weight: var(--hds-weight-semibold);
   line-height: 1.4;
 }
 .rotation-panel__head small {
@@ -43,9 +44,9 @@
   grid-template-columns: 36px minmax(0, 1fr) auto;
   gap: 14px;
   align-items: center;
-  padding: 16px;
-  border: 1px dashed var(--hds-border-strong);
+  padding: 14px 16px;
   border-radius: var(--hds-radius-lg);
+  background: var(--hds-surface-inset);
 }
 .rotation-empty > svg {
   width: 28px;
@@ -59,7 +60,7 @@
 .rotation-empty strong {
   font-size: 14px;
 }
-.rotation-empty span {
+.rotation-empty > div > span {
   font-size: 13px;
   color: var(--hds-text-secondary);
 }

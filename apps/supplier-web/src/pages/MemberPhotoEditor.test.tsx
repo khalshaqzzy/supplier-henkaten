@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
@@ -87,7 +87,6 @@ describe('Member photo editor', () => {
       },
     };
     const remove = vi.spyOn(supplierApi, 'removeMemberPhoto').mockResolvedValue(undefined);
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderEditor(withPhoto);
 
     const preview = screen.getByRole('img', { name: 'Foto Operator Photo Test' });
@@ -97,6 +96,9 @@ describe('Member photo editor', () => {
     fireEvent.error(preview);
     expect(screen.getByLabelText('Initials Operator Photo Test').textContent).toBe('OP');
     await userEvent.click(screen.getByRole('button', { name: 'Hapus foto' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Hapus foto' }),
+    );
 
     await waitFor(() => expect(remove).toHaveBeenCalledWith(memberId, 4));
     expect(

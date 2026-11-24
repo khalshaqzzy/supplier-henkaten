@@ -1,3 +1,19 @@
+## Amendment — 24 November 2026: Master Data desktop design polish
+
+- **Master Data hub.** Each area card shows its own icon, the active count and a readiness badge
+  (*Lengkap*, *Perlu dilengkapi*, *Opsional*) from the existing readiness status. Area names are
+  *Member & Akun*, *Line & Job*, *Part*, *Shift Template*, *Checklist 4M* and *Line Setup*.
+- **Detail pages.** Line, Part and Shift Template detail are titled with the record and show its
+  status badge and the full breadcrumb (*Supplier / Master Data / list / record*). Form, Jobs and
+  Status share one column; Jobs come before Status.
+- **Lists.** Status and account state are badges; roles read MP, QC, Line Leader, Supervisor.
+- **Confirmations.** Checklist publish, checklist activate/deactivate and member photo removal are
+  confirmed in an in-app dialog.
+- **4M categories** are shown with their colour dot, including the Checklist 4M cards.
+- No API, data or permission change.
+
+See [ADR 0056](../docs/adr/0056-master-data-desktop-design-polish.md).
+
 ## Amendment — 23 November 2026: Delete modes, weekly shift schedules, automatic rotation and cross-line visibility
 
 - **Hapus: Arsipkan atau Hapus permanen.** Deleting a Line, Job, Member, Part or Shift Template

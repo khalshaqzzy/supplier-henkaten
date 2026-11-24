@@ -7,12 +7,30 @@ import type {
 
 export const setupAreaMeta: Record<SupplierSetupArea, { label: string; to: string }> = {
   SHIFT_TEMPLATES: { label: 'Shift Template', to: '/master-data/shifts' },
-  MEMBERS_ACCOUNTS: { label: 'Member & akun', to: '/master-data/members' },
-  LINES_JOBS: { label: 'Line & job', to: '/master-data/lines' },
+  MEMBERS_ACCOUNTS: { label: 'Member & Akun', to: '/master-data/members' },
+  LINES_JOBS: { label: 'Line & Job', to: '/master-data/lines' },
   PARTS: { label: 'Part', to: '/master-data/parts' },
   CHECKLISTS: { label: 'Checklist 4M', to: '/master-data/checklists' },
   DEFAULT_ASSIGNMENTS: { label: 'Line Setup', to: '/master-data/line-setup' },
 };
+
+export type AreaStatus = 'ready' | 'pending' | 'optional';
+
+export function setupAreaStatus(area: {
+  area: SupplierSetupArea;
+  ready: boolean;
+  activeCount: number;
+  requiredCount: number;
+}): { status: AreaStatus; summary: string } {
+  if (area.requiredCount === 0)
+    return {
+      status: 'optional',
+      summary: `${area.activeCount} ${area.area === 'CHECKLISTS' ? 'kategori' : 'part'} · opsional`,
+    };
+  return area.ready
+    ? { status: 'ready', summary: `${area.activeCount} data aktif · lengkap` }
+    : { status: 'pending', summary: `${area.activeCount}/${area.requiredCount} minimum` };
+}
 
 export const setupAreaOrder = Object.keys(setupAreaMeta) as SupplierSetupArea[];
 

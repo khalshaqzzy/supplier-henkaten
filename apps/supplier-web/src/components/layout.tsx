@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import type { Capability } from '@tmmin-henkaten/contracts';
 import { BrandLockup, IconButton, Spinner } from '@tmmin-henkaten/ui';
@@ -378,6 +378,7 @@ export function PageHeader({
   actions,
   status,
   meta,
+  breadcrumbs = [],
 }: {
   eyebrow?: string;
   title: string;
@@ -385,6 +386,7 @@ export function PageHeader({
   actions?: ReactNode;
   status?: ReactNode;
   meta?: ReactNode;
+  breadcrumbs?: Array<{ label: string; to: string }>;
 }) {
   useEffect(() => {
     document.querySelector<HTMLElement>('.product-page-header h1')?.focus();
@@ -395,6 +397,14 @@ export function PageHeader({
         {title !== 'Overview Supplier' && (
           <nav className="product-breadcrumbs" aria-label="Breadcrumb">
             <NavLink to="/">Supplier</NavLink>
+            {breadcrumbs.map((crumb) => (
+              <Fragment key={crumb.to}>
+                <span aria-hidden="true">/</span>
+                <NavLink to={crumb.to} end>
+                  {crumb.label}
+                </NavLink>
+              </Fragment>
+            ))}
             <span aria-hidden="true">/</span>
             <span aria-current="page">{title}</span>
           </nav>

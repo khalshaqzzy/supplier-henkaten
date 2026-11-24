@@ -1,4 +1,4 @@
-import { Check, FileSpreadsheet, UploadCloud } from 'lucide-react';
+import { Check, Download, FileSpreadsheet, UploadCloud } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -10,7 +10,7 @@ import { supplierApi } from '../app/api';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { PageHeader } from '../components/layout';
-import { MasterBackLink } from './MasterDataPages';
+import { MasterBackLink, masterCrumb } from './MasterDataPages';
 import {
   parsePartMatrix,
   partCellText,
@@ -29,6 +29,7 @@ export function PartImportPage() {
   const { session } = useSession();
   const queryClient = useQueryClient();
   const [fileName, setFileName] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const [sheet, setSheet] = useState<PartImportSheet | null>(null);
   const [mapping, setMapping] = useState<PartColumnMapping>({
     numberIndex: -1,
@@ -180,7 +181,12 @@ export function PartImportPage() {
   return (
     <div className="product-page part-import-page">
       <MasterBackLink to="/master-data/parts" label="Part" />
-      <PageHeader eyebrow="Master Data · Part" title="Import part" description="" />
+      <PageHeader
+        eyebrow="Part"
+        title="Import part"
+        description=""
+        breadcrumbs={[masterCrumb, { label: 'Part', to: '/master-data/parts' }]}
+      />
       {problem && (
         <Alert tone="danger" title="Import belum disimpan">
           {problem}
@@ -235,8 +241,27 @@ export function PartImportPage() {
               </div>
             </div>
             <div className="part-import-upload__controls">
-              <label className="part-import-file">
-                <span>{fileName ?? 'Pilih CSV atau Excel'}</span>
+              <label
+                className={dragging ? 'part-import-file is-dragging' : 'part-import-file'}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setDragging(false);
+                  if (reading || processing || review.isPending || commit.isPending) return;
+                  void changeFile(event.dataTransfer.files?.[0] ?? null);
+                }}
+              >
+                <FileSpreadsheet aria-hidden="true" />
+                <span className="part-import-file__name">
+                  {fileName ?? 'Seret file ke sini atau pilih file'}
+                </span>
+                <span className="part-import-file__button" aria-hidden="true">
+                  {fileName ? 'Ganti file' : 'Pilih file'}
+                </span>
                 <input
                   type="file"
                   disabled={reading || processing || review.isPending || commit.isPending}
@@ -247,7 +272,11 @@ export function PartImportPage() {
                   }}
                 />
               </label>
-              <Button variant="ghost" onClick={downloadTemplate}>
+              <Button
+                variant="ghost"
+                leadingIcon={<Download aria-hidden="true" />}
+                onClick={downloadTemplate}
+              >
                 Unduh template CSV
               </Button>
             </div>

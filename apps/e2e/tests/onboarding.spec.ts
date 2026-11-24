@@ -189,8 +189,11 @@ test('onboards a Hosted tenant through both portals and completes start-ready se
       });
       await supplier.setViewportSize({ width: 1280, height: 720 });
     }
-    supplier.once('dialog', (dialog) => dialog.accept());
     await supplier.getByRole('button', { name: 'Publish versi baru' }).click();
+    await supplier
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Publish', exact: true })
+      .click();
     await expect(supplier.getByText('Versi 1', { exact: false })).toBeVisible();
   }
 

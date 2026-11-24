@@ -140,7 +140,7 @@ export function ShiftRotationPanel({ canManage }: { canManage: boolean }) {
           </div>
           {canManage && (
             <Button
-              variant="primary"
+              variant="secondary"
               leadingIcon={<Plus aria-hidden="true" />}
               onClick={() => setEditing('new')}
             >
