@@ -34,7 +34,7 @@ export function CursorPager({
         <Button
           size="sm"
           variant="secondary"
-          leadingIcon={<ArrowRight />}
+          trailingIcon={<ArrowRight />}
           disabled={!hasNextPage || !nextCursor}
           onClick={() => {
             if (!nextCursor) return;

@@ -1,3 +1,16 @@
+## Master Data desktop design polish — 24 November 2026
+
+Implementation on `feat/master-data-design-polish`: Supplier Portal Master Data UI polish without
+API change. Fixed rendering defects (member list avatar layout, *Buat jadwal* contrast, checklist
+panel spacing, undefined tokens, pager arrow); primary submit actions; `StatusBadge` statuses and
+account/role labels in the four master tables; Line/Part/Shift detail titled by record with status
+badge, `PageHeader.breadcrumbs` and a shared 880 px column (Jobs before Status); hub cards with
+distinct icons and readiness counts/badges from `setup-readiness`; Checklist 4M cards with 4M colour
+dots; icon job-row actions with tooltips; `AlertDialog` instead of `window.confirm`; softer shift day
+chips, flat rotation empty state, Part import drop zone and Line Setup selection highlight. See
+[ADR 0056](../docs/adr/0056-master-data-desktop-design-polish.md) and the current handoff. Phase 15
+remains the sole current `in_progress` phase; staging/device/UAT is unchanged.
+
 ## Delete modes, weekly shift schedules, rotation and cross-line visibility — 23 November 2026
 
 Implementation on `feat/delete-modes-shift-schedule-rotation-visibility`: Archive vs Permanent

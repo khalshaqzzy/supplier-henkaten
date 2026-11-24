@@ -171,7 +171,7 @@ describe('SetupPage blocker detail', () => {
         .getAttribute('aria-expanded'),
     ).toBe('true');
     expect(document.activeElement?.id).toBe('setup-area-default-assignments');
-    expect(screen.getByRole('link', { name: /^Member & akun/ }).getAttribute('href')).toBe(
+    expect(screen.getByRole('link', { name: /^Member & Akun/ }).getAttribute('href')).toBe(
       '/master-data/members',
     );
   });

@@ -22,7 +22,7 @@ import { useFocusTarget } from '../app/focus-target';
 import { scopedKey } from '../app/query';
 import { useSession } from '../app/session';
 import { PageHeader } from '../components/layout';
-import { MasterBackLink } from './MasterDataPages';
+import { MasterBackLink, masterCrumb } from './MasterDataPages';
 
 export function DefaultAssignmentsPage() {
   const { session } = useSession();
@@ -134,7 +134,12 @@ export function DefaultAssignmentsPage() {
   return (
     <div className="product-page">
       <MasterBackLink to="/master-data" label="Master Data" />
-      <PageHeader eyebrow="Master Data" title="Line Setup" description="" />
+      <PageHeader
+        eyebrow="Master Data"
+        title="Line Setup"
+        description=""
+        breadcrumbs={[masterCrumb]}
+      />
       <div className="defaults-toolbar">
         <label>
           <span>Line</span>
@@ -148,8 +153,7 @@ export function DefaultAssignmentsPage() {
             }}
             options={(lines.data?.items ?? []).map((line) => ({
               value: line.id,
-              label: line.code,
-              description: line.name,
+              label: `${line.code} · ${line.name}`,
             }))}
           />
         </label>

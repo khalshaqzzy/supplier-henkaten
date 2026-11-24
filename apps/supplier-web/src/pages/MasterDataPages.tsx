@@ -11,18 +11,31 @@ import {
   type ScheduleDraft,
 } from './ShiftSchedule';
 import type { MasterDeleteTarget } from '@tmmin-henkaten/api-client';
+import type { SupplierSetupArea } from '@tmmin-henkaten/contracts';
+import { setupAreaStatus, type AreaStatus } from './setupBlockers';
+import { accountState, formatTimestamp } from './masterFormat';
 import { memberRoleDescriptions, memberRoleLabels } from './memberRoles';
 import { SetupImportDialog } from './SetupImportDialog';
 import {
+  ArrowDown,
   ArrowLeft,
   ArchiveRestore,
   ArrowRight,
+  ArrowUp,
   Check,
   Clipboard,
-  Database,
+  ClipboardCheck,
+  Clock3,
+  Factory,
+  Network,
+  Package,
+  Pencil,
   Plus,
   Trash2,
+  UploadCloud,
   UserRound,
+  UsersRound,
+  type LucideIcon,
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
@@ -30,16 +43,22 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import {
   Alert,
+  AlertDialog,
+  Badge,
   Button,
   Card,
   EmptyState,
   ErrorState,
   Field,
   FilterBar,
+  FourMDot,
+  IconButton,
   Input,
   Select,
   Panel,
   Skeleton,
+  StatusBadge,
+  Tooltip,
   toast,
 } from '@tmmin-henkaten/ui';
 
@@ -89,22 +108,64 @@ export function MasterBackLink({ to, label }: { to: string; label: string }) {
 
 type ResourceKind = keyof typeof resources;
 
+export const masterCrumb = { label: 'Master Data', to: '/master-data' };
+
+function resourceTitle(item: MasterItem): string {
+  if ('fullName' in item) return item.fullName;
+  if ('partNumber' in item) return `${item.partNumber} · ${item.partName}`;
+  if ('code' in item) return `${item.code} · ${item.name}`;
+  return item.name;
+}
+
 const skillCategoryOptions = [
   { value: 'HIGH', label: 'High' },
   { value: 'MEDIUM', label: 'Medium' },
   { value: 'LOW', label: 'Low' },
 ];
 
+const overviewCards: Array<{
+  area: SupplierSetupArea;
+  title: string;
+  to: string;
+  icon: LucideIcon;
+}> = [
+  {
+    area: 'MEMBERS_ACCOUNTS',
+    title: 'Member & Akun',
+    to: '/master-data/members',
+    icon: UsersRound,
+  },
+  { area: 'LINES_JOBS', title: 'Line & Job', to: '/master-data/lines', icon: Factory },
+  { area: 'PARTS', title: 'Part', to: '/master-data/parts', icon: Package },
+  { area: 'SHIFT_TEMPLATES', title: 'Shift Template', to: '/master-data/shifts', icon: Clock3 },
+  {
+    area: 'CHECKLISTS',
+    title: 'Checklist 4M',
+    to: '/master-data/checklists',
+    icon: ClipboardCheck,
+  },
+  {
+    area: 'DEFAULT_ASSIGNMENTS',
+    title: 'Line Setup',
+    to: '/master-data/line-setup',
+    icon: Network,
+  },
+];
+
+const areaBadge = {
+  ready: { tone: 'success', label: 'Lengkap' },
+  pending: { tone: 'warning', label: 'Perlu dilengkapi' },
+  optional: { tone: 'neutral', label: 'Opsional' },
+} as const;
+
 export function MasterDataOverviewPage() {
   const { session } = useSession();
-  const cards = [
-    ['Member & Akun', '', '/master-data/members'],
-    ['Line & Job', '', '/master-data/lines'],
-    ['Part', '', '/master-data/parts'],
-    ['Shift Template', '', '/master-data/shifts'],
-    ['Checklist 4M', '', '/master-data/checklists'],
-    ['Line Setup', '', '/master-data/line-setup'],
-  ] as const;
+  const readiness = useQuery({
+    queryKey: scopedKey(scopeOf(session!), 'setup-readiness'),
+    queryFn: () => supplierApi.setupReadiness(),
+    refetchOnMount: 'always',
+  });
+  const areas = new Map(readiness.data?.areas.map((area) => [area.area, area]));
   return (
     <div className="product-page">
       <PageHeader
@@ -121,21 +182,43 @@ export function MasterDataOverviewPage() {
         }
       />
       <section className="master-overview">
-        {cards.map(([title, description, to]) => (
-          <Link key={to} to={to}>
-            <span>
-              <Database aria-hidden="true" />
-            </span>
-            <div>
-              <strong>{title}</strong>
-              {description && <small>{description}</small>}
-            </div>
-            <ArrowRight aria-hidden="true" />
-          </Link>
-        ))}
+        {overviewCards.map(({ area, title, to, icon: Icon }) => {
+          const data = areas.get(area);
+          const state = data ? setupAreaStatus(data) : null;
+          return (
+            <Link key={to} to={to}>
+              <span className="master-overview__icon">
+                <Icon aria-hidden="true" />
+              </span>
+              <div>
+                <strong>{title}</strong>
+                {data && state ? (
+                  <small>{overviewSummary(data, state.status)}</small>
+                ) : (
+                  readiness.isLoading && <Skeleton className="master-overview__skeleton" />
+                )}
+              </div>
+              {state && (
+                <StatusBadge tone={areaBadge[state.status].tone}>
+                  {areaBadge[state.status].label}
+                </StatusBadge>
+              )}
+              <ArrowRight aria-hidden="true" className="master-overview__arrow" />
+            </Link>
+          );
+        })}
       </section>
     </div>
   );
+}
+
+function overviewSummary(
+  area: { area: SupplierSetupArea; activeCount: number; requiredCount: number },
+  status: AreaStatus,
+) {
+  if (status === 'pending') return `${area.activeCount}/${area.requiredCount} minimum`;
+  if (area.area === 'CHECKLISTS') return `${area.activeCount} kategori aktif`;
+  return `${area.activeCount} data aktif`;
 }
 
 export function MasterListPage({ kind }: { kind: ResourceKind }) {
@@ -181,6 +264,7 @@ export function MasterListPage({ kind }: { kind: ResourceKind }) {
         eyebrow="Master Data"
         title={meta.title}
         description={meta.description}
+        breadcrumbs={[masterCrumb]}
         actions={
           <div className="master-header-actions">
             {kind === 'shifts' && session?.principal.role === 'SUPPLIER_ADMIN' && (
@@ -197,6 +281,7 @@ export function MasterListPage({ kind }: { kind: ResourceKind }) {
                 className="hds-button hds-button--secondary hds-button--md"
                 to="/master-data/parts/import"
               >
+                <UploadCloud aria-hidden="true" />
                 Import CSV / Excel
               </Link>
             )}
@@ -257,9 +342,13 @@ export function MasterListPage({ kind }: { kind: ResourceKind }) {
                 Reset filter
               </Button>
             ) : (
-              <div className="master-header-actions">
-                <Link to={`/master-data/${kind}/new`}>{meta.createLabel}</Link>
-              </div>
+              <Link
+                className="hds-button hds-button--primary hds-button--md"
+                to={`/master-data/${kind}/new`}
+              >
+                <Plus aria-hidden="true" />
+                {meta.createLabel}
+              </Link>
             )
           }
         />
@@ -364,19 +453,24 @@ function MasterRow({
             <strong>{item.fullName}</strong>
           </span>,
           item.registrationNumber ?? '—',
-          label(item.role),
+          memberRoleLabels[item.role],
           item.account?.username ?? '—',
-          item.account?.status ?? 'Tanpa akun',
-          item.active ? 'Aktif' : 'Arsip',
+          <AccountBadge key="account" member={item} />,
+          <ActiveBadge key="status" active={item.active} />,
         ]
       : kind === 'lines' && 'code' in item
-        ? [item.code, item.name, item.displayOrder, item.active ? 'Aktif' : 'Arsip']
+        ? [
+            item.code,
+            item.name,
+            item.displayOrder,
+            <ActiveBadge key="status" active={item.active} />,
+          ]
         : kind === 'parts' && 'partNumber' in item
           ? [
               item.partNumber,
               item.internalPartNumber ?? '—',
               item.partName,
-              item.active ? 'Aktif' : 'Arsip',
+              <ActiveBadge key="status" active={item.active} />,
             ]
           : 'startTime' in item
             ? [
@@ -387,7 +481,7 @@ function MasterRow({
                   isUniform={item.isUniform}
                 />,
                 item.timezone,
-                item.active ? 'Aktif' : 'Arsip',
+                <ActiveBadge key="status" active={item.active} />,
               ]
             : [];
   return (
@@ -429,6 +523,18 @@ function MasterRow({
       </td>
     </tr>
   );
+}
+
+function ActiveBadge({ active }: { active: boolean }) {
+  return (
+    <StatusBadge tone={active ? 'success' : 'neutral'}>{active ? 'Aktif' : 'Arsip'}</StatusBadge>
+  );
+}
+
+function AccountBadge({ member }: { member: { account?: { status: string } | null | undefined } }) {
+  const state = accountState(member);
+  if (!member.account) return <span className="master-muted">{state.label}</span>;
+  return <StatusBadge tone={state.tone}>{state.label}</StatusBadge>;
 }
 
 export function MasterFormPage({ kind }: { kind: ResourceKind }) {
@@ -578,12 +684,20 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
   };
 
   return (
-    <div className="product-page">
+    <div className={editing ? 'product-page master-detail-page' : 'product-page'}>
       <MasterBackLink to={`/master-data/${kind}`} label={resources[kind].title} />
       <PageHeader
         eyebrow={resources[kind].title}
-        title={editing ? 'Edit data' : resources[kind].createLabel}
+        title={
+          editing
+            ? detail.data
+              ? resourceTitle(detail.data)
+              : 'Edit data'
+            : resources[kind].createLabel
+        }
         description=""
+        breadcrumbs={[masterCrumb, { label: resources[kind].title, to: `/master-data/${kind}` }]}
+        {...(editing && detail.data ? { status: <ActiveBadge active={detail.data.active} /> } : {})}
       />
       {problem && (
         <Alert tone="danger" title="Perubahan gagal">
@@ -614,7 +728,7 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
               />
             )}
             <div className="form-actions">
-              <Button type="submit" loading={save.isPending}>
+              <Button type="submit" variant="primary" loading={save.isPending}>
                 {editing ? 'Simpan perubahan' : 'Buat data'}
               </Button>
               <Button
@@ -628,11 +742,11 @@ export function MasterFormPage({ kind }: { kind: ResourceKind }) {
           </form>
         </Card>
       )}
-      {editing && kind !== 'members' && detail.data && (
-        <ResourceLifecycle kind={kind} resource={detail.data} scope={scope} />
-      )}
       {editing && kind === 'lines' && detail.data && 'code' in detail.data && (
         <JobsPanel lineId={detail.data.id} scope={scope} />
+      )}
+      {editing && kind !== 'members' && detail.data && (
+        <ResourceLifecycle kind={kind} resource={detail.data} scope={scope} />
       )}
     </div>
   );
@@ -1010,8 +1124,8 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
         </form>
         <ol className="job-list">
           {jobs.data?.items.map((job, index) => (
-            <li key={job.id}>
-              <span>{job.displayOrder}</span>
+            <li key={job.id} className={job.active ? undefined : 'is-archived'}>
+              <span className="order-pill">{String(job.displayOrder).padStart(2, '0')}</span>
               {editingJobId === job.id ? (
                 <form
                   className="job-rename"
@@ -1083,49 +1197,56 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
                 }
                 options={skillCategoryOptions}
               />
-              <small>{job.active ? 'Aktif' : 'Arsip'}</small>
-              <div>
+              <span className="job-list__state">
+                {!job.active && <StatusBadge tone="neutral">Arsip</StatusBadge>}
+              </span>
+              <div className="job-list__actions">
                 {editingJobId !== job.id && (
-                  <Button
+                  <Tooltip label="Ubah nama">
+                    <IconButton
+                      size="sm"
+                      label={`Ubah nama job ${job.name}`}
+                      disabled={rename.isPending || editingJobId !== null}
+                      onClick={() => {
+                        setProblem(null);
+                        setEditingJobId(job.id);
+                        setEditingJobName(job.name);
+                      }}
+                    >
+                      <Pencil aria-hidden="true" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                <Tooltip label="Naikkan urutan">
+                  <IconButton
                     size="sm"
-                    variant="ghost"
-                    aria-label={`Ubah nama job ${job.name}`}
-                    disabled={rename.isPending || editingJobId !== null}
+                    label={`Naikkan job ${job.name}`}
+                    disabled={index === 0 || change.isPending || editingJobId !== null}
                     onClick={() => {
                       setProblem(null);
-                      setEditingJobId(job.id);
-                      setEditingJobName(job.name);
+                      change.mutate({ jobId: job.id, kind: 'up', index });
                     }}
                   >
-                    Ubah nama
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={index === 0 || change.isPending || editingJobId !== null}
-                  onClick={() => {
-                    setProblem(null);
-                    change.mutate({ jobId: job.id, kind: 'up', index });
-                  }}
-                >
-                  Naik
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={
-                    index === (jobs.data?.items.length ?? 0) - 1 ||
-                    change.isPending ||
-                    editingJobId !== null
-                  }
-                  onClick={() => {
-                    setProblem(null);
-                    change.mutate({ jobId: job.id, kind: 'down', index });
-                  }}
-                >
-                  Turun
-                </Button>
+                    <ArrowUp aria-hidden="true" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip label="Turunkan urutan">
+                  <IconButton
+                    size="sm"
+                    label={`Turunkan job ${job.name}`}
+                    disabled={
+                      index === (jobs.data?.items.length ?? 0) - 1 ||
+                      change.isPending ||
+                      editingJobId !== null
+                    }
+                    onClick={() => {
+                      setProblem(null);
+                      change.mutate({ jobId: job.id, kind: 'down', index });
+                    }}
+                  >
+                    <ArrowDown aria-hidden="true" />
+                  </IconButton>
+                </Tooltip>
                 {!job.active && (
                   <Button
                     size="sm"
@@ -1139,20 +1260,20 @@ function JobsPanel({ lineId, scope }: { lineId: string; scope: ReturnType<typeof
                     Aktifkan
                   </Button>
                 )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="lifecycle-delete"
-                  aria-label={`${job.active ? 'Hapus' : 'Hapus permanen'} job ${job.name}`}
-                  title={job.active ? 'Hapus' : 'Hapus permanen'}
-                  disabled={change.isPending || editingJobId !== null}
-                  onClick={() => {
-                    setProblem(null);
-                    setDeletingJob({ id: job.id, active: job.active });
-                  }}
-                >
-                  <Trash2 aria-hidden="true" />
-                </Button>
+                <Tooltip label={job.active ? 'Hapus' : 'Hapus permanen'}>
+                  <IconButton
+                    size="sm"
+                    className="lifecycle-delete"
+                    label={`${job.active ? 'Hapus' : 'Hapus permanen'} job ${job.name}`}
+                    disabled={change.isPending || editingJobId !== null}
+                    onClick={() => {
+                      setProblem(null);
+                      setDeletingJob({ id: job.id, active: job.active });
+                    }}
+                  >
+                    <Trash2 aria-hidden="true" />
+                  </IconButton>
+                </Tooltip>
               </div>
             </li>
           ))}
@@ -1214,7 +1335,7 @@ export function OneTimeCredential({
           />
           Saya sudah menyimpan informasi akun.
         </label>
-        <Button disabled={!acknowledged} leadingIcon={<Check />} onClick={onDone}>
+        <Button variant="primary" disabled={!acknowledged} leadingIcon={<Check />} onClick={onDone}>
           Selesai
         </Button>
       </div>
@@ -1226,13 +1347,20 @@ export function ChecklistOverviewPage() {
   return (
     <div className="product-page">
       <MasterBackLink to="/master-data" label="Master Data" />
-      <PageHeader eyebrow="Master Data" title="Checklist 4M" description="" />
-      <section className="checklist-category-grid">
+      <PageHeader
+        eyebrow="Master Data"
+        title="Checklist 4M"
+        description=""
+        breadcrumbs={[masterCrumb]}
+      />
+      <section className="master-overview checklist-category-grid">
         {(['MAN', 'MACHINE', 'MATERIAL', 'METHOD'] as const).map((category) => (
           <Link key={category} to={`/master-data/checklists/${category}`}>
-            <span>{category}</span>
-            <strong>{label(category)}</strong>
-            <ArrowRight />
+            <FourMDot category={category} className="master-overview__dot" />
+            <div>
+              <strong>{label(category)}</strong>
+            </div>
+            <ArrowRight aria-hidden="true" className="master-overview__arrow" />
           </Link>
         ))}
       </section>
@@ -1309,7 +1437,12 @@ export function ChecklistDetailPage() {
   return (
     <div className="product-page">
       <MasterBackLink to="/master-data/checklists" label="Checklist 4M" />
-      <PageHeader eyebrow="Checklist 4M" title={label(category)} description="" />
+      <PageHeader
+        eyebrow="Checklist 4M"
+        title={label(category)}
+        description=""
+        breadcrumbs={[masterCrumb, { label: 'Checklist 4M', to: '/master-data/checklists' }]}
+      />
       {notice && (
         <div role="status" className="sr-only">
           {notice}
@@ -1327,13 +1460,15 @@ export function ChecklistDetailPage() {
             title="Draft saat ini"
             description={`${items.length} item · Versi draft ${draft.data.version}`}
             className="checklist-editor__draft"
+            action={
+              <div className="checklist-editor__state">
+                {dirty && <Badge tone="warning">Belum disimpan</Badge>}
+                <StatusBadge tone={draft.data.active ? 'success' : 'neutral'}>
+                  {draft.data.active ? 'Aktif' : 'Nonaktif'}
+                </StatusBadge>
+              </div>
+            }
           >
-            <div className="checklist-editor__state">
-              <span className={draft.data.active ? 'is-active' : 'is-inactive'}>
-                {draft.data.active ? 'Aktif' : 'Nonaktif'}
-              </span>
-              {dirty && <span className="checklist-editor__dirty">Belum disimpan</span>}
-            </div>
             <ol>
               {items.map((item, index) => (
                 <li key={index}>
@@ -1366,6 +1501,7 @@ export function ChecklistDetailPage() {
                 Tambah item
               </Button>
               <Button
+                variant="primary"
                 loading={save.isPending}
                 disabled={!dirty || invalid || save.isPending}
                 onClick={() => {
@@ -1379,31 +1515,45 @@ export function ChecklistDetailPage() {
             {dirty && <p className="checklist-editor__hint">Simpan draft sebelum publish.</p>}
           </Panel>
           <Panel title="Publikasi" description="" className="checklist-editor__side">
-            <Button
-              disabled={dirty || invalid || publish.isPending}
-              loading={publish.isPending}
-              onClick={() => {
-                setProblem(null);
-                if (window.confirm('Publish draft ini sebagai versi baru?')) publish.mutate();
-              }}
-            >
-              Publish versi baru
-            </Button>
-            <Button
-              variant="secondary"
-              loading={lifecycle.isPending}
-              onClick={() => {
-                setProblem(null);
-                if (
-                  window.confirm(
-                    `${draft.data.active ? 'Nonaktifkan' : 'Aktifkan'} checklist ${label(category)}?`,
-                  )
-                )
-                  lifecycle.mutate();
-              }}
-            >
-              {draft.data.active ? 'Nonaktifkan checklist' : 'Aktifkan checklist'}
-            </Button>
+            <div className="checklist-editor__actions">
+              <AlertDialog
+                trigger={
+                  <Button
+                    variant="primary"
+                    disabled={dirty || invalid || publish.isPending}
+                    loading={publish.isPending}
+                    onClick={() => setProblem(null)}
+                  >
+                    Publish versi baru
+                  </Button>
+                }
+                title="Publish versi baru?"
+                description={`Draft ${label(category)} diterbitkan sebagai versi baru.`}
+                confirmLabel="Publish"
+                onConfirm={() => publish.mutate()}
+              />
+              <AlertDialog
+                trigger={
+                  <Button
+                    variant="ghost"
+                    className={draft.data.active ? 'checklist-editor__deactivate' : undefined}
+                    loading={lifecycle.isPending}
+                    onClick={() => setProblem(null)}
+                  >
+                    {draft.data.active ? 'Nonaktifkan checklist' : 'Aktifkan checklist'}
+                  </Button>
+                }
+                title={`${draft.data.active ? 'Nonaktifkan' : 'Aktifkan'} checklist ${label(category)}?`}
+                description={
+                  draft.data.active
+                    ? 'Checklist tidak dipakai pada Henkaten baru.'
+                    : 'Checklist dipakai kembali pada Henkaten baru.'
+                }
+                confirmLabel={draft.data.active ? 'Nonaktifkan' : 'Aktifkan'}
+                destructive={draft.data.active}
+                onConfirm={() => lifecycle.mutate()}
+              />
+            </div>
             <div className="checklist-editor__history">
               <h3>Riwayat versi</h3>
               <ol className="version-list">
@@ -1411,7 +1561,9 @@ export function ChecklistDetailPage() {
                   <li key={version.id}>
                     <strong>Versi {version.versionNumber}</strong>
                     <span>{version.items.length} item</span>
-                    <small>{new Date(version.publishedAt).toLocaleString('id-ID')}</small>
+                    <small>
+                      {formatTimestamp(version.publishedAt, session?.supplier?.timezone)}
+                    </small>
                   </li>
                 ))}
               </ol>

@@ -601,8 +601,14 @@ Catatan:
 - **Route:** `/master-data`
 - **Pengguna:** Supplier Admin normal/preparation.
 - **Tujuan:** melihat status masing-masing configuration area dan next prerequisite.
-- **Elements:** counts/active state/readiness untuk member, line/job, part, Shift Template, checklist,
-  dan defaults; links ke tiap area; Hosted Preparation context.
+- **Elements:** six area cards (Member & Akun, Line & Job, Part, Shift Template, Checklist 4M, Line
+  Setup), each with its own icon, active count and readiness badge (*Lengkap* / *Perlu dilengkapi* /
+  *Opsional*) from `setup-readiness` (shared query with `/setup`, refetched on mount; counts hidden
+  if the read fails); *Lihat readiness*; *Import Data*; Hosted Preparation context.
+- **Shared detail pattern (Line, Part, Shift Template):** title = record (`code · name`,
+  `TMMIN Part Number · name`, template name) with Aktif/Arsip badge; breadcrumb
+  *Supplier / Master Data / list / record*; form, Jobs (lines) and Status in one 880 px column;
+  primary *Simpan perubahan*. Lists show Aktif/Arsip and account state as badges.
 - **States:** empty/partial/ready and read failures per area.
 - **Dependency:** `AVAILABLE`, termasuk consolidated readiness status.
 
@@ -643,6 +649,8 @@ Catatan:
 - **Tujuan:** mengelola line dan ordered jobs secara individual.
 - **Elements:** line code/name/order/active; nested jobs name/order/active; create/edit,
   activate/deactivate, reorder, and links to defaults.
+  Job rows: `01`–`04` order pill, name, skill select, *Arsip* badge only when archived, icon
+  actions with tooltips (*Ubah nama*, *Naikkan urutan*, *Turunkan urutan*, *Hapus*).
 - **Validasi dan rules:** line code tenant-unique; job name unique per line; referenced data cannot
   hard-delete; reorder preserves identity/history.
 - **States:** incomplete line, no jobs, resource in use, version/reorder conflict.
@@ -680,6 +688,9 @@ Catatan:
 - **Tujuan:** menjaga satu active published checklist per category melalui immutable versions.
 - **Elements:** category status; current draft ordered items; add/edit/remove/reorder draft items;
   expected version; publish consequence; version history and item snapshots; activate/deactivate.
+  Overview: 2 × 2 cards with the 4M colour dot. Detail: Aktif/Nonaktif and *Belum disimpan* badges
+  in the draft header, primary *Publish versi baru*, danger-ghost *Nonaktifkan checklist*, both
+  confirmed in an in-app dialog.
 - **Validasi dan rules:** category fixed to MAN/MACHINE/MATERIAL/METHOD; publish needs minimum one item;
   published version immutable; deactivate affects future submissions only and cannot alter snapshots.
 - **States:** no draft, empty draft, unpublished category blocker, publish conflict, historical version.

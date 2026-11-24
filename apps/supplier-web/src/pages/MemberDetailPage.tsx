@@ -36,6 +36,7 @@ import { useSession } from '../app/session';
 import { MasterBackLink, OneTimeCredential, masterMutationProblem } from './MasterDataPages';
 import { MasterDeleteDialog } from './MasterDeleteDialog';
 import { MemberRoleDialog } from './MemberRoleDialog';
+import { accountState, formatTimestamp } from './masterFormat';
 import { memberRoleDescriptions, memberRoleLabels } from './memberRoles';
 import './member-detail.css';
 
@@ -103,6 +104,10 @@ function MemberDetailHeader({ member }: { member: Member }) {
         <div className="member-detail-header__copy">
           <nav className="product-breadcrumbs" aria-label="Breadcrumb">
             <NavLink to="/">Supplier</NavLink>
+            <span aria-hidden="true">/</span>
+            <NavLink to="/master-data" end>
+              Master Data
+            </NavLink>
             <span aria-hidden="true">/</span>
             <NavLink to="/master-data/members">Member &amp; Akun</NavLink>
             <span aria-hidden="true">/</span>
@@ -288,7 +293,13 @@ function MemberProfilePanel({ member, scope }: { member: Member; scope: Scope })
           >
             Batalkan
           </Button>
-          <Button type="submit" form={formId} loading={save.isPending} disabled={!dirty || !valid}>
+          <Button
+            type="submit"
+            form={formId}
+            variant="primary"
+            loading={save.isPending}
+            disabled={!dirty || !valid}
+          >
             Simpan perubahan
           </Button>
         </div>
@@ -404,23 +415,28 @@ export function MemberPhotoPanel({ member, scope }: { member: Member; scope: Sco
                 />
               </label>
               {member.photo && (
-                <Button
-                  variant="ghost"
-                  className="member-photo__remove"
-                  leadingIcon={<Trash2 />}
-                  loading={remove.isPending}
-                  disabled={pending}
-                  onClick={() => {
-                    setProblem(null);
-                    setNotice(null);
-                    if (
-                      window.confirm('Hapus foto member ini dan gunakan initials sebagai avatar?')
-                    )
-                      remove.mutate();
-                  }}
-                >
-                  Hapus foto
-                </Button>
+                <AlertDialog
+                  title="Hapus foto member?"
+                  description="Initials digunakan sebagai avatar."
+                  confirmLabel="Hapus foto"
+                  destructive
+                  onConfirm={() => remove.mutate()}
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      className="member-photo__remove"
+                      leadingIcon={<Trash2 />}
+                      loading={remove.isPending}
+                      disabled={pending}
+                      onClick={() => {
+                        setProblem(null);
+                        setNotice(null);
+                      }}
+                    >
+                      Hapus foto
+                    </Button>
+                  }
+                />
               )}
             </div>
           </div>
@@ -746,27 +762,6 @@ function MemberDetailSkeleton() {
       </div>
     </div>
   );
-}
-
-function accountState(member: Member): {
-  label: string;
-  tone: 'success' | 'warning' | 'neutral';
-} {
-  if (!member.account) return { label: 'Tanpa akun', tone: 'neutral' };
-  return member.account.status === 'ACTIVE'
-    ? { label: 'Akun aktif', tone: 'success' }
-    : { label: 'Akun nonaktif', tone: 'warning' };
-}
-
-function formatTimestamp(value: string, timeZone?: string): string {
-  return new Intl.DateTimeFormat('id-ID', {
-    ...(timeZone ? { timeZone } : {}),
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
 }
 
 function scopeOf(session: NonNullable<ReturnType<typeof useSession>['session']>): Scope {

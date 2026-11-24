@@ -220,8 +220,13 @@
   height: 40px;
   color: var(--hds-state-success-fg);
 }
-.catalog-delete-trigger {
+.hds-button.catalog-delete-trigger {
+  border-color: var(--hds-state-danger-border);
   color: var(--hds-state-danger-fg);
+}
+.hds-button.catalog-delete-trigger:hover:not(:disabled) {
+  border-color: var(--hds-state-danger-fg);
+  background: var(--hds-state-danger-bg);
 }
 .hds-dialog.catalog-delete-dialog {
   width: min(520px, calc(100vw - 32px));
