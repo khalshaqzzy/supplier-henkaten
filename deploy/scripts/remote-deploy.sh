@@ -519,7 +519,8 @@ if [[ "${already_activated}" == "true" ]]; then
 fi
 rm -f -- "${candidate_manifest}" "${staged_manifest}" "${prev_manifest_backup}" >/dev/null 2>&1 || true
 deploy_mutation_open=false
-promote_rollback_driver "${BASE_DIR}" || echo "Warning: failed to promote the activated release's rollback driver as known-good." >&2
+trap '' PIPE
+promote_rollback_driver "${BASE_DIR}" || note_stderr "Warning: failed to promote the activated release's rollback driver as known-good."
 
 release_directories=()
 while IFS= read -r release_entry; do

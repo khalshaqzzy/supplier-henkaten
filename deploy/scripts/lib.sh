@@ -1244,11 +1244,11 @@ verify_manifest_images_local() {
       had_operational_err=true
     fi
   done <<<"${parsed_lines}"
-  if [[ "${had_operational_err}" == "true" ]]; then
-    return 1
-  fi
   if [[ "${had_confirmed_missing}" == "true" ]]; then
     return 2
+  fi
+  if [[ "${had_operational_err}" == "true" ]]; then
+    return 1
   fi
   return 0
 }

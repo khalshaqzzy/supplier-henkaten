@@ -35,6 +35,7 @@ if ! env_check_out="$("${SCRIPT_DIR}/validate-runtime-env.sh" --allow-legacy-db-
   note_stderr "${env_check_out:-validate-runtime-env.sh failed for ${RUNTIME_ENV}.}"
   exit 1
 fi
+[[ -z "${env_check_out}" ]] || log_info "[rollback] ${env_check_out}"
 load_runtime_env "${RUNTIME_ENV}"
 [[ "${REQUESTED_ENV}" == "${APP_ENV:-}" && "${REQUESTED_SHA}" == "${RELEASE_SHA:-}" ]] || die "Rollback environment or release SHA mismatch."
 
@@ -213,4 +214,5 @@ activate_symlink "${RELEASE_DIR}" "${BASE_DIR}/current" || die "Failed to re-poi
 [[ -L "${BASE_DIR}/current" && "$(readlink "${BASE_DIR}/current")" == "${RELEASE_DIR}" ]] || die "Failed to re-point ${BASE_DIR}/current."
 publish_line_file "${REQUESTED_SHA}" "${BASE_DIR}/current_release" || die "Failed to publish ${BASE_DIR}/current_release."
 rollback_mutating=false
+trap '' PIPE
 { printf 'Rollback completed for %s.\n' "${REQUESTED_SHA}"; } 2>/dev/null || true

@@ -2547,6 +2547,7 @@ if TEST_PS_ALL_EXTRA_STOPPED=postgres TEST_RM_FAIL_RUNNING=true TEST_DOCKER_LOG=
   run_candidate "${stale_rmfail_base}" a200000000000000000000000000000000000003 10 >/dev/null 2>&1; then
   fail "deploy proceeded despite non-forced docker rm rejecting a restarted container"
 fi
+grep -Fxq 'DOCKER_RM rm postgres--stale-stopped-container' "${stale_rmfail_log}" || fail "stale_rmfail test did not attempt non-forced docker rm on the extra container"
 
 # 19. Policy refusal (exit 4) must survive a closed stderr pipe with inherited ignored SIGPIPE
 #     so automatic recovery never misclassifies a policy refusal as a retryable exit 1.
@@ -2601,6 +2602,25 @@ TEST_CONTAINERD_STORE=true TEST_IMAGE_STATE_FILE="${miss_before_tag_images}" \
 [[ "${miss_before_tag_status}" == "4" ]] || fail "rollback with missing target image ID did not exit 4 (got ${miss_before_tag_status})"
 if [[ -f "${miss_before_tag_log}" ]] && grep -q '^TAG ' "${miss_before_tag_log}"; then
   fail "rollback mutated Docker tags (outgoing pins) before checking target image availability"
+fi
+
+# Mixed inspect outcomes on target manifest (one confirmed missing + one daemon error) must STILL
+# refuse with exit 4, persist .rollback-unsafe, and perform zero docker tag calls.
+miss_mixed_base="${TEST_ROOT}/rollback-missing-plus-daemon-err"
+setup_rehearsal_base "${miss_mixed_base}"
+miss_mixed_once="${TEST_ROOT}/rollback-missing-plus-daemon-err.once"
+printf '%s\n' "$(fake_id "${rehearsal_prev:0:6}-api")" >"${miss_mixed_once}"
+miss_mixed_log="${TEST_ROOT}/rollback-missing-plus-daemon-err.log"
+miss_mixed_status=0
+TEST_CONTAINERD_STORE=true TEST_IMAGE_STATE_FILE="${miss_before_tag_images}" \
+  TEST_INSPECT_DAEMON_ERROR_ONCE_FILE="${miss_mixed_once}" \
+  TEST_DOCKER_LOG="${miss_mixed_log}" PATH="${fake_bin}:${PATH}" \
+  "${miss_mixed_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" \
+  staging "${rehearsal_prev}" "${miss_mixed_base}" >/dev/null 2>&1 || miss_mixed_status=$?
+[[ "${miss_mixed_status}" == "4" ]] || fail "rollback with one confirmed-missing ID and one daemon error did not exit 4 (got ${miss_mixed_status})"
+[[ -f "${miss_mixed_base}/releases/${rehearsal_prev}/.rollback-unsafe" ]] || fail "rollback with confirmed-missing ID + daemon error did not mark target .rollback-unsafe"
+if [[ -f "${miss_mixed_log}" ]] && grep -q '^TAG ' "${miss_mixed_log}"; then
+  fail "rollback mutated Docker tags on mixed missing + daemon-error target check"
 fi
 
 lock_base="${TEST_ROOT}/lock"
