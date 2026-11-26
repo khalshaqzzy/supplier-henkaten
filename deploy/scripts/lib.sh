@@ -264,12 +264,46 @@ mark_rollback_unsafe() {
   [[ -f "${dest_file}" && ! -L "${dest_file}" ]] || return 1
 }
 
+install_hardened_rollback_driver() {
+  local source_scripts_dir="$1"
+  local base_dir="$2"
+  local driver_dir="${base_dir}/shared/deployment-state/rollback-driver"
+  local script_name src tmp dest
+  mkdir -p "${driver_dir}" || return 1
+  for script_name in lib.sh validate-runtime-env.sh remote-rollback.sh; do
+    src="${source_scripts_dir}/${script_name}"
+    [[ -f "${src}" ]] || return 1
+    dest="${driver_dir}/${script_name}"
+    if [[ -L "${dest}" || ( -e "${dest}" && ! -f "${dest}" ) ]]; then
+      return 1
+    fi
+    tmp="$(mktemp "${driver_dir}/.${script_name}.tmp.XXXXXX")" || return 1
+    cp "${src}" "${tmp}" && chmod 755 "${tmp}" || {
+      rm -f -- "${tmp}"
+      return 1
+    }
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      mv -f "${tmp}" "${dest}" || {
+        rm -f -- "${tmp}"
+        return 1
+      }
+    else
+      mv -Tf "${tmp}" "${dest}" || {
+        rm -f -- "${tmp}"
+        return 1
+      }
+    fi
+  done
+}
+
 write_activated_images() {
   local release_dir="$1"
   local release_sha="$2"
-  local pg_ref image_ref image_id tmp_file dest_file backup_file unsafe_marker had_prev=false
+  local compose_env="${3:-${release_dir}/.runtime.env}"
+  local pg_ref svc image_ref container_id image_id resolved_id tmp_file dest_file backup_file unsafe_marker had_prev=false
   dest_file="${release_dir}/.activated-images"
   unsafe_marker="${release_dir}/.rollback-unsafe"
+  [[ -d "${release_dir}" && -n "${COMPOSE_PROJECT_NAME:-}" && -f "${compose_env}" ]] || return 1
   if [[ -L "${dest_file}" || ( -e "${dest_file}" && ! -f "${dest_file}" ) ]]; then
     echo "Refusing to publish pinned image manifest: ${dest_file} is not a regular file." >&2
     return 1
@@ -279,21 +313,29 @@ write_activated_images() {
     return 1
   fi
   pg_ref="$(postgres_image_ref_for "${release_dir}")"
-  tmp_file="${release_dir}/.activated-images.tmp"
-  backup_file="${release_dir}/.activated-images.prev"
-  : >"${tmp_file}" || return 1
+  tmp_file="$(mktemp "${release_dir}/.activated-images.tmp.XXXXXX" 2>/dev/null)" || return 1
   chmod 600 "${tmp_file}" || {
     rm -f -- "${tmp_file}"
     return 1
   }
-  for image_ref in \
-    "${pg_ref}" \
-    "supplier-henkaten-api:${release_sha}" \
-    "supplier-henkaten-supplier-web:${release_sha}" \
-    "supplier-henkaten-tmmin-web:${release_sha}" \
-    "supplier-henkaten-caddy:${release_sha}"; do
-    image_id="$(docker image inspect --format '{{.Id}}' "${image_ref}" 2>/dev/null || true)"
+  for svc in postgres api supplier-web tmmin-web caddy; do
+    if [[ "${svc}" == "postgres" ]]; then
+      image_ref="${pg_ref}"
+    else
+      image_ref="supplier-henkaten-${svc}:${release_sha}"
+    fi
+    container_id="$(compose_for "${release_dir}" "${compose_env}" ps -q "${svc}" 2>/dev/null | head -n 1 || true)"
+    if [[ -z "${container_id}" ]]; then
+      rm -f -- "${tmp_file}"
+      return 1
+    fi
+    image_id="$(docker inspect --format '{{.Image}}' "${container_id}" 2>/dev/null || true)"
     if [[ -z "${image_id}" ]]; then
+      rm -f -- "${tmp_file}"
+      return 1
+    fi
+    resolved_id="$(docker image inspect --format '{{.Id}}' "${image_id}" 2>/dev/null || true)"
+    if [[ "${resolved_id}" != "${image_id}" ]]; then
       rm -f -- "${tmp_file}"
       return 1
     fi
@@ -302,7 +344,12 @@ write_activated_images() {
       return 1
     }
   done
+  backup_file=""
   if [[ -f "${dest_file}" && ! -L "${dest_file}" ]]; then
+    backup_file="$(mktemp "${release_dir}/.activated-images.prev.XXXXXX" 2>/dev/null)" || {
+      rm -f -- "${tmp_file}"
+      return 1
+    }
     cp -p "${dest_file}" "${backup_file}" || {
       rm -f -- "${tmp_file}" "${backup_file}"
       return 1
@@ -332,7 +379,9 @@ write_activated_images() {
     fi
     return 1
   fi
-  rm -f -- "${backup_file}"
+  if [[ -n "${backup_file}" ]]; then
+    rm -f -- "${backup_file}" >/dev/null 2>&1 || true
+  fi
 }
 
 restore_pinned_images_file() {

@@ -68,7 +68,7 @@ wait_for_service "${RELEASE_DIR}" "${RUNTIME_ENV}" caddy 120
   "https://${API_DOMAIN}"
 
 if [[ ! -f "${RELEASE_DIR}/.activated-images" ]]; then
-  if ! write_activated_images "${RELEASE_DIR}" "${REQUESTED_SHA}"; then
+  if ! write_activated_images "${RELEASE_DIR}" "${REQUESTED_SHA}" "${RUNTIME_ENV}"; then
     compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
     die "Failed to persist verified .activated-images after rollback for ${REQUESTED_SHA}; stopped application services while preserving PostgreSQL."
   fi

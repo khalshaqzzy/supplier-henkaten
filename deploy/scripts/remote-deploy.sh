@@ -78,6 +78,8 @@ RUNTIME_ENV="${RELEASE_DIR}/.runtime.env"
 load_runtime_env "${RUNTIME_ENV}"
 [[ "${APP_ENV}" == "${REQUESTED_ENV}" && "${RELEASE_SHA}" == "${REQUESTED_SHA}" ]] || die "Stored runtime environment identity mismatch."
 
+install_hardened_rollback_driver "${RELEASE_DIR}/deploy/scripts" "${BASE_DIR}" || die "Failed to install hardened rollback driver."
+
 postgres_image_ref="$(postgres_image_ref_for "${RELEASE_DIR}")"
 saved_image_refs=()
 saved_image_ids=()
@@ -95,12 +97,12 @@ if [[ -n "${previous_release}" ]]; then
     )
   fi
   if [[ ! -f "${previous_pinned_images}" && ! -e "${previous_dir_for_snapshot}/.rollback-unsafe" && ! -L "${previous_dir_for_snapshot}/.rollback-unsafe" && -d "${previous_dir_for_snapshot}" ]]; then
-    if ! write_activated_images "${previous_dir_for_snapshot}" "${previous_release}"; then
+    if ! write_activated_images "${previous_dir_for_snapshot}" "${previous_release}" "${previous_dir_for_snapshot}/.runtime.env"; then
       if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
         die "Cannot safely redeploy active release ${REQUESTED_SHA}: unable to persist pre-build baseline pins in .activated-images."
       fi
       image_snapshot_complete=false
-      mark_rollback_unsafe "${previous_dir_for_snapshot}" "${previous_release}" || echo "Warning: failed to persist .rollback-unsafe marker for ${previous_release} before build." >&2
+      mark_rollback_unsafe "${previous_dir_for_snapshot}" "${previous_release}" || die "Cannot safely proceed with build: failed to backfill .activated-images or persist .rollback-unsafe for ${previous_release}."
     fi
   fi
   if [[ -f "${previous_pinned_images}" && ! -L "${previous_pinned_images}" ]]; then
@@ -176,7 +178,7 @@ candidate_deploy() {
     "https://${SUPPLIER_DOMAIN}" \
     "https://${TMMIN_DOMAIN}" \
     "https://${API_DOMAIN}" || return 1
-  write_activated_images "${RELEASE_DIR}" "${REQUESTED_SHA}" || return 1
+  write_activated_images "${RELEASE_DIR}" "${REQUESTED_SHA}" "${RUNTIME_ENV}" || return 1
 }
 
 if ! candidate_deploy; then

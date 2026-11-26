@@ -259,11 +259,11 @@ Untuk membuktikan ordering, merge dua candidate berdekatan. Hasil akhir harus se
 Rollback hanya menghidupkan code/image dan env dari release lama. Ia tidak menjalankan down
 migration, tidak menghapus volume, dan tidak mengembalikan schema/data.
 
-Rollback operator ke SHA yang masih retained:
+Rollback operator ke SHA yang masih retained (selalu jalankan driver rollback hardened di `shared/deployment-state/rollback-driver` agar validasi `.activated-images` dan `.rollback-unsafe` tetap aktif meski `current` sedang menunjuk ke rilis legacy):
 
 ```bash
 ssh -p 22 henkaten-deploy@VM_HOST
-/opt/supplier-henkaten/staging/current/deploy/scripts/remote-rollback.sh \
+/opt/supplier-henkaten/staging/shared/deployment-state/rollback-driver/remote-rollback.sh \
   staging PREVIOUS_40_CHARACTER_SHA /opt/supplier-henkaten/staging
 ```
 

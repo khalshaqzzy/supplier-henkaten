@@ -298,6 +298,20 @@ if [[ "${1:-}" == "tag" ]]; then
   exit 0
 fi
 if [[ "${1:-}" == "inspect" ]]; then
+  if [[ "${3:-}" == "{{.Image}}" ]]; then
+    container_name="${!#}"
+    svc_name="${container_name%-container}"
+    if [[ -n "${TEST_RUNNING_IMAGES_FILE:-}" && -f "${TEST_RUNNING_IMAGES_FILE}" ]]; then
+      awk -v target="${svc_name}" '$1 == target {print $2; exit}' "${TEST_RUNNING_IMAGES_FILE}"
+      exit 0
+    fi
+    if [[ "${svc_name}" == "postgres" ]]; then
+      get_image_tag "supplier-henkaten-postgres:18.4-pgvector-0.8.5"
+    else
+      get_image_tag "supplier-henkaten-${svc_name}:${RELEASE_SHA:-}"
+    fi
+    exit $?
+  fi
   echo healthy
   exit 0
 fi
@@ -316,6 +330,9 @@ if [[ "${1:-}" == "compose" ]]; then
     if [[ "${argument}" == "migrate" && "${TEST_MIGRATE_FAIL:-false}" == "true" ]]; then exit 1; fi
   done
   if [[ "${is_build}" == "true" ]]; then
+    if [[ -n "${TEST_BUILD_ASSERT_EXISTS:-}" && ! -f "${TEST_BUILD_ASSERT_EXISTS}" ]]; then
+      printf 'BUILD_PRECONDITION_MISSING %s\n' "${TEST_BUILD_ASSERT_EXISTS}" >>"${TEST_DOCKER_LOG:-/dev/null}"
+    fi
     if [[ -n "${TEST_IMAGE_STATE_FILE:-}" ]]; then
       build_suffix="${TEST_BUILD_TAG_SUFFIX:-${DEPLOY_RUN_NUMBER:-0}}"
       set_image_tag "supplier-henkaten-postgres:18.4-pgvector-0.8.5" "sha256:candidate-postgres-${build_suffix}"
@@ -327,14 +344,32 @@ if [[ "${1:-}" == "compose" ]]; then
     fi
     if [[ "${TEST_BUILD_FAIL:-false}" == "true" ]]; then exit 1; fi
   fi
-  if [[ "${is_up}" == "true" && -n "${TEST_IMAGE_STATE_FILE:-}" && -n "${TEST_DOCKER_LOG:-}" ]]; then
+  if [[ "${is_up}" == "true" && -n "${TEST_IMAGE_STATE_FILE:-}" ]]; then
     for argument in "$@"; do
       case "${argument}" in
         postgres)
-          printf 'STARTED postgres=%s\n' "$(get_image_tag "supplier-henkaten-postgres:18.4-pgvector-0.8.5")" >>"${TEST_DOCKER_LOG}"
+          started_id="$(get_image_tag "supplier-henkaten-postgres:18.4-pgvector-0.8.5")"
+          if [[ -n "${TEST_DOCKER_LOG:-}" ]]; then
+            printf 'STARTED postgres=%s\n' "${started_id}" >>"${TEST_DOCKER_LOG}"
+          fi
+          if [[ -n "${TEST_RUNNING_IMAGES_FILE:-}" ]]; then
+            tmp_run="${TEST_RUNNING_IMAGES_FILE}.tmp"
+            grep -Ev '^postgres ' "${TEST_RUNNING_IMAGES_FILE}" >"${tmp_run}" 2>/dev/null || true
+            printf 'postgres %s\n' "${started_id}" >>"${tmp_run}"
+            mv "${tmp_run}" "${TEST_RUNNING_IMAGES_FILE}"
+          fi
           ;;
         api | supplier-web | tmmin-web | caddy)
-          printf 'STARTED %s=%s\n' "${argument}" "$(get_image_tag "supplier-henkaten-${argument}:${RELEASE_SHA:-}")" >>"${TEST_DOCKER_LOG}"
+          started_id="$(get_image_tag "supplier-henkaten-${argument}:${RELEASE_SHA:-}")"
+          if [[ -n "${TEST_DOCKER_LOG:-}" ]]; then
+            printf 'STARTED %s=%s\n' "${argument}" "${started_id}" >>"${TEST_DOCKER_LOG}"
+          fi
+          if [[ -n "${TEST_RUNNING_IMAGES_FILE:-}" ]]; then
+            tmp_run="${TEST_RUNNING_IMAGES_FILE}.tmp"
+            grep -Ev "^${argument} " "${TEST_RUNNING_IMAGES_FILE}" >"${tmp_run}" 2>/dev/null || true
+            printf '%s %s\n' "${argument}" "${started_id}" >>"${tmp_run}"
+            mv "${tmp_run}" "${TEST_RUNNING_IMAGES_FILE}"
+          fi
           ;;
       esac
     done
@@ -393,6 +428,7 @@ prepare_candidate() {
   mkdir -p "${incoming}/deploy/scripts"
   cp "${SCRIPTS}/lib.sh" "${incoming}/deploy/scripts/lib.sh"
   cp "${SCRIPTS}/remote-deploy.sh" "${incoming}/deploy/scripts/remote-deploy.sh"
+  cp "${SCRIPTS}/remote-rollback.sh" "${incoming}/deploy/scripts/remote-rollback.sh"
   cp "${SCRIPTS}/validate-runtime-env.sh" "${incoming}/deploy/scripts/validate-runtime-env.sh"
   cat >"${incoming}/deploy/scripts/remote-preflight.sh" <<'EOF'
 #!/usr/bin/env bash
@@ -740,11 +776,12 @@ fi
 # If .rollback-unsafe is a directory, write_activated_images must fail AND preserve the existing .activated-images manifest untouched.
 unsafe_dir_release="${TEST_ROOT}/unsafe-dir-release"
 mkdir -p "${unsafe_dir_release}/.rollback-unsafe"
+cp "${rendered_env}" "${unsafe_dir_release}/.runtime.env"
 printf 'supplier-henkaten-api:%s sha256:original-pinned-api\n' "${retry_sha}" >"${unsafe_dir_release}/.activated-images"
-if PATH="${fake_bin}:${PATH}" bash -c '
+if COMPOSE_PROJECT_NAME=supplier-henkaten-staging PATH="${fake_bin}:${PATH}" bash -c '
   set -euo pipefail
   source "$1"
-  if write_activated_images "$2" "$3"; then
+  if write_activated_images "$2" "$3" "$2/.runtime.env"; then
     exit 0
   fi
   exit 1
@@ -752,6 +789,98 @@ if PATH="${fake_bin}:${PATH}" bash -c '
   fail "write_activated_images succeeded when .rollback-unsafe was a directory"
 fi
 grep -Fxq "supplier-henkaten-api:${retry_sha} sha256:original-pinned-api" "${unsafe_dir_release}/.activated-images" || fail "failed write_activated_images overwrote previous .activated-images manifest"
+
+# Pre-existing .activated-images.prev directory must NOT break write_activated_images (uses mktemp), AND post-rename rm failure must restore the previous manifest.
+prev_dir_release="${TEST_ROOT}/prev-dir-release"
+mkdir -p "${prev_dir_release}/.activated-images.prev"
+cp "${rendered_env}" "${prev_dir_release}/.runtime.env"
+printf 'supplier-henkaten-api:%s sha256:prior-pinned-api\n' "${retry_sha}" >"${prev_dir_release}/.activated-images"
+if ! COMPOSE_PROJECT_NAME=supplier-henkaten-staging RELEASE_SHA="${retry_sha}" PATH="${fake_bin}:${PATH}" bash -c '
+  set -euo pipefail
+  source "$1"
+  write_activated_images "$2" "$3" "$2/.runtime.env"
+' _ "${SCRIPTS}/lib.sh" "${prev_dir_release}" "${retry_sha}" >/dev/null 2>&1; then
+  fail "write_activated_images failed due to pre-existing .activated-images.prev directory"
+fi
+post_rename_release="${TEST_ROOT}/post-rename-restore-release"
+mkdir -p "${post_rename_release}"
+cp "${rendered_env}" "${post_rename_release}/.runtime.env"
+printf 'supplier-henkaten-api:%s sha256:preserved-before-post-rename-fail\n' "${retry_sha}" >"${post_rename_release}/.activated-images"
+printf 'unsafe\n' >"${post_rename_release}/.rollback-unsafe"
+fail_rm_bin="${TEST_ROOT}/fail-rm-bin"
+mkdir -p "${fail_rm_bin}"
+cat >"${fail_rm_bin}/rm" <<'EOF'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  if [[ "${arg}" == *"/.rollback-unsafe" ]]; then
+    exit 1
+  fi
+done
+exec /bin/rm "$@"
+EOF
+chmod +x "${fail_rm_bin}/rm"
+if COMPOSE_PROJECT_NAME=supplier-henkaten-staging RELEASE_SHA="${retry_sha}" PATH="${fail_rm_bin}:${fake_bin}:${PATH}" bash -c '
+  set -euo pipefail
+  source "$1"
+  if write_activated_images "$2" "$3" "$2/.runtime.env"; then
+    exit 0
+  fi
+  exit 1
+' _ "${SCRIPTS}/lib.sh" "${post_rename_release}" "${retry_sha}" >/dev/null 2>&1; then
+  fail "write_activated_images succeeded when post-rename .rollback-unsafe removal failed"
+fi
+grep -Fxq "supplier-henkaten-api:${retry_sha} sha256:preserved-before-post-rename-fail" "${post_rename_release}/.activated-images" || fail "post-rename failure did not restore previous .activated-images manifest"
+
+# Successful cross-SHA upgrade over an unpinned legacy release must backfill .activated-images from the ACTIVE RUNNING containers (even if mutable postgres tag already drifted).
+drift_base="${TEST_ROOT}/legacy-drift-upgrade"
+prepare_base "${drift_base}"
+drift_prev_sha=6161616161616161616161616161616161616161
+drift_new_sha=6262626262626262626262626262626262626262
+mkdir -p "${drift_base}/releases/${drift_prev_sha}/deploy/scripts"
+sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${drift_prev_sha}/" "${legacy_env}" >"${drift_base}/releases/${drift_prev_sha}/.runtime.env"
+printf '%s\n' "${drift_prev_sha}" >"${drift_base}/releases/${drift_prev_sha}/.source.sha"
+printf '%s\n' "${drift_prev_sha}" >"${drift_base}/current_release"
+drift_images="${TEST_ROOT}/drift-images.state"
+cat >"${drift_images}" <<EOF
+supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:drifted-postgres-tag
+supplier-henkaten-api:${drift_prev_sha} sha256:legacy-api
+supplier-henkaten-supplier-web:${drift_prev_sha} sha256:legacy-supplier-web
+supplier-henkaten-tmmin-web:${drift_prev_sha} sha256:legacy-tmmin-web
+supplier-henkaten-caddy:${drift_prev_sha} sha256:legacy-caddy
+EOF
+drift_running="${TEST_ROOT}/drift-running.state"
+cat >"${drift_running}" <<EOF
+postgres sha256:true-running-legacy-postgres
+api sha256:legacy-api
+supplier-web sha256:legacy-supplier-web
+tmmin-web sha256:legacy-tmmin-web
+caddy sha256:legacy-caddy
+EOF
+TEST_BUILD_TAG_SUFFIX=50 TEST_IMAGE_STATE_FILE="${drift_images}" TEST_RUNNING_IMAGES_FILE="${drift_running}" \
+  run_candidate "${drift_base}" "${drift_new_sha}" 50 >/dev/null
+[[ "$(<"${drift_base}/current_release")" == "${drift_new_sha}" ]] || fail "cross-SHA upgrade over legacy release did not activate"
+grep -Fxq 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:true-running-legacy-postgres' "${drift_base}/releases/${drift_prev_sha}/.activated-images" || fail "legacy backfill used drifted tag instead of active running postgres container image"
+grep -Fxq 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:candidate-postgres-50' "${drift_base}/releases/${drift_new_sha}/.activated-images" || fail "new release did not record its own running postgres image ID"
+[[ -x "${drift_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" ]] || fail "hardened rollback driver was not installed in shared/deployment-state/rollback-driver"
+
+# Pre-build cross-SHA abort when NEITHER backfill NOR mark_rollback_unsafe can succeed (unwritable legacy dir).
+unwritable_prev_base="${TEST_ROOT}/unwritable-prev-cross-sha"
+prepare_base "${unwritable_prev_base}"
+unwritable_prev_sha=6060606060606060606060606060606060606060
+mkdir -p "${unwritable_prev_base}/releases/${unwritable_prev_sha}/deploy/scripts"
+sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${unwritable_prev_sha}/" "${legacy_env}" >"${unwritable_prev_base}/releases/${unwritable_prev_sha}/.runtime.env"
+printf '%s\n' "${unwritable_prev_sha}" >"${unwritable_prev_base}/releases/${unwritable_prev_sha}/.source.sha"
+printf '%s\n' "${unwritable_prev_sha}" >"${unwritable_prev_base}/current_release"
+chmod 500 "${unwritable_prev_base}/releases/${unwritable_prev_sha}"
+unwritable_prev_log="${TEST_ROOT}/unwritable-prev-cross-sha.log"
+if TEST_DOCKER_LOG="${unwritable_prev_log}" run_candidate "${unwritable_prev_base}" 5959595959595959595959595959595959595959 10 >/dev/null 2>&1; then
+  chmod 700 "${unwritable_prev_base}/releases/${unwritable_prev_sha}"
+  fail "cross-SHA deploy proceeded despite failing both legacy backfill and .rollback-unsafe persistence"
+fi
+chmod 700 "${unwritable_prev_base}/releases/${unwritable_prev_sha}"
+if [[ -f "${unwritable_prev_log}" ]] && grep -q ' build ' "${unwritable_prev_log}"; then
+  fail "cross-SHA deploy ran docker compose build after failing both backfill and .rollback-unsafe persistence"
+fi
 
 # Deploy-level failure when .rollback-unsafe is a directory must NOT skip stopping mutated candidate app services.
 dir_marker_base="${TEST_ROOT}/dir-marker-cleanup"
@@ -802,13 +931,11 @@ grep -q ' stop ' "${mismatch_log}" || fail "restored-ID mismatch did not stop fa
 [[ "$(grep -c '^STARTED api=' "${mismatch_log}")" == "1" ]] || fail "restored-ID mismatch invoked rollback with unverified candidate image"
 [[ -f "${migration_base}/releases/${retry_sha}/.rollback-unsafe" ]] || fail "restored-ID mismatch did not write .rollback-unsafe marker"
 
-# Incomplete pre-build snapshot on a legacy unpinned release must durably write .rollback-unsafe before build, so even after build recreates the postgres tag, subsequent rollback refuses it.
+# Incomplete pre-build snapshot on a legacy unpinned release must durably write .rollback-unsafe BEFORE build, so even after build recreates the postgres tag, the hardened rollback driver refuses it (even without hardened scripts inside the legacy release dir).
 incomplete_snap_base="${TEST_ROOT}/incomplete-snap"
 prepare_base "${incomplete_snap_base}"
 incomplete_prev_sha=6666666666666666666666666666666666666666
 mkdir -p "${incomplete_snap_base}/releases/${incomplete_prev_sha}/deploy/scripts"
-cp "${SCRIPTS}/lib.sh" "${SCRIPTS}/validate-runtime-env.sh" "${SCRIPTS}/remote-rollback.sh" "${incomplete_snap_base}/releases/${incomplete_prev_sha}/deploy/scripts/"
-chmod +x "${incomplete_snap_base}/releases/${incomplete_prev_sha}/deploy/scripts/"*.sh
 sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${incomplete_prev_sha}/" "${legacy_env}" >"${incomplete_snap_base}/releases/${incomplete_prev_sha}/.runtime.env"
 printf '%s\n' "${incomplete_prev_sha}" >"${incomplete_snap_base}/releases/${incomplete_prev_sha}/.source.sha"
 printf '%s\n' "${incomplete_prev_sha}" >"${incomplete_snap_base}/current_release"
@@ -820,21 +947,26 @@ supplier-henkaten-tmmin-web:${incomplete_prev_sha} sha256:legacy-tmmin-web
 supplier-henkaten-caddy:${incomplete_prev_sha} sha256:legacy-caddy
 EOF
 incomplete_snap_log="${TEST_ROOT}/incomplete-snap.log"
-if TEST_BUILD_FAIL=true TEST_BUILD_TAG_SUFFIX=10 TEST_DOCKER_LOG="${incomplete_snap_log}" TEST_IMAGE_STATE_FILE="${incomplete_snap_images}" \
+if TEST_BUILD_FAIL=true TEST_BUILD_TAG_SUFFIX=10 \
+  TEST_BUILD_ASSERT_EXISTS="${incomplete_snap_base}/releases/${incomplete_prev_sha}/.rollback-unsafe" \
+  TEST_DOCKER_LOG="${incomplete_snap_log}" TEST_IMAGE_STATE_FILE="${incomplete_snap_images}" \
   run_candidate "${incomplete_snap_base}" 6565656565656565656565656565656565656565 10 >/dev/null 2>&1; then
   fail "candidate with missing postgres snapshot unexpectedly succeeded"
 fi
+if grep -q '^BUILD_PRECONDITION_MISSING ' "${incomplete_snap_log}"; then
+  fail ".rollback-unsafe was NOT written before docker compose build on incomplete legacy snapshot"
+fi
 [[ -f "${incomplete_snap_base}/releases/${incomplete_prev_sha}/.rollback-unsafe" ]] || fail "incomplete snapshot on failed build did not mark legacy target .rollback-unsafe"
-# The candidate build recreated the shared postgres tag, yet subsequent manual rollback must STILL refuse the marked legacy target.
+# The candidate build recreated the shared postgres tag, yet subsequent manual rollback through the documented hardened rollback driver must STILL refuse the untouched legacy target.
 grep -Fxq "supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:candidate-postgres-10" "${incomplete_snap_images}" || fail "expected build to recreate shared postgres tag in incomplete-snapshot test"
 incomplete_snap_rb_log="${TEST_ROOT}/incomplete-snap-rollback.log"
 if TEST_DOCKER_LOG="${incomplete_snap_rb_log}" TEST_IMAGE_STATE_FILE="${incomplete_snap_images}" \
-  PATH="${fake_bin}:${PATH}" "${incomplete_snap_base}/releases/${incomplete_prev_sha}/deploy/scripts/remote-rollback.sh" \
+  PATH="${fake_bin}:${PATH}" "${incomplete_snap_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" \
   staging "${incomplete_prev_sha}" "${incomplete_snap_base}" >/dev/null 2>&1; then
-  fail "subsequent rollback accepted legacy target after incomplete snapshot recreated postgres tag"
+  fail "subsequent rollback through hardened driver accepted legacy target after incomplete snapshot recreated postgres tag"
 fi
-if [[ -f "${incomplete_snap_rb_log}" ]] && grep -q '^STARTED ' "${incomplete_snap_rb_log}"; then
-  fail "subsequent rollback started containers for marked incomplete-snapshot legacy target"
+if [[ -f "${incomplete_snap_rb_log}" ]] && grep -Eq '^(STARTED|TAG) ' "${incomplete_snap_rb_log}"; then
+  fail "subsequent rollback started or tagged containers for marked incomplete-snapshot legacy target"
 fi
 
 # Legacy release marked .rollback-unsafe without .activated-images must block manual rollback AND cross-SHA automatic rollback.
