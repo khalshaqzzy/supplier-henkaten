@@ -200,9 +200,9 @@ if ! candidate_deploy; then
     echo "Failure occurred before modifying running services; active release ${previous_release} was preserved untouched." >&2
     exit 1
   fi
-  if [[ -n "${previous_release}" && ( "${images_restored}" != "true" || ( "${previous_release}" == "${REQUESTED_SHA}" && "${image_snapshot_complete}" != "true" ) ) ]]; then
+  if [[ -n "${previous_release}" && ( "${images_restored}" != "true" || "${image_snapshot_complete}" != "true" || ( -f "${previous_dir}/.rollback-unsafe" && ! -f "${previous_dir}/.activated-images" ) ) ]]; then
     compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
-    echo "Refusing automatic rollback because pre-build Docker image tags could not be verified as restored; failed application services were stopped while persistent PostgreSQL was preserved." >&2
+    echo "Refusing automatic rollback because pre-build Docker image tags could not be verified as restored or target release ${previous_release} is marked rollback-unsafe; failed application services were stopped while persistent PostgreSQL was preserved." >&2
     exit 1
   fi
   previous_env="${previous_dir}/.runtime.env"
@@ -219,7 +219,7 @@ if ! candidate_deploy; then
   exit 1
 fi
 
-write_activated_images "${RELEASE_DIR}" "${REQUESTED_SHA}" || echo "Warning: unable to persist .activated-images for ${REQUESTED_SHA}." >&2
+write_activated_images "${RELEASE_DIR}" "${REQUESTED_SHA}" || die "Failed to persist verified .activated-images for ${REQUESTED_SHA}; activation aborted."
 printf '%s\n' "${REQUESTED_SHA}" >"${RELEASE_DIR}/.activated.tmp"
 mv "${RELEASE_DIR}/.activated.tmp" "${RELEASE_DIR}/.activated"
 activate_symlink "${RELEASE_DIR}" "${BASE_DIR}/current"

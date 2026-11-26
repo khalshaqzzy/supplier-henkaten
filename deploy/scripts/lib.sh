@@ -245,8 +245,11 @@ write_activated_images() {
   local pg_ref image_ref image_id tmp_file
   pg_ref="$(postgres_image_ref_for "${release_dir}")"
   tmp_file="${release_dir}/.activated-images.tmp"
-  : >"${tmp_file}"
-  chmod 600 "${tmp_file}"
+  : >"${tmp_file}" || return 1
+  chmod 600 "${tmp_file}" || {
+    rm -f -- "${tmp_file}"
+    return 1
+  }
   for image_ref in \
     "${pg_ref}" \
     "supplier-henkaten-api:${release_sha}" \
@@ -258,36 +261,88 @@ write_activated_images() {
       rm -f -- "${tmp_file}"
       return 1
     fi
-    printf '%s %s\n' "${image_ref}" "${image_id}" >>"${tmp_file}"
+    printf '%s %s\n' "${image_ref}" "${image_id}" >>"${tmp_file}" || {
+      rm -f -- "${tmp_file}"
+      return 1
+    }
   done
-  mv -f "${tmp_file}" "${release_dir}/.activated-images"
+  mv -f "${tmp_file}" "${release_dir}/.activated-images" || {
+    rm -f -- "${tmp_file}"
+    return 1
+  }
   rm -f -- "${release_dir}/.rollback-unsafe"
 }
 
 restore_pinned_images_file() {
   local pinned_file="$1"
-  local only_ref="${2:-}"
-  local ref expected_id restored_id matched=0 status=0
+  local release_dir="$2"
+  local release_sha="$3"
+  local pg_ref expected_ref ref expected_id restored_id resolved_id extra
+  local -a expected_refs parsed_refs parsed_ids
+  local seen_refs=" "
+  local i found_count=0 status=0
+
   [[ -s "${pinned_file}" ]] || return 1
-  while IFS=' ' read -r ref expected_id extra; do
+  pg_ref="$(postgres_image_ref_for "${release_dir}")"
+  expected_refs=(
+    "${pg_ref}"
+    "supplier-henkaten-api:${release_sha}"
+    "supplier-henkaten-supplier-web:${release_sha}"
+    "supplier-henkaten-tmmin-web:${release_sha}"
+    "supplier-henkaten-caddy:${release_sha}"
+  )
+
+  parsed_refs=()
+  parsed_ids=()
+  while IFS=' ' read -r ref expected_id extra || [[ -n "${ref:-}" ]]; do
     [[ -n "${ref}" && -n "${expected_id}" && -z "${extra:-}" ]] || return 1
-    if [[ -n "${only_ref}" && "${ref}" != "${only_ref}" ]]; then
-      continue
+    if [[ "${seen_refs}" == *" ${ref} "* ]]; then
+      echo "Duplicate pinned image entry for ${ref} in ${pinned_file}." >&2
+      return 1
     fi
-    matched=$((matched + 1))
-    if ! docker tag "${expected_id}" "${ref}" >/dev/null 2>&1; then
-      echo "Failed to restore pinned Docker image tag ${ref} to ${expected_id}." >&2
-      status=1
-      continue
+    local allowed=false
+    for expected_ref in "${expected_refs[@]}"; do
+      if [[ "${ref}" == "${expected_ref}" ]]; then
+        allowed=true
+        break
+      fi
+    done
+    if [[ "${allowed}" != "true" ]]; then
+      echo "Unexpected pinned image entry ${ref} in ${pinned_file}." >&2
+      return 1
     fi
-    restored_id="$(docker image inspect --format '{{.Id}}' "${ref}" 2>/dev/null || true)"
-    if [[ "${restored_id}" != "${expected_id}" ]]; then
-      echo "Restored pinned Docker image tag ${ref} resolved to '${restored_id}', expected '${expected_id}'." >&2
-      status=1
-    fi
+    seen_refs+="${ref} "
+    parsed_refs+=("${ref}")
+    parsed_ids+=("${expected_id}")
+    found_count=$((found_count + 1))
   done <"${pinned_file}"
-  if (( matched == 0 )); then
+
+  if (( found_count != ${#expected_refs[@]} )); then
+    echo "Incomplete pinned image manifest ${pinned_file}: found ${found_count}/${#expected_refs[@]} required images." >&2
     return 1
   fi
+
+  # Pass 1: verify every pinned image ID exists locally before modifying any tag.
+  for ((i = 0; i < ${#parsed_refs[@]}; i++)); do
+    resolved_id="$(docker image inspect --format '{{.Id}}' "${parsed_ids[i]}" 2>/dev/null || true)"
+    if [[ "${resolved_id}" != "${parsed_ids[i]}" ]]; then
+      echo "Pinned Docker image ID ${parsed_ids[i]} for ${parsed_refs[i]} is unavailable locally." >&2
+      return 1
+    fi
+  done
+
+  # Pass 2: restore every tag and re-verify it resolves to its exact pinned ID.
+  for ((i = 0; i < ${#parsed_refs[@]}; i++)); do
+    if ! docker tag "${parsed_ids[i]}" "${parsed_refs[i]}" >/dev/null 2>&1; then
+      echo "Failed to restore pinned Docker image tag ${parsed_refs[i]} to ${parsed_ids[i]}." >&2
+      status=1
+      continue
+    fi
+    restored_id="$(docker image inspect --format '{{.Id}}' "${parsed_refs[i]}" 2>/dev/null || true)"
+    if [[ "${restored_id}" != "${parsed_ids[i]}" ]]; then
+      echo "Restored pinned Docker image tag ${parsed_refs[i]} resolved to '${restored_id}', expected '${parsed_ids[i]}'." >&2
+      status=1
+    fi
+  done
   return "${status}"
 }

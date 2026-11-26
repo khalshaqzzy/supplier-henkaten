@@ -285,6 +285,9 @@ if [[ "${1:-}" == "image" && "${2:-}" == "inspect" ]]; then
   exit $?
 fi
 if [[ "${1:-}" == "tag" ]]; then
+  if [[ -n "${TEST_DOCKER_LOG:-}" ]]; then
+    printf 'TAG %s %s\n' "$2" "$3" >>"${TEST_DOCKER_LOG}"
+  fi
   if [[ "${TEST_TAG_FAIL:-false}" == "true" ]]; then
     exit 1
   fi
@@ -647,21 +650,71 @@ if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=41 TEST_DOCKER_LOG="${c
   fail "second same-SHA smoke failure unexpectedly succeeded"
 fi
 grep -Fxq 'STARTED api=sha256:good-api' "${carryover_log}" || fail "second same-SHA invocation did not restore pinned sha256:good-api image"
+first_api_tag="$(grep " supplier-henkaten-api:${retry_sha}\$" "${carryover_log}" | head -n 1)"
+[[ "${first_api_tag}" == "TAG sha256:good-api supplier-henkaten-api:${retry_sha}" ]] || fail "first api restore on carry-over run did not target sha256:good-api (got: ${first_api_tag})"
 if grep -q 'STARTED api=sha256:candidate-api-40' "${carryover_log}"; then
   fail "second same-SHA invocation promoted rejected candidate-api-40 build into rollback"
 fi
 [[ ! -f "${migration_base}/releases/${retry_sha}/.rollback-unsafe" ]] || fail "successful pinned rollback recovery did not clear .rollback-unsafe"
 
+# Incomplete .activated-images manifest (only postgres pin) must be rejected by manual remote-rollback.sh.
+cp "${migration_base}/releases/${retry_sha}/.activated-images" "${TEST_ROOT}/saved-activated-images"
+head -n 1 "${TEST_ROOT}/saved-activated-images" >"${migration_base}/releases/${retry_sha}/.activated-images"
+incomplete_pin_log="${TEST_ROOT}/incomplete-pin-rollback.log"
+if TEST_DOCKER_LOG="${incomplete_pin_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
+  PATH="${fake_bin}:${PATH}" "${migration_base}/releases/${retry_sha}/deploy/scripts/remote-rollback.sh" \
+  staging "${retry_sha}" "${migration_base}" >/dev/null 2>&1; then
+  fail "manual rollback accepted an incomplete .activated-images manifest"
+fi
+if [[ -f "${incomplete_pin_log}" ]] && grep -q '^STARTED ' "${incomplete_pin_log}"; then
+  fail "manual rollback started containers from an incomplete .activated-images manifest"
+fi
+cp "${TEST_ROOT}/saved-activated-images" "${migration_base}/releases/${retry_sha}/.activated-images"
+rm -f "${migration_base}/releases/${retry_sha}/.rollback-unsafe"
+
+# Never-activated failed hardened candidate directory must be rejected by manual remote-rollback.sh.
+unactivated_sha=7777777777777777777777777777777777777777
+if TEST_MIGRATE_FAIL=true run_candidate "${migration_base}" "${unactivated_sha}" 43 >/dev/null 2>&1; then
+  fail "failing unactivated candidate unexpectedly succeeded"
+fi
+cp "${SCRIPTS}/remote-rollback.sh" "${migration_base}/releases/${unactivated_sha}/deploy/scripts/remote-rollback.sh"
+chmod +x "${migration_base}/releases/${unactivated_sha}/deploy/scripts/remote-rollback.sh"
+unactivated_rb_log="${TEST_ROOT}/unactivated-rollback.log"
+if TEST_DOCKER_LOG="${unactivated_rb_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
+  PATH="${fake_bin}:${PATH}" "${migration_base}/releases/${unactivated_sha}/deploy/scripts/remote-rollback.sh" \
+  staging "${unactivated_sha}" "${migration_base}" >/dev/null 2>&1; then
+  fail "manual rollback accepted a never-activated candidate release"
+fi
+if [[ -f "${unactivated_rb_log}" ]] && grep -q '^STARTED ' "${unactivated_rb_log}"; then
+  fail "manual rollback started containers for a never-activated candidate release"
+fi
+
+# write_activated_images must fail cleanly and preserve .rollback-unsafe when persisting pins fails.
+unwritable_dir="${TEST_ROOT}/unwritable-release"
+mkdir -p "${unwritable_dir}"
+printf 'dirty\n' >"${unwritable_dir}/.rollback-unsafe"
+chmod 500 "${unwritable_dir}"
+if PATH="${fake_bin}:${PATH}" bash -c '
+  set -euo pipefail
+  source "$1"
+  write_activated_images "$2" "$3"
+' _ "${SCRIPTS}/lib.sh" "${unwritable_dir}" "${retry_sha}" >/dev/null 2>&1; then
+  chmod 700 "${unwritable_dir}"
+  fail "write_activated_images succeeded on an unwritable release directory"
+fi
+chmod 700 "${unwritable_dir}"
+[[ -f "${unwritable_dir}/.rollback-unsafe" ]] || fail "failed write_activated_images removed .rollback-unsafe marker"
+
 # Restored-ID mismatch branch: docker tag exits 0 without updating the tag -> inspect mismatch must refuse rollback.
 mismatch_log="${TEST_ROOT}/same-sha-tag-mismatch.log"
 IFS='|' read -r mismatch_incoming mismatch_runtime mismatch_archive mismatch_checksum < <(
-  prepare_candidate "${migration_base}" "${retry_sha}" 42
+  prepare_candidate "${migration_base}" "${retry_sha}" 44
 )
 sed -i.bak "s/^POSTGRES_APP_PASSWORD=.*/POSTGRES_APP_PASSWORD=${updated_app_password}/" "${mismatch_runtime}"
 rm -f "${mismatch_runtime}.bak"
-if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_TAG_SILENT_NOOP=true TEST_BUILD_TAG_SUFFIX=42 TEST_DOCKER_LOG="${mismatch_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
+if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_TAG_SILENT_NOOP=true TEST_BUILD_TAG_SUFFIX=44 TEST_DOCKER_LOG="${mismatch_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
   PATH="${fake_bin}:${PATH}" "${mismatch_incoming}/deploy/scripts/remote-deploy.sh" \
-  staging "${retry_sha}" 42 "${migration_base}" "${mismatch_incoming}" "${mismatch_runtime}" \
+  staging "${retry_sha}" 44 "${migration_base}" "${mismatch_incoming}" "${mismatch_runtime}" \
   "${mismatch_archive}" "${mismatch_checksum}" 127.0.0.1 >/dev/null 2>&1; then
   fail "same-SHA smoke failure with silent tag mismatch unexpectedly succeeded"
 fi
@@ -669,7 +722,7 @@ grep -q ' stop ' "${mismatch_log}" || fail "restored-ID mismatch did not stop fa
 [[ "$(grep -c '^STARTED api=' "${mismatch_log}")" == "1" ]] || fail "restored-ID mismatch invoked rollback with unverified candidate image"
 [[ -f "${migration_base}/releases/${retry_sha}/.rollback-unsafe" ]] || fail "restored-ID mismatch did not write .rollback-unsafe marker"
 
-# Legacy release marked .rollback-unsafe without .activated-images must block manual rollback.
+# Legacy release marked .rollback-unsafe without .activated-images must block manual rollback AND cross-SHA automatic rollback.
 rm -f "${migration_base}/releases/${retry_sha}/.activated-images"
 legacy_unsafe_log="${TEST_ROOT}/legacy-rollback-unsafe.log"
 if TEST_DOCKER_LOG="${legacy_unsafe_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
@@ -680,6 +733,20 @@ fi
 if [[ -f "${legacy_unsafe_log}" ]] && grep -q '^STARTED ' "${legacy_unsafe_log}"; then
   fail "manual rollback started containers for a rollback-unsafe release lacking .activated-images"
 fi
+cross_sha_unsafe_log="${TEST_ROOT}/cross-sha-legacy-unsafe.log"
+cross_sha_target=8888888888888888888888888888888888888888
+cat >"${migration_base}/releases/${retry_sha}/deploy/scripts/remote-rollback.sh" <<EOF
+#!/usr/bin/env bash
+touch "${migration_base}/unsafe-cross-sha-rollback-called"
+exit 0
+EOF
+chmod +x "${migration_base}/releases/${retry_sha}/deploy/scripts/remote-rollback.sh"
+if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_DOCKER_LOG="${cross_sha_unsafe_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
+  run_candidate "${migration_base}" "${cross_sha_target}" 45 >/dev/null 2>&1; then
+  fail "cross-SHA smoke failure against unsafe legacy release unexpectedly succeeded"
+fi
+[[ ! -f "${migration_base}/unsafe-cross-sha-rollback-called" ]] || fail "cross-SHA failure invoked legacy rollback script despite .rollback-unsafe without pins"
+grep -q ' stop ' "${cross_sha_unsafe_log}" || fail "cross-SHA refusal against unsafe legacy release did not stop failed candidate services"
 
 rollback_base="${TEST_ROOT}/rollback"
 prepare_base "${rollback_base}"
