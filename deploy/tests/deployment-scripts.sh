@@ -672,9 +672,9 @@ fi
 cp "${TEST_ROOT}/saved-activated-images" "${migration_base}/releases/${retry_sha}/.activated-images"
 rm -f "${migration_base}/releases/${retry_sha}/.rollback-unsafe"
 
-# Never-activated failed hardened candidate directory must be rejected by manual remote-rollback.sh.
+# Never-activated failed hardened candidate directory must be rejected by manual remote-rollback.sh (even if .activated-images exists).
 unactivated_sha=7777777777777777777777777777777777777777
-if TEST_MIGRATE_FAIL=true run_candidate "${migration_base}" "${unactivated_sha}" 43 >/dev/null 2>&1; then
+if TEST_MIGRATE_FAIL=true TEST_IMAGE_STATE_FILE="${same_sha_images}" run_candidate "${migration_base}" "${unactivated_sha}" 43 >/dev/null 2>&1; then
   fail "failing unactivated candidate unexpectedly succeeded"
 fi
 cp "${SCRIPTS}/remote-rollback.sh" "${migration_base}/releases/${unactivated_sha}/deploy/scripts/remote-rollback.sh"
@@ -685,11 +685,24 @@ if TEST_DOCKER_LOG="${unactivated_rb_log}" TEST_IMAGE_STATE_FILE="${same_sha_ima
   staging "${unactivated_sha}" "${migration_base}" >/dev/null 2>&1; then
   fail "manual rollback accepted a never-activated candidate release"
 fi
+# Even if a complete 5-image .activated-images exists without .activated (crash between steps), manual rollback must reject it.
+cat >"${migration_base}/releases/${unactivated_sha}/.activated-images" <<EOF
+supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:good-postgres
+supplier-henkaten-api:${unactivated_sha} sha256:good-api
+supplier-henkaten-supplier-web:${unactivated_sha} sha256:good-supplier-web
+supplier-henkaten-tmmin-web:${unactivated_sha} sha256:good-tmmin-web
+supplier-henkaten-caddy:${unactivated_sha} sha256:good-caddy
+EOF
+if TEST_DOCKER_LOG="${unactivated_rb_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
+  PATH="${fake_bin}:${PATH}" "${migration_base}/releases/${unactivated_sha}/deploy/scripts/remote-rollback.sh" \
+  staging "${unactivated_sha}" "${migration_base}" >/dev/null 2>&1; then
+  fail "manual rollback accepted a never-activated candidate release carrying .activated-images without .activated"
+fi
 if [[ -f "${unactivated_rb_log}" ]] && grep -q '^STARTED ' "${unactivated_rb_log}"; then
   fail "manual rollback started containers for a never-activated candidate release"
 fi
 
-# write_activated_images must fail cleanly and preserve .rollback-unsafe when persisting pins fails.
+# write_activated_images must fail cleanly under conditional (errexit suppressed) when unwritable or destination is a directory, preserving .rollback-unsafe.
 unwritable_dir="${TEST_ROOT}/unwritable-release"
 mkdir -p "${unwritable_dir}"
 printf 'dirty\n' >"${unwritable_dir}/.rollback-unsafe"
@@ -697,13 +710,49 @@ chmod 500 "${unwritable_dir}"
 if PATH="${fake_bin}:${PATH}" bash -c '
   set -euo pipefail
   source "$1"
-  write_activated_images "$2" "$3"
+  if write_activated_images "$2" "$3"; then
+    exit 0
+  fi
+  exit 1
 ' _ "${SCRIPTS}/lib.sh" "${unwritable_dir}" "${retry_sha}" >/dev/null 2>&1; then
   chmod 700 "${unwritable_dir}"
-  fail "write_activated_images succeeded on an unwritable release directory"
+  fail "write_activated_images succeeded under conditional on an unwritable release directory"
 fi
 chmod 700 "${unwritable_dir}"
 [[ -f "${unwritable_dir}/.rollback-unsafe" ]] || fail "failed write_activated_images removed .rollback-unsafe marker"
+
+dir_dest_release="${TEST_ROOT}/dir-dest-release"
+mkdir -p "${dir_dest_release}/.activated-images"
+printf 'dirty\n' >"${dir_dest_release}/.rollback-unsafe"
+if PATH="${fake_bin}:${PATH}" bash -c '
+  set -euo pipefail
+  source "$1"
+  if write_activated_images "$2" "$3"; then
+    exit 0
+  fi
+  exit 1
+' _ "${SCRIPTS}/lib.sh" "${dir_dest_release}" "${retry_sha}" >/dev/null 2>&1; then
+  fail "write_activated_images succeeded when .activated-images was a directory"
+fi
+[[ -f "${dir_dest_release}/.rollback-unsafe" ]] || fail "directory-destination failure removed .rollback-unsafe marker"
+[[ ! -e "${dir_dest_release}/.activated-images/.activated-images.tmp" ]] || fail "mv placed temp file inside .activated-images directory"
+
+# Deploy-level pin persistence failure must route through recovery/stop and NOT advance current_release.
+pinfail_base="${TEST_ROOT}/pinfail"
+prepare_base "${pinfail_base}"
+pinfail_sha=9999999999999999999999999999999999999999
+pinfail_log="${TEST_ROOT}/pinfail-deploy.log"
+IFS='|' read -r pinfail_incoming pinfail_runtime pinfail_archive pinfail_checksum < <(
+  prepare_candidate "${pinfail_base}" "${pinfail_sha}" 10
+)
+mkdir -p "${pinfail_incoming}/.activated-images"
+if TEST_DOCKER_LOG="${pinfail_log}" PATH="${fake_bin}:${PATH}" "${pinfail_incoming}/deploy/scripts/remote-deploy.sh" \
+  staging "${pinfail_sha}" 10 "${pinfail_base}" "${pinfail_incoming}" "${pinfail_runtime}" \
+  "${pinfail_archive}" "${pinfail_checksum}" 127.0.0.1 >/dev/null 2>&1; then
+  fail "deploy with unwritable/directory .activated-images unexpectedly succeeded"
+fi
+[[ ! -f "${pinfail_base}/current_release" ]] || fail "pin persistence failure advanced current_release"
+grep -q ' stop ' "${pinfail_log}" || fail "pin persistence failure left candidate services running"
 
 # Restored-ID mismatch branch: docker tag exits 0 without updating the tag -> inspect mismatch must refuse rollback.
 mismatch_log="${TEST_ROOT}/same-sha-tag-mismatch.log"
@@ -721,6 +770,21 @@ fi
 grep -q ' stop ' "${mismatch_log}" || fail "restored-ID mismatch did not stop failed candidate services"
 [[ "$(grep -c '^STARTED api=' "${mismatch_log}")" == "1" ]] || fail "restored-ID mismatch invoked rollback with unverified candidate image"
 [[ -f "${migration_base}/releases/${retry_sha}/.rollback-unsafe" ]] || fail "restored-ID mismatch did not write .rollback-unsafe marker"
+
+# Incomplete pre-build snapshot on a legacy unpinned release must durably write .rollback-unsafe on candidate failure.
+incomplete_snap_base="${TEST_ROOT}/incomplete-snap"
+prepare_base "${incomplete_snap_base}"
+incomplete_prev_sha=6666666666666666666666666666666666666666
+mkdir -p "${incomplete_snap_base}/releases/${incomplete_prev_sha}/deploy/scripts"
+sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${incomplete_prev_sha}/" "${legacy_env}" >"${incomplete_snap_base}/releases/${incomplete_prev_sha}/.runtime.env"
+printf '%s\n' "${incomplete_prev_sha}" >"${incomplete_snap_base}/releases/${incomplete_prev_sha}/.source.sha"
+printf '%s\n' "${incomplete_prev_sha}" >"${incomplete_snap_base}/current_release"
+incomplete_snap_log="${TEST_ROOT}/incomplete-snap.log"
+if TEST_MISSING_IMAGE="supplier-henkaten-postgres:18.4-pgvector-0.8.5" TEST_BUILD_FAIL=true TEST_DOCKER_LOG="${incomplete_snap_log}" \
+  run_candidate "${incomplete_snap_base}" 6565656565656565656565656565656565656565 10 >/dev/null 2>&1; then
+  fail "candidate with missing postgres snapshot unexpectedly succeeded"
+fi
+[[ -f "${incomplete_snap_base}/releases/${incomplete_prev_sha}/.rollback-unsafe" ]] || fail "incomplete snapshot on failed build did not mark legacy target .rollback-unsafe"
 
 # Legacy release marked .rollback-unsafe without .activated-images must block manual rollback AND cross-SHA automatic rollback.
 rm -f "${migration_base}/releases/${retry_sha}/.activated-images"
@@ -780,10 +844,12 @@ touch "${rollback_failure_base}/rollback-failure-called"
 exit 1
 EOF
 chmod +x "${rollback_failure_base}/releases/${rollback_failure_previous}/deploy/scripts/remote-rollback.sh"
-if DEPLOY_FORCE_SMOKE_FAILURE=true run_candidate "${rollback_failure_base}" 5555555555555555555555555555555555555555 41 >/dev/null 2>&1; then
+rollback_failure_log="${TEST_ROOT}/rollback-failure.log"
+if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_DOCKER_LOG="${rollback_failure_log}" run_candidate "${rollback_failure_base}" 5555555555555555555555555555555555555555 41 >/dev/null 2>&1; then
   fail "candidate returned success when automatic rollback failed"
 fi
 [[ -f "${rollback_failure_base}/rollback-failure-called" ]] || fail "failing automatic rollback was not invoked"
+grep -q ' stop ' "${rollback_failure_log}" || fail "failed automatic rollback child left candidate services running"
 [[ "$(<"${rollback_failure_base}/current_release")" == "${rollback_failure_previous}" ]] || fail "rollback failure changed the previous pointer"
 
 lock_base="${TEST_ROOT}/lock"

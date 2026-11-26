@@ -242,7 +242,12 @@ postgres_image_ref_for() {
 write_activated_images() {
   local release_dir="$1"
   local release_sha="$2"
-  local pg_ref image_ref image_id tmp_file
+  local pg_ref image_ref image_id tmp_file dest_file
+  dest_file="${release_dir}/.activated-images"
+  if [[ -e "${dest_file}" && ( ! -f "${dest_file}" || -L "${dest_file}" ) ]]; then
+    echo "Refusing to publish pinned image manifest: ${dest_file} is not a regular file." >&2
+    return 1
+  fi
   pg_ref="$(postgres_image_ref_for "${release_dir}")"
   tmp_file="${release_dir}/.activated-images.tmp"
   : >"${tmp_file}" || return 1
@@ -266,10 +271,20 @@ write_activated_images() {
       return 1
     }
   done
-  mv -f "${tmp_file}" "${release_dir}/.activated-images" || {
-    rm -f -- "${tmp_file}"
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    if [[ -d "${dest_file}" || -L "${dest_file}" ]] || ! mv -f "${tmp_file}" "${dest_file}"; then
+      rm -f -- "${tmp_file}"
+      return 1
+    fi
+  else
+    if ! mv -Tf "${tmp_file}" "${dest_file}"; then
+      rm -f -- "${tmp_file}"
+      return 1
+    fi
+  fi
+  if [[ ! -f "${dest_file}" || -L "${dest_file}" ]]; then
     return 1
-  }
+  fi
   rm -f -- "${release_dir}/.rollback-unsafe"
 }
 

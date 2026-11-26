@@ -25,6 +25,16 @@ fi
 load_runtime_env "${RUNTIME_ENV}"
 [[ "${REQUESTED_ENV}" == "${APP_ENV:-}" && "${REQUESTED_SHA}" == "${RELEASE_SHA:-}" ]] || die "Rollback environment or release SHA mismatch."
 
+is_hardened_release=false
+if [[ -n "${POSTGRES_APP_USER:-}" || -f "${RELEASE_DIR}/apps/api/src/cli/migrate.ts" ]]; then
+  is_hardened_release=true
+fi
+if [[ "${is_hardened_release}" == "true" && ! -f "${RELEASE_DIR}/.activated" ]]; then
+  die "Rollback aborted: release ${REQUESTED_SHA} was never activated."
+fi
+if [[ -e "${RELEASE_DIR}/.activated-images" && ( ! -f "${RELEASE_DIR}/.activated-images" || -L "${RELEASE_DIR}/.activated-images" ) ]]; then
+  die "Rollback aborted: ${RELEASE_DIR}/.activated-images is not a regular file."
+fi
 if [[ -f "${RELEASE_DIR}/.activated-images" ]]; then
   if ! restore_pinned_images_file "${RELEASE_DIR}/.activated-images" "${RELEASE_DIR}" "${REQUESTED_SHA}"; then
     printf '%s\n' "${REQUESTED_SHA}" >"${RELEASE_DIR}/.rollback-unsafe.tmp"
@@ -33,10 +43,6 @@ if [[ -f "${RELEASE_DIR}/.activated-images" ]]; then
   fi
 elif [[ -f "${RELEASE_DIR}/.rollback-unsafe" ]]; then
   die "Rollback aborted: release ${REQUESTED_SHA} is marked rollback-unsafe and has no pinned activated image IDs."
-elif [[ ! -f "${RELEASE_DIR}/.activated" ]]; then
-  if [[ -n "${POSTGRES_APP_USER:-}" || -f "${RELEASE_DIR}/apps/api/src/cli/migrate.ts" ]]; then
-    die "Rollback aborted: release ${REQUESTED_SHA} was never activated."
-  fi
 fi
 
 printf 'Rolling code back to %s; database schema and shared volumes are not restored.\n' "${REQUESTED_SHA}"
@@ -60,7 +66,10 @@ wait_for_service "${RELEASE_DIR}" "${RUNTIME_ENV}" caddy 120
   "https://${API_DOMAIN}"
 
 if [[ ! -f "${RELEASE_DIR}/.activated-images" ]]; then
-  write_activated_images "${RELEASE_DIR}" "${REQUESTED_SHA}" || die "Failed to persist verified .activated-images after rollback for ${REQUESTED_SHA}."
+  if ! write_activated_images "${RELEASE_DIR}" "${REQUESTED_SHA}"; then
+    compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
+    die "Failed to persist verified .activated-images after rollback for ${REQUESTED_SHA}; stopped application services while preserving PostgreSQL."
+  fi
 else
   rm -f -- "${RELEASE_DIR}/.rollback-unsafe"
 fi

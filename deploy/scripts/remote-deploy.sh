@@ -183,6 +183,7 @@ candidate_deploy() {
     "https://${SUPPLIER_DOMAIN}" \
     "https://${TMMIN_DOMAIN}" \
     "https://${API_DOMAIN}" || return 1
+  write_activated_images "${RELEASE_DIR}" "${REQUESTED_SHA}" || return 1
 }
 
 if ! candidate_deploy; then
@@ -191,6 +192,8 @@ if ! candidate_deploy; then
   images_restored=true
   if ! restore_saved_images; then
     images_restored=false
+  fi
+  if [[ "${images_restored}" != "true" || "${image_snapshot_complete}" != "true" ]]; then
     if [[ -n "${previous_release}" && -d "${previous_dir}" ]]; then
       printf '%s\n' "${REQUESTED_SHA}" >"${previous_dir}/.rollback-unsafe.tmp"
       mv -f "${previous_dir}/.rollback-unsafe.tmp" "${previous_dir}/.rollback-unsafe"
@@ -210,8 +213,11 @@ if ! candidate_deploy; then
     [[ -f "${previous_dir}/.source.sha" && "$(<"${previous_dir}/.source.sha")" == "${previous_release}" ]] &&
     "${RELEASE_DIR}/deploy/scripts/validate-runtime-env.sh" --allow-legacy-db-role "${previous_env}" >/dev/null &&
     (load_runtime_env "${previous_env}" && [[ "${APP_ENV:-}" == "${REQUESTED_ENV}" && "${RELEASE_SHA:-}" == "${previous_release}" ]]); then
-    DEPLOY_LOCK_HELD=true "${previous_dir}/deploy/scripts/remote-rollback.sh" \
-      "${REQUESTED_ENV}" "${previous_release}" "${BASE_DIR}" || echo "Automatic code rollback also failed." >&2
+    if ! DEPLOY_LOCK_HELD=true "${previous_dir}/deploy/scripts/remote-rollback.sh" \
+      "${REQUESTED_ENV}" "${previous_release}" "${BASE_DIR}"; then
+      echo "Automatic code rollback also failed; stopping failed candidate application services while preserving PostgreSQL." >&2
+      compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
+    fi
   else
     compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
     echo "No validated previous code release was available; failed application services were stopped while persistent PostgreSQL was preserved." >&2
@@ -219,7 +225,6 @@ if ! candidate_deploy; then
   exit 1
 fi
 
-write_activated_images "${RELEASE_DIR}" "${REQUESTED_SHA}" || die "Failed to persist verified .activated-images for ${REQUESTED_SHA}; activation aborted."
 printf '%s\n' "${REQUESTED_SHA}" >"${RELEASE_DIR}/.activated.tmp"
 mv "${RELEASE_DIR}/.activated.tmp" "${RELEASE_DIR}/.activated"
 activate_symlink "${RELEASE_DIR}" "${BASE_DIR}/current"
