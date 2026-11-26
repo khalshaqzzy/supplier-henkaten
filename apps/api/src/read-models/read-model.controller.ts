@@ -154,6 +154,10 @@ export class SupplierReadModelController {
     @Req() request: ContextRequest,
     @Res() response: Response,
   ) {
+    if (request.method !== 'GET') {
+      response.status(405).end();
+      return;
+    }
     return this.realtime.handleHttpStream(
       this.access.supplierScope(request),
       this.access.principal(request),

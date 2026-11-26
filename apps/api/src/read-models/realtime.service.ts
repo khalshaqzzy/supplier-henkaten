@@ -27,8 +27,6 @@ export type StreamMessage = {
   retry?: number;
 };
 
-type EventOrderPoint = { occurredAt: Date; id: string };
-
 type ActiveStreamSlot = {
   sessionId: string;
   userId: string;
@@ -82,6 +80,9 @@ export class RealtimeService {
   private readonly sessionSlots = new Map<string, ActiveStreamSlot[]>();
   private readonly userCounts = new Map<string, number>();
   private readonly supplierCounts = new Map<string, number>();
+
+  private pendingAdmissionsGlobal = 0;
+  private readonly pendingAdmissionsByUser = new Map<string, number>();
 
   private readonly sessionCache = new Map<string, CachedEntry<boolean>>();
   private readonly sessionInFlight = new Map<
@@ -144,6 +145,11 @@ export class RealtimeService {
           subscription.unsubscribe();
           return;
         }
+        if (response.writableLength > MAX_WRITER_BUFFERED_BYTES) {
+          subscription.unsubscribe();
+          response.destroy();
+          return;
+        }
         response.write(formatSseFrame(message));
       },
       complete: () => {
@@ -170,14 +176,19 @@ export class RealtimeService {
     lastEventId: string | undefined,
     response?: Response,
   ): Promise<Observable<StreamMessage>> {
-    if (lineId) {
-      await this.assertLineExists(scope.supplierId, lineId);
+    const releaseAdmission = this.acquireAdmission(principal.userId);
+    try {
+      if (lineId) {
+        await this.assertLineExists(scope.supplierId, lineId);
+      }
+      if (response && (response.destroyed || response.writableEnded)) {
+        return new Observable<StreamMessage>((subscriber) => subscriber.complete());
+      }
+      const slot = this.acquireSlot(scope.supplierId, principal, response);
+      return this.createStreamObservable(scope, principal, lineId, lastEventId, response, slot);
+    } finally {
+      releaseAdmission();
     }
-    if (response && (response.destroyed || response.writableEnded)) {
-      return new Observable<StreamMessage>((subscriber) => subscriber.complete());
-    }
-    const slot = this.acquireSlot(scope.supplierId, principal, response);
-    return this.createStreamObservable(scope, principal, lineId, lastEventId, response, slot);
   }
 
   stream(
@@ -196,6 +207,26 @@ export class RealtimeService {
       maxPerSupplier: this.config?.sseMaxPerSupplier ?? 60,
       maxGlobal: this.config?.sseMaxGlobal ?? 300,
       revalidationCacheMs: this.config ? this.config.sseRevalidationCacheMs : 0,
+    };
+  }
+
+  private acquireAdmission(userId: string): () => void {
+    const limits = this.limits();
+    const userPending = this.pendingAdmissionsByUser.get(userId) ?? 0;
+    if (userPending >= limits.maxPerUser || this.pendingAdmissionsGlobal >= limits.maxGlobal) {
+      this.logger.warn({ scope: 'sse', limitType: 'admission' }, 'SSE admission limit exceeded');
+      throw rateLimited();
+    }
+    this.pendingAdmissionsGlobal += 1;
+    this.pendingAdmissionsByUser.set(userId, userPending + 1);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.pendingAdmissionsGlobal = Math.max(0, this.pendingAdmissionsGlobal - 1);
+      const next = (this.pendingAdmissionsByUser.get(userId) ?? 1) - 1;
+      if (next > 0) this.pendingAdmissionsByUser.set(userId, next);
+      else this.pendingAdmissionsByUser.delete(userId);
     };
   }
 
@@ -298,8 +329,8 @@ export class RealtimeService {
 
       let closed = false;
       let replaying = true;
-      let highWater: EventOrderPoint | null = null;
       let liveOverflowed = false;
+      let waitingForDrain = false;
       let draining = false;
       const pendingLive: RealtimeOutboxEvent[] = [];
       const seen = new Set<string>();
@@ -359,11 +390,22 @@ export class RealtimeService {
         });
       };
 
-      const writerBackpressured = () =>
-        Boolean(
-          response &&
-          (response.writableNeedDrain || response.writableLength > MAX_WRITER_BUFFERED_BYTES),
-        );
+      const writerExceededHardCap = () =>
+        Boolean(response && response.writableLength > MAX_WRITER_BUFFERED_BYTES);
+
+      const writerNeedsDrain = () => Boolean(response && response.writableNeedDrain);
+
+      const scheduleAfterDrain = () => {
+        if (closed || waitingForDrain) return;
+        if (!response) return;
+        waitingForDrain = true;
+        response.once('drain', () => {
+          waitingForDrain = false;
+          if (!closed && !replaying && (liveOverflowed || pendingLive.length > 0)) {
+            void drainLive();
+          }
+        });
+      };
 
       const enqueueLive = (event: RealtimeOutboxEvent) => {
         if (closed) return;
@@ -375,7 +417,11 @@ export class RealtimeService {
             this.invalidateSession(principal.sessionId);
           }
         }
-        if (pendingLive.length >= MAX_PENDING_LIVE || writerBackpressured()) {
+        if (writerExceededHardCap()) {
+          finish();
+          return;
+        }
+        if (pendingLive.length >= MAX_PENDING_LIVE || writerNeedsDrain()) {
           pendingLive.length = 0;
           liveOverflowed = true;
         } else if (!liveOverflowed) {
@@ -385,10 +431,20 @@ export class RealtimeService {
       };
 
       const drainLive = async () => {
-        if (draining || closed || replaying) return;
+        if (draining || closed || replaying || waitingForDrain) return;
         draining = true;
         try {
           while (!closed && (liveOverflowed || pendingLive.length > 0)) {
+            if (writerExceededHardCap()) {
+              finish();
+              return;
+            }
+            if (writerNeedsDrain()) {
+              pendingLive.length = 0;
+              liveOverflowed = true;
+              scheduleAfterDrain();
+              return;
+            }
             if (liveOverflowed) {
               liveOverflowed = false;
               const sessionOk = await this.validateSession(scope.supplierId, principal, false);
@@ -397,12 +453,20 @@ export class RealtimeService {
                 finish();
                 return;
               }
+              if (writerExceededHardCap()) {
+                finish();
+                return;
+              }
+              if (writerNeedsDrain()) {
+                liveOverflowed = true;
+                scheduleAfterDrain();
+                return;
+              }
               emitResync();
               continue;
             }
             const nextEvent = pendingLive.shift();
             if (!nextEvent) continue;
-            if (highWater && compareEventOrder(nextEvent, highWater) <= 0) continue;
             if (!recordSeen(nextEvent.id)) continue;
             const sessionOk = await this.validateSession(scope.supplierId, principal, false);
             if (closed) return;
@@ -412,11 +476,20 @@ export class RealtimeService {
             }
             const allowed = await this.loadAllowedLines(scope.supplierId, false);
             if (closed) return;
+            if (lineId && !allowed.includes(lineId)) {
+              finish();
+              return;
+            }
             if (!this.inScope(nextEvent, lineId, allowed)) continue;
-            if (writerBackpressured()) {
+            if (writerExceededHardCap()) {
+              finish();
+              return;
+            }
+            if (writerNeedsDrain()) {
               pendingLive.length = 0;
               liveOverflowed = true;
-              continue;
+              scheduleAfterDrain();
+              return;
             }
             subscriber.next(this.invalidation(nextEvent, scope.supplierId));
           }
@@ -424,14 +497,20 @@ export class RealtimeService {
           finish();
         } finally {
           draining = false;
-          if (!closed && !replaying && (liveOverflowed || pendingLive.length > 0)) {
+          if (
+            !closed &&
+            !replaying &&
+            !waitingForDrain &&
+            (liveOverflowed || pendingLive.length > 0)
+          ) {
             void drainLive();
           }
         }
       };
 
       // Subscribe to live events BEFORE opening the replay query so no events
-      // committed during replay are lost; high-water suppression prevents duplicates.
+      // committed during replay are lost; recordSeen deduplicates the handoff
+      // without dropping late-committed transactions.
       pumpSubscription = this.pump.events().subscribe({
         next: enqueueLive,
         complete: finish,
@@ -446,7 +525,19 @@ export class RealtimeService {
             finish();
             return;
           }
-          if (!writerBackpressured()) {
+          if (lineId) {
+            const allowed = await this.loadAllowedLines(scope.supplierId, false);
+            if (closed) return;
+            if (!allowed.includes(lineId)) {
+              finish();
+              return;
+            }
+          }
+          if (writerExceededHardCap()) {
+            finish();
+            return;
+          }
+          if (!writerNeedsDrain()) {
             subscriber.next({
               type: 'heartbeat',
               retry: 3_000,
@@ -460,13 +551,13 @@ export class RealtimeService {
 
       const start = async () => {
         try {
-          const sessionOk = await this.validateSession(scope.supplierId, principal, true);
+          const sessionOk = await this.validateSession(scope.supplierId, principal, false);
           if (closed) return;
           if (!sessionOk) {
             finish();
             return;
           }
-          const initialAllowed = await this.loadAllowedLines(scope.supplierId, true);
+          const initialAllowed = await this.loadAllowedLines(scope.supplierId, false);
           if (closed) return;
 
           if (lineId && !initialAllowed.includes(lineId)) {
@@ -506,21 +597,43 @@ export class RealtimeService {
           }
           const currentAllowed = await this.loadAllowedLines(scope.supplierId, false);
           if (closed) return;
+          if (lineId && !currentAllowed.includes(lineId)) {
+            finish();
+            return;
+          }
 
           if (replayResult.resync) {
-            emitResync();
+            if (writerExceededHardCap()) {
+              finish();
+              return;
+            }
+            if (writerNeedsDrain()) {
+              liveOverflowed = true;
+              scheduleAfterDrain();
+            } else {
+              emitResync();
+            }
           } else {
-            highWater = replayResult.highWater;
             for (const item of replayResult.events) {
               if (closed) return;
               if (!this.inScope(item, lineId, currentAllowed)) continue;
               if (!recordSeen(item.id)) continue;
+              if (writerExceededHardCap()) {
+                finish();
+                return;
+              }
+              if (writerNeedsDrain()) {
+                pendingLive.length = 0;
+                liveOverflowed = true;
+                scheduleAfterDrain();
+                break;
+              }
               subscriber.next(this.invalidation(item, scope.supplierId));
             }
           }
 
           replaying = false;
-          if (!closed && (liveOverflowed || pendingLive.length > 0)) {
+          if (!closed && !waitingForDrain && (liveOverflowed || pendingLive.length > 0)) {
             void drainLive();
           }
         } catch {
@@ -574,7 +687,7 @@ export class RealtimeService {
         if (currentEpoch !== requestEpoch) {
           return false;
         }
-        if (ttlMs > 0) {
+        if (ttlMs > 0 && this.sessionSlots.has(key)) {
           this.sessionCache.set(key, {
             value: true,
             expiresAt: Date.now() + ttlMs,
@@ -588,10 +701,10 @@ export class RealtimeService {
           if (entry?.promise === trackedPromise) {
             this.sessionInFlight.delete(key);
           }
-          if (!this.sessionSlots.has(key)) {
-            this.sessionCache.delete(key);
-            this.sessionEpochs.delete(key);
-          }
+        }
+        if (!this.sessionSlots.has(key) && !this.sessionInFlight.has(key)) {
+          this.sessionCache.delete(key);
+          this.sessionEpochs.delete(key);
         }
       }
     })();
@@ -658,9 +771,13 @@ export class RealtimeService {
   }
 
   private invalidateSession(sessionId: string): void {
-    this.sessionEpochs.set(sessionId, (this.sessionEpochs.get(sessionId) ?? 0) + 1);
     this.sessionCache.delete(sessionId);
     this.sessionInFlight.delete(sessionId);
+    if (this.sessionSlots.has(sessionId)) {
+      this.sessionEpochs.set(sessionId, (this.sessionEpochs.get(sessionId) ?? 0) + 1);
+    } else {
+      this.sessionEpochs.delete(sessionId);
+    }
   }
 
   private invalidateSupplierLines(supplierId: string): void {
@@ -677,12 +794,11 @@ export class RealtimeService {
   ): Promise<{
     events: RealtimeOutboxEvent[];
     resync: boolean;
-    highWater: EventOrderPoint | null;
   }> {
-    let cursor: EventOrderPoint | null = null;
+    let cursor: { occurredAt: Date; id: string } | null = null;
     if (lastEventId !== undefined) {
       if (!opaqueIdSchema.safeParse(lastEventId).success) {
-        return { events: [], resync: true, highWater: null };
+        return { events: [], resync: true };
       }
       const cursorRow = await this.prisma.outboxEvent.findFirst({
         where: {
@@ -704,14 +820,13 @@ export class RealtimeService {
         },
       });
       if (!cursorRow || !this.inScope(cursorRow, requestedLineId, allowedLineIds)) {
-        return { events: [], resync: true, highWater: null };
+        return { events: [], resync: true };
       }
       cursor = { occurredAt: cursorRow.occurredAt, id: cursorRow.id };
     }
 
     const matched: RealtimeOutboxEvent[] = [];
     let scanCursor = cursor;
-    let highWater = cursor;
     let scanned = 0;
 
     for (;;) {
@@ -747,24 +862,23 @@ export class RealtimeService {
 
       for (const row of batch) {
         scanned += 1;
-        highWater = { occurredAt: row.occurredAt, id: row.id };
         if (this.inScope(row, requestedLineId, allowedLineIds)) {
           matched.push(row);
           if (matched.length > REPLAY_LIMIT) {
-            return { events: [], resync: true, highWater: null };
+            return { events: [], resync: true };
           }
         }
       }
 
       if (batch.length <= REPLAY_LIMIT) break;
       if (scanned >= MAX_REPLAY_SCAN) {
-        return { events: [], resync: true, highWater: null };
+        return { events: [], resync: true };
       }
       const tail = batch[batch.length - 1]!;
       scanCursor = { occurredAt: tail.occurredAt, id: tail.id };
     }
 
-    return { events: matched, resync: false, highWater };
+    return { events: matched, resync: false };
   }
 
   private invalidation(event: RealtimeOutboxEvent, supplierId: string): StreamMessage {
@@ -790,6 +904,7 @@ export class RealtimeService {
     allowedLineIds: readonly string[],
   ): boolean {
     if (!isAllowedSupplierEvent(event)) return false;
+    if (requestedLineId && !allowedLineIds.includes(requestedLineId)) return false;
     const eventLineIds = extractEventLineIds(event);
 
     if (TENANT_WIDE_EVENT_SET.has(event.eventType)) {
@@ -831,12 +946,6 @@ function extractEventLineIds(event: Pick<RealtimeOutboxEvent, 'payload'>): strin
     result.push(record.sourceLineId);
   }
   return result;
-}
-
-function compareEventOrder(left: EventOrderPoint, right: EventOrderPoint): number {
-  const diff = left.occurredAt.getTime() - right.occurredAt.getTime();
-  if (diff !== 0) return diff;
-  return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
 }
 
 function rateLimited(): ProblemException {

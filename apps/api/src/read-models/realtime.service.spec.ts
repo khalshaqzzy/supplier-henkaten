@@ -48,7 +48,11 @@ function fakeResponse() {
   return Object.assign(emitter, {
     destroyed: false,
     writableEnded: false,
+    writableNeedDrain: false,
     writableLength: 0,
+    destroy: vi.fn(function (this: { destroyed: boolean }) {
+      this.destroyed = true;
+    }),
     end: vi.fn(function (this: { writableEnded: boolean }) {
       this.writableEnded = true;
     }),
@@ -416,5 +420,58 @@ describe('RealtimeService', () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
     sub1.unsubscribe();
     sub2.unsubscribe();
+  });
+
+  it('closes stalled SSE writers exceeding hard byte budget and defers resync until drain', async () => {
+    const events = new Subject<RealtimeOutboxEvent>();
+    const service = new RealtimeService(
+      {
+        line: {
+          findFirst: vi.fn().mockResolvedValue({ id: LINE_A }),
+          findMany: vi.fn().mockResolvedValue([{ id: LINE_A }]),
+        },
+        outboxEvent: { findMany: vi.fn().mockResolvedValue([]) },
+      } as never,
+      { events: () => events } as never,
+      { resolve: vi.fn().mockResolvedValue(principal) } as never,
+      {
+        sseMaxPerSession: 6,
+        sseMaxPerUser: 12,
+        sseMaxPerSupplier: 60,
+        sseMaxGlobal: 300,
+        sseRevalidationCacheMs: 2_000,
+      } as never,
+    );
+
+    const res = fakeResponse();
+    const stream = await service.prepareStream(
+      new TenantScope(SUPPLIER_ID),
+      principal,
+      LINE_A,
+      undefined,
+      res as never,
+    );
+    const messages: Array<{ type: string }> = [];
+    const completed = vi.fn();
+    const sub = stream.subscribe({ next: (m) => messages.push(m), complete: completed });
+    await new Promise((resolve) => setTimeout(resolve, 15));
+
+    // Simulate writableNeedDrain: resync must be deferred until 'drain' fires.
+    res.writableNeedDrain = true;
+    events.next(event({ id: randomUUID() }));
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    expect(messages.filter((m) => m.type === 'resync')).toHaveLength(0);
+
+    res.writableNeedDrain = false;
+    res.emit('drain');
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    expect(messages.filter((m) => m.type === 'resync')).toHaveLength(1);
+
+    // Exceeding hard byte budget closes the stalled stream immediately.
+    res.writableLength = 600 * 1024;
+    events.next(event({ id: randomUUID() }));
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    expect(completed).toHaveBeenCalledOnce();
+    sub.unsubscribe();
   });
 });

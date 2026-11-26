@@ -7,13 +7,14 @@ source "${SCRIPT_DIR}/lib.sh"
 
 [[ $# -eq 3 ]] || die "Usage: remote-rollback.sh <app-env> <release-sha> <base-dir>"
 REQUESTED_ENV="$1"
-RELEASE_SHA="$2"
+REQUESTED_SHA="$2"
 BASE_DIR="$3"
-require_sha "${RELEASE_SHA}"
+require_sha "${REQUESTED_SHA}"
 [[ "${REQUESTED_ENV}" =~ ^(staging|production)$ ]] || die "APP_ENV must be staging or production."
-RELEASE_DIR="${BASE_DIR}/releases/${RELEASE_SHA}"
+RELEASE_DIR="${BASE_DIR}/releases/${REQUESTED_SHA}"
 RUNTIME_ENV="${RELEASE_DIR}/.runtime.env"
 [[ -d "${RELEASE_DIR}" && -f "${RUNTIME_ENV}" ]] || die "Rollback release or its runtime env is unavailable."
+[[ -f "${RELEASE_DIR}/.source.sha" && "$(<"${RELEASE_DIR}/.source.sha")" == "${REQUESTED_SHA}" ]] || die "Rollback release directory failed source identity validation."
 
 if [[ "${DEPLOY_LOCK_HELD:-false}" != "true" ]]; then
   exec 9>"${BASE_DIR}/deploy.lock"
@@ -22,9 +23,9 @@ fi
 
 "${SCRIPT_DIR}/validate-runtime-env.sh" --allow-legacy-db-role "${RUNTIME_ENV}"
 load_runtime_env "${RUNTIME_ENV}"
-[[ "${REQUESTED_ENV}" == "${APP_ENV:-}" ]] || die "Rollback environment mismatch."
+[[ "${REQUESTED_ENV}" == "${APP_ENV:-}" && "${REQUESTED_SHA}" == "${RELEASE_SHA:-}" ]] || die "Rollback environment or release SHA mismatch."
 
-printf 'Rolling code back to %s; database schema and shared volumes are not restored.\n' "${RELEASE_SHA}"
+printf 'Rolling code back to %s; database schema and shared volumes are not restored.\n' "${REQUESTED_SHA}"
 compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" up -d --no-deps postgres
 wait_for_service "${RELEASE_DIR}" "${RUNTIME_ENV}" postgres 180
 if [[ -n "${POSTGRES_APP_USER:-}" && -n "${POSTGRES_APP_PASSWORD:-}" && -f "${RELEASE_DIR}/apps/api/src/cli/migrate.ts" ]]; then
@@ -39,12 +40,12 @@ compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" up -d --no-deps caddy --remove-orp
 wait_for_service "${RELEASE_DIR}" "${RUNTIME_ENV}" caddy 120
 
 "${RELEASE_DIR}/deploy/scripts/smoke-check.sh" \
-  "${RELEASE_SHA}" \
+  "${REQUESTED_SHA}" \
   "https://${SUPPLIER_DOMAIN}" \
   "https://${TMMIN_DOMAIN}" \
   "https://${API_DOMAIN}"
 
 activate_symlink "${RELEASE_DIR}" "${BASE_DIR}/current"
-printf '%s\n' "${RELEASE_SHA}" >"${BASE_DIR}/current_release.tmp"
+printf '%s\n' "${REQUESTED_SHA}" >"${BASE_DIR}/current_release.tmp"
 mv "${BASE_DIR}/current_release.tmp" "${BASE_DIR}/current_release"
-printf 'Rollback completed for %s.\n' "${RELEASE_SHA}"
+printf 'Rollback completed for %s.\n' "${REQUESTED_SHA}"

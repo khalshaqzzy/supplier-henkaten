@@ -36,7 +36,11 @@ export const HIDDEN_AT_LEDGER_TABLES = ['AuditEvent', 'ExternalIngestionEvent'] 
 /**
  * Soft-deletable core tables that must never be physically deleted or truncated.
  */
-export const NO_DELETE_TABLES = ['Henkaten', 'ExternalHenkatenProjection'] as const;
+export const NO_DELETE_TABLES = [
+  'Henkaten',
+  'ExternalHenkatenProjection',
+  'HenkatenApprovalRoute',
+] as const;
 
 /**
  * Computes a PostgreSQL SCRAM-SHA-256 verifier (RFC 5802 / PG 10+) so the
@@ -55,10 +59,11 @@ export type ProvisionRuntimeRoleOptions = {
   migrationDatabaseUrl: string;
   appUser: string;
   appPassword: string;
+  provisionRoleOnly?: boolean;
 };
 
 export async function provisionRuntimeRole(options: ProvisionRuntimeRoleOptions): Promise<void> {
-  const { migrationDatabaseUrl, appUser, appPassword } = options;
+  const { migrationDatabaseUrl, appUser, appPassword, provisionRoleOnly = false } = options;
   if (!SAFE_PG_ROLE_PATTERN.test(appUser)) {
     throw new Error('POSTGRES_APP_USER must match ^[a-z_][a-z0-9_]{0,62}$.');
   }
@@ -184,14 +189,38 @@ export async function provisionRuntimeRole(options: ProvisionRuntimeRoleOptions)
       JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE n.nspname = 'public'
         AND NOT t.tgisinternal
-        AND t.tgname ~ '(_prevent_update_delete|_immutable|_deletion_guard)$'
+        AND t.tgname ~ '(_prevent_update_delete|_immutable|_deletion_guard|_enforce_immutability|_enforce_terminal)$'
         AND NOT (c.relname = ANY($1::text[]))
       `,
       [expectedRestrictedTables],
     );
     if (uncategorized.rows.length > 0) {
-      throw new Error(
-        `Uncategorized immutable tables missing from runtime DB role grant lists: ${uncategorized.rows.map((r) => r.table_name).join(', ')}`,
+      const names = uncategorized.rows.map((r) => r.table_name);
+      if (!provisionRoleOnly) {
+        throw new Error(
+          `Uncategorized immutable tables missing from runtime DB role grant lists: ${names.join(', ')}`,
+        );
+      }
+      // During rollback to an older hardened release against a forward-migrated schema,
+      // fail closed on newer immutable tables the older release does not query.
+      await adminClient.query("SELECT set_config('app.uncategorized_tables', $1, true)", [
+        names.join(','),
+      ]);
+      await adminClient.query(`
+        DO $$
+        DECLARE
+          target_user text := current_setting('app.target_user');
+          tbl text;
+        BEGIN
+          FOREACH tbl IN ARRAY string_to_array(current_setting('app.uncategorized_tables'), ',') LOOP
+            IF tbl <> '' AND to_regclass(format('public.%I', tbl)) IS NOT NULL THEN
+              EXECUTE format('REVOKE ALL PRIVILEGES ON TABLE public.%I FROM %I', tbl, target_user);
+            END IF;
+          END LOOP;
+        END $$;
+      `);
+      process.stderr.write(
+        `Warning: revoked access to forward-migrated immutable tables during rollback role reconciliation: ${names.join(', ')}\n`,
       );
     }
 
@@ -303,6 +332,7 @@ async function run(): Promise<void> {
       migrationDatabaseUrl: databaseUrl,
       appUser,
       appPassword,
+      provisionRoleOnly,
     });
     process.stdout.write(`Provisioned least-privilege runtime database role ${appUser}.\n`);
   }

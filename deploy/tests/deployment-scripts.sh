@@ -125,6 +125,19 @@ if "${SCRIPTS}/validate-runtime-env.sh" "${same_app_password_env}" >/dev/null 2>
   fail "identical POSTGRES_APP_PASSWORD and POSTGRES_PASSWORD were accepted"
 fi
 
+legacy_env="${TEST_ROOT}/legacy.env"
+grep -Ev '^POSTGRES_APP_(USER|PASSWORD)=' "${rendered_env}" >"${legacy_env}"
+if "${SCRIPTS}/validate-runtime-env.sh" "${legacy_env}" >/dev/null 2>&1; then
+  fail "legacy env without POSTGRES_APP_* passed strict validation"
+fi
+"${SCRIPTS}/validate-runtime-env.sh" --allow-legacy-db-role "${legacy_env}" >/dev/null || fail "legacy env was rejected under --allow-legacy-db-role"
+
+partial_app_env="${TEST_ROOT}/partial-app.env"
+grep -Ev '^POSTGRES_APP_PASSWORD=' "${rendered_env}" >"${partial_app_env}"
+if "${SCRIPTS}/validate-runtime-env.sh" --allow-legacy-db-role "${partial_app_env}" >/dev/null 2>&1; then
+  fail "half-configured POSTGRES_APP_USER without POSTGRES_APP_PASSWORD was accepted"
+fi
+
 if (
   set -a
   # shellcheck disable=SC1090
@@ -284,6 +297,8 @@ prepare_candidate() {
   local incoming="${base}/incoming/${sha}.${run}"
   mkdir -p "${incoming}/deploy/scripts"
   cp "${SCRIPTS}/lib.sh" "${incoming}/deploy/scripts/lib.sh"
+  cp "${SCRIPTS}/remote-deploy.sh" "${incoming}/deploy/scripts/remote-deploy.sh"
+  cp "${SCRIPTS}/validate-runtime-env.sh" "${incoming}/deploy/scripts/validate-runtime-env.sh"
   cat >"${incoming}/deploy/scripts/remote-preflight.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -315,7 +330,7 @@ run_candidate() {
   local smoke_exit="${4:-0}"
   local incoming runtime archive checksum
   IFS='|' read -r incoming runtime archive checksum < <(prepare_candidate "${base}" "${sha}" "${run}" "${smoke_exit}")
-  PATH="${fake_bin}:${PATH}" "${SCRIPTS}/remote-deploy.sh" \
+  PATH="${fake_bin}:${PATH}" "${incoming}/deploy/scripts/remote-deploy.sh" \
     staging "${sha}" "${run}" "${base}" "${incoming}" "${runtime}" \
     "${archive}" "${checksum}" 127.0.0.1
 }
@@ -392,7 +407,8 @@ rollback_base="${TEST_ROOT}/rollback"
 prepare_base "${rollback_base}"
 previous_sha=dddddddddddddddddddddddddddddddddddddddd
 mkdir -p "${rollback_base}/releases/${previous_sha}/deploy/scripts"
-cp "${rendered_env}" "${rollback_base}/releases/${previous_sha}/.runtime.env"
+sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${previous_sha}/" "${legacy_env}" >"${rollback_base}/releases/${previous_sha}/.runtime.env"
+printf '%s\n' "${previous_sha}" >"${rollback_base}/releases/${previous_sha}/.source.sha"
 printf '%s\n' "${previous_sha}" >"${rollback_base}/current_release"
 cat >"${rollback_base}/releases/${previous_sha}/deploy/scripts/remote-rollback.sh" <<EOF
 #!/usr/bin/env bash

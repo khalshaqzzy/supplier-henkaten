@@ -93,7 +93,7 @@ candidate_deploy() {
 if ! candidate_deploy; then
   echo "Candidate deployment failed. No database down migration will be attempted." >&2
   previous_env="${BASE_DIR}/releases/${previous_release}/.runtime.env"
-  if [[ -n "${previous_release}" && "${previous_release}" != "${REQUESTED_SHA}" && -f "${previous_env}" ]] && "${SCRIPT_DIR}/validate-runtime-env.sh" --allow-legacy-db-role "${previous_env}" >/dev/null 2>&1; then
+  if [[ -n "${previous_release}" && "${previous_release}" != "${REQUESTED_SHA}" && -f "${previous_env}" ]] && "${RELEASE_DIR}/deploy/scripts/validate-runtime-env.sh" --allow-legacy-db-role "${previous_env}" >/dev/null; then
     DEPLOY_LOCK_HELD=true "${BASE_DIR}/releases/${previous_release}/deploy/scripts/remote-rollback.sh" \
       "${REQUESTED_ENV}" "${previous_release}" "${BASE_DIR}" || echo "Automatic code rollback also failed." >&2
   else
