@@ -588,4 +588,4 @@ if [[ "${retention_inventory_indeterminate}" == "false" ]]; then
 fi
 
 rm -f -- "${ARCHIVE}" "${RUNTIME_ENV_INCOMING}"
-printf 'Release %s is active; previous release was %s.\n' "${REQUESTED_SHA}" "${previous_release:-none}"
+{ printf 'Release %s is active; previous release was %s.\n' "${REQUESTED_SHA}" "${previous_release:-none}"; } 2>/dev/null || true
