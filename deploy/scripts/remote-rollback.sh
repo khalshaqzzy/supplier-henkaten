@@ -50,7 +50,7 @@ elif [[ -e "${RELEASE_DIR}/.rollback-unsafe" || -L "${RELEASE_DIR}/.rollback-uns
 else
   # Never start a retained release from mutable shared tags (e.g. a PostgreSQL tag rebuilt by a later
   # candidate) and never record whatever those tags currently resolve to as the release's pins.
-  die "Rollback aborted: release ${REQUESTED_SHA} has no verified .activated-images pins; redeploy that SHA through the pipeline instead."
+  die "Rollback aborted: release ${REQUESTED_SHA} has no verified .activated-images pins; ship the desired code as a new commit (for example a git revert) on the deployment branch so the pipeline builds and pins it."
 fi
 
 printf 'Rolling code back to %s; database schema and shared volumes are not restored.\n' "${REQUESTED_SHA}"

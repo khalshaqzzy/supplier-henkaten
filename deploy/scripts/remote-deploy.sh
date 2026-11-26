@@ -98,7 +98,7 @@ if [[ -n "${previous_release}" ]]; then
     )
   fi
   if [[ ! -f "${previous_pinned_images}" && ! -e "${previous_dir_for_snapshot}/.rollback-unsafe" && ! -L "${previous_dir_for_snapshot}/.rollback-unsafe" && -d "${previous_dir_for_snapshot}" ]]; then
-    if ! write_activated_images "${previous_dir_for_snapshot}" "${previous_release}" "${previous_dir_for_snapshot}/.runtime.env"; then
+    if ! write_activated_images "${previous_dir_for_snapshot}" "${previous_release}" "${previous_dir_for_snapshot}/.runtime.env" "${BASE_DIR}/current_release"; then
       if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
         die "Cannot safely redeploy active release ${REQUESTED_SHA}: unable to persist pre-build baseline pins in .activated-images."
       fi
@@ -156,6 +156,10 @@ restore_saved_images() {
 }
 
 services_mutated=false
+forced_smoke_failure_reached=false
+# Exit status reserved for "candidate failed, shared hardened driver completed automatic recovery"
+# so callers (rehearse-staging.sh) can prove recovery actually ran rather than inferring it from state.
+AUTOMATIC_ROLLBACK_COMPLETED_EXIT=3
 candidate_deploy() {
   compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" build --pull postgres api supplier-web tmmin-web caddy || return 1
   services_mutated=true
@@ -172,6 +176,7 @@ candidate_deploy() {
   wait_for_service "${RELEASE_DIR}" "${RUNTIME_ENV}" caddy 120 || return 1
   if [[ "${DEPLOY_FORCE_SMOKE_FAILURE:-false}" == "true" && "${APP_ENV}" == "staging" ]]; then
     echo "A staging-only forced smoke failure was requested." >&2
+    forced_smoke_failure_reached=true
     return 1
   fi
   "${RELEASE_DIR}/deploy/scripts/smoke-check.sh" \
@@ -180,6 +185,20 @@ candidate_deploy() {
     "https://${TMMIN_DOMAIN}" \
     "https://${API_DOMAIN}" || return 1
   write_activated_images "${RELEASE_DIR}" "${REQUESTED_SHA}" "${RUNTIME_ENV}" || return 1
+}
+
+# If the candidate's own (unproven) driver fails during recovery, retry once with the bundle of the last
+# successfully activated deploy. The parent has already verified restored tags and a complete snapshot of
+# a pinned target, so the fallback driver only ever restarts verified pins.
+run_known_good_rollback_driver() {
+  local good_driver candidate_bundle good_bundle
+  good_driver="$(known_good_rollback_driver_path "${BASE_DIR}")"
+  [[ -x "${good_driver}" ]] || return 1
+  candidate_bundle="$(cd "$(dirname "$(hardened_rollback_driver_path "${BASE_DIR}")")" 2>/dev/null && pwd -P)" || candidate_bundle=""
+  good_bundle="$(cd "$(dirname "${good_driver}")" 2>/dev/null && pwd -P)" || return 1
+  [[ "${good_bundle}" != "${candidate_bundle}" ]] || return 1
+  echo "Candidate rollback driver failed; retrying recovery once with the known-good driver ${good_bundle}." >&2
+  DEPLOY_LOCK_HELD=true "${good_driver}" "${REQUESTED_ENV}" "${previous_release}" "${BASE_DIR}"
 }
 
 if ! candidate_deploy; then
@@ -215,9 +234,14 @@ if ! candidate_deploy; then
       echo "Hardened rollback driver is unavailable; stopping failed candidate application services while preserving PostgreSQL." >&2
       compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
     elif ! DEPLOY_LOCK_HELD=true "${hardened_rollback_driver}" \
-      "${REQUESTED_ENV}" "${previous_release}" "${BASE_DIR}"; then
+      "${REQUESTED_ENV}" "${previous_release}" "${BASE_DIR}" &&
+      ! run_known_good_rollback_driver; then
       echo "Automatic code rollback also failed; stopping failed candidate application services while preserving PostgreSQL." >&2
       compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
+    else
+      printf 'DEPLOY_RESULT=automatic-rollback-completed forced_smoke_failure=%s restored=%s\n' \
+        "${forced_smoke_failure_reached}" "${previous_release}"
+      exit "${AUTOMATIC_ROLLBACK_COMPLETED_EXIT}"
     fi
   else
     compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
@@ -231,6 +255,7 @@ mv "${RELEASE_DIR}/.activated.tmp" "${RELEASE_DIR}/.activated"
 activate_symlink "${RELEASE_DIR}" "${BASE_DIR}/current"
 printf '%s\n' "${REQUESTED_SHA}" >"${BASE_DIR}/current_release.tmp"
 mv "${BASE_DIR}/current_release.tmp" "${BASE_DIR}/current_release"
+promote_rollback_driver "${BASE_DIR}" || echo "Warning: failed to promote the activated release's rollback driver as known-good." >&2
 
 release_directories=()
 while IFS= read -r release_entry; do

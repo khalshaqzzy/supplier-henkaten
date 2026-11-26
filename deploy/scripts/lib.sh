@@ -264,6 +264,16 @@ mark_rollback_unsafe() {
   [[ -f "${dest_file}" && ! -L "${dest_file}" ]] || return 1
 }
 
+# Rename SRC onto DEST exactly (never into DEST when DEST is a directory).
+rename_exact() {
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    [[ ! -d "$2" || -L "$2" ]] || return 1
+    mv -hf -- "$1" "$2"
+  else
+    mv -Tf -- "$1" "$2"
+  fi
+}
+
 hardened_rollback_driver_path() {
   printf '%s\n' "$1/shared/deployment-state/rollback-driver/remote-rollback.sh"
 }
@@ -276,7 +286,8 @@ install_hardened_rollback_driver() {
   local base_dir="$2"
   local state_dir="${base_dir}/shared/deployment-state"
   local driver_link="${state_dir}/rollback-driver"
-  local script_name stage entry legacy_dir
+  local good_link="${state_dir}/rollback-driver.good"
+  local script_name stage legacy_dir tmp_link previous_target=""
   mkdir -p "${state_dir}" || return 1
   for script_name in lib.sh validate-runtime-env.sh remote-rollback.sh; do
     [[ -f "${source_scripts_dir}/${script_name}" && ! -L "${source_scripts_dir}/${script_name}" ]] || return 1
@@ -295,6 +306,13 @@ install_hardened_rollback_driver() {
     return 1
   }
   # Migrate a pre-versioning real directory out of the way (we hold the deploy lock, so no rollback runs).
+  # A directory cannot be atomically replaced by a symlink, so on any publication failure the legacy
+  # directory is moved back; if the process dies inside this window the next deploy republishes, and the
+  # operator fallback is the newest rollback-driver.legacy.*/remote-rollback.sh (see deploymentGuide §9).
+  legacy_dir=""
+  if [[ -L "${driver_link}" ]]; then
+    previous_target="$(readlink "${driver_link}")"
+  fi
   if [[ -e "${driver_link}" && ! -L "${driver_link}" ]]; then
     if [[ ! -d "${driver_link}" ]]; then
       rm -rf -- "${stage}"
@@ -308,22 +326,82 @@ install_hardened_rollback_driver() {
       rm -rf -- "${stage}"
       return 1
     }
+    previous_target="${legacy_dir}"
   fi
-  if ! activate_symlink "${stage}" "${driver_link}" || [[ ! -L "${driver_link}" || "$(readlink "${driver_link}")" != "${stage}" ]]; then
+  tmp_link="$(mktemp -u "${state_dir}/.rollback-driver.link.XXXXXX")" || tmp_link=""
+  if [[ -z "${tmp_link}" ]] || ! ln -s "${stage}" "${tmp_link}" ||
+    ! rename_exact "${tmp_link}" "${driver_link}" ||
+    [[ ! -L "${driver_link}" || "$(readlink "${driver_link}")" != "${stage}" ]]; then
+    [[ -z "${tmp_link}" ]] || rm -f -- "${tmp_link}"
+    if [[ -n "${legacy_dir}" ]]; then
+      if [[ -L "${driver_link}" && "$(readlink "${driver_link}")" == "${stage}" ]]; then
+        rm -f -- "${driver_link}"
+      fi
+      if [[ ! -e "${driver_link}" && ! -L "${driver_link}" ]]; then
+        mv -- "${legacy_dir}" "${driver_link}" || echo "Warning: legacy rollback driver remains at ${legacy_dir}." >&2
+      fi
+    fi
     rm -rf -- "${stage}"
     return 1
   fi
+  # Superseded bundles are NOT pruned here: the candidate has not proven itself yet. Record the bundle that
+  # was live before this install as the known-good fallback (only if none is recorded yet, so repeated
+  # failed candidates can never displace the bundle of the last successfully activated deploy).
+  if [[ -n "${previous_target}" && -d "${previous_target}" && ! -e "${good_link}" && ! -L "${good_link}" ]]; then
+    publish_driver_link "${previous_target}" "${good_link}" ||
+      echo "Warning: failed to record known-good rollback driver ${previous_target}." >&2
+  fi
+}
+
+publish_driver_link() {
+  local target="$1"
+  local link_path="$2"
+  local tmp_link
+  tmp_link="$(mktemp -u "$(dirname "${link_path}")/.rollback-driver.link.XXXXXX")" || return 1
+  if ! ln -s "${target}" "${tmp_link}" || ! rename_exact "${tmp_link}" "${link_path}"; then
+    rm -f -- "${tmp_link}"
+    return 1
+  fi
+  [[ -L "${link_path}" && "$(readlink "${link_path}")" == "${target}" ]]
+}
+
+known_good_rollback_driver_path() {
+  printf '%s\n' "$1/shared/deployment-state/rollback-driver.good/remote-rollback.sh"
+}
+
+# After a deploy has activated successfully, its rollback driver bundle becomes the known-good fallback and
+# every other bundle (including a migrated legacy directory) is pruned.
+promote_rollback_driver() {
+  local base_dir="$1"
+  local state_dir="${base_dir}/shared/deployment-state"
+  local driver_link="${state_dir}/rollback-driver"
+  local good_link="${state_dir}/rollback-driver.good"
+  local target entry
+  [[ -L "${driver_link}" ]] || return 1
+  target="$(readlink "${driver_link}")"
+  [[ -d "${target}" && -x "${target}/remote-rollback.sh" ]] || return 1
+  publish_driver_link "${target}" "${good_link}" || return 1
   for entry in "${state_dir}"/rollback-driver.v.* "${state_dir}"/rollback-driver.legacy.*; do
-    [[ -d "${entry}" && ! -L "${entry}" && "${entry}" != "${stage}" ]] || continue
+    [[ -d "${entry}" && ! -L "${entry}" && "${entry}" != "${target}" ]] || continue
     rm -rf -- "${entry}" >/dev/null 2>&1 || true
   done
+}
+
+file_mtime_epoch() {
+  stat -c '%Y' -- "$1" 2>/dev/null || stat -f '%m' -- "$1" 2>/dev/null
 }
 
 write_activated_images() {
   local release_dir="$1"
   local pin_sha="$2"
   local compose_env="${3:-${release_dir}/.runtime.env}"
+  # Optional: a file whose mtime is the moment this release became current. When given (pre-build
+  # backfill of an already-active release), every container must predate it; a container created after
+  # activation (e.g. PostgreSQL replaced by an interrupted later rollout, whose shared tag carries no
+  # release identity) makes the baseline ambiguous and fails closed.
+  local activated_at_file="${4:-}"
   local pg_ref svc image_ref container_ids container_id config_image image_id resolved_id tmp_file dest_file backup_file unsafe_marker had_prev=false
+  local activated_epoch="" created created_epoch
   dest_file="${release_dir}/.activated-images"
   unsafe_marker="${release_dir}/.rollback-unsafe"
   [[ -d "${release_dir}" && -n "${COMPOSE_PROJECT_NAME:-}" && -f "${compose_env}" ]] || return 1
@@ -334,6 +412,10 @@ write_activated_images() {
   if [[ -L "${unsafe_marker}" || ( -e "${unsafe_marker}" && ! -f "${unsafe_marker}" ) ]]; then
     echo "Refusing to publish pinned image manifest: ${unsafe_marker} is not a regular file." >&2
     return 1
+  fi
+  if [[ -n "${activated_at_file}" ]]; then
+    activated_epoch="$(file_mtime_epoch "${activated_at_file}")" || return 1
+    [[ "${activated_epoch}" =~ ^[0-9]+$ ]] || return 1
   fi
   pg_ref="$(postgres_image_ref_for "${release_dir}")"
   tmp_file="$(mktemp "${release_dir}/.activated-images.tmp.XXXXXX" 2>/dev/null)" || return 1
@@ -362,6 +444,19 @@ write_activated_images() {
       echo "Refusing to pin ${svc}: running container was created from '${config_image}', expected '${image_ref}' for release ${pin_sha}." >&2
       rm -f -- "${tmp_file}"
       return 1
+    fi
+    if [[ -n "${activated_epoch}" ]]; then
+      created="$(docker inspect --format '{{.Created}}' "${container_id}" 2>/dev/null || true)"
+      created_epoch=""
+      # GNU date maps an empty string to today's midnight, so never parse an empty timestamp.
+      if [[ "${created}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T ]]; then
+        created_epoch="$(date -u -d "${created}" +%s 2>/dev/null || true)"
+      fi
+      if [[ ! "${created_epoch}" =~ ^[0-9]+$ ]] || (( created_epoch > activated_epoch )); then
+        echo "Refusing to pin ${svc}: running container (created '${created}') does not predate activation of release ${pin_sha}; baseline provenance is ambiguous." >&2
+        rm -f -- "${tmp_file}"
+        return 1
+      fi
     fi
     image_id="$(docker inspect --format '{{.Image}}' "${container_id}" 2>/dev/null || true)"
     if [[ -z "${image_id}" ]]; then
