@@ -64,16 +64,38 @@ fi
 # stack serving traffic (e.g. the target API behind the old Caddy/frontends). Fail closed: stop Caddy and the
 # application services while preserving PostgreSQL; the release pointer still names the prior release, whose
 # verified pins let an operator recover it through this driver.
+# The mutation flag alone decides cleanup (it is cleared only after full success), so an interrupted run
+# (SIGTERM/SIGINT/SIGHUP, where Bash may enter the EXIT trap with status 0) also fails closed.
 rollback_mutating=false
 stop_mixed_stack_on_failure() {
   local status=$?
-  if [[ "${status}" -ne 0 && "${rollback_mutating}" == "true" ]]; then
+  if [[ "${rollback_mutating}" == "true" ]]; then
+    trap - TERM INT HUP
     compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
-    echo "Rollback to ${REQUESTED_SHA} failed after services began changing; stopped Caddy and application services while preserving PostgreSQL to avoid serving a mixed release. Re-run this driver for a release with verified pins (for example the release named by current_release)." >&2
+    echo "Rollback to ${REQUESTED_SHA} failed or was interrupted after services began changing; stopped Caddy and application services while preserving PostgreSQL to avoid serving a mixed release. Re-run this driver for a release with verified pins (for example the release named by current_release)." >&2
+    # Exit 4 is reserved for refusals BEFORE any change; a post-mutation failure (e.g. a target smoke-check or
+    # migrate container that happens to return 4) must stay retryable by the known-good fallback.
+    if [[ "${status}" -eq 0 || "${status}" -eq "${ROLLBACK_POLICY_REFUSAL_EXIT}" ]]; then
+      status=1
+    fi
   fi
   exit "${status}"
 }
 trap stop_mixed_stack_on_failure EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
+trap 'exit 129' HUP
+
+# Pointer destinations must be publishable BEFORE any service changes (a directory left by a manual restore
+# would otherwise swallow the pointer while the rollback reports success).
+for pointer_path in "${BASE_DIR}/current_release" "${RELEASE_DIR}/.activated"; do
+  if [[ -d "${pointer_path}" && ! -L "${pointer_path}" ]]; then
+    refuse "Rollback aborted: ${pointer_path} is a directory; repair it before rolling back."
+  fi
+done
+if [[ -e "${BASE_DIR}/current" && ! -L "${BASE_DIR}/current" ]]; then
+  refuse "Rollback aborted: ${BASE_DIR}/current is not a symlink; repair it before rolling back."
+fi
 
 printf 'Rolling code back to %s; database schema and shared volumes are not restored.\n' "${REQUESTED_SHA}"
 rollback_mutating=true
@@ -97,10 +119,9 @@ wait_for_service "${RELEASE_DIR}" "${RUNTIME_ENV}" caddy 120
   "https://${API_DOMAIN}"
 
 rm -f -- "${RELEASE_DIR}/.rollback-unsafe"
-printf '%s\n' "${REQUESTED_SHA}" >"${RELEASE_DIR}/.activated.tmp"
-mv "${RELEASE_DIR}/.activated.tmp" "${RELEASE_DIR}/.activated"
-activate_symlink "${RELEASE_DIR}" "${BASE_DIR}/current"
-printf '%s\n' "${REQUESTED_SHA}" >"${BASE_DIR}/current_release.tmp"
-mv "${BASE_DIR}/current_release.tmp" "${BASE_DIR}/current_release"
+publish_line_file "${REQUESTED_SHA}" "${RELEASE_DIR}/.activated" || die "Failed to publish ${RELEASE_DIR}/.activated."
+activate_symlink "${RELEASE_DIR}" "${BASE_DIR}/current" || die "Failed to re-point ${BASE_DIR}/current."
+[[ -L "${BASE_DIR}/current" && "$(readlink "${BASE_DIR}/current")" == "${RELEASE_DIR}" ]] || die "Failed to re-point ${BASE_DIR}/current."
+publish_line_file "${REQUESTED_SHA}" "${BASE_DIR}/current_release" || die "Failed to publish ${BASE_DIR}/current_release."
 rollback_mutating=false
 printf 'Rollback completed for %s.\n' "${REQUESTED_SHA}"

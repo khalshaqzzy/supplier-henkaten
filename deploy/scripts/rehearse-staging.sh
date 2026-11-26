@@ -19,6 +19,8 @@ require_sha "${CURRENT_SHA}"
 
 ROLLBACK_DRIVER="$(hardened_rollback_driver_path "${BASE_DIR}")"
 [[ -x "${ROLLBACK_DRIVER}" ]] || die "Hardened shared rollback driver is unavailable; deploy a hardened release first."
+rollback_driver_bundle_is_strict "$(cd "$(dirname "${ROLLBACK_DRIVER}")" && pwd -P)" ||
+  die "Shared rollback driver lacks the strict pin contract; refusing to rehearse with it."
 
 PREVIOUS_DIR="${BASE_DIR}/releases/${PREVIOUS_SHA}"
 CURRENT_DIR="${BASE_DIR}/releases/${CURRENT_SHA}"

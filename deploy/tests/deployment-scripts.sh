@@ -338,6 +338,10 @@ if [[ "${1:-}" == "inspect" ]]; then
     printf '%s\n' "${config_ref:-${default_ref}}"
     exit 0
   fi
+  if [[ -n "${TEST_STARTING_SERVICE:-}" && "${svc_name}" == "${TEST_STARTING_SERVICE}" ]]; then
+    echo starting
+    exit 0
+  fi
   if [[ -n "${TEST_UNHEALTHY_SERVICE:-}" && "${svc_name}" == "${TEST_UNHEALTHY_SERVICE}" && "${3:-}" != "{{json .State.Health}}" ]]; then
     echo unhealthy
     exit 0
@@ -1361,6 +1365,28 @@ if grep -Fxq 'STARTED postgres=sha256:fb-postgres' "${rv_log}"; then
 fi
 grep -q ' stop ' "${rv_log}" || fail "failed pin revalidation left candidate services running"
 
+# A driver that reports success without actually restoring the previous release's pinned images must not be
+# trusted: no DEPLOY_RESULT/exit 3, candidate app services stopped.
+IFS='|' read -r fs_incoming fs_runtime fs_archive fs_checksum < <(prepare_candidate "${fallback_base}" 7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f70 17)
+printf '#!/usr/bin/env bash\nexit 0\n' >"${fs_incoming}/deploy/scripts/remote-rollback.sh"
+chmod +x "${fs_incoming}/deploy/scripts/remote-rollback.sh"
+fs_running="${TEST_ROOT}/false-success-running.state"
+{
+  printf 'postgres sha256:fb-postgres supplier-henkaten-postgres:18.4-pgvector-0.8.5\n'
+  for svc in api supplier-web tmmin-web caddy; do
+    printf '%s sha256:fb-%s supplier-henkaten-%s:%s\n' "${svc}" "${svc}" "${svc}" "${fallback_prev}"
+  done
+} >"${fs_running}"
+fs_log="${TEST_ROOT}/driver-false-success.log"
+fs_status=0
+DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=17 TEST_DOCKER_LOG="${fs_log}" TEST_IMAGE_STATE_FILE="${fallback_base}/images.state" \
+  TEST_RUNNING_IMAGES_FILE="${fs_running}" \
+  PATH="${fake_bin}:${PATH}" "${fs_incoming}/deploy/scripts/remote-deploy.sh" \
+  staging 7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f70 17 "${fallback_base}" "${fs_incoming}" "${fs_runtime}" \
+  "${fs_archive}" "${fs_checksum}" 127.0.0.1 >/dev/null 2>&1 || fs_status=$?
+[[ "${fs_status}" == "1" ]] || fail "a driver that falsely reported success was trusted (exit ${fs_status})"
+grep -q ' stop ' "${fs_log}" || fail "falsely reported recovery left candidate services running"
+
 # A known-good link to a bundle WITHOUT the strict pin contract (e.g. the pre-versioning driver that could
 # start unpinned releases from mutable tags) must never be used as the fallback.
 nonstrict_good="${fallback_base}/shared/deployment-state/rollback-driver.legacy.nonstrict"
@@ -1369,14 +1395,14 @@ printf '#!/usr/bin/env bash\ntouch "%s/nonstrict-driver-ran"\nexit 0\n' "${fallb
 chmod +x "${nonstrict_good}/remote-rollback.sh"
 ln -sfn "${nonstrict_good}" "${fallback_base}/shared/deployment-state/rollback-driver.good"
 printf '%s\n' "${fallback_prev}" >"${fallback_base}/current_release"
-IFS='|' read -r ns_incoming ns_runtime ns_archive ns_checksum < <(prepare_candidate "${fallback_base}" 7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a 16)
+IFS='|' read -r ns_incoming ns_runtime ns_archive ns_checksum < <(prepare_candidate "${fallback_base}" 7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a 18)
 printf '#!/usr/bin/env bash\nexit 1\n' >"${ns_incoming}/deploy/scripts/remote-rollback.sh"
 chmod +x "${ns_incoming}/deploy/scripts/remote-rollback.sh"
 ns_log="${TEST_ROOT}/driver-fallback-nonstrict.log"
 ns_status=0
-DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=16 TEST_DOCKER_LOG="${ns_log}" TEST_IMAGE_STATE_FILE="${fallback_base}/images.state" \
+DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=18 TEST_DOCKER_LOG="${ns_log}" TEST_IMAGE_STATE_FILE="${fallback_base}/images.state" \
   PATH="${fake_bin}:${PATH}" "${ns_incoming}/deploy/scripts/remote-deploy.sh" \
-  staging 7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a 16 "${fallback_base}" "${ns_incoming}" "${ns_runtime}" \
+  staging 7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a 18 "${fallback_base}" "${ns_incoming}" "${ns_runtime}" \
   "${ns_archive}" "${ns_checksum}" 127.0.0.1 >/dev/null 2>&1 || ns_status=$?
 [[ ! -f "${fallback_base}/nonstrict-driver-ran" ]] || fail "automatic recovery fell back to a known-good driver lacking the strict pin contract"
 [[ "${ns_status}" == "1" ]] || fail "failed recovery without an eligible strict fallback must exit 1 (got ${ns_status})"
@@ -1463,8 +1489,9 @@ if TEST_RUNNING_IMAGES_FILE="${pgempty_running}" COMPOSE_PROJECT_NAME=supplier-h
   fail "write_activated_images accepted an unparseable container Created timestamp"
 fi
 
-# Legacy rollback-driver directory migration must be undone if symlink publication fails, so the
-# documented shared path keeps working.
+# If symlink publication fails after the NON-strict pre-versioning driver directory was moved aside, that
+# legacy driver must stay quarantined (never restored to the documented path) and the staged strict bundle
+# must be kept as the operator fallback.
 mig_base="${TEST_ROOT}/driver-migration-failure"
 prepare_base "${mig_base}"
 mkdir -p "${mig_base}/shared/deployment-state/rollback-driver"
@@ -1485,10 +1512,28 @@ if PATH="${fail_mv_bin}:${fake_bin}:${PATH}" bash -c 'set -euo pipefail; source 
   _ "${SCRIPTS}/lib.sh" "${SCRIPTS}" "${mig_base}" >/dev/null 2>&1; then
   fail "rollback driver install reported success although symlink publication failed"
 fi
-mig_link="${mig_base}/shared/deployment-state/rollback-driver"
-[[ -d "${mig_link}" && ! -L "${mig_link}" ]] || fail "failed driver publication did not restore the legacy rollback-driver directory"
-grep -Fxq 'legacy-driver' "${mig_link}/remote-rollback.sh" || fail "restored legacy rollback-driver directory lost its contents"
-[[ "$(find "${mig_base}/shared/deployment-state" -mindepth 1 -maxdepth 1 -name 'rollback-driver.*' -o -mindepth 1 -maxdepth 1 -name '.rollback-driver.link.*' | wc -l | tr -d ' ')" == "0" ]] || fail "failed driver publication left staged bundles, temporary links, or a stranded legacy directory"
+mig_state="${mig_base}/shared/deployment-state"
+[[ ! -e "${mig_state}/rollback-driver" && ! -L "${mig_state}/rollback-driver" ]] || fail "failed driver publication put a driver (possibly the non-strict legacy one) back at the documented path"
+[[ "$(find "${mig_state}" -mindepth 1 -maxdepth 1 -name 'rollback-driver.legacy.*' | wc -l | tr -d ' ')" == "1" ]] || fail "non-strict legacy driver was not quarantined"
+mig_stage="$(find "${mig_state}" -mindepth 1 -maxdepth 1 -name 'rollback-driver.v.*' | head -n 1)"
+[[ -n "${mig_stage}" ]] || fail "failed driver publication discarded the staged strict bundle"
+grep -Fxq 'strict-five-image-pins-v1' "${mig_stage}/.driver-contract" || fail "kept staged bundle lacks the strict contract"
+[[ "$(find "${mig_state}" -mindepth 1 -maxdepth 1 -name '.rollback-driver.link.*' | wc -l | tr -d ' ')" == "0" ]] || fail "failed driver publication left a temporary link"
+# Rehearsal must refuse to run a shared driver that lacks the strict contract.
+ln -s "$(find "${mig_state}" -mindepth 1 -maxdepth 1 -name 'rollback-driver.legacy.*' | head -n 1)" "${mig_state}/rollback-driver"
+chmod +x "${mig_state}/rollback-driver/remote-rollback.sh"
+mkdir -p "${mig_base}/releases/$(printf '%040x' 91)" "${mig_base}/releases/$(printf '%040x' 92)"
+for mig_sha in "$(printf '%040x' 91)" "$(printf '%040x' 92)"; do
+  sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${mig_sha}/" "${rendered_env}" >"${mig_base}/releases/${mig_sha}/.runtime.env"
+done
+printf '%s\n' "$(printf '%040x' 92)" >"${mig_base}/current_release"
+printf '5\n' >"${mig_state}/highest_seen_run"
+mig_rehearsal_out="${TEST_ROOT}/mig-rehearsal.out"
+if PATH="${fake_bin}:${PATH}" "${SCRIPTS}/rehearse-staging.sh" "$(printf '%040x' 91)" "$(printf '%040x' 92)" "${mig_base}" 127.0.0.1 I_ACCEPT_STAGING_INTERRUPTION \
+  >"${mig_rehearsal_out}" 2>&1; then
+  fail "rehearsal ran with a shared rollback driver lacking the strict contract"
+fi
+grep -q 'lacks the strict pin contract' "${mig_rehearsal_out}" || fail "rehearsal did not refuse the non-strict shared driver for the expected reason"
 
 # End-to-end staging rehearsal: succeeds only with positive proof that the forced smoke failure was reached
 # and the shared driver completed automatic recovery; a candidate that fails earlier (here: build) must
@@ -1582,6 +1627,79 @@ TEST_DOCKER_LOG="${rbrefuse_log}" TEST_IMAGE_STATE_FILE="${rbfail_base}/images.s
 if [[ -f "${rbrefuse_log}" ]] && grep -q ' stop ' "${rbrefuse_log}"; then
   fail "policy refusal before any service change stopped running services"
 fi
+
+# A post-mutation failure whose command happens to exit 4 (here: the target smoke-check) must NOT surface as
+# the pre-mutation policy-refusal status, so automatic recovery can still retry it.
+cp "${rbfail_base}/images.state" "${rbfail_base}/releases/${rbfail_target}/.activated-images"
+printf '#!/usr/bin/env bash\nexit 4\n' >"${rbfail_base}/releases/${rbfail_target}/deploy/scripts/smoke-check.sh"
+rb4_status=0
+TEST_DOCKER_LOG="${TEST_ROOT}/rollback-post-mutation-4.log" TEST_IMAGE_STATE_FILE="${rbfail_base}/images.state" \
+  PATH="${fake_bin}:${PATH}" "${rbfail_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" \
+  staging "${rbfail_target}" "${rbfail_base}" >/dev/null 2>&1 || rb4_status=$?
+[[ "${rb4_status}" == "1" ]] || fail "post-mutation failure exiting 4 was reported as a policy refusal (got ${rb4_status})"
+grep -Eq ' stop caddy supplier-web tmmin-web api$' "${TEST_ROOT}/rollback-post-mutation-4.log" || fail "post-mutation exit-4 failure did not stop the mixed stack"
+printf '#!/usr/bin/env bash\nexit 0\n' >"${rbfail_base}/releases/${rbfail_target}/deploy/scripts/smoke-check.sh"
+
+# SIGTERM while the target API health wait is in progress must still stop the mixed stack (Bash may enter
+# the EXIT trap with status 0 after a signal, so cleanup is keyed on the mutation flag).
+wait_for_log_line() {
+  local file="$1" pattern="$2" tries=0
+  until [[ -f "${file}" ]] && grep -q -- "${pattern}" "${file}"; do
+    tries=$((tries + 1))
+    (( tries < 200 )) || return 1
+    sleep 0.1
+  done
+}
+cp "${rbfail_base}/images.state" "${rbfail_base}/releases/${rbfail_target}/.activated-images"
+rbsig_log="${TEST_ROOT}/rollback-sigterm.log"
+TEST_STARTING_SERVICE=api TEST_DOCKER_LOG="${rbsig_log}" TEST_IMAGE_STATE_FILE="${rbfail_base}/images.state" \
+  PATH="${fake_bin}:${PATH}" "${rbfail_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" \
+  staging "${rbfail_target}" "${rbfail_base}" >/dev/null 2>&1 &
+rbsig_pid=$!
+wait_for_log_line "${rbsig_log}" 'up -d --no-deps api' || { kill "${rbsig_pid}" 2>/dev/null || true; fail "rollback SIGTERM fixture never started the target API"; }
+kill -TERM "${rbsig_pid}"
+rbsig_status=0
+wait "${rbsig_pid}" || rbsig_status=$?
+[[ "${rbsig_status}" != "0" ]] || fail "interrupted rollback exited 0"
+grep -Eq ' stop caddy supplier-web tmmin-web api$' "${rbsig_log}" || fail "SIGTERM during the rollback health wait left a mixed stack running"
+[[ "$(<"${rbfail_base}/current_release")" == "${rbfail_current}" ]] || fail "interrupted rollback changed current_release"
+
+# A current_release left as a directory must be refused BEFORE any service changes (no silent success with
+# the pointer swallowed into the directory).
+rbdir_base="${TEST_ROOT}/rollback-pointer-dir"
+cp -R "${rbfail_base}" "${rbdir_base}"
+rm -f -- "${rbdir_base}/shared/deployment-state/rollback-driver"
+install_driver "${SCRIPTS}" "${rbdir_base}" || fail "pointer-dir fixture driver install failed"
+rm -f -- "${rbdir_base}/current_release"
+mkdir -p "${rbdir_base}/current_release"
+rbdir_log="${TEST_ROOT}/rollback-pointer-dir.log"
+rbdir_status=0
+TEST_DOCKER_LOG="${rbdir_log}" TEST_IMAGE_STATE_FILE="${rbdir_base}/images.state" \
+  PATH="${fake_bin}:${PATH}" "${rbdir_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" \
+  staging "${rbfail_target}" "${rbdir_base}" >/dev/null 2>&1 || rbdir_status=$?
+[[ "${rbdir_status}" == "4" ]] || fail "rollback with a directory current_release was not refused with status 4 (got ${rbdir_status})"
+if [[ -f "${rbdir_log}" ]] && grep -Eq '^STARTED |up -d' "${rbdir_log}"; then
+  fail "rollback changed services although current_release was a directory"
+fi
+[[ -z "$(find "${rbdir_base}/current_release" -mindepth 1 -print -quit)" ]] || fail "rollback wrote a pointer inside the current_release directory"
+
+# SIGTERM during the deploy's own mutation window (candidate API health wait) must stop the candidate
+# application services and leave the pointers untouched.
+dsig_base="${TEST_ROOT}/deploy-sigterm"
+prepare_base "${dsig_base}"
+dsig_log="${TEST_ROOT}/deploy-sigterm.log"
+IFS='|' read -r dsig_incoming dsig_runtime dsig_archive dsig_checksum < <(prepare_candidate "${dsig_base}" 7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e70 10)
+TEST_STARTING_SERVICE=api TEST_DOCKER_LOG="${dsig_log}" PATH="${fake_bin}:${PATH}" "${dsig_incoming}/deploy/scripts/remote-deploy.sh" \
+  staging 7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e70 10 "${dsig_base}" "${dsig_incoming}" "${dsig_runtime}" \
+  "${dsig_archive}" "${dsig_checksum}" 127.0.0.1 >/dev/null 2>&1 &
+dsig_pid=$!
+wait_for_log_line "${dsig_log}" 'up -d --no-deps api' || { kill "${dsig_pid}" 2>/dev/null || true; fail "deploy SIGTERM fixture never started the candidate API"; }
+kill -TERM "${dsig_pid}"
+dsig_status=0
+wait "${dsig_pid}" || dsig_status=$?
+[[ "${dsig_status}" != "0" ]] || fail "interrupted deploy exited 0"
+grep -Eq ' stop caddy supplier-web tmmin-web api$' "${dsig_log}" || fail "SIGTERM during the deploy mutation window left candidate services running"
+[[ ! -e "${dsig_base}/current_release" ]] || fail "interrupted deploy published current_release"
 
 lock_base="${TEST_ROOT}/lock"
 prepare_base "${lock_base}"

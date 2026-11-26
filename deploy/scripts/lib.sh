@@ -283,6 +283,50 @@ rollback_driver_bundle_is_strict() {
   [[ -d "$1" && -x "$1/remote-rollback.sh" && -f "$1/.driver-contract" && "$(<"$1/.driver-contract")" == "${ROLLBACK_DRIVER_CONTRACT}" ]]
 }
 
+# Verify that every running service container of a release runs exactly the image ID pinned in its
+# .activated-images manifest (used to double-check a driver that reported a successful recovery).
+verify_running_matches_manifest() {
+  local release_dir="$1"
+  local compose_env="$2"
+  local pin_sha="$3"
+  local manifest="${release_dir}/.activated-images"
+  local pg_ref svc image_ref expected_id container_ids running_id
+  [[ -f "${manifest}" && ! -L "${manifest}" ]] || return 1
+  pg_ref="$(postgres_image_ref_for "${release_dir}")"
+  for svc in postgres api supplier-web tmmin-web caddy; do
+    if [[ "${svc}" == "postgres" ]]; then
+      image_ref="${pg_ref}"
+    else
+      image_ref="supplier-henkaten-${svc}:${pin_sha}"
+    fi
+    expected_id="$(awk -v target="${image_ref}" '$1 == target {print $2; exit}' "${manifest}")"
+    container_ids="$(compose_for "${release_dir}" "${compose_env}" ps -q "${svc}" 2>/dev/null || true)"
+    [[ -n "${expected_id}" && -n "${container_ids}" && "${container_ids}" != *$'\n'* ]] || return 1
+    running_id="$(docker inspect --format '{{.Image}}' "${container_ids}" 2>/dev/null || true)"
+    if [[ "${running_id}" != "${expected_id}" ]]; then
+      echo "Post-recovery check: ${svc} runs '${running_id}', expected pinned '${expected_id}'." >&2
+      return 1
+    fi
+  done
+}
+
+# Atomically publish a one-line text file (refusing to place it inside a directory at the destination).
+publish_line_file() {
+  local value="$1"
+  local dest="$2"
+  local tmp
+  if [[ -d "${dest}" && ! -L "${dest}" ]]; then
+    echo "Refusing to publish ${dest}: destination is a directory." >&2
+    return 1
+  fi
+  tmp="$(mktemp "${dest}.tmp.XXXXXX")" || return 1
+  if ! printf '%s\n' "${value}" >"${tmp}" || ! rename_exact "${tmp}" "${dest}"; then
+    rm -f -- "${tmp}"
+    return 1
+  fi
+  [[ -f "${dest}" && ! -L "${dest}" && "$(<"${dest}")" == "${value}" ]]
+}
+
 hardened_rollback_driver_path() {
   printf '%s\n' "$1/shared/deployment-state/rollback-driver/remote-rollback.sh"
 }
@@ -316,10 +360,10 @@ install_hardened_rollback_driver() {
     return 1
   fi
   # Migrate a pre-versioning real directory out of the way (we hold the deploy lock, so no rollback runs).
-  # A directory cannot be atomically replaced by a symlink, so on any publication failure the legacy
-  # directory is moved back; if the process dies inside this window the next deploy republishes, and the
-  # operator fallback is the already-staged strict bundle (rollback-driver.v.* whose .driver-contract
-  # matches), NEVER the non-strict rollback-driver.legacy.* driver (see deploymentGuide §9).
+  # The legacy driver is NOT strict (it can start unpinned releases from mutable tags), so it is quarantined
+  # permanently and never moved back to the documented path. If publication fails (or the process dies in
+  # this window) the rollback-driver path is simply absent until the next deploy republishes, and the staged
+  # strict bundle (rollback-driver.v.* whose .driver-contract matches) is KEPT as the operator fallback.
   legacy_dir=""
   if [[ -e "${driver_link}" && ! -L "${driver_link}" ]]; then
     if [[ ! -d "${driver_link}" ]]; then
@@ -341,14 +385,11 @@ install_hardened_rollback_driver() {
     [[ ! -L "${driver_link}" || "$(readlink "${driver_link}")" != "${stage}" ]]; then
     [[ -z "${tmp_link}" ]] || rm -f -- "${tmp_link}"
     if [[ -n "${legacy_dir}" ]]; then
-      if [[ -L "${driver_link}" && "$(readlink "${driver_link}")" == "${stage}" ]]; then
-        rm -f -- "${driver_link}"
-      fi
-      if [[ ! -e "${driver_link}" && ! -L "${driver_link}" ]]; then
-        mv -- "${legacy_dir}" "${driver_link}" || echo "Warning: legacy rollback driver remains at ${legacy_dir}." >&2
-      fi
+      # Keep the strict staged bundle for operator recovery; the legacy driver stays quarantined.
+      echo "Rollback driver publication failed; non-strict legacy driver quarantined at ${legacy_dir}; strict bundle kept at ${stage}." >&2
+    else
+      rm -rf -- "${stage}"
     fi
-    rm -rf -- "${stage}"
     return 1
   fi
   # Superseded bundles are NOT pruned and rollback-driver.good is NOT touched here: the candidate has not
@@ -477,10 +518,10 @@ write_activated_images() {
         created_ns="$(normalize_timestamp_ns "$(date -u -d "${created}" +%s.%N 2>/dev/null || true)" || true)"
       fi
       # Full nanosecond precision and STRICT ordering: a container whose .Created is equal to or later than
-      # the activation instant (including a recreation later within the same second) is ambiguous. A plain restart preserves .Created and still passes. Both values are
-      # wall-clock readings of this host, so this legacy-only heuristic assumes current_release was not
-      # touched/restored manually and the clock did not step backwards after activation; the Config.Image
-      # ownership check above still applies regardless.
+      # the activation instant (including a recreation later within the same second) is ambiguous. A plain
+      # restart preserves .Created and still passes. Both values are wall-clock readings of this host, so
+      # this legacy-only heuristic assumes current_release was not touched/restored manually and the clock
+      # did not step backwards after activation; the Config.Image ownership check above still applies.
       if [[ -z "${created_ns}" ]] || ! timestamp_ns_before "${created_ns}" "${activated_ns}"; then
         echo "Refusing to pin ${svc}: running container (created '${created}') does not strictly predate activation of release ${pin_sha}; baseline provenance is ambiguous." >&2
         rm -f -- "${tmp_file}"

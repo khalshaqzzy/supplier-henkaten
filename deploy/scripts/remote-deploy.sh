@@ -78,6 +78,14 @@ RUNTIME_ENV="${RELEASE_DIR}/.runtime.env"
 load_runtime_env "${RUNTIME_ENV}"
 [[ "${APP_ENV}" == "${REQUESTED_ENV}" && "${RELEASE_SHA}" == "${REQUESTED_SHA}" ]] || die "Stored runtime environment identity mismatch."
 
+for pointer_path in "${BASE_DIR}/current_release" "${RELEASE_DIR}/.activated"; do
+  if [[ -d "${pointer_path}" && ! -L "${pointer_path}" ]]; then
+    die "${pointer_path} is a directory; repair it before deploying."
+  fi
+done
+if [[ -e "${BASE_DIR}/current" && ! -L "${BASE_DIR}/current" ]]; then
+  die "${BASE_DIR}/current is not a symlink; repair it before deploying."
+fi
 install_hardened_rollback_driver "${RELEASE_DIR}/deploy/scripts" "${BASE_DIR}" || die "Failed to install hardened rollback driver."
 
 saved_image_refs=()
@@ -156,12 +164,31 @@ restore_saved_images() {
 }
 
 services_mutated=false
+# Open from the first service mutation until a definitive outcome (activation, or completed automatic
+# recovery). If the deploy is interrupted or dies inside this window, the EXIT trap stops the candidate's
+# application services (PostgreSQL preserved) so no mixed stack keeps serving traffic.
+deploy_mutation_open=false
+stop_candidate_on_interrupted_mutation() {
+  local status=$?
+  if [[ "${deploy_mutation_open}" == "true" ]]; then
+    trap - TERM INT HUP
+    compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
+    echo "Deploy of ${REQUESTED_SHA} ended or was interrupted inside its service-mutation window; stopped application services while preserving PostgreSQL." >&2
+    [[ "${status}" -ne 0 ]] || status=1
+  fi
+  exit "${status}"
+}
+trap stop_candidate_on_interrupted_mutation EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
+trap 'exit 129' HUP
 forced_smoke_failure_reached=false
 # Exit status reserved for "candidate failed, shared hardened driver completed automatic recovery"
 # so callers (rehearse-staging.sh) can prove recovery actually ran rather than inferring it from state.
 AUTOMATIC_ROLLBACK_COMPLETED_EXIT=3
 candidate_deploy() {
   compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" build --pull postgres api supplier-web tmmin-web caddy || return 1
+  deploy_mutation_open=true
   services_mutated=true
   compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" up -d --no-deps postgres || return 1
   wait_for_service "${RELEASE_DIR}" "${RUNTIME_ENV}" postgres 180 || return 1
@@ -243,11 +270,12 @@ if ! candidate_deploy; then
     # deploy lock) so legacy release scripts that start services from mutable tags are never trusted.
     hardened_rollback_driver="$(hardened_rollback_driver_path "${BASE_DIR}")"
     candidate_driver_status=0
-    if [[ -x "${hardened_rollback_driver}" ]]; then
+    if [[ -x "${hardened_rollback_driver}" ]] &&
+      rollback_driver_bundle_is_strict "$(cd "$(dirname "${hardened_rollback_driver}")" 2>/dev/null && pwd -P)"; then
       DEPLOY_LOCK_HELD=true "${hardened_rollback_driver}" \
         "${REQUESTED_ENV}" "${previous_release}" "${BASE_DIR}" || candidate_driver_status=$?
     else
-      echo "Candidate hardened rollback driver is unavailable." >&2
+      echo "Candidate hardened rollback driver is unavailable or lacks the strict pin contract." >&2
       candidate_driver_status=127
     fi
     # A deliberate policy refusal by the candidate driver is final; only crashes/other failures (or a
@@ -256,9 +284,14 @@ if ! candidate_deploy; then
       { (( candidate_driver_status == ROLLBACK_POLICY_REFUSAL_EXIT )) || ! run_known_good_rollback_driver; }; then
       echo "Automatic code rollback failed or was refused (candidate driver exit ${candidate_driver_status}); stopping failed candidate application services while preserving PostgreSQL." >&2
       compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
+    elif [[ ! -f "${BASE_DIR}/current_release" || "$(<"${BASE_DIR}/current_release")" != "${previous_release}" ]] ||
+      ! verify_running_matches_manifest "${previous_dir}" "${previous_env}" "${previous_release}"; then
+      echo "A rollback driver reported success but ${previous_release} is not verifiably active on its pinned images; stopping application services while preserving PostgreSQL." >&2
+      compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
     else
       printf 'DEPLOY_RESULT=automatic-rollback-completed forced_smoke_failure=%s restored=%s\n' \
         "${forced_smoke_failure_reached}" "${previous_release}"
+      deploy_mutation_open=false
       exit "${AUTOMATIC_ROLLBACK_COMPLETED_EXIT}"
     fi
   else
@@ -268,11 +301,11 @@ if ! candidate_deploy; then
   exit 1
 fi
 
-printf '%s\n' "${REQUESTED_SHA}" >"${RELEASE_DIR}/.activated.tmp"
-mv "${RELEASE_DIR}/.activated.tmp" "${RELEASE_DIR}/.activated"
-activate_symlink "${RELEASE_DIR}" "${BASE_DIR}/current"
-printf '%s\n' "${REQUESTED_SHA}" >"${BASE_DIR}/current_release.tmp"
-mv "${BASE_DIR}/current_release.tmp" "${BASE_DIR}/current_release"
+publish_line_file "${REQUESTED_SHA}" "${RELEASE_DIR}/.activated" || die "Failed to publish ${RELEASE_DIR}/.activated."
+activate_symlink "${RELEASE_DIR}" "${BASE_DIR}/current" || die "Failed to re-point ${BASE_DIR}/current."
+[[ -L "${BASE_DIR}/current" && "$(readlink "${BASE_DIR}/current")" == "${RELEASE_DIR}" ]] || die "Failed to re-point ${BASE_DIR}/current."
+publish_line_file "${REQUESTED_SHA}" "${BASE_DIR}/current_release" || die "Failed to publish ${BASE_DIR}/current_release."
+deploy_mutation_open=false
 promote_rollback_driver "${BASE_DIR}" || echo "Warning: failed to promote the activated release's rollback driver as known-good." >&2
 
 release_directories=()
