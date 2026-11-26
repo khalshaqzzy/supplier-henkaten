@@ -155,6 +155,7 @@ export class SupplierReadModelController {
     @Res() response: Response,
   ) {
     if (request.method !== 'GET') {
+      response.setHeader('Allow', 'GET');
       response.status(405).end();
       return;
     }

@@ -60,9 +60,13 @@ export type RealtimeOutboxEvent = {
 
 @Injectable()
 export class RealtimeEventPump implements OnModuleInit, BeforeApplicationShutdown {
+  private static readonly LATE_COMMIT_LOOKBACK_MS = 10_000;
+  private static readonly MAX_PUBLISHED_IDS = 5_000;
   private readonly logger = new Logger(RealtimeEventPump.name);
   private readonly subject = new Subject<RealtimeOutboxEvent>();
   private readonly startedAt = new Date();
+  private readonly publishedIds = new Set<string>();
+  private readonly publishedOrder: string[] = [];
   private cursor: Pick<RealtimeOutboxEvent, 'id' | 'occurredAt'> | undefined;
   private timer: NodeJS.Timeout | undefined;
   private inFlight: Promise<void> | undefined;
@@ -100,6 +104,10 @@ export class RealtimeEventPump implements OnModuleInit, BeforeApplicationShutdow
   }
 
   async poll(): Promise<void> {
+    const initialLowerBound = this.cursor
+      ? new Date(this.cursor.occurredAt.getTime() - RealtimeEventPump.LATE_COMMIT_LOOKBACK_MS)
+      : this.startedAt;
+    let pageCursor: Pick<RealtimeOutboxEvent, 'id' | 'occurredAt'> | undefined;
     for (;;) {
       const events = await this.prisma.outboxEvent.findMany({
         where: {
@@ -107,14 +115,14 @@ export class RealtimeEventPump implements OnModuleInit, BeforeApplicationShutdow
           supplierId: { not: null },
           eventType: { in: [...SUPPLIER_SSE_ALLOWED_EVENTS] },
           aggregateType: { notIn: [...SUPPLIER_SSE_BLOCKED_AGGREGATES] },
-          ...(this.cursor
+          ...(pageCursor
             ? {
                 OR: [
-                  { occurredAt: { gt: this.cursor.occurredAt } },
-                  { occurredAt: this.cursor.occurredAt, id: { gt: this.cursor.id } },
+                  { occurredAt: { gt: pageCursor.occurredAt } },
+                  { occurredAt: pageCursor.occurredAt, id: { gt: pageCursor.id } },
                 ],
               }
-            : { occurredAt: { gte: this.startedAt } }),
+            : { occurredAt: { gte: initialLowerBound } }),
         },
         orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
         take: 500,
@@ -131,7 +139,22 @@ export class RealtimeEventPump implements OnModuleInit, BeforeApplicationShutdow
       });
       if (events.length === 0) return;
       for (const event of events) {
-        this.cursor = { id: event.id, occurredAt: event.occurredAt };
+        pageCursor = { id: event.id, occurredAt: event.occurredAt };
+        if (
+          !this.cursor ||
+          event.occurredAt.getTime() > this.cursor.occurredAt.getTime() ||
+          (event.occurredAt.getTime() === this.cursor.occurredAt.getTime() &&
+            event.id > this.cursor.id)
+        ) {
+          this.cursor = { id: event.id, occurredAt: event.occurredAt };
+        }
+        if (this.publishedIds.has(event.id)) continue;
+        this.publishedIds.add(event.id);
+        this.publishedOrder.push(event.id);
+        if (this.publishedOrder.length > RealtimeEventPump.MAX_PUBLISHED_IDS) {
+          const expired = this.publishedOrder.shift();
+          if (expired) this.publishedIds.delete(expired);
+        }
         this.subject.next(event);
       }
       if (events.length < 500) return;

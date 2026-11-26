@@ -426,7 +426,8 @@ rollback_failure_base="${TEST_ROOT}/rollback-failure"
 prepare_base "${rollback_failure_base}"
 rollback_failure_previous=4444444444444444444444444444444444444444
 mkdir -p "${rollback_failure_base}/releases/${rollback_failure_previous}/deploy/scripts"
-cp "${rendered_env}" "${rollback_failure_base}/releases/${rollback_failure_previous}/.runtime.env"
+sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${rollback_failure_previous}/" "${rendered_env}" >"${rollback_failure_base}/releases/${rollback_failure_previous}/.runtime.env"
+printf '%s\n' "${rollback_failure_previous}" >"${rollback_failure_base}/releases/${rollback_failure_previous}/.source.sha"
 printf '%s\n' "${rollback_failure_previous}" >"${rollback_failure_base}/current_release"
 cat >"${rollback_failure_base}/releases/${rollback_failure_previous}/deploy/scripts/remote-rollback.sh" <<EOF
 #!/usr/bin/env bash

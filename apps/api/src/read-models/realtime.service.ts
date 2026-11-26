@@ -357,6 +357,13 @@ export class RealtimeService {
         if (!subscriber.closed) subscriber.complete();
       };
 
+      const closeStalledWriter = () => {
+        finish();
+        if (response && !response.destroyed) {
+          response.destroy();
+        }
+      };
+
       if (slot) {
         slot.evict = () => {
           if (closed || subscriber.closed) return;
@@ -418,7 +425,7 @@ export class RealtimeService {
           }
         }
         if (writerExceededHardCap()) {
-          finish();
+          closeStalledWriter();
           return;
         }
         if (pendingLive.length >= MAX_PENDING_LIVE || writerNeedsDrain()) {

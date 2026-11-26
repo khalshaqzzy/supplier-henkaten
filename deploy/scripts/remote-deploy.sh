@@ -92,9 +92,13 @@ candidate_deploy() {
 
 if ! candidate_deploy; then
   echo "Candidate deployment failed. No database down migration will be attempted." >&2
-  previous_env="${BASE_DIR}/releases/${previous_release}/.runtime.env"
-  if [[ -n "${previous_release}" && "${previous_release}" != "${REQUESTED_SHA}" && -f "${previous_env}" ]] && "${RELEASE_DIR}/deploy/scripts/validate-runtime-env.sh" --allow-legacy-db-role "${previous_env}" >/dev/null; then
-    DEPLOY_LOCK_HELD=true "${BASE_DIR}/releases/${previous_release}/deploy/scripts/remote-rollback.sh" \
+  previous_dir="${BASE_DIR}/releases/${previous_release}"
+  previous_env="${previous_dir}/.runtime.env"
+  if [[ -n "${previous_release}" && "${previous_release}" != "${REQUESTED_SHA}" && -f "${previous_env}" ]] &&
+    [[ -f "${previous_dir}/.source.sha" && "$(<"${previous_dir}/.source.sha")" == "${previous_release}" ]] &&
+    "${RELEASE_DIR}/deploy/scripts/validate-runtime-env.sh" --allow-legacy-db-role "${previous_env}" >/dev/null &&
+    (load_runtime_env "${previous_env}" && [[ "${APP_ENV:-}" == "${REQUESTED_ENV}" && "${RELEASE_SHA:-}" == "${previous_release}" ]]); then
+    DEPLOY_LOCK_HELD=true "${previous_dir}/deploy/scripts/remote-rollback.sh" \
       "${REQUESTED_ENV}" "${previous_release}" "${BASE_DIR}" || echo "Automatic code rollback also failed." >&2
   else
     compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true

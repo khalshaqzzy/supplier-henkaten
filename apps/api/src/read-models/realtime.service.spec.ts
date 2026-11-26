@@ -77,6 +77,25 @@ describe('RealtimeEventPump', () => {
     subscription.unsubscribe();
     await pump.beforeApplicationShutdown();
   });
+
+  it('delivers late-committed events within the lookback window exactly once', async () => {
+    const t2 = event({ id: 'event-2', occurredAt: new Date('2026-07-25T00:00:05.000Z') });
+    const t1Late = event({ id: 'event-1-late', occurredAt: new Date('2026-07-25T00:00:02.000Z') });
+    const findMany = vi.fn().mockResolvedValueOnce([t2]).mockResolvedValueOnce([t1Late, t2]);
+    const pump = new RealtimeEventPump(
+      { outboxEvent: { findMany } } as never,
+      { realtimePollMs: 1_000 } as never,
+    );
+    const received: string[] = [];
+    const subscription = pump.events().subscribe((item) => received.push(item.id));
+
+    await pump.poll();
+    await pump.poll();
+
+    expect(received).toEqual(['event-2', 'event-1-late']);
+    subscription.unsubscribe();
+    await pump.beforeApplicationShutdown();
+  });
 });
 
 describe('RealtimeService', () => {
@@ -467,11 +486,12 @@ describe('RealtimeService', () => {
     await new Promise((resolve) => setTimeout(resolve, 15));
     expect(messages.filter((m) => m.type === 'resync')).toHaveLength(1);
 
-    // Exceeding hard byte budget closes the stalled stream immediately.
+    // Exceeding hard byte budget closes and destroys the stalled HTTP socket immediately.
     res.writableLength = 600 * 1024;
     events.next(event({ id: randomUUID() }));
     await new Promise((resolve) => setTimeout(resolve, 15));
     expect(completed).toHaveBeenCalledOnce();
+    expect(res.destroy).toHaveBeenCalledOnce();
     sub.unsubscribe();
   });
 });
