@@ -9,6 +9,7 @@ import { SessionService } from '../auth/session.service.js';
 import { TenantScope } from '../common/scope.js';
 import type { RequestPrincipal } from '../common/request-context.js';
 import { provisionRuntimeRole } from '../cli/migrate.js';
+import { HealthController } from '../health/health.controller.js';
 import { HenkatenService } from '../henkaten/henkaten.service.js';
 import { ReadModelService, redactAuditSummary } from './read-model.service.js';
 
@@ -513,6 +514,58 @@ describe('audit isolation and passive session validation', () => {
       } finally {
         await adminClient.end();
       }
+    }
+  });
+
+  it('returns 503 on /ready for unresolved migrations and recovers to 200 after resolve --rolled-back + successful retry', async () => {
+    const healthController = app.get(HealthController);
+    const checkReady = async () => {
+      let statusCode = 200;
+      const body = await healthController.ready({
+        status: (code: number) => {
+          statusCode = code;
+        },
+      } as never);
+      return { statusCode, body };
+    };
+
+    const migrationDatabaseUrl = process.env['DATABASE_URL']!;
+    const migrationName = `99999999999999_readiness_recovery_${randomUUID().replaceAll('-', '').slice(0, 8)}`;
+    const failedRowId = randomUUID();
+    const retryRowId = randomUUID();
+    const adminClient = new pg.Client({ connectionString: migrationDatabaseUrl });
+    await adminClient.connect();
+    try {
+      // 1. Interrupted migration (finished_at IS NULL, rolled_back_at IS NULL) -> 503.
+      await adminClient.query(
+        `INSERT INTO "_prisma_migrations" (id, checksum, migration_name, started_at, applied_steps_count)
+         VALUES ($1, '0000000000000000000000000000000000000000000000000000000000000000', $2, NOW(), 0)`,
+        [failedRowId, migrationName],
+      );
+      expect((await checkReady()).statusCode).toBe(503);
+
+      // 2. Marked rolled-back by `prisma migrate resolve --rolled-back` without successful retry -> still 503.
+      await adminClient.query(
+        `UPDATE "_prisma_migrations" SET rolled_back_at = NOW() WHERE id = $1`,
+        [failedRowId],
+      );
+      expect((await checkReady()).statusCode).toBe(503);
+
+      // 3. Successful retry row inserted by `prisma migrate deploy` -> recovers to 200 ready.
+      await adminClient.query(
+        `INSERT INTO "_prisma_migrations" (id, checksum, finished_at, migration_name, started_at, applied_steps_count)
+         VALUES ($1, '0000000000000000000000000000000000000000000000000000000000000000', NOW(), $2, NOW(), 1)`,
+        [retryRowId, migrationName],
+      );
+      const recovered = await checkReady();
+      expect(recovered.statusCode).toBe(200);
+      expect(recovered.body.status).toBe('ready');
+    } finally {
+      await adminClient.query(`DELETE FROM "_prisma_migrations" WHERE id IN ($1, $2)`, [
+        failedRowId,
+        retryRowId,
+      ]);
+      await adminClient.end();
     }
   });
 });

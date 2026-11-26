@@ -106,7 +106,7 @@ export function BoardPage() {
         },
         onResync: () => invalidateBoardRealtimeQueries(queryClient, scope),
       }),
-    [boardKey, lineId, queryClient, scope.purpose, scope.supplierId, scope.userId],
+    [lineId, queryClient, scope.purpose, scope.supplierId, scope.userId],
   );
   useEffect(() => {
     realtime.connect();

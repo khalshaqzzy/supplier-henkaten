@@ -256,6 +256,28 @@ mkdir -p "${fake_bin}"
 cat >"${fake_bin}/docker" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+set_image_tag() {
+  local ref="$1"
+  local id="$2"
+  [[ -n "${TEST_IMAGE_STATE_FILE:-}" ]] || return 0
+  local tmp="${TEST_IMAGE_STATE_FILE}.tmp"
+  grep -Ev "^${ref} " "${TEST_IMAGE_STATE_FILE}" >"${tmp}" 2>/dev/null || true
+  printf '%s %s\n' "${ref}" "${id}" >>"${tmp}"
+  mv "${tmp}" "${TEST_IMAGE_STATE_FILE}"
+}
+get_image_tag() {
+  local ref="$1"
+  [[ -n "${TEST_IMAGE_STATE_FILE:-}" && -f "${TEST_IMAGE_STATE_FILE}" ]] || return 0
+  awk -v target="${ref}" '$1 == target {print $2; exit}' "${TEST_IMAGE_STATE_FILE}"
+}
+if [[ "${1:-}" == "image" && "${2:-}" == "inspect" ]]; then
+  get_image_tag "${!#}"
+  exit 0
+fi
+if [[ "${1:-}" == "tag" ]]; then
+  set_image_tag "$3" "$2"
+  exit 0
+fi
 if [[ "${1:-}" == "inspect" ]]; then
   echo healthy
   exit 0
@@ -267,10 +289,36 @@ if [[ "${1:-}" == "compose" ]]; then
   if [[ -n "${TEST_DOCKER_LOG:-}" ]]; then
     printf '%s\n' "$*" >>"${TEST_DOCKER_LOG}"
   fi
+  is_build=false
+  is_up=false
   for argument in "$@"; do
-    if [[ "${argument}" == "build" && "${TEST_BUILD_FAIL:-false}" == "true" ]]; then exit 1; fi
+    if [[ "${argument}" == "build" ]]; then is_build=true; fi
+    if [[ "${argument}" == "up" ]]; then is_up=true; fi
     if [[ "${argument}" == "migrate" && "${TEST_MIGRATE_FAIL:-false}" == "true" ]]; then exit 1; fi
   done
+  if [[ "${is_build}" == "true" ]]; then
+    if [[ -n "${TEST_IMAGE_STATE_FILE:-}" ]]; then
+      set_image_tag "supplier-henkaten-postgres:18.4-pgvector-0.8.5" "sha256:candidate-postgres-${DEPLOY_RUN_NUMBER:-0}"
+      if [[ -n "${RELEASE_SHA:-}" ]]; then
+        for svc in api supplier-web tmmin-web caddy; do
+          set_image_tag "supplier-henkaten-${svc}:${RELEASE_SHA}" "sha256:candidate-${svc}-${DEPLOY_RUN_NUMBER:-0}"
+        done
+      fi
+    fi
+    if [[ "${TEST_BUILD_FAIL:-false}" == "true" ]]; then exit 1; fi
+  fi
+  if [[ "${is_up}" == "true" && -n "${TEST_IMAGE_STATE_FILE:-}" && -n "${TEST_DOCKER_LOG:-}" ]]; then
+    for argument in "$@"; do
+      case "${argument}" in
+        postgres)
+          printf 'STARTED postgres=%s\n' "$(get_image_tag "supplier-henkaten-postgres:18.4-pgvector-0.8.5")" >>"${TEST_DOCKER_LOG}"
+          ;;
+        api | supplier-web | tmmin-web | caddy)
+          printf 'STARTED %s=%s\n' "${argument}" "$(get_image_tag "supplier-henkaten-${argument}:${RELEASE_SHA:-}")" >>"${TEST_DOCKER_LOG}"
+          ;;
+      esac
+    done
+  fi
   previous=""
   for argument in "$@"; do
     if [[ "${previous}" == "-q" ]]; then
@@ -467,14 +515,22 @@ if PATH="${fake_bin}:${PATH}" "${mutated_incoming}/deploy/scripts/remote-deploy.
 fi
 grep -Fxq "POSTGRES_APP_PASSWORD=${updated_app_password}" "${migration_base}/releases/${retry_sha}/.runtime.env" || fail "rejected same-SHA redeploy mutated activated rollback snapshot"
 
-# Same-SHA build failure on an active release must NOT stop running services.
+# Same-SHA build failure on an active release must NOT stop running services and must restore pre-build image tags.
+same_sha_images="${TEST_ROOT}/same-sha-images.state"
+cat >"${same_sha_images}" <<EOF
+supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:good-postgres
+supplier-henkaten-api:${retry_sha} sha256:good-api
+supplier-henkaten-supplier-web:${retry_sha} sha256:good-supplier-web
+supplier-henkaten-tmmin-web:${retry_sha} sha256:good-tmmin-web
+supplier-henkaten-caddy:${retry_sha} sha256:good-caddy
+EOF
 same_sha_docker_log="${TEST_ROOT}/same-sha-build-fail.log"
 IFS='|' read -r buildfail_incoming buildfail_runtime buildfail_archive buildfail_checksum < <(
   prepare_candidate "${migration_base}" "${retry_sha}" 37
 )
 sed -i.bak "s/^POSTGRES_APP_PASSWORD=.*/POSTGRES_APP_PASSWORD=${updated_app_password}/" "${buildfail_runtime}"
 rm -f "${buildfail_runtime}.bak"
-if TEST_BUILD_FAIL=true TEST_DOCKER_LOG="${same_sha_docker_log}" \
+if TEST_BUILD_FAIL=true TEST_DOCKER_LOG="${same_sha_docker_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
   PATH="${fake_bin}:${PATH}" "${buildfail_incoming}/deploy/scripts/remote-deploy.sh" \
   staging "${retry_sha}" 37 "${migration_base}" "${buildfail_incoming}" "${buildfail_runtime}" \
   "${buildfail_archive}" "${buildfail_checksum}" 127.0.0.1 >/dev/null 2>&1; then
@@ -483,14 +539,12 @@ fi
 if grep -q ' stop ' "${same_sha_docker_log}"; then
   fail "same-SHA build failure stopped running active services"
 fi
+grep -Fxq "supplier-henkaten-api:${retry_sha} sha256:good-api" "${same_sha_images}" || fail "same-SHA partial build failure did not restore pre-build api image tag"
+grep -Fxq "supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:good-postgres" "${same_sha_images}" || fail "same-SHA partial build failure did not restore pre-build postgres image tag"
 [[ "$(<"${migration_base}/current_release")" == "${retry_sha}" ]] || fail "same-SHA build failure altered current_release"
 
-# Same-SHA post-mutation failure recovers via verified rollback script instead of stopping the app.
-cat >"${migration_base}/releases/${retry_sha}/deploy/scripts/remote-rollback.sh" <<EOF
-#!/usr/bin/env bash
-touch "${migration_base}/same-sha-rollback-called"
-exit 0
-EOF
+# Same-SHA post-mutation failure runs the real remote-rollback.sh and restarts the restored pre-build image IDs.
+cp "${SCRIPTS}/remote-rollback.sh" "${migration_base}/releases/${retry_sha}/deploy/scripts/remote-rollback.sh"
 chmod +x "${migration_base}/releases/${retry_sha}/deploy/scripts/remote-rollback.sh"
 same_sha_smoke_log="${TEST_ROOT}/same-sha-smoke-fail.log"
 IFS='|' read -r smokefail_incoming smokefail_runtime smokefail_archive smokefail_checksum < <(
@@ -498,16 +552,20 @@ IFS='|' read -r smokefail_incoming smokefail_runtime smokefail_archive smokefail
 )
 sed -i.bak "s/^POSTGRES_APP_PASSWORD=.*/POSTGRES_APP_PASSWORD=${updated_app_password}/" "${smokefail_runtime}"
 rm -f "${smokefail_runtime}.bak"
-if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_DOCKER_LOG="${same_sha_smoke_log}" \
+if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_DOCKER_LOG="${same_sha_smoke_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
   PATH="${fake_bin}:${PATH}" "${smokefail_incoming}/deploy/scripts/remote-deploy.sh" \
   staging "${retry_sha}" 38 "${migration_base}" "${smokefail_incoming}" "${smokefail_runtime}" \
   "${smokefail_archive}" "${smokefail_checksum}" 127.0.0.1 >/dev/null 2>&1; then
   fail "same-SHA forced smoke failure unexpectedly succeeded"
 fi
-[[ -f "${migration_base}/same-sha-rollback-called" ]] || fail "same-SHA post-mutation failure did not invoke snapshot recovery"
 if grep -q ' stop ' "${same_sha_smoke_log}"; then
   fail "same-SHA post-mutation failure stopped application services instead of recovering"
 fi
+grep -Fxq 'STARTED postgres=sha256:good-postgres' "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build postgres image"
+grep -Fxq 'STARTED api=sha256:good-api' "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build api image"
+grep -Fxq 'STARTED supplier-web=sha256:good-supplier-web' "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build supplier-web image"
+grep -Fxq 'STARTED tmmin-web=sha256:good-tmmin-web' "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build tmmin-web image"
+grep -Fxq 'STARTED caddy=sha256:good-caddy' "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build caddy image"
 
 rollback_base="${TEST_ROOT}/rollback"
 prepare_base "${rollback_base}"

@@ -48,8 +48,17 @@ export class HealthController {
               'AuditEvent_prevent_update_delete',
               'ExternalIngestionEvent_prevent_update_delete'
             )) AS trigger_count,
-          (SELECT count(*) FROM "_prisma_migrations"
-            WHERE finished_at IS NULL OR rolled_back_at IS NOT NULL) AS unfinished_migrations
+          (SELECT count(*) FROM "_prisma_migrations" m
+            WHERE m.finished_at IS NULL
+              AND (
+                m.rolled_back_at IS NULL
+                OR NOT EXISTS (
+                  SELECT 1 FROM "_prisma_migrations" ok
+                  WHERE ok.migration_name = m.migration_name
+                    AND ok.finished_at IS NOT NULL
+                    AND ok.rolled_back_at IS NULL
+                )
+              )) AS unfinished_migrations
       `;
       if (
         foundation === undefined ||

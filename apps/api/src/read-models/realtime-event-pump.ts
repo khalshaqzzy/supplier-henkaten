@@ -145,14 +145,16 @@ export class RealtimeEventPump implements OnModuleInit, BeforeApplicationShutdow
     if (this.stopping) return;
 
     const nowMs = Date.now();
-    if (
-      this.cursor &&
+    const cursorAtPollStart = this.cursor;
+    const shouldConfirmAfterSweep = Boolean(
+      cursorAtPollStart &&
       this.lastActivityMs > 0 &&
-      nowMs - this.lastActivityMs >= RealtimeEventPump.LATE_COMMIT_LOOKBACK_MS
-    ) {
-      this.confirmedCursor = this.cursor;
-      this.publishedIds.clear();
-    }
+      nowMs - this.lastActivityMs >= RealtimeEventPump.LATE_COMMIT_LOOKBACK_MS &&
+      (!this.confirmedCursor ||
+        cursorAtPollStart.occurredAt.getTime() > this.confirmedCursor.occurredAt.getTime() ||
+        (cursorAtPollStart.occurredAt.getTime() === this.confirmedCursor.occurredAt.getTime() &&
+          cursorAtPollStart.id > this.confirmedCursor.id)),
+    );
 
     let pageCursor: Pick<RealtimeOutboxEvent, 'id' | 'occurredAt'> | undefined;
     let initialLowerBound: Date | undefined;
@@ -172,6 +174,14 @@ export class RealtimeEventPump implements OnModuleInit, BeforeApplicationShutdow
     }
 
     let scanned = 0;
+    let sawNewEvent = false;
+
+    const finishSweep = () => {
+      if (shouldConfirmAfterSweep && !sawNewEvent && this.cursor) {
+        this.confirmedCursor = this.cursor;
+        this.publishedIds.clear();
+      }
+    };
 
     for (;;) {
       if (this.stopping) return;
@@ -208,7 +218,11 @@ export class RealtimeEventPump implements OnModuleInit, BeforeApplicationShutdow
           payload: true,
         },
       });
-      if (this.stopping || events.length === 0) return;
+      if (this.stopping) return;
+      if (events.length === 0) {
+        finishSweep();
+        return;
+      }
 
       for (const event of events) {
         if (this.stopping) return;
@@ -231,12 +245,16 @@ export class RealtimeEventPump implements OnModuleInit, BeforeApplicationShutdow
           this.advanceOverflowCursor(this.cursor ?? pageCursor);
           return;
         }
+        sawNewEvent = true;
         this.publishedIds.set(event.id, event.occurredAt.getTime());
         this.lastActivityMs = Date.now();
         this.subject.next(event);
       }
 
-      if (events.length < RealtimeEventPump.PAGE_SIZE) return;
+      if (events.length < RealtimeEventPump.PAGE_SIZE) {
+        finishSweep();
+        return;
+      }
       if (scanned >= RealtimeEventPump.MAX_POLL_EVENTS) {
         this.logger.warn(
           { scanned },

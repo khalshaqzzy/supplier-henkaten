@@ -78,6 +78,36 @@ RUNTIME_ENV="${RELEASE_DIR}/.runtime.env"
 load_runtime_env "${RUNTIME_ENV}"
 [[ "${APP_ENV}" == "${REQUESTED_ENV}" && "${RELEASE_SHA}" == "${REQUESTED_SHA}" ]] || die "Stored runtime environment identity mismatch."
 
+postgres_image_ref="$(awk '/^[[:space:]]*image:[[:space:]]*supplier-henkaten-postgres:/ {print $2; exit}' "${RELEASE_DIR}/deploy/compose/docker-compose.remote.yml" 2>/dev/null || true)"
+postgres_image_ref="${postgres_image_ref:-supplier-henkaten-postgres:18.4-pgvector-0.8.5}"
+saved_image_refs=()
+saved_image_ids=()
+if [[ -n "${previous_release}" ]]; then
+  snapshot_candidates=("${postgres_image_ref}")
+  if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
+    snapshot_candidates+=(
+      "supplier-henkaten-api:${REQUESTED_SHA}"
+      "supplier-henkaten-supplier-web:${REQUESTED_SHA}"
+      "supplier-henkaten-tmmin-web:${REQUESTED_SHA}"
+      "supplier-henkaten-caddy:${REQUESTED_SHA}"
+    )
+  fi
+  for image_ref in "${snapshot_candidates[@]}"; do
+    image_id="$(docker image inspect --format '{{.Id}}' "${image_ref}" 2>/dev/null || true)"
+    if [[ -n "${image_id}" ]]; then
+      saved_image_refs+=("${image_ref}")
+      saved_image_ids+=("${image_id}")
+    fi
+  done
+fi
+
+restore_saved_images() {
+  local idx
+  for ((idx = 0; idx < ${#saved_image_refs[@]}; idx++)); do
+    docker tag "${saved_image_ids[idx]}" "${saved_image_refs[idx]}" >/dev/null 2>&1 || true
+  done
+}
+
 services_mutated=false
 candidate_deploy() {
   compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" build --pull postgres api supplier-web tmmin-web caddy || return 1
@@ -106,6 +136,7 @@ candidate_deploy() {
 
 if ! candidate_deploy; then
   echo "Candidate deployment failed. No database down migration will be attempted." >&2
+  restore_saved_images
   if [[ -n "${previous_release}" && "${services_mutated}" == "false" ]]; then
     echo "Failure occurred before modifying running services; active release ${previous_release} was preserved untouched." >&2
     exit 1

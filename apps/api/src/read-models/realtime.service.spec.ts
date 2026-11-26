@@ -154,23 +154,45 @@ describe('RealtimeEventPump', () => {
     }
   });
 
-  it('converges to a strict cursor after idle lookback expiry and stops multi-page polling on shutdown', async () => {
+  it('completes a final overlapping lookback sweep before confirming idle cursor and stops multi-page polling on shutdown', async () => {
     vi.useFakeTimers();
     try {
-      const e1 = event({ id: 'event-idle-1', occurredAt: new Date('2026-07-25T00:00:05.000Z') });
-      const findMany = vi.fn().mockResolvedValueOnce([e1]).mockResolvedValueOnce([]);
+      const e2 = event({ id: 'event-idle-2', occurredAt: new Date('2026-07-25T00:00:05.000Z') });
+      const e1LateBeforeExpiry = event({
+        id: 'event-idle-1-late',
+        occurredAt: new Date('2026-07-25T00:00:02.000Z'),
+      });
+      const findMany = vi
+        .fn()
+        .mockResolvedValueOnce([e2])
+        .mockResolvedValueOnce([e1LateBeforeExpiry, e2])
+        .mockResolvedValueOnce([e1LateBeforeExpiry, e2])
+        .mockResolvedValueOnce([]);
       const pump = new RealtimeEventPump(
         { outboxEvent: { findMany } } as never,
         { realtimePollMs: 1_000 } as never,
       );
+      const received: string[] = [];
+      const sub = pump.events().subscribe((item) => received.push(item.id));
 
       await pump.poll();
+      // First poll after lookback expiry performs a final overlapping sweep and catches a late commit.
       await vi.advanceTimersByTimeAsync(RealtimeEventPump.LATE_COMMIT_LOOKBACK_MS + 100);
       await pump.poll();
+      expect(findMany.mock.calls[1]![0].where).toHaveProperty('occurredAt.gte');
+      expect(received).toEqual(['event-idle-2', 'event-idle-1-late']);
 
-      expect(findMany.mock.calls[1]![0].where).toHaveProperty('AND');
-      expect(findMany.mock.calls[1]![0].where.AND[0]).toHaveProperty('occurredAt.gte');
-      expect(findMany.mock.calls[1]![0].where.AND[1]).toHaveProperty('OR');
+      // Another quiet window passes: final sweep sees no new events and confirms cursor.
+      await vi.advanceTimersByTimeAsync(RealtimeEventPump.LATE_COMMIT_LOOKBACK_MS + 100);
+      await pump.poll();
+      expect(findMany.mock.calls[2]![0].where).toHaveProperty('occurredAt.gte');
+
+      // Subsequent idle poll uses strict confirmedCursor with explicit leading occurredAt >= bound.
+      await pump.poll();
+      expect(findMany.mock.calls[3]![0].where).toHaveProperty('AND');
+      expect(findMany.mock.calls[3]![0].where.AND[0]).toHaveProperty('occurredAt.gte');
+      expect(findMany.mock.calls[3]![0].where.AND[1]).toHaveProperty('OR');
+      sub.unsubscribe();
       await pump.beforeApplicationShutdown();
     } finally {
       vi.useRealTimers();
@@ -944,5 +966,72 @@ describe('RealtimeService', () => {
     expect(stalledRes.destroy).toHaveBeenCalledOnce();
     sub1.unsubscribe();
     sub2.unsubscribe();
+  });
+
+  it('caps concurrent replay SQL queries across rapid evictions and falls back to resync until in-flight replays settle', async () => {
+    const events = new Subject<RealtimeOutboxEvent>();
+    const resolvers: Array<(rows: RealtimeOutboxEvent[]) => void> = [];
+    const findManyOutbox = vi.fn().mockImplementation(
+      () =>
+        new Promise<RealtimeOutboxEvent[]>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+    const service = new RealtimeService(
+      {
+        line: {
+          findFirst: vi.fn().mockResolvedValue({ id: LINE_A }),
+          findMany: vi.fn().mockResolvedValue([{ id: LINE_A }]),
+        },
+        outboxEvent: { findMany: findManyOutbox },
+      } as never,
+      { events: () => events } as never,
+      { resolve: vi.fn().mockResolvedValue(principal) } as never,
+      {
+        sseMaxPerSession: 1,
+        sseMaxPerUser: 5,
+        sseMaxPerSupplier: 10,
+        sseMaxGlobal: 20,
+        sseRevalidationCacheMs: 2_000,
+      } as never,
+    );
+
+    const openAndSubscribe = async () => {
+      const res = fakeResponse();
+      const s = await service.prepareStream(
+        new TenantScope(SUPPLIER_ID),
+        principal,
+        LINE_A,
+        undefined,
+        res as never,
+      );
+      const msgs: string[] = [];
+      const sub = s.subscribe((m) => msgs.push(m.type));
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return { res, sub, msgs };
+    };
+
+    // Streams 1 and 2 occupy the 2 per-user replay DB slots even after stream 1 is evicted.
+    const c1 = await openAndSubscribe();
+    const c2 = await openAndSubscribe();
+    expect(findManyOutbox).toHaveBeenCalledTimes(2);
+
+    // Stream 3 evicts stream 2 while both replay queries are still pending: must NOT start a 3rd SQL query.
+    const c3 = await openAndSubscribe();
+    expect(findManyOutbox).toHaveBeenCalledTimes(2);
+    expect(c3.msgs).toContain('resync');
+
+    // Once an in-flight replay settles, its replay budget slot is released for future streams.
+    resolvers.shift()?.([]);
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    const c4 = await openAndSubscribe();
+    expect(findManyOutbox).toHaveBeenCalledTimes(3);
+
+    resolvers.forEach((resolve) => resolve([]));
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    c1.sub.unsubscribe();
+    c2.sub.unsubscribe();
+    c3.sub.unsubscribe();
+    c4.sub.unsubscribe();
   });
 });

@@ -50,6 +50,8 @@ const MAX_WRITER_BUFFERED_BYTES = 512 * 1024;
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const EVICTION_CLOSE_GRACE_MS = 2_000;
 const MAX_EVICTING_SOCKETS = 16;
+const MAX_CONCURRENT_REPLAYS_PER_USER = 2;
+const MAX_CONCURRENT_REPLAYS_GLOBAL = 32;
 const MAX_LINE_LOAD_RETRIES = 2;
 
 const ALLOWED_EVENT_SET = new Set<string>(SUPPLIER_SSE_ALLOWED_EVENTS);
@@ -87,7 +89,9 @@ export class RealtimeService {
 
   private pendingAdmissionsGlobal = 0;
   private evictingSockets = 0;
+  private activeReplaysGlobal = 0;
   private readonly pendingAdmissionsByUser = new Map<string, number>();
+  private readonly activeReplaysByUser = new Map<string, number>();
 
   private readonly sessionCache = new Map<string, CachedEntry<boolean>>();
   private readonly sessionInFlight = new Map<
@@ -137,7 +141,7 @@ export class RealtimeService {
   }
 
   private scheduleEvictionDestroy(response?: Response): void {
-    if (!response || response.destroyed) return;
+    if (!response || response.destroyed || response.writableFinished) return;
     if (
       response.writableNeedDrain ||
       response.writableLength > MAX_WRITER_BUFFERED_BYTES ||
@@ -270,6 +274,27 @@ export class RealtimeService {
       maxPerSupplier: this.config?.sseMaxPerSupplier ?? 60,
       maxGlobal: this.config?.sseMaxGlobal ?? 300,
       revalidationCacheMs: this.config ? this.config.sseRevalidationCacheMs : 0,
+    };
+  }
+
+  private tryAcquireReplay(userId: string): (() => void) | null {
+    const limits = this.limits();
+    const userCap = Math.max(1, Math.min(MAX_CONCURRENT_REPLAYS_PER_USER, limits.maxPerUser));
+    const globalCap = Math.max(1, Math.min(MAX_CONCURRENT_REPLAYS_GLOBAL, limits.maxGlobal));
+    const userActive = this.activeReplaysByUser.get(userId) ?? 0;
+    if (userActive >= userCap || this.activeReplaysGlobal >= globalCap) {
+      return null;
+    }
+    this.activeReplaysGlobal += 1;
+    this.activeReplaysByUser.set(userId, userActive + 1);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.activeReplaysGlobal = Math.max(0, this.activeReplaysGlobal - 1);
+      const next = (this.activeReplaysByUser.get(userId) ?? 1) - 1;
+      if (next > 0) this.activeReplaysByUser.set(userId, next);
+      else this.activeReplaysByUser.delete(userId);
     };
   }
 
@@ -684,13 +709,22 @@ export class RealtimeService {
 
           scheduleNextHeartbeat();
 
-          const replayResult = await this.replay(
-            scope.supplierId,
-            lastEventId,
-            lineId,
-            initialAllowed,
-            () => closed,
-          );
+          const releaseReplay = this.tryAcquireReplay(principal.userId);
+          const replayResult = releaseReplay
+            ? await (async () => {
+                try {
+                  return await this.replay(
+                    scope.supplierId,
+                    lastEventId,
+                    lineId,
+                    initialAllowed,
+                    () => closed,
+                  );
+                } finally {
+                  releaseReplay();
+                }
+              })()
+            : { events: [], resync: true };
           if (closed) return;
 
           // Validate session and line scope ONCE for the entire replay batch.
