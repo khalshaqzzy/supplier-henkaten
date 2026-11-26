@@ -231,3 +231,63 @@ activate_symlink() {
     mv -Tf "${temporary_link}" "${link_path}"
   fi
 }
+
+postgres_image_ref_for() {
+  local release_dir="$1"
+  local ref
+  ref="$(awk '/^[[:space:]]*image:[[:space:]]*supplier-henkaten-postgres:/ {print $2; exit}' "${release_dir}/deploy/compose/docker-compose.remote.yml" 2>/dev/null || true)"
+  printf '%s\n' "${ref:-supplier-henkaten-postgres:18.4-pgvector-0.8.5}"
+}
+
+write_activated_images() {
+  local release_dir="$1"
+  local release_sha="$2"
+  local pg_ref image_ref image_id tmp_file
+  pg_ref="$(postgres_image_ref_for "${release_dir}")"
+  tmp_file="${release_dir}/.activated-images.tmp"
+  : >"${tmp_file}"
+  chmod 600 "${tmp_file}"
+  for image_ref in \
+    "${pg_ref}" \
+    "supplier-henkaten-api:${release_sha}" \
+    "supplier-henkaten-supplier-web:${release_sha}" \
+    "supplier-henkaten-tmmin-web:${release_sha}" \
+    "supplier-henkaten-caddy:${release_sha}"; do
+    image_id="$(docker image inspect --format '{{.Id}}' "${image_ref}" 2>/dev/null || true)"
+    if [[ -z "${image_id}" ]]; then
+      rm -f -- "${tmp_file}"
+      return 1
+    fi
+    printf '%s %s\n' "${image_ref}" "${image_id}" >>"${tmp_file}"
+  done
+  mv -f "${tmp_file}" "${release_dir}/.activated-images"
+  rm -f -- "${release_dir}/.rollback-unsafe"
+}
+
+restore_pinned_images_file() {
+  local pinned_file="$1"
+  local only_ref="${2:-}"
+  local ref expected_id restored_id matched=0 status=0
+  [[ -s "${pinned_file}" ]] || return 1
+  while IFS=' ' read -r ref expected_id extra; do
+    [[ -n "${ref}" && -n "${expected_id}" && -z "${extra:-}" ]] || return 1
+    if [[ -n "${only_ref}" && "${ref}" != "${only_ref}" ]]; then
+      continue
+    fi
+    matched=$((matched + 1))
+    if ! docker tag "${expected_id}" "${ref}" >/dev/null 2>&1; then
+      echo "Failed to restore pinned Docker image tag ${ref} to ${expected_id}." >&2
+      status=1
+      continue
+    fi
+    restored_id="$(docker image inspect --format '{{.Id}}' "${ref}" 2>/dev/null || true)"
+    if [[ "${restored_id}" != "${expected_id}" ]]; then
+      echo "Restored pinned Docker image tag ${ref} resolved to '${restored_id}', expected '${expected_id}'." >&2
+      status=1
+    fi
+  done <"${pinned_file}"
+  if (( matched == 0 )); then
+    return 1
+  fi
+  return "${status}"
+}

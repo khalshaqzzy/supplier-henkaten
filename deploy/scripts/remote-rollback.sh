@@ -25,6 +25,16 @@ fi
 load_runtime_env "${RUNTIME_ENV}"
 [[ "${REQUESTED_ENV}" == "${APP_ENV:-}" && "${REQUESTED_SHA}" == "${RELEASE_SHA:-}" ]] || die "Rollback environment or release SHA mismatch."
 
+if [[ -f "${RELEASE_DIR}/.activated-images" ]]; then
+  if ! restore_pinned_images_file "${RELEASE_DIR}/.activated-images"; then
+    printf '%s\n' "${REQUESTED_SHA}" >"${RELEASE_DIR}/.rollback-unsafe.tmp"
+    mv -f "${RELEASE_DIR}/.rollback-unsafe.tmp" "${RELEASE_DIR}/.rollback-unsafe"
+    die "Rollback aborted: failed to restore and verify pinned activated images for ${REQUESTED_SHA}."
+  fi
+elif [[ -f "${RELEASE_DIR}/.rollback-unsafe" ]]; then
+  die "Rollback aborted: release ${REQUESTED_SHA} is marked rollback-unsafe and has no pinned activated image IDs."
+fi
+
 printf 'Rolling code back to %s; database schema and shared volumes are not restored.\n' "${REQUESTED_SHA}"
 compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" up -d --no-deps postgres
 wait_for_service "${RELEASE_DIR}" "${RUNTIME_ENV}" postgres 180
@@ -45,6 +55,11 @@ wait_for_service "${RELEASE_DIR}" "${RUNTIME_ENV}" caddy 120
   "https://${TMMIN_DOMAIN}" \
   "https://${API_DOMAIN}"
 
+if [[ ! -f "${RELEASE_DIR}/.activated-images" ]]; then
+  write_activated_images "${RELEASE_DIR}" "${REQUESTED_SHA}" || true
+else
+  rm -f -- "${RELEASE_DIR}/.rollback-unsafe"
+fi
 printf '%s\n' "${REQUESTED_SHA}" >"${RELEASE_DIR}/.activated.tmp"
 mv "${RELEASE_DIR}/.activated.tmp" "${RELEASE_DIR}/.activated"
 activate_symlink "${RELEASE_DIR}" "${BASE_DIR}/current"

@@ -78,12 +78,13 @@ RUNTIME_ENV="${RELEASE_DIR}/.runtime.env"
 load_runtime_env "${RUNTIME_ENV}"
 [[ "${APP_ENV}" == "${REQUESTED_ENV}" && "${RELEASE_SHA}" == "${REQUESTED_SHA}" ]] || die "Stored runtime environment identity mismatch."
 
-postgres_image_ref="$(awk '/^[[:space:]]*image:[[:space:]]*supplier-henkaten-postgres:/ {print $2; exit}' "${RELEASE_DIR}/deploy/compose/docker-compose.remote.yml" 2>/dev/null || true)"
-postgres_image_ref="${postgres_image_ref:-supplier-henkaten-postgres:18.4-pgvector-0.8.5}"
+postgres_image_ref="$(postgres_image_ref_for "${RELEASE_DIR}")"
 saved_image_refs=()
 saved_image_ids=()
 image_snapshot_complete=true
 if [[ -n "${previous_release}" ]]; then
+  previous_dir_for_snapshot="${BASE_DIR}/releases/${previous_release}"
+  previous_pinned_images="${previous_dir_for_snapshot}/.activated-images"
   snapshot_candidates=("${postgres_image_ref}")
   if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
     snapshot_candidates+=(
@@ -93,19 +94,52 @@ if [[ -n "${previous_release}" ]]; then
       "supplier-henkaten-caddy:${REQUESTED_SHA}"
     )
   fi
-  for image_ref in "${snapshot_candidates[@]}"; do
-    image_id="$(docker image inspect --format '{{.Id}}' "${image_ref}" 2>/dev/null || true)"
-    if [[ -z "${image_id}" ]]; then
+  if [[ -f "${previous_pinned_images}" ]]; then
+    for image_ref in "${snapshot_candidates[@]}"; do
+      pinned_id="$(awk -v target="${image_ref}" '$1 == target {print $2; exit}' "${previous_pinned_images}" 2>/dev/null || true)"
+      if [[ -z "${pinned_id}" ]]; then
+        if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
+          die "Cannot safely redeploy active release ${REQUESTED_SHA}: missing pinned image ID for ${image_ref} in .activated-images."
+        fi
+        image_snapshot_complete=false
+        echo "Warning: missing pinned image ID for ${image_ref} in previous release .activated-images." >&2
+        continue
+      fi
+      resolved_pinned_id="$(docker image inspect --format '{{.Id}}' "${pinned_id}" 2>/dev/null || true)"
+      if [[ "${resolved_pinned_id}" != "${pinned_id}" ]]; then
+        if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
+          die "Cannot safely redeploy active release ${REQUESTED_SHA}: pinned Docker image ID ${pinned_id} for ${image_ref} is unavailable locally."
+        fi
+        image_snapshot_complete=false
+        echo "Warning: pinned Docker image ID ${pinned_id} for ${image_ref} is unavailable locally." >&2
+        continue
+      fi
+      saved_image_refs+=("${image_ref}")
+      saved_image_ids+=("${pinned_id}")
+    done
+  else
+    if [[ -f "${previous_dir_for_snapshot}/.rollback-unsafe" ]]; then
       if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
-        die "Cannot safely redeploy active release ${REQUESTED_SHA}: missing local Docker image ID for ${image_ref}."
+        die "Cannot safely redeploy active release ${REQUESTED_SHA}: release is marked rollback-unsafe without pinned .activated-images."
       fi
       image_snapshot_complete=false
-      echo "Warning: unable to snapshot existing Docker image ID for ${image_ref} before build." >&2
+      echo "Warning: previous release ${previous_release} is marked rollback-unsafe without pinned .activated-images." >&2
     else
-      saved_image_refs+=("${image_ref}")
-      saved_image_ids+=("${image_id}")
+      for image_ref in "${snapshot_candidates[@]}"; do
+        image_id="$(docker image inspect --format '{{.Id}}' "${image_ref}" 2>/dev/null || true)"
+        if [[ -z "${image_id}" ]]; then
+          if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
+            die "Cannot safely redeploy active release ${REQUESTED_SHA}: missing local Docker image ID for ${image_ref}."
+          fi
+          image_snapshot_complete=false
+          echo "Warning: unable to snapshot existing Docker image ID for ${image_ref} before build." >&2
+        else
+          saved_image_refs+=("${image_ref}")
+          saved_image_ids+=("${image_id}")
+        fi
+      done
     fi
-  done
+  fi
 fi
 
 restore_saved_images() {
@@ -153,9 +187,14 @@ candidate_deploy() {
 
 if ! candidate_deploy; then
   echo "Candidate deployment failed. No database down migration will be attempted." >&2
+  previous_dir="${BASE_DIR}/releases/${previous_release}"
   images_restored=true
   if ! restore_saved_images; then
     images_restored=false
+    if [[ -n "${previous_release}" && -d "${previous_dir}" ]]; then
+      printf '%s\n' "${REQUESTED_SHA}" >"${previous_dir}/.rollback-unsafe.tmp"
+      mv -f "${previous_dir}/.rollback-unsafe.tmp" "${previous_dir}/.rollback-unsafe"
+    fi
   fi
   if [[ -n "${previous_release}" && "${services_mutated}" == "false" ]]; then
     echo "Failure occurred before modifying running services; active release ${previous_release} was preserved untouched." >&2
@@ -166,7 +205,6 @@ if ! candidate_deploy; then
     echo "Refusing automatic rollback because pre-build Docker image tags could not be verified as restored; failed application services were stopped while persistent PostgreSQL was preserved." >&2
     exit 1
   fi
-  previous_dir="${BASE_DIR}/releases/${previous_release}"
   previous_env="${previous_dir}/.runtime.env"
   if [[ -n "${previous_release}" && -f "${previous_env}" ]] &&
     [[ -f "${previous_dir}/.source.sha" && "$(<"${previous_dir}/.source.sha")" == "${previous_release}" ]] &&
@@ -181,6 +219,7 @@ if ! candidate_deploy; then
   exit 1
 fi
 
+write_activated_images "${RELEASE_DIR}" "${REQUESTED_SHA}" || echo "Warning: unable to persist .activated-images for ${REQUESTED_SHA}." >&2
 printf '%s\n' "${REQUESTED_SHA}" >"${RELEASE_DIR}/.activated.tmp"
 mv "${RELEASE_DIR}/.activated.tmp" "${RELEASE_DIR}/.activated"
 activate_symlink "${RELEASE_DIR}" "${BASE_DIR}/current"

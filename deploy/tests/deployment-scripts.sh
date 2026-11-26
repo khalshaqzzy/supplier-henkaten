@@ -270,6 +270,10 @@ get_image_tag() {
   if [[ "${TEST_MISSING_IMAGE:-}" == "${ref}" ]]; then
     return 1
   fi
+  if [[ "${ref}" == sha256:* ]]; then
+    printf '%s\n' "${ref}"
+    return 0
+  fi
   if [[ -n "${TEST_IMAGE_STATE_FILE:-}" && -f "${TEST_IMAGE_STATE_FILE}" ]]; then
     awk -v target="${ref}" '$1 == target {print $2; exit}' "${TEST_IMAGE_STATE_FILE}"
     return 0
@@ -283,6 +287,9 @@ fi
 if [[ "${1:-}" == "tag" ]]; then
   if [[ "${TEST_TAG_FAIL:-false}" == "true" ]]; then
     exit 1
+  fi
+  if [[ "${TEST_TAG_SILENT_NOOP:-false}" == "true" ]]; then
+    exit 0
   fi
   set_image_tag "$3" "$2"
   exit 0
@@ -307,10 +314,11 @@ if [[ "${1:-}" == "compose" ]]; then
   done
   if [[ "${is_build}" == "true" ]]; then
     if [[ -n "${TEST_IMAGE_STATE_FILE:-}" ]]; then
-      set_image_tag "supplier-henkaten-postgres:18.4-pgvector-0.8.5" "sha256:candidate-postgres-${DEPLOY_RUN_NUMBER:-0}"
+      build_suffix="${TEST_BUILD_TAG_SUFFIX:-${DEPLOY_RUN_NUMBER:-0}}"
+      set_image_tag "supplier-henkaten-postgres:18.4-pgvector-0.8.5" "sha256:candidate-postgres-${build_suffix}"
       if [[ -n "${RELEASE_SHA:-}" ]]; then
         for svc in api supplier-web tmmin-web caddy; do
-          set_image_tag "supplier-henkaten-${svc}:${RELEASE_SHA}" "sha256:candidate-${svc}-${DEPLOY_RUN_NUMBER:-0}"
+          set_image_tag "supplier-henkaten-${svc}:${RELEASE_SHA}" "sha256:candidate-${svc}-${build_suffix}"
         done
       fi
     fi
@@ -533,6 +541,8 @@ supplier-henkaten-supplier-web:${retry_sha} sha256:good-supplier-web
 supplier-henkaten-tmmin-web:${retry_sha} sha256:good-tmmin-web
 supplier-henkaten-caddy:${retry_sha} sha256:good-caddy
 EOF
+cp "${same_sha_images}" "${migration_base}/releases/${retry_sha}/.activated-images"
+chmod 600 "${migration_base}/releases/${retry_sha}/.activated-images"
 same_sha_docker_log="${TEST_ROOT}/same-sha-build-fail.log"
 IFS='|' read -r buildfail_incoming buildfail_runtime buildfail_archive buildfail_checksum < <(
   prepare_candidate "${migration_base}" "${retry_sha}" 37
@@ -583,7 +593,7 @@ IFS='|' read -r missing_incoming missing_runtime missing_archive missing_checksu
 )
 sed -i.bak "s/^POSTGRES_APP_PASSWORD=.*/POSTGRES_APP_PASSWORD=${updated_app_password}/" "${missing_runtime}"
 rm -f "${missing_runtime}.bak"
-if TEST_MISSING_IMAGE="supplier-henkaten-api:${retry_sha}" TEST_DOCKER_LOG="${missing_img_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
+if TEST_MISSING_IMAGE="sha256:good-api" TEST_DOCKER_LOG="${missing_img_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
   PATH="${fake_bin}:${PATH}" "${missing_incoming}/deploy/scripts/remote-deploy.sh" \
   staging "${retry_sha}" 39 "${migration_base}" "${missing_incoming}" "${missing_runtime}" \
   "${missing_archive}" "${missing_checksum}" 127.0.0.1 >/dev/null 2>&1; then
@@ -593,14 +603,14 @@ if [[ -f "${missing_img_log}" ]] && grep -q ' build ' "${missing_img_log}"; then
   fail "same-SHA active redeploy ran docker compose build despite missing image snapshot"
 fi
 
-# Failed image tag restoration must refuse rollback instead of restarting the failed candidate build.
+# Failed image tag restoration must refuse rollback, stop failed candidate, and durably mark .rollback-unsafe.
 tag_fail_log="${TEST_ROOT}/same-sha-tag-fail.log"
 IFS='|' read -r tagfail_incoming tagfail_runtime tagfail_archive tagfail_checksum < <(
   prepare_candidate "${migration_base}" "${retry_sha}" 40
 )
 sed -i.bak "s/^POSTGRES_APP_PASSWORD=.*/POSTGRES_APP_PASSWORD=${updated_app_password}/" "${tagfail_runtime}"
 rm -f "${tagfail_runtime}.bak"
-if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_TAG_FAIL=true TEST_DOCKER_LOG="${tag_fail_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
+if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_TAG_FAIL=true TEST_BUILD_TAG_SUFFIX=40 TEST_DOCKER_LOG="${tag_fail_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
   PATH="${fake_bin}:${PATH}" "${tagfail_incoming}/deploy/scripts/remote-deploy.sh" \
   staging "${retry_sha}" 40 "${migration_base}" "${tagfail_incoming}" "${tagfail_runtime}" \
   "${tagfail_archive}" "${tagfail_checksum}" 127.0.0.1 >/dev/null 2>&1; then
@@ -608,6 +618,68 @@ if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_TAG_FAIL=true TEST_DOCKER_LOG="${tag_fai
 fi
 grep -q ' stop ' "${tag_fail_log}" || fail "failed image tag restore did not stop failed candidate services"
 [[ "$(grep -c '^STARTED api=' "${tag_fail_log}")" == "1" ]] || fail "failed image tag restore invoked rollback and restarted the broken candidate api image"
+[[ -f "${migration_base}/releases/${retry_sha}/.rollback-unsafe" ]] || fail "failed image tag restore did not write .rollback-unsafe marker"
+# At this point same_sha_images STILL holds the rejected candidate-*-40 tags!
+grep -Fxq "supplier-henkaten-api:${retry_sha} sha256:candidate-api-40" "${same_sha_images}" || fail "expected dirty rejected candidate tag to remain after failed restore"
+
+# Manual rollback while tag restoration still fails must refuse to start the rejected candidate build.
+manual_rb_fail_log="${TEST_ROOT}/manual-rollback-tag-fail.log"
+if TEST_TAG_FAIL=true TEST_DOCKER_LOG="${manual_rb_fail_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
+  PATH="${fake_bin}:${PATH}" "${migration_base}/releases/${retry_sha}/deploy/scripts/remote-rollback.sh" \
+  staging "${retry_sha}" "${migration_base}" >/dev/null 2>&1; then
+  fail "manual rollback succeeded despite failed pinned image restoration"
+fi
+if [[ -f "${manual_rb_fail_log}" ]] && grep -q '^STARTED ' "${manual_rb_fail_log}"; then
+  fail "manual rollback started rejected candidate images after failed pinned restoration"
+fi
+
+# Carrying dirty candidate-*-40 tags into a SECOND same-SHA deploy (run 41) that also fails must restore the pinned sha256:good-* images, NEVER candidate-*-40.
+carryover_log="${TEST_ROOT}/same-sha-carryover-41.log"
+IFS='|' read -r carry_incoming carry_runtime carry_archive carry_checksum < <(
+  prepare_candidate "${migration_base}" "${retry_sha}" 41
+)
+sed -i.bak "s/^POSTGRES_APP_PASSWORD=.*/POSTGRES_APP_PASSWORD=${updated_app_password}/" "${carry_runtime}"
+rm -f "${carry_runtime}.bak"
+if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=41 TEST_DOCKER_LOG="${carryover_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
+  PATH="${fake_bin}:${PATH}" "${carry_incoming}/deploy/scripts/remote-deploy.sh" \
+  staging "${retry_sha}" 41 "${migration_base}" "${carry_incoming}" "${carry_runtime}" \
+  "${carry_archive}" "${carry_checksum}" 127.0.0.1 >/dev/null 2>&1; then
+  fail "second same-SHA smoke failure unexpectedly succeeded"
+fi
+grep -Fxq 'STARTED api=sha256:good-api' "${carryover_log}" || fail "second same-SHA invocation did not restore pinned sha256:good-api image"
+if grep -q 'STARTED api=sha256:candidate-api-40' "${carryover_log}"; then
+  fail "second same-SHA invocation promoted rejected candidate-api-40 build into rollback"
+fi
+[[ ! -f "${migration_base}/releases/${retry_sha}/.rollback-unsafe" ]] || fail "successful pinned rollback recovery did not clear .rollback-unsafe"
+
+# Restored-ID mismatch branch: docker tag exits 0 without updating the tag -> inspect mismatch must refuse rollback.
+mismatch_log="${TEST_ROOT}/same-sha-tag-mismatch.log"
+IFS='|' read -r mismatch_incoming mismatch_runtime mismatch_archive mismatch_checksum < <(
+  prepare_candidate "${migration_base}" "${retry_sha}" 42
+)
+sed -i.bak "s/^POSTGRES_APP_PASSWORD=.*/POSTGRES_APP_PASSWORD=${updated_app_password}/" "${mismatch_runtime}"
+rm -f "${mismatch_runtime}.bak"
+if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_TAG_SILENT_NOOP=true TEST_BUILD_TAG_SUFFIX=42 TEST_DOCKER_LOG="${mismatch_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
+  PATH="${fake_bin}:${PATH}" "${mismatch_incoming}/deploy/scripts/remote-deploy.sh" \
+  staging "${retry_sha}" 42 "${migration_base}" "${mismatch_incoming}" "${mismatch_runtime}" \
+  "${mismatch_archive}" "${mismatch_checksum}" 127.0.0.1 >/dev/null 2>&1; then
+  fail "same-SHA smoke failure with silent tag mismatch unexpectedly succeeded"
+fi
+grep -q ' stop ' "${mismatch_log}" || fail "restored-ID mismatch did not stop failed candidate services"
+[[ "$(grep -c '^STARTED api=' "${mismatch_log}")" == "1" ]] || fail "restored-ID mismatch invoked rollback with unverified candidate image"
+[[ -f "${migration_base}/releases/${retry_sha}/.rollback-unsafe" ]] || fail "restored-ID mismatch did not write .rollback-unsafe marker"
+
+# Legacy release marked .rollback-unsafe without .activated-images must block manual rollback.
+rm -f "${migration_base}/releases/${retry_sha}/.activated-images"
+legacy_unsafe_log="${TEST_ROOT}/legacy-rollback-unsafe.log"
+if TEST_DOCKER_LOG="${legacy_unsafe_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
+  PATH="${fake_bin}:${PATH}" "${migration_base}/releases/${retry_sha}/deploy/scripts/remote-rollback.sh" \
+  staging "${retry_sha}" "${migration_base}" >/dev/null 2>&1; then
+  fail "manual rollback succeeded on a rollback-unsafe release lacking .activated-images"
+fi
+if [[ -f "${legacy_unsafe_log}" ]] && grep -q '^STARTED ' "${legacy_unsafe_log}"; then
+  fail "manual rollback started containers for a rollback-unsafe release lacking .activated-images"
+fi
 
 rollback_base="${TEST_ROOT}/rollback"
 prepare_base "${rollback_base}"
