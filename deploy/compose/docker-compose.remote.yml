@@ -65,6 +65,7 @@ services:
       dockerfile: deploy/postgres/Dockerfile
     init: true
     restart: unless-stopped
+    stop_grace_period: 60s
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}

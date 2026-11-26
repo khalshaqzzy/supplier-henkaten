@@ -31,7 +31,7 @@ current handoff. Pre-merge review follow-up: the legacy pin backfill is now rest
 non-hardened releases (`release_is_hardened()`); a hardened release missing `.activated-images` is
 refused for same-SHA redeploy and marked `.rollback-unsafe` on cross-SHA deploy. The optional
 read-only production checks in deploymentGuide §9.5 are informational (the deploy enforces steps
-1–4 itself) and do not block the merge to `main`. Phase 15 remains the sole current `in_progress` phase; staging/device/UAT is
+1–4 itself) and do not block the merge to `main`. Post-merge containerd image-store follow-up (`fix/deploy-containerd-image-pins`): fixed production deploy failure where Docker Engine's containerd image store GC'd unreferenced OCI manifest-list image IDs after `compose build` moved the shared PostgreSQL tag while Compose left the running container orphaned; added content-addressed retention tags (`supplier-henkaten-pin-<env>:<service>-<digest>`), `ensure_service_runs_image()` exact-image reconciliation (`--force-recreate` on ref/ID/inspectability mismatch, `stop_grace_period: 60s` on PostgreSQL, `--no-deps --pull never` on one-off `migrate`/`bootstrap-admin`), `BUILDX_NO_DEFAULT_ATTESTATIONS=1` build opt-out, in-driver `verify_running_matches_manifest()` under `strict-five-image-pins-v3`, structured UTC operational/diagnostic logs, containerd GC fake-Docker coverage, and real Docker 29 DinD `--feature containerd-snapshotter` CI verification (`deploy/tests/containerd-image-store.sh`). Phase 15 remains the sole current `in_progress` phase; staging/device/UAT is
 unchanged.
 
 ## Master Data desktop design polish — 24 November 2026

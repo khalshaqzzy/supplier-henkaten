@@ -128,6 +128,7 @@ For staging release work, the baseline above is extended by the commands and ass
 pnpm migrations:destructive-check <staging-base-sha>
 pnpm deployment:validate
 pnpm test:deployment
+deploy/tests/containerd-image-store.sh (against a containerd image-store Docker daemon or pinned Docker 29 DinD with --feature containerd-snapshotter)
 pnpm security:exceptions:check
 pnpm security:audit
 actionlint, ShellCheck, Hadolint, and bash -n using the workflow-pinned tool images
