@@ -988,6 +988,7 @@ describe('RealtimeService', () => {
       { events: () => events } as never,
       { resolve: vi.fn().mockResolvedValue(principal) } as never,
       {
+        dbPoolMax: 20,
         sseMaxPerSession: 1,
         sseMaxPerUser: 5,
         sseMaxPerSupplier: 10,
@@ -1033,5 +1034,87 @@ describe('RealtimeService', () => {
     c2.sub.unsubscribe();
     c3.sub.unsubscribe();
     c4.sub.unsubscribe();
+  });
+
+  it('sizes global replay concurrency against dbPoolMax across distinct users and falls back to resync when saturated', async () => {
+    const events = new Subject<RealtimeOutboxEvent>();
+    const resolvers: Array<(rows: RealtimeOutboxEvent[]) => void> = [];
+    const findManyOutbox = vi.fn().mockImplementation(
+      () =>
+        new Promise<RealtimeOutboxEvent[]>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+    const service = new RealtimeService(
+      {
+        line: {
+          findFirst: vi.fn().mockResolvedValue({ id: LINE_A }),
+          findMany: vi.fn().mockResolvedValue([{ id: LINE_A }]),
+        },
+        outboxEvent: { findMany: findManyOutbox },
+      } as never,
+      { events: () => events } as never,
+      {
+        resolve: vi.fn().mockImplementation((token: string) =>
+          Promise.resolve({
+            ...principal,
+            userId: `user-${token}`,
+            sessionId: `session-${token}`,
+            rawSessionToken: token,
+          }),
+        ),
+      } as never,
+      {
+        dbPoolMax: 8, // global replay budget = floor(8 / 4) = 2 (reserves 75% of DB pool)
+        sseMaxPerSession: 6,
+        sseMaxPerUser: 12,
+        sseMaxPerSupplier: 60,
+        sseMaxGlobal: 300,
+        sseRevalidationCacheMs: 2_000,
+      } as never,
+    );
+
+    const openForUser = async (tag: string) => {
+      const userPrincipal: RequestPrincipal = {
+        ...principal,
+        userId: `user-${tag}`,
+        sessionId: `session-${tag}`,
+        rawSessionToken: tag,
+      };
+      const res = fakeResponse();
+      const s = await service.prepareStream(
+        new TenantScope(SUPPLIER_ID),
+        userPrincipal,
+        LINE_A,
+        undefined,
+        res as never,
+      );
+      const msgs: string[] = [];
+      const sub = s.subscribe((m) => msgs.push(m.type));
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return { sub, msgs };
+    };
+
+    const u1 = await openForUser('a');
+    const u2 = await openForUser('b');
+    expect(findManyOutbox).toHaveBeenCalledTimes(2);
+
+    // Distinct 3rd user hits the pool-derived global cap (2) and gets immediate resync without DB replay.
+    const u3 = await openForUser('c');
+    expect(findManyOutbox).toHaveBeenCalledTimes(2);
+    expect(u3.msgs).toContain('resync');
+
+    // Settling one global replay permits a 4th user to replay again.
+    resolvers.shift()?.([]);
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    const u4 = await openForUser('d');
+    expect(findManyOutbox).toHaveBeenCalledTimes(3);
+
+    resolvers.forEach((resolve) => resolve([]));
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    u1.sub.unsubscribe();
+    u2.sub.unsubscribe();
+    u3.sub.unsubscribe();
+    u4.sub.unsubscribe();
   });
 });

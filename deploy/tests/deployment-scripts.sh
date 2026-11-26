@@ -267,14 +267,23 @@ set_image_tag() {
 }
 get_image_tag() {
   local ref="$1"
-  [[ -n "${TEST_IMAGE_STATE_FILE:-}" && -f "${TEST_IMAGE_STATE_FILE}" ]] || return 0
-  awk -v target="${ref}" '$1 == target {print $2; exit}' "${TEST_IMAGE_STATE_FILE}"
+  if [[ "${TEST_MISSING_IMAGE:-}" == "${ref}" ]]; then
+    return 1
+  fi
+  if [[ -n "${TEST_IMAGE_STATE_FILE:-}" && -f "${TEST_IMAGE_STATE_FILE}" ]]; then
+    awk -v target="${ref}" '$1 == target {print $2; exit}' "${TEST_IMAGE_STATE_FILE}"
+    return 0
+  fi
+  printf 'sha256:existing-%s\n' "${ref}"
 }
 if [[ "${1:-}" == "image" && "${2:-}" == "inspect" ]]; then
   get_image_tag "${!#}"
-  exit 0
+  exit $?
 fi
 if [[ "${1:-}" == "tag" ]]; then
+  if [[ "${TEST_TAG_FAIL:-false}" == "true" ]]; then
+    exit 1
+  fi
   set_image_tag "$3" "$2"
   exit 0
 fi
@@ -566,6 +575,39 @@ grep -Fxq 'STARTED api=sha256:good-api' "${same_sha_smoke_log}" || fail "same-SH
 grep -Fxq 'STARTED supplier-web=sha256:good-supplier-web' "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build supplier-web image"
 grep -Fxq 'STARTED tmmin-web=sha256:good-tmmin-web' "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build tmmin-web image"
 grep -Fxq 'STARTED caddy=sha256:good-caddy' "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build caddy image"
+
+# Missing pre-build image on same-SHA active redeploy must abort BEFORE building.
+missing_img_log="${TEST_ROOT}/same-sha-missing-image.log"
+IFS='|' read -r missing_incoming missing_runtime missing_archive missing_checksum < <(
+  prepare_candidate "${migration_base}" "${retry_sha}" 39
+)
+sed -i.bak "s/^POSTGRES_APP_PASSWORD=.*/POSTGRES_APP_PASSWORD=${updated_app_password}/" "${missing_runtime}"
+rm -f "${missing_runtime}.bak"
+if TEST_MISSING_IMAGE="supplier-henkaten-api:${retry_sha}" TEST_DOCKER_LOG="${missing_img_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
+  PATH="${fake_bin}:${PATH}" "${missing_incoming}/deploy/scripts/remote-deploy.sh" \
+  staging "${retry_sha}" 39 "${migration_base}" "${missing_incoming}" "${missing_runtime}" \
+  "${missing_archive}" "${missing_checksum}" 127.0.0.1 >/dev/null 2>&1; then
+  fail "same-SHA active redeploy succeeded with missing pre-build image snapshot"
+fi
+if [[ -f "${missing_img_log}" ]] && grep -q ' build ' "${missing_img_log}"; then
+  fail "same-SHA active redeploy ran docker compose build despite missing image snapshot"
+fi
+
+# Failed image tag restoration must refuse rollback instead of restarting the failed candidate build.
+tag_fail_log="${TEST_ROOT}/same-sha-tag-fail.log"
+IFS='|' read -r tagfail_incoming tagfail_runtime tagfail_archive tagfail_checksum < <(
+  prepare_candidate "${migration_base}" "${retry_sha}" 40
+)
+sed -i.bak "s/^POSTGRES_APP_PASSWORD=.*/POSTGRES_APP_PASSWORD=${updated_app_password}/" "${tagfail_runtime}"
+rm -f "${tagfail_runtime}.bak"
+if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_TAG_FAIL=true TEST_DOCKER_LOG="${tag_fail_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
+  PATH="${fake_bin}:${PATH}" "${tagfail_incoming}/deploy/scripts/remote-deploy.sh" \
+  staging "${retry_sha}" 40 "${migration_base}" "${tagfail_incoming}" "${tagfail_runtime}" \
+  "${tagfail_archive}" "${tagfail_checksum}" 127.0.0.1 >/dev/null 2>&1; then
+  fail "same-SHA smoke failure with failed tag restore unexpectedly succeeded"
+fi
+grep -q ' stop ' "${tag_fail_log}" || fail "failed image tag restore did not stop failed candidate services"
+[[ "$(grep -c '^STARTED api=' "${tag_fail_log}")" == "1" ]] || fail "failed image tag restore invoked rollback and restarted the broken candidate api image"
 
 rollback_base="${TEST_ROOT}/rollback"
 prepare_base "${rollback_base}"

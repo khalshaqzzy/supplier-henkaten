@@ -82,6 +82,7 @@ postgres_image_ref="$(awk '/^[[:space:]]*image:[[:space:]]*supplier-henkaten-pos
 postgres_image_ref="${postgres_image_ref:-supplier-henkaten-postgres:18.4-pgvector-0.8.5}"
 saved_image_refs=()
 saved_image_ids=()
+image_snapshot_complete=true
 if [[ -n "${previous_release}" ]]; then
   snapshot_candidates=("${postgres_image_ref}")
   if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
@@ -94,7 +95,13 @@ if [[ -n "${previous_release}" ]]; then
   fi
   for image_ref in "${snapshot_candidates[@]}"; do
     image_id="$(docker image inspect --format '{{.Id}}' "${image_ref}" 2>/dev/null || true)"
-    if [[ -n "${image_id}" ]]; then
+    if [[ -z "${image_id}" ]]; then
+      if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
+        die "Cannot safely redeploy active release ${REQUESTED_SHA}: missing local Docker image ID for ${image_ref}."
+      fi
+      image_snapshot_complete=false
+      echo "Warning: unable to snapshot existing Docker image ID for ${image_ref} before build." >&2
+    else
       saved_image_refs+=("${image_ref}")
       saved_image_ids+=("${image_id}")
     fi
@@ -102,10 +109,20 @@ if [[ -n "${previous_release}" ]]; then
 fi
 
 restore_saved_images() {
-  local idx
+  local idx restored_id status=0
   for ((idx = 0; idx < ${#saved_image_refs[@]}; idx++)); do
-    docker tag "${saved_image_ids[idx]}" "${saved_image_refs[idx]}" >/dev/null 2>&1 || true
+    if ! docker tag "${saved_image_ids[idx]}" "${saved_image_refs[idx]}" >/dev/null 2>&1; then
+      echo "Failed to restore Docker image tag ${saved_image_refs[idx]} to ${saved_image_ids[idx]}." >&2
+      status=1
+      continue
+    fi
+    restored_id="$(docker image inspect --format '{{.Id}}' "${saved_image_refs[idx]}" 2>/dev/null || true)"
+    if [[ "${restored_id}" != "${saved_image_ids[idx]}" ]]; then
+      echo "Restored Docker image tag ${saved_image_refs[idx]} resolved to '${restored_id}', expected '${saved_image_ids[idx]}'." >&2
+      status=1
+    fi
   done
+  return "${status}"
 }
 
 services_mutated=false
@@ -136,9 +153,17 @@ candidate_deploy() {
 
 if ! candidate_deploy; then
   echo "Candidate deployment failed. No database down migration will be attempted." >&2
-  restore_saved_images
+  images_restored=true
+  if ! restore_saved_images; then
+    images_restored=false
+  fi
   if [[ -n "${previous_release}" && "${services_mutated}" == "false" ]]; then
     echo "Failure occurred before modifying running services; active release ${previous_release} was preserved untouched." >&2
+    exit 1
+  fi
+  if [[ -n "${previous_release}" && ( "${images_restored}" != "true" || ( "${previous_release}" == "${REQUESTED_SHA}" && "${image_snapshot_complete}" != "true" ) ) ]]; then
+    compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
+    echo "Refusing automatic rollback because pre-build Docker image tags could not be verified as restored; failed application services were stopped while persistent PostgreSQL was preserved." >&2
     exit 1
   fi
   previous_dir="${BASE_DIR}/releases/${previous_release}"

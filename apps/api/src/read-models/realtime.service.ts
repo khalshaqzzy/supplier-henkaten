@@ -51,7 +51,8 @@ const HEARTBEAT_INTERVAL_MS = 15_000;
 const EVICTION_CLOSE_GRACE_MS = 2_000;
 const MAX_EVICTING_SOCKETS = 16;
 const MAX_CONCURRENT_REPLAYS_PER_USER = 2;
-const MAX_CONCURRENT_REPLAYS_GLOBAL = 32;
+const DEFAULT_DB_POOL_MAX = 10;
+const REPLAY_POOL_SHARE_DIVISOR = 4;
 const MAX_LINE_LOAD_RETRIES = 2;
 
 const ALLOWED_EVENT_SET = new Set<string>(SUPPLIER_SSE_ALLOWED_EVENTS);
@@ -279,8 +280,15 @@ export class RealtimeService {
 
   private tryAcquireReplay(userId: string): (() => void) | null {
     const limits = this.limits();
-    const userCap = Math.max(1, Math.min(MAX_CONCURRENT_REPLAYS_PER_USER, limits.maxPerUser));
-    const globalCap = Math.max(1, Math.min(MAX_CONCURRENT_REPLAYS_GLOBAL, limits.maxGlobal));
+    const poolMax = this.config?.dbPoolMax ?? DEFAULT_DB_POOL_MAX;
+    const globalCap = Math.max(
+      1,
+      Math.min(Math.floor(poolMax / REPLAY_POOL_SHARE_DIVISOR), limits.maxGlobal),
+    );
+    const userCap = Math.max(
+      1,
+      Math.min(MAX_CONCURRENT_REPLAYS_PER_USER, limits.maxPerUser, globalCap),
+    );
     const userActive = this.activeReplaysByUser.get(userId) ?? 0;
     if (userActive >= userCap || this.activeReplaysGlobal >= globalCap) {
       return null;
@@ -708,6 +716,7 @@ export class RealtimeService {
           });
 
           scheduleNextHeartbeat();
+          if (closed) return;
 
           const releaseReplay = this.tryAcquireReplay(principal.userId);
           const replayResult = releaseReplay
