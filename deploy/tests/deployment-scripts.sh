@@ -289,6 +289,19 @@ remove_image_tag() {
 }
 get_image_tag() {
   local ref="$1"
+  if [[ -n "${TEST_INSPECT_CONTEXT_ERROR_FILE:-}" && -f "${TEST_INSPECT_CONTEXT_ERROR_FILE}" ]] && grep -Fxq "${ref}" "${TEST_INSPECT_CONTEXT_ERROR_FILE}"; then
+    printf 'context "production": context not found\n' >&2
+    return 1
+  fi
+  if [[ -n "${TEST_INSPECT_DAEMON_ERROR_AFTER_BUILD_FILE:-}" && -f "${TEST_INSPECT_DAEMON_ERROR_AFTER_BUILD_FILE}" && -n "${TEST_BUILD_DONE_MARKER:-}" && -f "${TEST_BUILD_DONE_MARKER}" ]]; then
+    local after_target
+    after_target="$(<"${TEST_INSPECT_DAEMON_ERROR_AFTER_BUILD_FILE}")"
+    if [[ -z "${after_target}" || "${after_target}" == "${ref}" ]]; then
+      rm -f -- "${TEST_INSPECT_DAEMON_ERROR_AFTER_BUILD_FILE}"
+      printf 'Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n' >&2
+      return 1
+    fi
+  fi
   if [[ -n "${TEST_INSPECT_DAEMON_ERROR_ONCE_FILE:-}" && -f "${TEST_INSPECT_DAEMON_ERROR_ONCE_FILE}" ]]; then
     local once_target
     once_target="$(<"${TEST_INSPECT_DAEMON_ERROR_ONCE_FILE}")"
@@ -416,8 +429,22 @@ if [[ "${1:-}" == "tag" ]]; then
   set_image_tag "$3" "${src_id}"
   exit 0
 fi
+if [[ "${1:-}" == "rm" ]]; then
+  if [[ -n "${TEST_DOCKER_LOG:-}" ]]; then
+    printf 'DOCKER_RM %s\n' "${!#}" >>"${TEST_DOCKER_LOG}"
+  fi
+  exit 0
+fi
 if [[ "${1:-}" == "inspect" ]]; then
   container_name="${!#}"
+  if [[ "${3:-}" == "{{.State.Running}}" ]]; then
+    if [[ "${container_name}" == *-stale-stopped-container ]]; then
+      echo false
+    else
+      echo true
+    fi
+    exit 0
+  fi
   container_base="${container_name%-container}"
   svc_name="${container_base%%--*}"
   container_sha="${RELEASE_SHA:-}"
@@ -539,6 +566,9 @@ if [[ "${1:-}" == "compose" ]]; then
       fi
     fi
     if [[ "${TEST_BUILD_FAIL:-false}" == "true" ]]; then exit 1; fi
+    if [[ -n "${TEST_BUILD_DONE_MARKER:-}" ]]; then
+      touch "${TEST_BUILD_DONE_MARKER}"
+    fi
   fi
   if [[ "${is_up}" == "true" && ( -n "${TEST_IMAGE_STATE_FILE:-}" || -n "${TEST_RUNNING_IMAGES_FILE:-}" ) ]]; then
     for argument in "$@"; do
@@ -610,6 +640,9 @@ if [[ "${1:-}" == "compose" ]]; then
       fi
       ps_sha="$(awk -F= '$1 == "RELEASE_SHA" {print $2; exit}' "${compose_env_file}" 2>/dev/null || true)"
       echo "${argument}--${ps_sha}-container"
+      if [[ "${is_ps_all}" == "true" && "${TEST_PS_ALL_EXTRA_STOPPED:-}" == "${argument}" ]]; then
+        echo "${argument}--stale-stopped-container"
+      fi
       if [[ "${TEST_PS_DUPLICATE_SERVICE:-}" == "${argument}" ]]; then
         echo "${argument}--duplicate-container"
       fi
@@ -2427,6 +2460,65 @@ if PATH="${fake_bin}:${PATH}" bash -c '
 ' _ "${SCRIPTS}/lib.sh" >/dev/null 2>&1; then
   fail "validate_image_id accepted uppercase hex digest"
 fi
+
+# 16. Unrelated "not found" error (e.g. Docker context not found) must be classified as indeterminate
+#     operational error (exit 1), NEVER confirmed missing (exit 2) or policy refusal (exit 4 / .rollback-unsafe).
+ctxerr_base="${TEST_ROOT}/rollback-context-error"
+setup_rehearsal_base "${ctxerr_base}"
+ctxerr_file="${TEST_ROOT}/rollback-context-error.targets"
+printf '%s\n' "$(fake_id "${rehearsal_prev:0:6}-postgres")" >"${ctxerr_file}"
+ctxerr_images="${TEST_ROOT}/rollback-context-error-images.state"
+cat "${ctxerr_base}/releases/${rehearsal_prev}/.activated-images" "${ctxerr_base}/releases/${rehearsal_cur}/.activated-images" >"${ctxerr_images}"
+for svc in postgres api supplier-web tmmin-web caddy; do
+  printf 'supplier-henkaten-pin-staging:%s-%s %s\n' "${svc}" "$(fake_hex "${rehearsal_cur:0:6}-${svc}")" "$(fake_id "${rehearsal_cur:0:6}-${svc}")" >>"${ctxerr_images}"
+done
+ctxerr_status=0
+TEST_CONTAINERD_STORE=true TEST_INSPECT_CONTEXT_ERROR_FILE="${ctxerr_file}" \
+  TEST_IMAGE_STATE_FILE="${ctxerr_images}" PATH="${fake_bin}:${PATH}" \
+  "${ctxerr_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" \
+  staging "${rehearsal_prev}" "${ctxerr_base}" >/dev/null 2>&1 || ctxerr_status=$?
+[[ "${ctxerr_status}" == "1" ]] || fail "Docker context-not-found error during rollback was misclassified (got exit ${ctxerr_status}, expected 1)"
+[[ ! -e "${ctxerr_base}/releases/${rehearsal_prev}/.rollback-unsafe" ]] || fail "Docker context-not-found error falsely marked healthy rollback target .rollback-unsafe"
+
+# 17. Transient Docker inspection failure during retention ranking must skip destructive cleanup
+#     so a verified older rollback target is never evicted due to an inconclusive daemon check.
+retind_base="${TEST_ROOT}/retention-indeterminate"
+cp -R "${retprio_base}" "${retind_base}"
+# Restore the evicted broken release and remove the 6th release so we replay with 5 existing releases + 1 new
+rm -rf -- "${retind_base}/releases/a100000000000000000000000000000000000006"
+mkdir -p "${retind_base}/releases/${retprio_shas[4]}/deploy/scripts" "${retind_base}/releases/${retprio_shas[4]}/deploy/compose"
+cp "${COMPOSE_FILE}" "${retind_base}/releases/${retprio_shas[4]}/deploy/compose/docker-compose.remote.yml"
+sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${retprio_shas[4]}/" "${rendered_env}" >"${retind_base}/releases/${retprio_shas[4]}/.runtime.env"
+printf '%s\n' "${retprio_shas[4]}" >"${retind_base}/releases/${retprio_shas[4]}/.source.sha"
+printf '%s\n' "${retprio_shas[4]}" >"${retind_base}/releases/${retprio_shas[4]}/.activated"
+printf 'malformed-entry\n' >"${retind_base}/releases/${retprio_shas[4]}/.activated-images"
+touch -d "2026-01-05 00:00:00 UTC" "${retind_base}/releases/${retprio_shas[4]}"
+printf '%s\n' "${retprio_shas[3]}" >"${retind_base}/current_release"
+rm -f -- "${retind_base}/current"
+ln -s "${retind_base}/releases/${retprio_shas[3]}" "${retind_base}/current"
+printf '5\n' >"${retind_base}/shared/deployment-state/highest_seen_run"
+retind_images="${TEST_ROOT}/retention-indeterminate-images.state"
+cp "${retprio_images}" "${retind_images}"
+retind_running="${TEST_ROOT}/retention-indeterminate-running.state"
+cp "${retprio_running}" "${retind_running}"
+retind_after_build="${TEST_ROOT}/retention-indeterminate.once"
+printf '%s\n' "$(fake_id "rp-${retprio_shas[2]:0:8}-pg")" >"${retind_after_build}"
+retind_build_done="${TEST_ROOT}/retention-indeterminate.built"
+TEST_CONTAINERD_STORE=true TEST_IMAGE_STATE_FILE="${retind_images}" TEST_RUNNING_IMAGES_FILE="${retind_running}" \
+  TEST_INSPECT_DAEMON_ERROR_AFTER_BUILD_FILE="${retind_after_build}" TEST_BUILD_DONE_MARKER="${retind_build_done}" \
+  run_candidate "${retind_base}" a100000000000000000000000000000000000007 11 >/dev/null 2>&1 || fail "retention-indeterminate deploy failed"
+[[ -d "${retind_base}/releases/${retprio_shas[0]}" ]] || fail "transient inspect failure during retention ranking evicted an older verified release"
+[[ -d "${retind_base}/releases/${retprio_shas[2]}" ]] || fail "transient inspect failure during retention ranking evicted the indeterminately inspected release"
+[[ -d "${retind_base}/releases/${retprio_shas[4]}" ]] || fail "transient inspect failure did not skip destructive cleanup completely"
+
+# 18. Leftover stopped/renamed container from an interrupted Compose recreate must be cleaned up
+#     by ensure_service_runs_image without failing closed (while multiple running containers still fail).
+stale_stop_base="${TEST_ROOT}/stale-stopped-leftover"
+prepare_base "${stale_stop_base}"
+stale_stop_log="${TEST_ROOT}/stale-stopped-leftover.log"
+TEST_PS_ALL_EXTRA_STOPPED=postgres TEST_DOCKER_LOG="${stale_stop_log}" \
+  run_candidate "${stale_stop_base}" a200000000000000000000000000000000000001 10 >/dev/null 2>&1 || fail "deploy failed closed on a leftover stopped container from an interrupted Compose recreate"
+grep -Fxq 'DOCKER_RM postgres--stale-stopped-container' "${stale_stop_log}" || fail "ensure_service_runs_image did not remove leftover stopped container"
 
 lock_base="${TEST_ROOT}/lock"
 prepare_base "${lock_base}"

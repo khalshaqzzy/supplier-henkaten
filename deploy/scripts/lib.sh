@@ -61,11 +61,11 @@ wait_for_service() {
       status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${container_id}" 2>/dev/null || true)"
       case "${status}" in
         healthy)
-          printf 'Service %s is healthy.\n' "${service}"
+          { printf 'Service %s is healthy.\n' "${service}"; } 2>/dev/null || true
           return 0
           ;;
         unhealthy | exited | dead)
-          printf 'Service %s entered bad state: %s\n' "${service}" "${status}" >&2
+          note_stderr "Service ${service} entered bad state: ${status}"
           docker inspect --format '{{json .State.Health}}' "${container_id}" >&2 || true
           docker logs "${container_id}" --tail 150 >&2 || true
           return 1
@@ -74,7 +74,7 @@ wait_for_service() {
     fi
 
     if (( "$(date +%s)" - started_at >= timeout_seconds )); then
-      printf 'Timed out waiting for %s.\n' "${service}" >&2
+      note_stderr "Timed out waiting for ${service}."
       if [[ -n "${container_id:-}" ]]; then
         docker logs "${container_id}" --tail 150 >&2 || true
       fi
@@ -352,7 +352,8 @@ inspect_local_image_state() {
     note_stderr "${context}: local image '${image_id}' resolved to unexpected ID '${out:-<empty>}'."
     return 1
   fi
-  if printf '%s\n' "${err_text}" | grep -Eiq 'no such image|not found'; then
+  local err_lower="${err_text,,}"
+  if (( status != 127 )) && [[ "${err_lower}" == *"no such image: ${image_id}"* || "${err_lower}" == *"no such object: ${image_id}"* || "${err_lower}" == *"image \"${image_id}\": not found"* ]]; then
     note_stderr "${context}: pinned image ID '${image_id}' is confirmed missing locally (${err_text})."
     return 2
   fi
@@ -575,20 +576,31 @@ ensure_manifest_pins() {
   return 0
 }
 
-# Return 0 iff a retained release directory is a complete, locally verifiable rollback target.
+# Determine whether a retained release directory is a complete, locally verifiable rollback target.
+# Returns:
+#   0: verified rollback target (regular .activated/.activated-images, no .rollback-unsafe, all 5 IDs present)
+#   2: confirmed not a verified target (missing markers, .rollback-unsafe, invalid manifest, or confirmed missing ID)
+#   1: indeterminate/operational Docker inspection error (caller must skip destructive eviction)
 release_is_verified_rollback_target() {
   local release_dir="$1"
-  local pin_sha parsed_lines svc ref expected_id
-  [[ -d "${release_dir}" ]] || return 1
+  local pin_sha parsed_lines svc ref expected_id inspect_rc
+  [[ -d "${release_dir}" ]] || return 2
   pin_sha="$(basename "${release_dir}")"
-  [[ "${pin_sha}" =~ ^[0-9a-f]{40}$ ]] || return 1
-  [[ -f "${release_dir}/.activated" && ! -L "${release_dir}/.activated" ]] || return 1
-  [[ -f "${release_dir}/.activated-images" && ! -L "${release_dir}/.activated-images" ]] || return 1
-  [[ ! -e "${release_dir}/.rollback-unsafe" && ! -L "${release_dir}/.rollback-unsafe" ]] || return 1
-  parsed_lines="$(parse_manifest_file "${release_dir}/.activated-images" "${release_dir}" "${pin_sha}" 2>/dev/null)" || return 1
+  [[ "${pin_sha}" =~ ^[0-9a-f]{40}$ ]] || return 2
+  [[ -f "${release_dir}/.activated" && ! -L "${release_dir}/.activated" ]] || return 2
+  [[ -f "${release_dir}/.activated-images" && ! -L "${release_dir}/.activated-images" ]] || return 2
+  [[ ! -e "${release_dir}/.rollback-unsafe" && ! -L "${release_dir}/.rollback-unsafe" ]] || return 2
+  parsed_lines="$(parse_manifest_file "${release_dir}/.activated-images" "${release_dir}" "${pin_sha}" 2>/dev/null)" || return 2
   while IFS=' ' read -r svc ref expected_id; do
-    inspect_local_image_state "${expected_id}" "Retention check for ${pin_sha} (${svc})" 2>/dev/null || return 1
+    inspect_rc=0
+    inspect_local_image_state "${expected_id}" "Retention check for ${pin_sha} (${svc})" 2>/dev/null || inspect_rc=$?
+    if (( inspect_rc == 1 )); then
+      return 1
+    elif (( inspect_rc != 0 )); then
+      return 2
+    fi
   done <<<"${parsed_lines}"
+  return 0
 }
 
 # Reconcile a single Compose service so it runs the exact expected image ref and ID.
@@ -625,8 +637,31 @@ ensure_service_runs_image() {
     return 1
   fi
   if [[ "${container_ids}" == *$'\n'* ]]; then
-    note_stderr "Reconciliation failed for ${svc}: expected at most one existing container, found '${container_ids//$'\n'/ }'."
-    return 1
+    # An interrupted Compose recreate can leave an old stopped/renamed container alongside the
+    # active one. Fail closed if >1 container is running; otherwise remove only non-running leftovers.
+    local live_ids cid is_running rm_err
+    if ! live_ids="$(compose_ps_ids "${release_dir}" "${runtime_env}" ps -q "${svc}")"; then
+      note_stderr "Reconciliation failed for ${svc}: docker compose ps failed while inspecting multiple containers."
+      return 1
+    fi
+    if [[ "${live_ids}" == *$'\n'* ]]; then
+      note_stderr "Reconciliation failed for ${svc}: multiple running containers found ('${live_ids//$'\n'/ }')."
+      return 1
+    fi
+    while IFS= read -r cid; do
+      [[ -n "${cid}" && "${cid}" != "${live_ids}" ]] || continue
+      is_running="$(docker inspect --format '{{.State.Running}}' "${cid}" 2>/dev/null || true)"
+      if [[ "${is_running}" == "true" ]]; then
+        note_stderr "Reconciliation failed for ${svc}: extra container ${cid} is still running alongside '${live_ids:-none}'."
+        return 1
+      fi
+      log_info "[reconcile] ${svc}: removing leftover stopped container ${cid} from an interrupted recreate."
+      if ! rm_err="$(docker rm -f "${cid}" 2>&1)"; then
+        note_stderr "Reconciliation failed for ${svc}: could not remove leftover stopped container ${cid} (${rm_err:-docker rm failed})."
+        return 1
+      fi
+    done <<<"${container_ids}"
+    container_ids="${live_ids}"
   fi
 
   if [[ -n "${container_ids}" ]]; then
@@ -751,7 +786,10 @@ prune_unreferenced_pin_tags() {
 
   for dir in "${kept_dirs[@]}"; do
     manifest="${dir}/.activated-images"
-    [[ -e "${manifest}" || -L "${manifest}" ]] || continue
+    if [[ ! -e "${manifest}" && ! -L "${manifest}" ]]; then
+      log_info "[prune] Kept release ${dir} has no .activated-images manifest; skipping its manifest entries."
+      continue
+    fi
     sha="$(basename "${dir}")"
     if ! [[ "${sha}" =~ ^[0-9a-f]{40}$ ]]; then
       note_stderr "Skipping pin-tag pruning: kept release directory '${dir}' does not have a valid SHA basename."

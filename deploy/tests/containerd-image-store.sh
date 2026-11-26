@@ -32,14 +32,19 @@ if [[ "${driver_status}" != *"io.containerd.snapshotter"* ]]; then
 fi
 
 # Safety guard: refuse to touch any daemon that has live/stopped staging or production Compose
-# containers or existing staging retention pin tags.
+# containers or existing staging retention pin tags, and fail closed on any query error.
 for live_project in supplier-henkaten-staging supplier-henkaten-production; do
-  existing_live="$(docker ps -a -q --filter "label=com.docker.compose.project=${live_project}" 2>/dev/null || true)"
+  if ! existing_live="$(docker ps -a -q --filter "label=com.docker.compose.project=${live_project}")"; then
+    fail "Refusing to run: failed to query existing containers for Compose project '${live_project}'."
+  fi
   if [[ -n "${existing_live}" ]]; then
     fail "Refusing to run: target Docker daemon has existing containers for Compose project '${live_project}'."
   fi
 done
-existing_staging_pins="$(docker image ls --format '{{.Repository}}:{{.Tag}}' supplier-henkaten-pin-staging 2>/dev/null | awk 'NF && $0 !~ /:<none>$/' || true)"
+if ! existing_staging_pins="$(docker image ls --format '{{.Repository}}:{{.Tag}}' supplier-henkaten-pin-staging)"; then
+  fail "Refusing to run: failed to query existing tags in supplier-henkaten-pin-staging."
+fi
+existing_staging_pins="$(printf '%s\n' "${existing_staging_pins}" | awk 'NF && $0 !~ /:<none>$/')"
 if [[ -n "${existing_staging_pins}" ]]; then
   fail "Refusing to run: target Docker daemon already has tags in supplier-henkaten-pin-staging."
 fi
@@ -88,13 +93,13 @@ make_fixture_release() {
   local pg_label="${3:-v1}"
   mkdir -p "${dir}/deploy/compose" "${dir}/ctx-pg" "${dir}/ctx-app"
   cat >"${dir}/ctx-pg/Dockerfile" <<EOF
-FROM busybox:1.36.1
+FROM busybox:1.36.1@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
 LABEL org.supplier-henkaten.pg="${pg_label}"
 HEALTHCHECK --interval=1s --timeout=1s --retries=10 CMD test -d /var/lib/pg-sentinel
 CMD ["sh", "-c", "trap 'exit 0' TERM INT; while :; do sleep 1; done"]
 EOF
   cat >"${dir}/ctx-app/Dockerfile" <<EOF
-FROM busybox:1.36.1
+FROM busybox:1.36.1@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
 LABEL org.supplier-henkaten.sha="${sha}"
 HEALTHCHECK --interval=1s --timeout=1s --retries=10 CMD true
 CMD ["sh", "-c", "trap 'exit 0' TERM INT; while :; do sleep 1; done"]
@@ -161,7 +166,15 @@ pg_cid_1="$(compose_for "${REL_A}" "${REL_A}/.runtime.env" ps -q postgres)"
 sleep 2
 compose_for "${REL_A}" "${REL_A}/.runtime.env" build --quiet postgres
 pg_attested_2="$(docker image inspect --format '{{.Id}}' "${PG_REF}")"
-[[ "${pg_attested_2}" != "${pg_attested_1}" ]] || fail "canary failed: two attested builds produced identical OCI index ID (${pg_attested_1}); provenance attestations were not active"
+if [[ "${pg_attested_2}" == "${pg_attested_1}" ]]; then
+  printf 'Warning: default runner Buildx %s produced identical IDs across two builds (%s); forcing distinct unpinned rebuild to exercise containerd tag-overwrite GC.\n' \
+    "${buildx_version:-unknown}" "${pg_attested_1}" >&2
+  make_fixture_release "${REL_A}" "${SHA_A}" "v1-canary"
+  compose_for "${REL_A}" "${REL_A}/.runtime.env" build --quiet postgres
+  pg_attested_2="$(docker image inspect --format '{{.Id}}' "${PG_REF}")"
+  [[ "${pg_attested_2}" != "${pg_attested_1}" ]] || fail "forced canary rebuild did not produce a distinct postgres image ID"
+  make_fixture_release "${REL_A}" "${SHA_A}" "v1"
+fi
 if docker image inspect --format '{{.Id}}' "${pg_attested_1}" >/dev/null 2>&1; then
   fail "canary failed: overwriting the sole tag did not garbage-collect unpinned ${pg_attested_1} (daemon does not exhibit containerd tag-overwrite GC)"
 fi

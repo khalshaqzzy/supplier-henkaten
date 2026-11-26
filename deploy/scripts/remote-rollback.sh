@@ -60,6 +60,32 @@ if [[ -L "${RELEASE_DIR}/.rollback-unsafe" || ( -e "${RELEASE_DIR}/.rollback-uns
   refuse "Rollback aborted: ${RELEASE_DIR}/.rollback-unsafe is not a regular file."
 fi
 
+target_pg_ref=""
+target_pg_id=""
+target_api_ref=""
+target_api_id=""
+target_supplier_ref=""
+target_supplier_id=""
+target_tmmin_ref=""
+target_tmmin_id=""
+target_caddy_ref=""
+target_caddy_id=""
+
+# Validate target manifest existence and syntax BEFORE touching outgoing retention tags so policy
+# refusals (exit 4) on unpinned, unsafe, or malformed targets remain strictly read-only.
+if [[ -f "${RELEASE_DIR}/.activated-images" ]]; then
+  if ! parsed_target_manifest="$(parse_manifest_file "${RELEASE_DIR}/.activated-images" "${RELEASE_DIR}" "${REQUESTED_SHA}")"; then
+    mark_rollback_unsafe "${RELEASE_DIR}" "${REQUESTED_SHA}" || note_stderr "Warning: failed to persist .rollback-unsafe marker for ${REQUESTED_SHA}."
+    refuse "Rollback aborted: ${RELEASE_DIR}/.activated-images failed strict manifest validation."
+  fi
+elif [[ -e "${RELEASE_DIR}/.rollback-unsafe" || -L "${RELEASE_DIR}/.rollback-unsafe" ]]; then
+  refuse "Rollback aborted: release ${REQUESTED_SHA} is marked rollback-unsafe and has no pinned activated image IDs."
+else
+  # Never start a retained release from mutable shared tags (e.g. a PostgreSQL tag rebuilt by a later
+  # candidate) and never record whatever those tags currently resolve to as the release's pins.
+  refuse "Rollback aborted: release ${REQUESTED_SHA} has no verified .activated-images pins; ship the desired code as a new commit (for example a git revert) on the deployment branch so the pipeline builds and pins it."
+fi
+
 # Retain pins for the outgoing active release (when different and pinned) BEFORE retagging the
 # shared PostgreSQL tag so rolling back never garbage-collects the outgoing release's PostgreSQL
 # image. An operational retention/inspect error aborts before touching any runtime tag.
@@ -79,46 +105,23 @@ if [[ -f "${BASE_DIR}/current_release" && ! -L "${BASE_DIR}/current_release" ]];
   fi
 fi
 
-target_pg_ref=""
-target_pg_id=""
-target_api_ref=""
-target_api_id=""
-target_supplier_ref=""
-target_supplier_id=""
-target_tmmin_ref=""
-target_tmmin_id=""
-target_caddy_ref=""
-target_caddy_id=""
-
-if [[ -f "${RELEASE_DIR}/.activated-images" ]]; then
-  if ! parsed_target_manifest="$(parse_manifest_file "${RELEASE_DIR}/.activated-images" "${RELEASE_DIR}" "${REQUESTED_SHA}")"; then
-    mark_rollback_unsafe "${RELEASE_DIR}" "${REQUESTED_SHA}" || echo "Warning: failed to persist .rollback-unsafe marker for ${REQUESTED_SHA}." >&2
-    refuse "Rollback aborted: ${RELEASE_DIR}/.activated-images failed strict manifest validation."
-  fi
-  restore_status=0
-  restore_pinned_images_file "${RELEASE_DIR}/.activated-images" "${RELEASE_DIR}" "${REQUESTED_SHA}" "${REQUESTED_ENV}" || restore_status=$?
-  if (( restore_status == 2 )); then
-    mark_rollback_unsafe "${RELEASE_DIR}" "${REQUESTED_SHA}" || echo "Warning: failed to persist .rollback-unsafe marker for ${REQUESTED_SHA}." >&2
-    refuse "Rollback aborted: one or more pinned activated image IDs for ${REQUESTED_SHA} are confirmed missing locally."
-  elif (( restore_status != 0 )); then
-    die "Rollback aborted: operational Docker error while restoring or verifying pinned image tags for ${REQUESTED_SHA}."
-  fi
-  while IFS=' ' read -r rb_svc rb_ref rb_id; do
-    case "${rb_svc}" in
-      postgres) target_pg_ref="${rb_ref}"; target_pg_id="${rb_id}" ;;
-      api) target_api_ref="${rb_ref}"; target_api_id="${rb_id}" ;;
-      supplier-web) target_supplier_ref="${rb_ref}"; target_supplier_id="${rb_id}" ;;
-      tmmin-web) target_tmmin_ref="${rb_ref}"; target_tmmin_id="${rb_id}" ;;
-      caddy) target_caddy_ref="${rb_ref}"; target_caddy_id="${rb_id}" ;;
-    esac
-  done <<<"${parsed_target_manifest}"
-elif [[ -e "${RELEASE_DIR}/.rollback-unsafe" || -L "${RELEASE_DIR}/.rollback-unsafe" ]]; then
-  refuse "Rollback aborted: release ${REQUESTED_SHA} is marked rollback-unsafe and has no pinned activated image IDs."
-else
-  # Never start a retained release from mutable shared tags (e.g. a PostgreSQL tag rebuilt by a later
-  # candidate) and never record whatever those tags currently resolve to as the release's pins.
-  refuse "Rollback aborted: release ${REQUESTED_SHA} has no verified .activated-images pins; ship the desired code as a new commit (for example a git revert) on the deployment branch so the pipeline builds and pins it."
+restore_status=0
+restore_pinned_images_file "${RELEASE_DIR}/.activated-images" "${RELEASE_DIR}" "${REQUESTED_SHA}" "${REQUESTED_ENV}" || restore_status=$?
+if (( restore_status == 2 )); then
+  mark_rollback_unsafe "${RELEASE_DIR}" "${REQUESTED_SHA}" || note_stderr "Warning: failed to persist .rollback-unsafe marker for ${REQUESTED_SHA}."
+  refuse "Rollback aborted: one or more pinned activated image IDs for ${REQUESTED_SHA} are confirmed missing locally."
+elif (( restore_status != 0 )); then
+  die "Rollback aborted: operational Docker error while restoring or verifying pinned image tags for ${REQUESTED_SHA}."
 fi
+while IFS=' ' read -r rb_svc rb_ref rb_id; do
+  case "${rb_svc}" in
+    postgres) target_pg_ref="${rb_ref}"; target_pg_id="${rb_id}" ;;
+    api) target_api_ref="${rb_ref}"; target_api_id="${rb_id}" ;;
+    supplier-web) target_supplier_ref="${rb_ref}"; target_supplier_id="${rb_id}" ;;
+    tmmin-web) target_tmmin_ref="${rb_ref}"; target_tmmin_id="${rb_id}" ;;
+    caddy) target_caddy_ref="${rb_ref}"; target_caddy_id="${rb_id}" ;;
+  esac
+done <<<"${parsed_target_manifest}"
 
 # Once services start being replaced, any failure (health, smoke, pointer update) must not leave a mixed
 # stack serving traffic (e.g. the target API behind the old Caddy/frontends). Fail closed: stop Caddy and the
@@ -150,7 +153,7 @@ trap 'exit 143' TERM
 trap 'exit 130' INT
 trap 'exit 129' HUP
 
-printf 'Rolling code back to %s; database schema and shared volumes are not restored.\n' "${REQUESTED_SHA}"
+{ printf 'Rolling code back to %s; database schema and shared volumes are not restored.\n' "${REQUESTED_SHA}"; } 2>/dev/null || true
 log_info "[rollback] Pre-mutation checks passed (pointers, activation proof, 5-image manifest restored and pinned); quiescing Caddy and opening mutation window."
 rollback_mutating=true
 # Quiesce ingress BEFORE replacing anything: with the current Caddy stopped, no request can reach a
@@ -191,4 +194,4 @@ activate_symlink "${RELEASE_DIR}" "${BASE_DIR}/current" || die "Failed to re-poi
 [[ -L "${BASE_DIR}/current" && "$(readlink "${BASE_DIR}/current")" == "${RELEASE_DIR}" ]] || die "Failed to re-point ${BASE_DIR}/current."
 publish_line_file "${REQUESTED_SHA}" "${BASE_DIR}/current_release" || die "Failed to publish ${BASE_DIR}/current_release."
 rollback_mutating=false
-printf 'Rollback completed for %s.\n' "${REQUESTED_SHA}"
+{ printf 'Rollback completed for %s.\n' "${REQUESTED_SHA}"; } 2>/dev/null || true

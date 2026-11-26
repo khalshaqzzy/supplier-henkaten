@@ -169,27 +169,34 @@ if [[ "${previous_release}" != "${REQUESTED_SHA}" && -f "${RELEASE_DIR}/.activat
   fi
 fi
 
-# Opportunistically materialize missing retention tags for other retained releases (v2 -> v3 upgrade).
+# Materialize missing retention tags for other retained releases (v2 -> v3 upgrade).
+# Abort before build if an operational Docker error prevents protecting an older retained release.
 for retained_dir in "${BASE_DIR}/releases/"*; do
   [[ -d "${retained_dir}" && "${retained_dir}" != "${RELEASE_DIR}" ]] || continue
   [[ -z "${previous_release}" || "${retained_dir}" != "${BASE_DIR}/releases/${previous_release}" ]] || continue
   [[ -f "${retained_dir}/.activated-images" && ! -L "${retained_dir}/.activated-images" ]] || continue
   retained_sha="$(basename "${retained_dir}")"
   [[ "${retained_sha}" =~ ^[0-9a-f]{40}$ ]] || continue
-  ensure_manifest_pins "${REQUESTED_ENV}" "${retained_dir}" "${retained_sha}" || echo "Warning: could not retain all pins for older release ${retained_sha}." >&2
+  retained_pin_status=0
+  ensure_manifest_pins "${REQUESTED_ENV}" "${retained_dir}" "${retained_sha}" || retained_pin_status=$?
+  if (( retained_pin_status == 1 )); then
+    die "Cannot safely proceed with build: operational Docker error retaining pins for older release ${retained_sha}; aborting before overwriting shared tags."
+  elif (( retained_pin_status != 0 )); then
+    note_stderr "Warning: older release ${retained_sha} had confirmed-missing local image(s) or an invalid manifest (status ${retained_pin_status})."
+  fi
 done
 
 restore_saved_images() {
   local idx restored_id tag_err status=0
   for ((idx = 0; idx < ${#saved_image_refs[@]}; idx++)); do
     if ! tag_err="$(docker tag "${saved_image_ids[idx]}" "${saved_image_refs[idx]}" 2>&1)"; then
-      echo "Failed to restore Docker image tag ${saved_image_refs[idx]} to ${saved_image_ids[idx]} (${tag_err:-docker tag failed})." >&2
+      note_stderr "Failed to restore Docker image tag ${saved_image_refs[idx]} to ${saved_image_ids[idx]} (${tag_err:-docker tag failed})."
       status=1
       continue
     fi
     restored_id="$(docker image inspect --format '{{.Id}}' "${saved_image_refs[idx]}" 2>/dev/null || true)"
     if [[ "${restored_id}" != "${saved_image_ids[idx]}" ]]; then
-      echo "Restored Docker image tag ${saved_image_refs[idx]} resolved to '${restored_id:-<empty>}', expected '${saved_image_ids[idx]}'." >&2
+      note_stderr "Restored Docker image tag ${saved_image_refs[idx]} resolved to '${restored_id:-<empty>}', expected '${saved_image_ids[idx]}'."
       status=1
     fi
   done
@@ -245,7 +252,10 @@ candidate_deploy() {
 
   pg_ref="$(postgres_image_ref_for "${RELEASE_DIR}")"
   rm -f -- "${candidate_manifest}" "${staged_manifest}"
-  umask 077
+  install -m 600 /dev/null "${candidate_manifest}" || {
+    note_stderr "Candidate deploy failed creating staged candidate manifest ${candidate_manifest}."
+    return 1
+  }
   for svc in "${DEPLOY_SERVICES[@]}"; do
     ref="$(service_image_ref_for "${RELEASE_DIR}" "${REQUESTED_SHA}" "${svc}")"
     if ! built_id="$(docker image inspect --format '{{.Id}}' "${ref}" 2>&1)"; then
@@ -356,23 +366,24 @@ run_known_good_rollback_driver() {
   # five-image manifest is revalidated (every pinned ID present locally, tags restored and re-verified)
   # immediately before the retry, since the failed candidate attempt may have touched tags.
   if ! rollback_driver_bundle_is_strict "${good_bundle}"; then
-    echo "Known-good rollback driver ${good_bundle} lacks the strict pin contract; not retrying." >&2
+    note_stderr "Known-good rollback driver ${good_bundle} lacks the strict pin contract; not retrying."
     return 1
   fi
   if [[ ! -f "${previous_dir}/.activated-images" || -L "${previous_dir}/.activated-images" ]] ||
     ! restore_pinned_images_file "${previous_dir}/.activated-images" "${previous_dir}" "${previous_release}" "${REQUESTED_ENV}"; then
-    echo "Target ${previous_release} pins could not be revalidated; not retrying with the known-good driver." >&2
+    note_stderr "Target ${previous_release} pins could not be revalidated; not retrying with the known-good driver."
     return 1
   fi
-  echo "Candidate rollback driver failed; retrying recovery once with the known-good driver ${good_bundle}." >&2
+  note_stderr "Candidate rollback driver failed; retrying recovery once with the known-good driver ${good_bundle}."
   DEPLOY_LOCK_HELD=true "${good_driver}" "${REQUESTED_ENV}" "${previous_release}" "${BASE_DIR}"
 }
 
 if ! candidate_deploy; then
-  # From here on a closed SSH session (cancelled runner) must not kill recovery mid-way via SIGPIPE.
+  # From here on a closed SSH session (cancelled runner) must not kill recovery mid-way via SIGPIPE
+  # or via an EPIPE write error under `set -e` (all writes use note_stderr / log_info / `|| true`).
   trap '' PIPE
   rm -f -- "${candidate_manifest}" "${staged_manifest}" >/dev/null 2>&1 || true
-  echo "Candidate deployment failed. No database down migration will be attempted." >&2
+  note_stderr "Candidate deployment failed. No database down migration will be attempted."
   previous_dir="${BASE_DIR}/releases/${previous_release}"
   images_restored=true
   if ! restore_saved_images; then
@@ -380,11 +391,11 @@ if ! candidate_deploy; then
   fi
   if [[ "${images_restored}" != "true" || "${image_snapshot_complete}" != "true" ]]; then
     if [[ -n "${previous_release}" && -d "${previous_dir}" ]]; then
-      mark_rollback_unsafe "${previous_dir}" "${REQUESTED_SHA}" || echo "Warning: failed to persist .rollback-unsafe marker for ${previous_release}." >&2
+      mark_rollback_unsafe "${previous_dir}" "${REQUESTED_SHA}" || note_stderr "Warning: failed to persist .rollback-unsafe marker for ${previous_release}."
     fi
   fi
   if [[ -n "${previous_release}" && "${services_mutated}" == "false" ]]; then
-    echo "Failure occurred before modifying running services; active release ${previous_release} was preserved untouched." >&2
+    note_stderr "Failure occurred before modifying running services; active release ${previous_release} was preserved untouched."
     exit 1
   fi
   if [[ -n "${previous_release}" && ( "${images_restored}" != "true" || "${image_snapshot_complete}" != "true" || ( ( -e "${previous_dir}/.rollback-unsafe" || -L "${previous_dir}/.rollback-unsafe" ) && ! -f "${previous_dir}/.activated-images" ) ) ]]; then
@@ -421,18 +432,18 @@ if ! candidate_deploy; then
         "${REQUESTED_ENV}" "${previous_release}" "${BASE_DIR}" || candidate_driver_status=$?
       log_info "[deploy] Candidate rollback driver exited with status ${candidate_driver_status}."
     else
-      echo "Candidate hardened rollback driver is unavailable or lacks the strict pin contract." >&2
+      note_stderr "Candidate hardened rollback driver is unavailable or lacks the strict pin contract."
       candidate_driver_status=127
     fi
     # A deliberate policy refusal by the candidate driver is final; only crashes/other failures (or a
     # missing candidate driver) may be retried once with the strict known-good driver.
     if (( candidate_driver_status != 0 )) &&
       { (( candidate_driver_status == ROLLBACK_POLICY_REFUSAL_EXIT )) || ! run_known_good_rollback_driver; }; then
-      echo "Automatic code rollback failed or was refused (candidate driver exit ${candidate_driver_status}); stopping failed candidate application services while preserving PostgreSQL." >&2
+      note_stderr "Automatic code rollback failed or was refused (candidate driver exit ${candidate_driver_status}); stopping failed candidate application services while preserving PostgreSQL."
       failclosed_stop_app_services "${RELEASE_DIR}" "${RUNTIME_ENV}" "${BASE_DIR}" || true
     elif [[ ! -f "${BASE_DIR}/current_release" || "$(<"${BASE_DIR}/current_release")" != "${previous_release}" ]] ||
       ! verify_running_matches_manifest "${previous_dir}" "${previous_env}" "${previous_release}" "${REQUESTED_ENV}"; then
-      echo "A rollback driver reported success but ${previous_release} is not verifiably active on its pinned images; stopping application services while preserving PostgreSQL." >&2
+      note_stderr "A rollback driver reported success but ${previous_release} is not verifiably active on its pinned images; stopping application services while preserving PostgreSQL."
       failclosed_stop_app_services "${RELEASE_DIR}" "${RUNTIME_ENV}" "${BASE_DIR}" || true
     else
       # Recovery is verified: close the mutation window BEFORE writing to a possibly broken stdout, so a
@@ -444,7 +455,7 @@ if ! candidate_deploy; then
     fi
   else
     failclosed_stop_app_services "${RELEASE_DIR}" "${RUNTIME_ENV}" "${BASE_DIR}" || true
-    echo "No validated previous code release was available; failed application services were stopped while persistent PostgreSQL was preserved." >&2
+    note_stderr "No validated previous code release was available; failed application services were stopped while persistent PostgreSQL was preserved."
   fi
   exit 1
 fi
@@ -520,8 +531,11 @@ if [[ -n "${previous_release}" && "${previous_release}" != "${REQUESTED_SHA}" &&
 fi
 # Prioritize locally verified rollback-capable activated releases over broken or unactivated
 # directories so a recent malformed/missing-image release cannot evict a healthy rollback target
-# from the 5-release retention budget.
+# from the 5-release retention budget. If Docker cannot determine the local image inventory,
+# fail safe by skipping destructive release and retention-tag cleanup for this run.
+retention_inventory_indeterminate=false
 for pass in verified_activated activated other; do
+  [[ "${retention_inventory_indeterminate}" == "false" ]] || break
   for release_entry in "${release_directories[@]}"; do
     (( ${#kept_releases[@]} < 5 )) || break
     already_kept=false
@@ -533,7 +547,14 @@ for pass in verified_activated activated other; do
     done
     [[ "${already_kept}" == "false" ]] || continue
     if [[ "${pass}" == "verified_activated" ]]; then
-      release_is_verified_rollback_target "${release_entry}" || continue
+      ver_rc=0
+      release_is_verified_rollback_target "${release_entry}" || ver_rc=$?
+      if (( ver_rc == 1 )); then
+        retention_inventory_indeterminate=true
+        note_stderr "Warning: indeterminate Docker inspection error while ranking retained release ${release_entry}; skipping destructive release and pin-tag cleanup for this run."
+        break
+      fi
+      (( ver_rc == 0 )) || continue
     elif [[ "${pass}" == "activated" ]]; then
       [[ -f "${release_entry}/.activated" && -f "${release_entry}/.activated-images" ]] || continue
     fi
@@ -541,26 +562,28 @@ for pass in verified_activated activated other; do
   done
 done
 
-for stale_dir in "${release_directories[@]}"; do
-  should_keep=false
-  for kept_release in "${kept_releases[@]}"; do
-    if [[ "${stale_dir}" == "${kept_release}" ]]; then
-      should_keep=true
-      break
-    fi
+if [[ "${retention_inventory_indeterminate}" == "false" ]]; then
+  for stale_dir in "${release_directories[@]}"; do
+    should_keep=false
+    for kept_release in "${kept_releases[@]}"; do
+      if [[ "${stale_dir}" == "${kept_release}" ]]; then
+        should_keep=true
+        break
+      fi
+    done
+    [[ "${should_keep}" == "false" ]] || continue
+    require_safe_path "${stale_dir}" "${BASE_DIR}/releases"
+    stale_sha="$(basename "${stale_dir}")"
+    require_sha "${stale_sha}"
+    log_info "[prune] Removing stale release directory ${stale_sha} and its application runtime tags."
+    rm -rf -- "${stale_dir}"
+    for stale_svc in api supplier-web tmmin-web caddy; do
+      docker image rm --no-prune "supplier-henkaten-${stale_svc}:${stale_sha}" >/dev/null 2>&1 || true
+    done
   done
-  [[ "${should_keep}" == "false" ]] || continue
-  require_safe_path "${stale_dir}" "${BASE_DIR}/releases"
-  stale_sha="$(basename "${stale_dir}")"
-  require_sha "${stale_sha}"
-  log_info "[prune] Removing stale release directory ${stale_sha} and its application runtime tags."
-  rm -rf -- "${stale_dir}"
-  for stale_svc in api supplier-web tmmin-web caddy; do
-    docker image rm --no-prune "supplier-henkaten-${stale_svc}:${stale_sha}" >/dev/null 2>&1 || true
-  done
-done
 
-prune_unreferenced_pin_tags "${REQUESTED_ENV}" "${kept_releases[@]}"
+  prune_unreferenced_pin_tags "${REQUESTED_ENV}" "${kept_releases[@]}"
+fi
 
 rm -f -- "${ARCHIVE}" "${RUNTIME_ENV_INCOMING}"
 printf 'Release %s is active; previous release was %s.\n' "${REQUESTED_SHA}" "${previous_release:-none}"
