@@ -1,3 +1,17 @@
+# Current Session Handoff: PR #54 pre-merge follow-up (H-1 pin backfill guard, operator docs)
+
+- Date: 2026-11-26. Branch `fix/security-high-findings` (PR #54 to `main`), building on `58c7982`. Phase 15 remains the sole `in_progress` phase.
+- Objective: act on the PR #54 deep review before merge: fix review finding H-1, run the production pre-merge checks, and bring operator docs up to date.
+- Completed:
+  - **H-1 fix** (`deploy/scripts/lib.sh`, `remote-deploy.sh`, `remote-rollback.sh`): new `release_is_hardened()` (stored `.runtime.env` has `POSTGRES_APP_USER`, or the tree ships `apps/api/src/cli/migrate.ts`), shared by deploy and rollback. The legacy wall-clock pin backfill now runs only for non-hardened releases. A hardened previous release missing `.activated-images` refuses a same-SHA redeploy before build and, on a cross-SHA deploy, is marked `.rollback-unsafe` before build (deploy aborts if the marker cannot be written).
+  - Regression fixture in `deploy/tests/deployment-scripts.sh` (hardened release, running containers that would satisfy the legacy heuristic): same-SHA refused for the expected reason with no build and no pins; cross-SHA marks `.rollback-unsafe` before build, activates, never backfills, and the shared rollback driver refuses the release. Mutation check: against the previous scripts the same-SHA rebuild was accepted and the cross-SHA deploy backfilled pins.
+  - Docs: `.agent/deploymentGuide.md` §5 (optional `POSTGRES_APP_USER`/`POSTGRES_APP_PASSWORD`, HMAC fallback, `POSTGRES_PASSWORD` coupling), §9.4/§9.5 (hardened guard, new step 5 `OutboxEvent` size check with a verified read-only query, consequence of failed provenance checks), §10 (`migrate.js` + role provisioning, `--provision-role-only` on rollback), §11 (superuser rotation breaks rollback to older snapshots; dual-role runtime rotation); ADR 0057 (backfill gate, validation, bounded 10 s late-commit wording, Risks and Follow-up Work); `implementationPhases.md`.
+- **Blocked:** production VM pre-merge checks were not run. Domains resolve to `34.177.107.125`, SSH port 22 times out from the workstation (likely a GCP firewall source allowlist), the VM is not in any GCP project the local gcloud account can see, and the deploy key exists only as the `VM_SSH_PRIVATE_KEY` GitHub secret. SSH access was deferred by the user.
+- Checks run: `deploy/tests/deployment-scripts.sh` in Linux (`docker:27-cli` + util-linux `flock`, non-root) passed; ShellCheck v0.11.0 (CI-pinned image) 0 findings; `git diff --check` clean.
+- Next recommended action: with VM access, run `.agent/deploymentGuide.md` §9.5 steps 1–5 read-only on production; confirm CI is green on the new PR head; decide on an independent `POSTGRES_APP_PASSWORD` before or after first deploy; then merge. Review follow-ups not done here: M-1 (database-level `CREATE`/`TEMPORARY` revoke), M-6 (SSE client resync state guard), PR #54 description refresh.
+
+---
+
 # Current Session Handoff: High-severity security hardening (H-01..H-07)
 
 - Date: 2026-11-26. Branch `fix/security-high-findings` from main `db60208` (PR #53 merged). Delivery authorized: commit, push the branch and open a PR to `main`. Phase 15 remains the sole `in_progress` phase.

@@ -151,6 +151,19 @@ Tambahkan environment secrets berikut:
 | `TMMIN_BOOTSTRAP_USERNAME` | username protected bootstrap administrator |
 | `TMMIN_BOOTSTRAP_PASSWORD` | password sementara minimum 12 karakter |
 
+Secret opsional untuk role database runtime least-privilege (ADR 0057):
+
+| Secret | Isi |
+| --- | --- |
+| `POSTGRES_APP_USER` | opsional; identifier role runtime non-superuser (`^[a-z_][a-z0-9_]{0,62}$`), wajib berbeda dari `POSTGRES_USER`. Bila kosong, diturunkan menjadi `<POSTGRES_USER>_app` (contoh `supplier_henkaten_app`). |
+| `POSTGRES_APP_PASSWORD` | opsional; 32–128 karakter aman. Bila kosong, render runtime env menurunkan password satu arah HMAC-SHA256 dari `POSTGRES_PASSWORD` + env/user/database (mode staged zero-touch, tercetak sebagai warning di log deploy). |
+
+Container `api` dan `bootstrap-admin` hanya menerima `POSTGRES_APP_USER`/`POSTGRES_APP_PASSWORD`;
+hanya `migrate` yang memakai `POSTGRES_USER`/`POSTGRES_PASSWORD` (owner schema). Karena password
+turunan bergantung pada `POSTGRES_PASSWORD`, **mengganti `POSTGRES_PASSWORD` juga mengganti password
+role runtime** selama `POSTGRES_APP_PASSWORD` belum diisi. Beralih dari password turunan ke secret
+independen mengikuti koreografi rotasi pada bagian 11.
+
 Untuk seluruh password/secret dotenv, gunakan hanya `A-Z`, `a-z`, `0-9`, `_`, dan `-`. Generator
 yang sesuai:
 
@@ -325,8 +338,8 @@ sebelumnya; jalankan driver lagi untuk rilis dengan pin terverifikasi (biasanya 
 ### 9.4 Target yang ditolak dan jalur pemulihan
 
 Target tanpa manifest `.activated-images` lima image yang terverifikasi selalu ditolak — misalnya
-rilis legacy lama yang tidak pernah menjadi `current` saat deploy hardened, atau baseline campuran
-yang ditandai `.rollback-unsafe`. Pipeline **tidak bisa** men-deploy ulang SHA lama (workflow hanya
+rilis legacy lama yang tidak pernah menjadi `current` saat deploy hardened, baseline campuran
+yang ditandai `.rollback-unsafe`, atau rilis hardened yang kehilangan `.activated-images`. Pipeline **tidak bisa** men-deploy ulang SHA lama (workflow hanya
 men-deploy tip branch dan menolak SHA stale), jadi jalur pemulihan yang didukung adalah mengirim kode
 yang diinginkan sebagai **commit baru** di branch deployment (misalnya `git revert` dari perubahan yang
 bermasalah) sehingga pipeline membangun, mengaktifkan, dan mem-pin release baru tersebut.
@@ -349,6 +362,16 @@ Pemeriksaan waktu ini adalah heuristik khusus rilis legacy: ia mengandalkan `cur
 tidak di-`touch`/di-restore manual dan jam host yang tidak mundur. Rilis hardened tidak bergantung
 padanya karena pin dicatat saat aktivasi.
 
+Batas ini ditegakkan oleh `release_is_hardened()` di `deploy/scripts/lib.sh`: sebuah rilis dianggap
+hardened bila `.runtime.env`-nya memuat `POSTGRES_APP_USER` atau tree-nya memuat
+`apps/api/src/cli/migrate.ts`. Bila rilis aktif yang hardened ternyata tidak punya `.activated-images`
+(manifest hilang/terhapus), deploy **tidak pernah** mem-backfill pin dari container yang berjalan:
+
+- redeploy SHA yang sama ditolak sebelum build
+  (`legacy pin backfill is not permitted for hardened releases`);
+- deploy SHA baru menandai rilis tersebut `.rollback-unsafe` sebelum build lalu melanjutkan; rilis itu
+  tidak bisa menjadi target rollback dan pemulihannya mengikuti jalur commit baru pada 9.4.
+
 **Risiko residual yang diterima:** bila deploy legacy pernah membangun ulang tag PostgreSQL bersama lalu
 rollback legacy menyalakan PostgreSQL dari tag itu untuk SHA aplikasi yang lebih lama, backfill akan
 mem-pin kombinasi yang memang sedang berjalan tersebut (tidak ada catatan image PostgreSQL independen
@@ -365,6 +388,23 @@ untuk rilis legacy).
 4. `Config.Image` harus persis `supplier-henkaten-postgres:18.4-pgvector-0.8.5` untuk postgres dan
    `supplier-henkaten-<service>:<SHA aktif>` untuk service aplikasi; bila riwayat rebuild/rollback legacy
    seperti di atas pernah terjadi, bandingkan juga `.Image` PostgreSQL dengan ekspektasi operator.
+5. Ukuran `OutboxEvent` (migration `20261126002800_outbox_realtime_poll_index` memakai `CREATE INDEX`
+   biasa yang menahan write ke tabel itu selama index dibangun, sementara API lama masih melayani):
+
+   ```bash
+   pg="$(docker ps -q --filter label=com.docker.compose.project=supplier-henkaten-production --filter label=com.docker.compose.service=postgres)"
+   docker exec -i "$pg" sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At' <<'SQL'
+   SELECT count(*), pg_size_pretty(pg_total_relation_size('"OutboxEvent"')) FROM "OutboxEvent";
+   SQL
+   ```
+
+   Sampai ratusan ribu baris, build index selesai dalam hitungan detik atau kurang. Bila jauh lebih besar,
+   merge pada jam sepi.
+
+Seluruh pemeriksaan di atas read-only. Bila langkah 2–4 gagal, deploy pertama tetap berjalan (rilis
+legacy ditandai `.rollback-unsafe` sebelum build), tetapi automatic rollback ke `db60208` tidak tersedia:
+bila deploy itu gagal, service aplikasi dihentikan dan layanan mati sampai commit perbaikan ter-deploy.
+Putuskan merge dengan kesadaran itu.
 
 ### 9.6 Driver bundle dan fallback operator
 
@@ -424,7 +464,13 @@ menambahkan bypass/dispatch publik ke workflow.
 
 ## 10. Migration
 
-- Hosted deployment hanya menjalankan `prisma migrate deploy`.
+- Hosted deployment menjalankan service `migrate` (`node dist/cli/migrate.js`) dengan
+  `POSTGRES_USER` sebagai owner schema: pertama `prisma migrate deploy`, lalu provisioning idempotent
+  role runtime `POSTGRES_APP_USER` (verifier SCRAM-SHA-256, grant per tabel/kolom, revoke `CREATE` pada
+  schema `public`, verifikasi login non-superuser). `REQUIRE_APP_DB_ROLE=true` membuat deploy gagal
+  bila provisioning gagal atau ada tabel immutable baru yang belum dikategorikan.
+- Rollback menjalankan `migrate.js --provision-role-only` dari release target: grant direkonsiliasi
+  tanpa migration, dan tabel immutable yang belum dikenal release lama dicabut seluruh aksesnya.
 - Migration harus forward-only dan backward-compatible dengan setidaknya satu code release
   sebelumnya.
 - CI menguji fresh database dan previous-SHA-to-current upgrade.
@@ -460,6 +506,19 @@ perubahan role terkoordinasi di database, GitHub secret, dan runtime env dengan 
   Recovery merotasi password protected administrator dan mencabut session aktif.
 - Caddy email: ganti secret dan deploy; state certificate tetap berada di shared Caddy path.
 - Database password: ikuti prosedur terkoordinasi pada bagian migration, bukan secret-only rotation.
+  Ingat bahwa selama `POSTGRES_APP_PASSWORD` belum diisi, password role runtime diturunkan dari
+  `POSTGRES_PASSWORD`, jadi rotasi superuser juga mengubah password runtime pada deploy berikutnya.
+  Snapshot `.runtime.env` rilis lama tetap menyimpan `POSTGRES_PASSWORD` lama, sehingga rollback ke rilis
+  sebelum rotasi akan gagal di `--provision-role-only` setelah Caddy dihentikan; rencanakan rotasi
+  superuser sebagai perubahan yang memutus jalur rollback ke rilis sebelumnya.
+- Role runtime (`POSTGRES_APP_PASSWORD`, termasuk beralih dari password turunan HMAC ke secret
+  independen): `migrate` menjalankan `ALTER ROLE` sebelum `api` diganti, sehingga mengganti password
+  role yang sama menimbulkan jeda autentikasi untuk `api` lama. Pilih salah satu:
+  1. maintenance window singkat; atau
+  2. switchover dua role: isi `POSTGRES_APP_USER` dengan nama role baru (contoh
+     `supplier_henkaten_app_v2`) bersama `POSTGRES_APP_PASSWORD` independen, deploy (`api` lama tetap
+     memakai role lama sampai diganti), lalu hapus role lama setelah tidak ada snapshot rollback yang
+     mereferensikannya.
 
 Jangan mencetak secret di terminal bersama, workflow log, issue, atau pull request.
 
