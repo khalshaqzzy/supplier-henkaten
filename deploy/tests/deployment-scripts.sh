@@ -338,6 +338,10 @@ if [[ "${1:-}" == "inspect" ]]; then
     printf '%s\n' "${config_ref:-${default_ref}}"
     exit 0
   fi
+  if [[ -n "${TEST_UNHEALTHY_SERVICE:-}" && "${svc_name}" == "${TEST_UNHEALTHY_SERVICE}" && "${3:-}" != "{{json .State.Health}}" ]]; then
+    echo unhealthy
+    exit 0
+  fi
   echo healthy
   exit 0
 fi
@@ -1330,6 +1334,33 @@ DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=13 TEST_DOCKER_LOG="${md_l
 [[ "${md_status}" == "3" ]] || fail "missing candidate driver did not fall back to the known-good driver (exit ${md_status})"
 grep -Fxq 'STARTED postgres=sha256:fb-postgres' "${md_log}" || fail "known-good fallback for a missing candidate driver did not restart pinned postgres"
 
+# If the parent cannot revalidate the target's pins (a pinned ID missing locally) after the candidate driver
+# failed, the known-good driver must NOT run: exit 1, candidate app services stopped.
+IFS='|' read -r rv_incoming rv_runtime rv_archive rv_checksum < <(prepare_candidate "${fallback_base}" 7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f 15)
+printf '#!/usr/bin/env bash\ntouch "%s/revalidation-candidate-driver-ran"\nexit 1\n' "${fallback_base}" >"${rv_incoming}/deploy/scripts/remote-rollback.sh"
+chmod +x "${rv_incoming}/deploy/scripts/remote-rollback.sh"
+# Point .good at a strict-contract probe bundle so the test proves the PARENT's revalidation gate (not the
+# known-good driver's own pin checks) is what prevents the retry.
+rv_probe="${fallback_base}/shared/deployment-state/rollback-driver.v.revalidation-probe"
+mkdir -p "${rv_probe}"
+printf 'strict-five-image-pins-v1\n' >"${rv_probe}/.driver-contract"
+printf '#!/usr/bin/env bash\ntouch "%s/revalidation-probe-ran"\nexit 0\n' "${fallback_base}" >"${rv_probe}/remote-rollback.sh"
+chmod +x "${rv_probe}/remote-rollback.sh"
+ln -sfn "${rv_probe}" "${fallback_base}/shared/deployment-state/rollback-driver.good"
+rv_log="${TEST_ROOT}/driver-fallback-revalidation.log"
+rv_status=0
+DEPLOY_FORCE_SMOKE_FAILURE=true TEST_MISSING_IMAGE=sha256:fb-caddy TEST_BUILD_TAG_SUFFIX=15 TEST_DOCKER_LOG="${rv_log}" TEST_IMAGE_STATE_FILE="${fallback_base}/images.state" \
+  PATH="${fake_bin}:${PATH}" "${rv_incoming}/deploy/scripts/remote-deploy.sh" \
+  staging 7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f 15 "${fallback_base}" "${rv_incoming}" "${rv_runtime}" \
+  "${rv_archive}" "${rv_checksum}" 127.0.0.1 >/dev/null 2>&1 || rv_status=$?
+[[ -f "${fallback_base}/revalidation-candidate-driver-ran" ]] || fail "revalidation test never reached the candidate driver"
+[[ ! -f "${fallback_base}/revalidation-probe-ran" ]] || fail "known-good driver was invoked although the parent could not revalidate the target's pins"
+[[ "${rv_status}" == "1" ]] || fail "known-good retry ran although target pins could not be revalidated (exit ${rv_status})"
+if grep -Fxq 'STARTED postgres=sha256:fb-postgres' "${rv_log}"; then
+  fail "known-good driver started services although target pins could not be revalidated"
+fi
+grep -q ' stop ' "${rv_log}" || fail "failed pin revalidation left candidate services running"
+
 # A known-good link to a bundle WITHOUT the strict pin contract (e.g. the pre-versioning driver that could
 # start unpinned releases from mutable tags) must never be used as the fallback.
 nonstrict_good="${fallback_base}/shared/deployment-state/rollback-driver.legacy.nonstrict"
@@ -1338,14 +1369,14 @@ printf '#!/usr/bin/env bash\ntouch "%s/nonstrict-driver-ran"\nexit 0\n' "${fallb
 chmod +x "${nonstrict_good}/remote-rollback.sh"
 ln -sfn "${nonstrict_good}" "${fallback_base}/shared/deployment-state/rollback-driver.good"
 printf '%s\n' "${fallback_prev}" >"${fallback_base}/current_release"
-IFS='|' read -r ns_incoming ns_runtime ns_archive ns_checksum < <(prepare_candidate "${fallback_base}" 7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a 14)
+IFS='|' read -r ns_incoming ns_runtime ns_archive ns_checksum < <(prepare_candidate "${fallback_base}" 7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a 16)
 printf '#!/usr/bin/env bash\nexit 1\n' >"${ns_incoming}/deploy/scripts/remote-rollback.sh"
 chmod +x "${ns_incoming}/deploy/scripts/remote-rollback.sh"
 ns_log="${TEST_ROOT}/driver-fallback-nonstrict.log"
 ns_status=0
-DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=14 TEST_DOCKER_LOG="${ns_log}" TEST_IMAGE_STATE_FILE="${fallback_base}/images.state" \
+DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=16 TEST_DOCKER_LOG="${ns_log}" TEST_IMAGE_STATE_FILE="${fallback_base}/images.state" \
   PATH="${fake_bin}:${PATH}" "${ns_incoming}/deploy/scripts/remote-deploy.sh" \
-  staging 7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a 14 "${fallback_base}" "${ns_incoming}" "${ns_runtime}" \
+  staging 7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a 16 "${fallback_base}" "${ns_incoming}" "${ns_runtime}" \
   "${ns_archive}" "${ns_checksum}" 127.0.0.1 >/dev/null 2>&1 || ns_status=$?
 [[ ! -f "${fallback_base}/nonstrict-driver-ran" ]] || fail "automatic recovery fell back to a known-good driver lacking the strict pin contract"
 [[ "${ns_status}" == "1" ]] || fail "failed recovery without an eligible strict fallback must exit 1 (got ${ns_status})"
@@ -1506,6 +1537,50 @@ if TEST_BUILD_FAIL=true TEST_IMAGE_STATE_FILE="${rehearsal_bad_base}/images.stat
   "${SCRIPTS}/rehearse-staging.sh" "${rehearsal_prev}" "${rehearsal_cur}" "${rehearsal_bad_base}" 127.0.0.1 I_ACCEPT_STAGING_INTERRUPTION \
   >/dev/null 2>&1; then
   fail "staging rehearsal reported success although the candidate failed before the forced smoke failure and no automatic recovery ran"
+fi
+
+# A manual rollback that fails after it started replacing services (here: target API never healthy) must
+# not leave the target API behind the old Caddy/frontends: it stops Caddy and the app services, preserves
+# PostgreSQL, and leaves current_release untouched.
+rbfail_base="${TEST_ROOT}/rollback-midway-failure"
+prepare_base "${rbfail_base}"
+rbfail_target=7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d
+rbfail_current=7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e
+mkdir -p "${rbfail_base}/releases/${rbfail_target}/deploy/scripts"
+sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${rbfail_target}/" "${legacy_env}" >"${rbfail_base}/releases/${rbfail_target}/.runtime.env"
+printf '%s\n' "${rbfail_target}" >"${rbfail_base}/releases/${rbfail_target}/.source.sha"
+printf '#!/usr/bin/env bash\nexit 0\n' >"${rbfail_base}/releases/${rbfail_target}/deploy/scripts/smoke-check.sh"
+chmod +x "${rbfail_base}/releases/${rbfail_target}/deploy/scripts/smoke-check.sh"
+{
+  printf 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:rbf-postgres\n'
+  for svc in api supplier-web tmmin-web caddy; do
+    printf 'supplier-henkaten-%s:%s sha256:rbf-%s\n' "${svc}" "${rbfail_target}" "${svc}"
+  done
+} >"${rbfail_base}/releases/${rbfail_target}/.activated-images"
+cp "${rbfail_base}/releases/${rbfail_target}/.activated-images" "${rbfail_base}/images.state"
+printf '%s\n' "${rbfail_current}" >"${rbfail_base}/current_release"
+install_driver "${SCRIPTS}" "${rbfail_base}" || fail "midway-failure fixture driver install failed"
+rbfail_log="${TEST_ROOT}/rollback-midway-failure.log"
+if TEST_UNHEALTHY_SERVICE=api TEST_DOCKER_LOG="${rbfail_log}" TEST_IMAGE_STATE_FILE="${rbfail_base}/images.state" \
+  PATH="${fake_bin}:${PATH}" "${rbfail_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" \
+  staging "${rbfail_target}" "${rbfail_base}" >/dev/null 2>&1; then
+  fail "manual rollback succeeded although the target API never became healthy"
+fi
+grep -Eq ' stop caddy supplier-web tmmin-web api$' "${rbfail_log}" || fail "failed manual rollback left a mixed stack (old Caddy/frontends + target API) running"
+if grep -Eq ' stop .*postgres' "${rbfail_log}"; then
+  fail "failed manual rollback stopped PostgreSQL"
+fi
+[[ "$(<"${rbfail_base}/current_release")" == "${rbfail_current}" ]] || fail "failed manual rollback changed current_release"
+# A refusal BEFORE any service changes must not stop anything.
+rbrefuse_log="${TEST_ROOT}/rollback-refusal-no-stop.log"
+rm -f -- "${rbfail_base}/releases/${rbfail_target}/.activated-images"
+rbrefuse_status=0
+TEST_DOCKER_LOG="${rbrefuse_log}" TEST_IMAGE_STATE_FILE="${rbfail_base}/images.state" \
+  PATH="${fake_bin}:${PATH}" "${rbfail_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" \
+  staging "${rbfail_target}" "${rbfail_base}" >/dev/null 2>&1 || rbrefuse_status=$?
+[[ "${rbrefuse_status}" == "4" ]] || fail "unpinned target refusal did not exit with the policy-refusal status 4 (got ${rbrefuse_status})"
+if [[ -f "${rbrefuse_log}" ]] && grep -q ' stop ' "${rbrefuse_log}"; then
+  fail "policy refusal before any service change stopped running services"
 fi
 
 lock_base="${TEST_ROOT}/lock"

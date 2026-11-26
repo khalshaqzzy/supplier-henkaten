@@ -60,7 +60,23 @@ else
   refuse "Rollback aborted: release ${REQUESTED_SHA} has no verified .activated-images pins; ship the desired code as a new commit (for example a git revert) on the deployment branch so the pipeline builds and pins it."
 fi
 
+# Once services start being replaced, any failure (health, smoke, pointer update) must not leave a mixed
+# stack serving traffic (e.g. the target API behind the old Caddy/frontends). Fail closed: stop Caddy and the
+# application services while preserving PostgreSQL; the release pointer still names the prior release, whose
+# verified pins let an operator recover it through this driver.
+rollback_mutating=false
+stop_mixed_stack_on_failure() {
+  local status=$?
+  if [[ "${status}" -ne 0 && "${rollback_mutating}" == "true" ]]; then
+    compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
+    echo "Rollback to ${REQUESTED_SHA} failed after services began changing; stopped Caddy and application services while preserving PostgreSQL to avoid serving a mixed release. Re-run this driver for a release with verified pins (for example the release named by current_release)." >&2
+  fi
+  exit "${status}"
+}
+trap stop_mixed_stack_on_failure EXIT
+
 printf 'Rolling code back to %s; database schema and shared volumes are not restored.\n' "${REQUESTED_SHA}"
+rollback_mutating=true
 compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" up -d --no-deps postgres
 wait_for_service "${RELEASE_DIR}" "${RUNTIME_ENV}" postgres 180
 if [[ -n "${POSTGRES_APP_USER:-}" && -n "${POSTGRES_APP_PASSWORD:-}" && -f "${RELEASE_DIR}/apps/api/src/cli/migrate.ts" ]]; then
@@ -86,4 +102,5 @@ mv "${RELEASE_DIR}/.activated.tmp" "${RELEASE_DIR}/.activated"
 activate_symlink "${RELEASE_DIR}" "${BASE_DIR}/current"
 printf '%s\n' "${REQUESTED_SHA}" >"${BASE_DIR}/current_release.tmp"
 mv "${BASE_DIR}/current_release.tmp" "${BASE_DIR}/current_release"
+rollback_mutating=false
 printf 'Rollback completed for %s.\n' "${REQUESTED_SHA}"

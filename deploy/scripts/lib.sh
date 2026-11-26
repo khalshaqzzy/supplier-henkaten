@@ -318,7 +318,8 @@ install_hardened_rollback_driver() {
   # Migrate a pre-versioning real directory out of the way (we hold the deploy lock, so no rollback runs).
   # A directory cannot be atomically replaced by a symlink, so on any publication failure the legacy
   # directory is moved back; if the process dies inside this window the next deploy republishes, and the
-  # operator fallback is the newest rollback-driver.legacy.*/remote-rollback.sh (see deploymentGuide §9).
+  # operator fallback is the already-staged strict bundle (rollback-driver.v.* whose .driver-contract
+  # matches), NEVER the non-strict rollback-driver.legacy.* driver (see deploymentGuide §9).
   legacy_dir=""
   if [[ -e "${driver_link}" && ! -L "${driver_link}" ]]; then
     if [[ ! -d "${driver_link}" ]]; then
@@ -475,8 +476,8 @@ write_activated_images() {
       if [[ "${created}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T ]]; then
         created_ns="$(normalize_timestamp_ns "$(date -u -d "${created}" +%s.%N 2>/dev/null || true)" || true)"
       fi
-      # Full nanosecond precision and STRICT ordering: a container (re)created in the same second as, or
-      # after, activation is ambiguous. A plain restart preserves .Created and still passes. Both values are
+      # Full nanosecond precision and STRICT ordering: a container whose .Created is equal to or later than
+      # the activation instant (including a recreation later within the same second) is ambiguous. A plain restart preserves .Created and still passes. Both values are
       # wall-clock readings of this host, so this legacy-only heuristic assumes current_release was not
       # touched/restored manually and the clock did not step backwards after activation; the Config.Image
       # ownership check above still applies regardless.
