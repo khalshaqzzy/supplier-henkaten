@@ -29,9 +29,9 @@ credential derivation (`H-07`). See
 [ADR 0057](../docs/adr/0057-high-severity-security-hardening-and-runtime-db-isolation.md) and the
 current handoff. Pre-merge review follow-up: the legacy pin backfill is now restricted to
 non-hardened releases (`release_is_hardened()`); a hardened release missing `.activated-images` is
-refused for same-SHA redeploy and marked `.rollback-unsafe` on cross-SHA deploy. The production
-pre-merge VM checks (deploymentGuide §9.5 steps 1–5) remain outstanding and block the merge to
-`main`. Phase 15 remains the sole current `in_progress` phase; staging/device/UAT is
+refused for same-SHA redeploy and marked `.rollback-unsafe` on cross-SHA deploy. The optional
+read-only production checks in deploymentGuide §9.5 are informational (the deploy enforces steps
+1–4 itself) and do not block the merge to `main`. Phase 15 remains the sole current `in_progress` phase; staging/device/UAT is
 unchanged.
 
 ## Master Data desktop design polish — 24 November 2026

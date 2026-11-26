@@ -377,7 +377,10 @@ rollback legacy menyalakan PostgreSQL dari tag itu untuk SHA aplikasi yang lebih
 mem-pin kombinasi yang memang sedang berjalan tersebut (tidak ada catatan image PostgreSQL independen
 untuk rilis legacy).
 
-**Pemeriksaan wajib di VM production sebelum merge deploy hardened pertama ke `main`:**
+**Pemeriksaan opsional (read-only) di VM production sebelum merge deploy hardened pertama ke `main`.**
+Langkah 1–4 juga dijalankan otomatis oleh `remote-deploy.sh` sebelum build dan gagal tertutup ke
+`.rollback-unsafe`; menjalankannya lebih dulu hanya memberi tahu sebelumnya apakah automatic rollback ke
+`db60208` akan tersedia. Langkah 5 memperkirakan durasi lock index migration.
 
 1. `stat -c '%.9Y' /opt/supplier-henkaten/production/current_release`
 2. Untuk setiap service (`postgres api supplier-web tmmin-web caddy`):
