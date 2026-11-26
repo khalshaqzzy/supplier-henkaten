@@ -17,6 +17,11 @@ require_sha "${CURRENT_SHA}"
 [[ -n "${EXPECTED_HOST}" && ! "${EXPECTED_HOST}" =~ [[:space:]] ]] || die "Expected VM host is invalid."
 [[ -f "${BASE_DIR}/current_release" && "$(<"${BASE_DIR}/current_release")" == "${CURRENT_SHA}" ]] || die "The requested current release is not active."
 
+ROLLBACK_DRIVER="$(hardened_rollback_driver_path "${BASE_DIR}")"
+[[ -x "${ROLLBACK_DRIVER}" ]] || die "Hardened shared rollback driver is unavailable; deploy a hardened release first."
+rollback_driver_bundle_is_strict "$(cd "$(dirname "${ROLLBACK_DRIVER}")" && pwd -P)" ||
+  die "Shared rollback driver lacks the strict pin contract; refusing to rehearse with it."
+
 PREVIOUS_DIR="${BASE_DIR}/releases/${PREVIOUS_SHA}"
 CURRENT_DIR="${BASE_DIR}/releases/${CURRENT_SHA}"
 [[ -d "${PREVIOUS_DIR}" && -f "${PREVIOUS_DIR}/.runtime.env" ]] || die "Previous release is unavailable."
@@ -32,10 +37,11 @@ INCOMING_DIR="${BASE_DIR}/incoming/${CURRENT_SHA}.${REHEARSAL_RUN}"
 ARCHIVE="${BASE_DIR}/incoming/${CURRENT_SHA}.${REHEARSAL_RUN}.tar.gz"
 RUNTIME_ENV="${BASE_DIR}/incoming/${CURRENT_SHA}.${REHEARSAL_RUN}.env"
 SENTINEL="${BASE_DIR}/shared/member-photos/.rollback-rehearsal-sentinel"
+DEPLOY_OUTPUT="${BASE_DIR}/incoming/${CURRENT_SHA}.${REHEARSAL_RUN}.deploy.log"
 
 cleanup() {
   rm -rf -- "${INCOMING_DIR}"
-  rm -f -- "${ARCHIVE}" "${RUNTIME_ENV}" "${SENTINEL}"
+  rm -f -- "${ARCHIVE}" "${RUNTIME_ENV}" "${SENTINEL}" "${DEPLOY_OUTPUT}"
 }
 trap cleanup EXIT
 
@@ -53,7 +59,7 @@ DATABASE_IDENTITY="$(database_identity "${CURRENT_DIR}" "${CURRENT_DIR}/.runtime
 [[ "${DATABASE_IDENTITY}" =~ ^[0-9]+$ ]] || die "Could not capture the PostgreSQL cluster identity."
 printf '%s\n' "${CURRENT_SHA}" >"${SENTINEL}"
 
-"${CURRENT_DIR}/deploy/scripts/remote-rollback.sh" staging "${PREVIOUS_SHA}" "${BASE_DIR}"
+"${ROLLBACK_DRIVER}" staging "${PREVIOUS_SHA}" "${BASE_DIR}"
 [[ -f "${SENTINEL}" && "$(<"${SENTINEL}")" == "${CURRENT_SHA}" ]] || die "Photo-volume sentinel was not preserved by rollback."
 load_runtime_env "${PREVIOUS_DIR}/.runtime.env"
 [[ "$(database_identity "${PREVIOUS_DIR}" "${PREVIOUS_DIR}/.runtime.env")" == "${DATABASE_IDENTITY}" ]] || die "PostgreSQL cluster identity changed during rollback."
@@ -66,18 +72,25 @@ sed "s/^DEPLOY_RUN_NUMBER=.*/DEPLOY_RUN_NUMBER=${REHEARSAL_RUN}/" \
   "${CURRENT_DIR}/.runtime.env" >"${RUNTIME_ENV}"
 ARCHIVE_SHA256="$(sha256sum "${ARCHIVE}" | awk '{print $1}')"
 
-if DEPLOY_FORCE_SMOKE_FAILURE=true "${INCOMING_DIR}/deploy/scripts/remote-deploy.sh" \
+set +e
+DEPLOY_FORCE_SMOKE_FAILURE=true "${INCOMING_DIR}/deploy/scripts/remote-deploy.sh" \
   staging "${CURRENT_SHA}" "${REHEARSAL_RUN}" "${BASE_DIR}" "${INCOMING_DIR}" \
-  "${RUNTIME_ENV}" "${ARCHIVE}" "${ARCHIVE_SHA256}" "${EXPECTED_HOST}"; then
-  die "Forced-smoke candidate unexpectedly succeeded."
-fi
+  "${RUNTIME_ENV}" "${ARCHIVE}" "${ARCHIVE_SHA256}" "${EXPECTED_HOST}" | tee "${DEPLOY_OUTPUT}"
+deploy_status="${PIPESTATUS[0]}"
+set -e
+[[ "${deploy_status}" != "0" ]] || die "Forced-smoke candidate unexpectedly succeeded."
+# The pointer/sentinel state below is already satisfied by the first manual rollback, so require positive
+# proof that the forced smoke failure was reached AND the shared driver completed automatic recovery.
+[[ "${deploy_status}" == "3" ]] || die "Candidate failed (exit ${deploy_status}) without completing hardened automatic recovery."
+grep -Fxq "DEPLOY_RESULT=automatic-rollback-completed forced_smoke_failure=true restored=${PREVIOUS_SHA}" "${DEPLOY_OUTPUT}" ||
+  die "Automatic recovery was not proven to follow the forced smoke failure for ${PREVIOUS_SHA}."
 
 [[ "$(<"${BASE_DIR}/current_release")" == "${PREVIOUS_SHA}" ]] || die "Automatic rollback did not restore the previous release."
 [[ -f "${SENTINEL}" && "$(<"${SENTINEL}")" == "${CURRENT_SHA}" ]] || die "Photo-volume sentinel was not preserved by automatic rollback."
 load_runtime_env "${PREVIOUS_DIR}/.runtime.env"
 [[ "$(database_identity "${PREVIOUS_DIR}" "${PREVIOUS_DIR}/.runtime.env")" == "${DATABASE_IDENTITY}" ]] || die "PostgreSQL cluster identity changed during automatic rollback."
 
-"${CURRENT_DIR}/deploy/scripts/remote-rollback.sh" staging "${CURRENT_SHA}" "${BASE_DIR}"
+"${ROLLBACK_DRIVER}" staging "${CURRENT_SHA}" "${BASE_DIR}"
 [[ "$(<"${BASE_DIR}/current_release")" == "${CURRENT_SHA}" ]] || die "Latest release was not restored."
 [[ -f "${SENTINEL}" ]] || die "Photo-volume sentinel was not preserved while restoring the latest release."
 load_runtime_env "${CURRENT_DIR}/.runtime.env"

@@ -151,6 +151,19 @@ Tambahkan environment secrets berikut:
 | `TMMIN_BOOTSTRAP_USERNAME` | username protected bootstrap administrator |
 | `TMMIN_BOOTSTRAP_PASSWORD` | password sementara minimum 12 karakter |
 
+Secret opsional untuk role database runtime least-privilege (ADR 0057):
+
+| Secret | Isi |
+| --- | --- |
+| `POSTGRES_APP_USER` | opsional; identifier role runtime non-superuser (`^[a-z_][a-z0-9_]{0,62}$`), wajib berbeda dari `POSTGRES_USER`. Bila kosong, diturunkan menjadi `<POSTGRES_USER>_app` (contoh `supplier_henkaten_app`). |
+| `POSTGRES_APP_PASSWORD` | opsional; 32–128 karakter aman. Bila kosong, render runtime env menurunkan password satu arah HMAC-SHA256 dari `POSTGRES_PASSWORD` + env/user/database (mode staged zero-touch, tercetak sebagai warning di log deploy). |
+
+Container `api` dan `bootstrap-admin` hanya menerima `POSTGRES_APP_USER`/`POSTGRES_APP_PASSWORD`;
+hanya `migrate` yang memakai `POSTGRES_USER`/`POSTGRES_PASSWORD` (owner schema). Karena password
+turunan bergantung pada `POSTGRES_PASSWORD`, **mengganti `POSTGRES_PASSWORD` juga mengganti password
+role runtime** selama `POSTGRES_APP_PASSWORD` belum diisi. Beralih dari password turunan ke secret
+independen mengikuti koreografi rotasi pada bagian 11.
+
 Untuk seluruh password/secret dotenv, gunakan hanya `A-Z`, `a-z`, `0-9`, `_`, dan `-`. Generator
 yang sesuai:
 
@@ -257,15 +270,171 @@ Untuk membuktikan ordering, merge dua candidate berdekatan. Hasil akhir harus se
 ## 9. Rollback dan Rehearsal
 
 Rollback hanya menghidupkan code/image dan env dari release lama. Ia tidak menjalankan down
-migration, tidak menghapus volume, dan tidak mengembalikan schema/data.
+migration, tidak menghapus volume, dan tidak mengembalikan schema/data. Semua rollback (manual,
+automatic, dan rehearsal) berjalan lewat **driver rollback hardened bersama** dan selalu fail closed:
+bila sesuatu tidak bisa diverifikasi, service aplikasi dihentikan dan PostgreSQL dipertahankan, bukan
+menyalakan image yang tidak terverifikasi.
 
-Rollback operator ke SHA yang masih retained:
+### 9.1 State deployment yang relevan
+
+| Path | Arti |
+| --- | --- |
+| `releases/<sha>/.activated` | Bukti rilis pernah aktif (wajib untuk target rollback hardened). |
+| `releases/<sha>/.activated-images` | Manifest pin lima image (`postgres`, `api`, `supplier-web`, `tmmin-web`, `caddy`) berisi image ID immutable yang dicatat saat aktivasi. |
+| `releases/<sha>/.rollback-unsafe` | Penanda bahwa baseline rilis tidak bisa diverifikasi; rollback ke rilis ini ditolak bila tanpa pin. |
+| `current`, `current_release` | Symlink dan pointer rilis aktif; selalu dipublikasikan dengan rename tepat setelah smoke sukses. |
+| `shared/deployment-state/rollback-driver` | Symlink ke bundle driver strict yang dipublikasikan deploy terakhir. |
+| `shared/deployment-state/rollback-driver.v.*` | Bundle driver berversi (`lib.sh`, `validate-runtime-env.sh`, `remote-rollback.sh`) dengan marker `.driver-contract` = `strict-five-image-pins-v2`. |
+| `shared/deployment-state/rollback-driver.good` | Symlink ke bundle strict milik deploy terakhir yang **berhasil diaktifkan** (tidak ada sebelum aktivasi hardened pertama). |
+| `shared/deployment-state/rollback-driver.legacy.*` | Driver pra-versioning yang dikarantina. **Non-strict — jangan pernah dijalankan.** |
+| `shared/deployment-state/failclosed.log` | Output `compose stop` dari jalur fail-closed (tetap tertulis walau sesi SSH putus). |
+
+### 9.2 Rollback manual
+
+Hanya ke SHA yang masih retained dan memiliki pin terverifikasi:
 
 ```bash
 ssh -p 22 henkaten-deploy@VM_HOST
-/opt/supplier-henkaten/staging/current/deploy/scripts/remote-rollback.sh \
-  staging PREVIOUS_40_CHARACTER_SHA /opt/supplier-henkaten/staging
+DRIVER=/opt/supplier-henkaten/staging/shared/deployment-state/rollback-driver
+# Jalankan HANYA bila driver adalah bundle strict (marker kontrak cocok); jika tidak, berhenti.
+[[ -L "$DRIVER" && "$(cat "$DRIVER/.driver-contract" 2>/dev/null)" == strict-five-image-pins-v2 ]] &&
+  "$DRIVER/remote-rollback.sh" staging PREVIOUS_40_CHARACTER_SHA /opt/supplier-henkaten/staging
 ```
+
+Urutan kerja driver:
+
+1. Mengambil deploy lock dan memvalidasi `.runtime.env`, `.source.sha`, `APP_ENV`/`RELEASE_SHA`.
+2. Menolak (exit `4`, tanpa mengubah service apa pun) bila: rilis hardened tanpa `.activated`;
+   `.activated-images`/`.rollback-unsafe` bukan file reguler; manifest tidak lengkap, image ID pin
+   tidak ada secara lokal, atau retag gagal diverifikasi; target ditandai `.rollback-unsafe` tanpa
+   pin; target tidak punya pin sama sekali; `current_release`/`.activated` berupa direktori atau
+   `current` bukan symlink.
+3. Menghentikan Caddy (ingress) lebih dulu, lalu menyalakan PostgreSQL, API, dan frontend dari image
+   yang di-pin, dan baru menyalakan Caddy lagi setelah semuanya sehat; lalu menjalankan smoke check.
+4. Mempublikasikan `.activated`, `current`, dan `current_release`.
+
+Bila langkah 3–4 gagal atau diinterupsi, driver menghentikan Caddy dan service aplikasi
+(PostgreSQL dipertahankan) dan keluar dengan status `1`. `current_release` tetap menunjuk rilis
+sebelumnya; jalankan driver lagi untuk rilis dengan pin terverifikasi (biasanya yang tertulis di
+`current_release`).
+
+### 9.3 Automatic recovery saat deploy gagal
+
+- Sebelum build, deploy memasang bundle driver strict baru dari candidate (belum menyentuh `.good`).
+- Bila candidate gagal setelah service berubah, recovery hanya dicoba bila tag image pra-build terbukti
+  dipulihkan dan rilis sebelumnya punya snapshot pin lengkap; jika tidak, service aplikasi dihentikan.
+- Recovery memakai driver bersama milik candidate, **tidak pernah** script milik rilis target.
+- Bila driver candidate hilang, non-strict, atau gagal karena alasan selain penolakan kebijakan
+  (exit `4`), deploy mencoba ulang **sekali** dengan `rollback-driver.good`, tetapi hanya bila bundle
+  itu strict dan setelah memverifikasi ulang kelima pin target. Penolakan kebijakan (exit `4`) bersifat
+  final.
+- Setelah driver melapor sukses, deploy memverifikasi sendiri bahwa `current_release` menunjuk target
+  dan setiap service menjalankan tepat satu container dengan image ID yang di-pin. Baru kemudian deploy
+  mencetak `DEPLOY_RESULT=automatic-rollback-completed forced_smoke_failure=<bool> restored=<sha>` dan
+  keluar dengan status `3`. Workflow tetap menganggap status non-zero sebagai gagal.
+- Setelah deploy berhasil diaktifkan, bundle driver-nya dipromosikan menjadi `rollback-driver.good`
+  dan bundle lain (termasuk driver legacy yang dikarantina) dipruning.
+
+### 9.4 Target yang ditolak dan jalur pemulihan
+
+Target tanpa manifest `.activated-images` lima image yang terverifikasi selalu ditolak — misalnya
+rilis legacy lama yang tidak pernah menjadi `current` saat deploy hardened, baseline campuran
+yang ditandai `.rollback-unsafe`, atau rilis hardened yang kehilangan `.activated-images`. Pipeline **tidak bisa** men-deploy ulang SHA lama (workflow hanya
+men-deploy tip branch dan menolak SHA stale), jadi jalur pemulihan yang didukung adalah mengirim kode
+yang diinginkan sebagai **commit baru** di branch deployment (misalnya `git revert` dari perubahan yang
+bermasalah) sehingga pipeline membangun, mengaktifkan, dan mem-pin release baru tersebut.
+
+Bila candidate membawa pemeriksaan pin yang rusak, driver candidate menolak dengan exit `4` dan
+automatic recovery sengaja tidak mencoba ulang; pulihkan manual dengan
+`/opt/supplier-henkaten/<env>/shared/deployment-state/rollback-driver.good/remote-rollback.sh`
+(argumen sama dengan 9.2).
+
+### 9.5 Deploy hardened pertama di atas rilis legacy (`db60208`)
+
+Rilis legacy tidak punya pin. Sebelum build, deploy mem-backfill `.activated-images` rilis aktif dari
+container yang sedang berjalan, dengan syarat setiap service punya **tepat satu** container yang
+`Config.Image`-nya persis image reference rilis itu, dan `.Created`-nya (presisi nanodetik) **lebih
+awal secara ketat** dari mtime `current_release`. Bila salah satu syarat gagal, rilis legacy ditandai
+`.rollback-unsafe` sebelum build (deploy dibatalkan bila penanda pun tidak bisa ditulis), dan kegagalan
+deploy pertama akan menghentikan service aplikasi tanpa automatic rollback.
+
+Pemeriksaan waktu ini adalah heuristik khusus rilis legacy: ia mengandalkan `current_release` yang
+tidak di-`touch`/di-restore manual dan jam host yang tidak mundur. Rilis hardened tidak bergantung
+padanya karena pin dicatat saat aktivasi.
+
+Batas ini ditegakkan oleh `release_is_hardened()` di `deploy/scripts/lib.sh`: sebuah rilis dianggap
+hardened bila `.runtime.env`-nya memuat `POSTGRES_APP_USER` atau tree-nya memuat
+`apps/api/src/cli/migrate.ts`. Bila rilis aktif yang hardened ternyata tidak punya `.activated-images`
+(manifest hilang/terhapus), deploy **tidak pernah** mem-backfill pin dari container yang berjalan:
+
+- redeploy SHA yang sama ditolak sebelum build
+  (`legacy pin backfill is not permitted for hardened releases`);
+- deploy SHA baru menandai rilis tersebut `.rollback-unsafe` sebelum build lalu melanjutkan; rilis itu
+  tidak bisa menjadi target rollback dan pemulihannya mengikuti jalur commit baru pada 9.4.
+
+**Risiko residual yang diterima:** bila deploy legacy pernah membangun ulang tag PostgreSQL bersama lalu
+rollback legacy menyalakan PostgreSQL dari tag itu untuk SHA aplikasi yang lebih lama, backfill akan
+mem-pin kombinasi yang memang sedang berjalan tersebut (tidak ada catatan image PostgreSQL independen
+untuk rilis legacy).
+
+**Pemeriksaan opsional (read-only) di VM production sebelum merge deploy hardened pertama ke `main`.**
+Langkah 1–4 juga dijalankan otomatis oleh `remote-deploy.sh` sebelum build dan gagal tertutup ke
+`.rollback-unsafe`; menjalankannya lebih dulu hanya memberi tahu sebelumnya apakah automatic rollback ke
+`db60208` akan tersedia. Langkah 5 memperkirakan durasi lock index migration.
+
+1. `stat -c '%.9Y' /opt/supplier-henkaten/production/current_release`
+2. Untuk setiap service (`postgres api supplier-web tmmin-web caddy`):
+   `docker ps -q --filter label=com.docker.compose.project=supplier-henkaten-production --filter label=com.docker.compose.service=<service>`
+   harus mengembalikan **tepat satu** container.
+3. `docker inspect --format '{{.Created}} {{.Config.Image}} {{.Image}}' <id>`; konversi `.Created` dengan
+   `date -u -d '<created>' +%s.%N` dan pastikan nilainya lebih kecil (ketat) dari hasil langkah 1.
+4. `Config.Image` harus persis `supplier-henkaten-postgres:18.4-pgvector-0.8.5` untuk postgres dan
+   `supplier-henkaten-<service>:<SHA aktif>` untuk service aplikasi; bila riwayat rebuild/rollback legacy
+   seperti di atas pernah terjadi, bandingkan juga `.Image` PostgreSQL dengan ekspektasi operator.
+5. Ukuran `OutboxEvent` (migration `20261126002800_outbox_realtime_poll_index` memakai `CREATE INDEX`
+   biasa yang menahan write ke tabel itu selama index dibangun, sementara API lama masih melayani):
+
+   ```bash
+   pg="$(docker ps -q --filter label=com.docker.compose.project=supplier-henkaten-production --filter label=com.docker.compose.service=postgres)"
+   docker exec -i "$pg" sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At' <<'SQL'
+   SELECT count(*), pg_size_pretty(pg_total_relation_size('"OutboxEvent"')) FROM "OutboxEvent";
+   SQL
+   ```
+
+   Sampai ratusan ribu baris, build index selesai dalam hitungan detik atau kurang. Bila jauh lebih besar,
+   merge pada jam sepi.
+
+Seluruh pemeriksaan di atas read-only. Bila langkah 2–4 gagal, deploy pertama tetap berjalan (rilis
+legacy ditandai `.rollback-unsafe` sebelum build), tetapi automatic rollback ke `db60208` tidak tersedia:
+bila deploy itu gagal, service aplikasi dihentikan dan layanan mati sampai commit perbaikan ter-deploy.
+Putuskan merge dengan kesadaran itu.
+
+### 9.6 Driver bundle dan fallback operator
+
+- Instalasi mengkarantina direktori driver pra-versioning (non-strict) sebagai `rollback-driver.legacy.*`
+  **sebelum** men-stage bundle baru; driver itu tidak pernah dikembalikan ke path terdokumentasi.
+- Bila staging atau publikasi symlink gagal (atau proses mati di jendela itu), `rollback-driver` tidak
+  ada sampai deploy berikutnya. Gunakan `remote-rollback.sh` dari bundle `rollback-driver.v.*` terbaru
+  yang `.driver-contract`-nya tepat `strict-five-image-pins-v2` (bundle yang sudah di-stage dipertahankan),
+  atau `rollback-driver.good` bila ada. Bila tidak ada bundle strict, gunakan jalur commit baru (9.4).
+- **Jangan pernah** menjalankan `rollback-driver.legacy.*` — driver itu dapat menyalakan rilis tanpa pin
+  dari tag yang bisa berubah.
+
+### 9.7 Interupsi dan kegagalan host
+
+- Deploy dan rollback memasang trap yang dikunci pada flag "service sedang diganti": kegagalan,
+  SIGTERM/SIGINT/SIGHUP, atau putusnya sesi SSH (runner CI dibatalkan) di jendela itu menghentikan Caddy
+  dan service aplikasi (PostgreSQL dipertahankan). Output `compose stop` ditulis ke `failclosed.log`
+  sehingga stop tetap selesai walau pipe output sudah tertutup; cleanup tidak bisa diinterupsi sinyal
+  kedua.
+- SIGKILL, OOM killer, atau mati listrik melewati semua trap. Karena service memakai
+  `restart: unless-stopped`, set campuran yang sedang berjalan bisa hidup lagi setelah reboot. Setelah
+  deploy/rollback yang terbunuh seperti itu, **segera jalankan driver (9.2) untuk rilis yang tertulis di
+  `current_release`**.
+- Deploy dan rollback menolak berjalan sebelum mengubah service bila `current_release` atau `.activated`
+  berupa direktori atau `current` bukan symlink; perbaiki state tersebut lebih dulu.
+
+### 9.8 Rehearsal staging
 
 Sesudah minimal dua release sukses, rehearsal staging yang confirmation-gated:
 
@@ -275,15 +444,36 @@ Sesudah minimal dua release sukses, rehearsal staging yang confirmation-gated:
   /opt/supplier-henkaten/staging VM_HOST I_ACCEPT_STAGING_INTERRUPTION
 ```
 
-Rehearsal mengganti code ke previous release, menjalankan current release dengan forced smoke
-failure, membuktikan automatic rollback, memvalidasi identitas cluster PostgreSQL dan sentinel foto,
-lalu mengembalikan release terbaru. Jalankan hanya dalam maintenance window staging. Mekanisme
-`DEPLOY_FORCE_SMOKE_FAILURE` tetap internal pada controlled direct-VM rehearsal; jangan menambahkan
-bypass/dispatch publik ke workflow.
+Rehearsal memakai driver bersama untuk kedua rollback manual dan menolak berjalan bila driver itu belum
+terpasang atau tidak strict. Ia mengganti code ke previous release, menjalankan current release dengan
+forced smoke failure, lalu mengembalikan release terbaru, sambil memvalidasi identitas cluster PostgreSQL
+dan sentinel foto. Karena rollback manual pertama sudah menghasilkan state pointer/sentinel yang
+diharapkan, rehearsal hanya lulus bila `remote-deploy.sh` keluar dengan status `3` dan mencetak
+`DEPLOY_RESULT=automatic-rollback-completed forced_smoke_failure=true restored=<PREVIOUS_SHA>`; kegagalan
+lebih awal (preflight/build/migrate) membuat rehearsal gagal. Jalankan hanya dalam maintenance window
+staging. Mekanisme `DEPLOY_FORCE_SMOKE_FAILURE` tetap internal pada controlled direct-VM rehearsal; jangan
+menambahkan bypass/dispatch publik ke workflow.
+
+### 9.9 Status keluar
+
+| Script | Status | Arti |
+| --- | --- | --- |
+| `remote-deploy.sh` | `0` | Candidate aktif. |
+| `remote-deploy.sh` | `3` | Candidate gagal; automatic recovery selesai dan terverifikasi. |
+| `remote-deploy.sh` | `1` / lainnya | Gagal; service aplikasi candidate dihentikan bila sempat diubah. |
+| `remote-rollback.sh` | `0` | Rollback selesai dan pointer dipublikasikan. |
+| `remote-rollback.sh` | `4` | Penolakan kebijakan sebelum service apa pun diubah (final, tidak dicoba ulang). |
+| `remote-rollback.sh` | `1` / lainnya | Gagal; bila service sempat diubah, Caddy dan service aplikasi dihentikan. |
 
 ## 10. Migration
 
-- Hosted deployment hanya menjalankan `prisma migrate deploy`.
+- Hosted deployment menjalankan service `migrate` (`node dist/cli/migrate.js`) dengan
+  `POSTGRES_USER` sebagai owner schema: pertama `prisma migrate deploy`, lalu provisioning idempotent
+  role runtime `POSTGRES_APP_USER` (verifier SCRAM-SHA-256, grant per tabel/kolom, revoke `CREATE` pada
+  schema `public`, verifikasi login non-superuser). `REQUIRE_APP_DB_ROLE=true` membuat deploy gagal
+  bila provisioning gagal atau ada tabel immutable baru yang belum dikategorikan.
+- Rollback menjalankan `migrate.js --provision-role-only` dari release target: grant direkonsiliasi
+  tanpa migration, dan tabel immutable yang belum dikenal release lama dicabut seluruh aksesnya.
 - Migration harus forward-only dan backward-compatible dengan setidaknya satu code release
   sebelumnya.
 - CI menguji fresh database dan previous-SHA-to-current upgrade.
@@ -319,6 +509,19 @@ perubahan role terkoordinasi di database, GitHub secret, dan runtime env dengan 
   Recovery merotasi password protected administrator dan mencabut session aktif.
 - Caddy email: ganti secret dan deploy; state certificate tetap berada di shared Caddy path.
 - Database password: ikuti prosedur terkoordinasi pada bagian migration, bukan secret-only rotation.
+  Ingat bahwa selama `POSTGRES_APP_PASSWORD` belum diisi, password role runtime diturunkan dari
+  `POSTGRES_PASSWORD`, jadi rotasi superuser juga mengubah password runtime pada deploy berikutnya.
+  Snapshot `.runtime.env` rilis lama tetap menyimpan `POSTGRES_PASSWORD` lama, sehingga rollback ke rilis
+  sebelum rotasi akan gagal di `--provision-role-only` setelah Caddy dihentikan; rencanakan rotasi
+  superuser sebagai perubahan yang memutus jalur rollback ke rilis sebelumnya.
+- Role runtime (`POSTGRES_APP_PASSWORD`, termasuk beralih dari password turunan HMAC ke secret
+  independen): `migrate` menjalankan `ALTER ROLE` sebelum `api` diganti, sehingga mengganti password
+  role yang sama menimbulkan jeda autentikasi untuk `api` lama. Pilih salah satu:
+  1. maintenance window singkat; atau
+  2. switchover dua role: isi `POSTGRES_APP_USER` dengan nama role baru (contoh
+     `supplier_henkaten_app_v2`) bersama `POSTGRES_APP_PASSWORD` independen, deploy (`api` lama tetap
+     memakai role lama sampai diganti), lalu hapus role lama setelah tidak ada snapshot rollback yang
+     mereferensikannya.
 
 Jangan mencetak secret di terminal bersama, workflow log, issue, atau pull request.
 

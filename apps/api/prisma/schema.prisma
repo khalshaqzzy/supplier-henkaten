@@ -421,6 +421,7 @@ model OutboxEvent {
   supplier         Supplier? @relation(fields: [supplierId], references: [id], onDelete: Restrict)
 
   @@index([processedAt, failedAt, availableAt])
+  @@index([occurredAt, id])
   @@index([supplierId, occurredAt])
   @@index([supplierId, occurredAt, id])
 }

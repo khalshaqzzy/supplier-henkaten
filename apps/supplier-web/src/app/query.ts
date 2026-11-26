@@ -22,17 +22,17 @@ export const queryClient = new QueryClient({
   },
 });
 
+export function scopedKeyPrefix(
+  identity: { userId: string; supplierId: string; purpose: string },
+  resource: string,
+) {
+  return ['SUPPLIER', identity.userId, identity.supplierId, identity.purpose, resource] as const;
+}
+
 export function scopedKey(
   identity: { userId: string; supplierId: string; purpose: string },
   resource: string,
   params?: unknown,
 ) {
-  return [
-    'SUPPLIER',
-    identity.userId,
-    identity.supplierId,
-    identity.purpose,
-    resource,
-    params,
-  ] as const;
+  return [...scopedKeyPrefix(identity, resource), params] as const;
 }

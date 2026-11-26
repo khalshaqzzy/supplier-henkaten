@@ -430,6 +430,7 @@ export class ShiftService {
         const effects = await this.finalization.closeTerminalEffects(tx, {
           supplierId: scope.supplierId,
           henkatenId: henkaten.id,
+          lineId: henkaten.lineId,
           henkatenVersion: updated.version,
           toStatus: 'CANCELLED',
           reason: 'SHIFT_ENDED',

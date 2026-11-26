@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=deploy/scripts/lib.sh
+source "${SCRIPT_DIR}/lib.sh"
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -12,6 +16,9 @@ Required environment:
   TMMIN_BOOTSTRAP_USERNAME TMMIN_BOOTSTRAP_DISPLAY_NAME TMMIN_BOOTSTRAP_PASSWORD
   PCR_OPENAI_BASE_URL PCR_OPENAI_API_KEY PCR_OPENAI_MODEL
   PCR_CONFIDENCE_THRESHOLD PCR_INFERENCE_TIMEOUT_MS PCR_WORKER_ENABLED PCR_WORKER_POLL_MS
+
+Optional environment (staged zero-touch runtime DB role):
+  POSTGRES_APP_USER POSTGRES_APP_PASSWORD
 
 The rendered dotenv content is written to stdout. Redirect it to a mode-0600 file
 or pipe it directly to SSH. The script never writes or logs secret values itself.
@@ -41,9 +48,9 @@ case "${APP_ENV}" in
     : "${PRODUCTION_API_DOMAIN:?PRODUCTION_API_DOMAIN is required}"
     COMPOSE_PROJECT_NAME="supplier-henkaten-production"
     SHARED_DIR="/opt/supplier-henkaten/production/shared"
-    SUPPLIER_DOMAIN="${PRODUCTION_SUPPLIER_DOMAIN}"
-    TMMIN_DOMAIN="${PRODUCTION_TMMIN_DOMAIN}"
-    API_DOMAIN="${PRODUCTION_API_DOMAIN}"
+    SUPPLIER_DOMAIN="$(printf '%s' "${PRODUCTION_SUPPLIER_DOMAIN}" | tr '[:upper:]' '[:lower:]')"
+    TMMIN_DOMAIN="$(printf '%s' "${PRODUCTION_TMMIN_DOMAIN}" | tr '[:upper:]' '[:lower:]')"
+    API_DOMAIN="$(printf '%s' "${PRODUCTION_API_DOMAIN}" | tr '[:upper:]' '[:lower:]')"
     ;;
   *)
     echo "APP_ENV must be staging or production." >&2
@@ -71,6 +78,7 @@ require_value() {
 require_safe() {
   local name="$1"
   local minimum="${2:-1}"
+  local maximum="${3:-0}"
   local value
   require_value "${name}"
   value="${!name}"
@@ -78,11 +86,73 @@ require_safe() {
     echo "${name} must use only A-Z, a-z, 0-9, underscore, or hyphen and contain at least ${minimum} characters." >&2
     exit 1
   }
+  if (( maximum > 0 && ${#value} > maximum )); then
+    echo "${name} must contain at most ${maximum} characters." >&2
+    exit 1
+  fi
 }
+
+for domain_name in SUPPLIER_DOMAIN TMMIN_DOMAIN API_DOMAIN; do
+  validate_fqdn "${!domain_name}" || {
+    echo "${domain_name} must be a valid RFC-1123 hostname." >&2
+    exit 1
+  }
+done
 
 require_safe POSTGRES_USER 1
 require_safe POSTGRES_PASSWORD 32
 require_safe POSTGRES_DATABASE 1
+
+derive_default_app_user() {
+  local raw="$1"
+  local sanitized
+  sanitized="$(printf '%s' "${raw}" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_' '_')"
+  if [[ ! "${sanitized}" =~ ^[a-z_] ]]; then
+    sanitized="u_${sanitized}"
+  fi
+  printf '%s_app' "${sanitized:0:59}"
+}
+
+if [[ -n "${POSTGRES_APP_USER:-}" ]]; then
+  [[ "${POSTGRES_APP_USER}" =~ ^[a-z_][a-z0-9_]{0,62}$ ]] || {
+    echo "POSTGRES_APP_USER must match ^[a-z_][a-z0-9_]{0,62}$." >&2
+    exit 1
+  }
+else
+  POSTGRES_APP_USER="$(derive_default_app_user "${POSTGRES_USER}")"
+fi
+[[ "${POSTGRES_APP_USER}" != "${POSTGRES_USER}" ]] || {
+  echo "POSTGRES_APP_USER must be distinct from POSTGRES_USER." >&2
+  exit 1
+}
+
+if [[ -n "${POSTGRES_APP_PASSWORD:-}" ]]; then
+  require_safe POSTGRES_APP_PASSWORD 32 128
+else
+  echo "Warning: POSTGRES_APP_PASSWORD is not set; deriving a one-way HMAC-SHA256 runtime password (staged zero-touch). Provision an independent POSTGRES_APP_PASSWORD secret when ready." >&2
+  if command -v python3 >/dev/null 2>&1; then
+    POSTGRES_APP_PASSWORD="$(
+      APP_ENV="${APP_ENV}" POSTGRES_USER="${POSTGRES_USER}" POSTGRES_APP_USER="${POSTGRES_APP_USER}" POSTGRES_DATABASE="${POSTGRES_DATABASE}" POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
+        python3 -c 'import hashlib, hmac, os; msg = ("supplier-henkaten:postgres-app-role:v1:" + os.environ["APP_ENV"] + ":" + os.environ["POSTGRES_USER"] + ":" + os.environ["POSTGRES_APP_USER"] + ":" + os.environ["POSTGRES_DATABASE"]).encode(); print(hmac.new(os.environ["POSTGRES_PASSWORD"].encode(), msg, hashlib.sha256).hexdigest())'
+    )"
+  elif command -v node >/dev/null 2>&1; then
+    POSTGRES_APP_PASSWORD="$(
+      APP_ENV="${APP_ENV}" POSTGRES_USER="${POSTGRES_USER}" POSTGRES_APP_USER="${POSTGRES_APP_USER}" POSTGRES_DATABASE="${POSTGRES_DATABASE}" POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
+        node -e 'const c=require("node:crypto");const m="supplier-henkaten:postgres-app-role:v1:"+process.env.APP_ENV+":"+process.env.POSTGRES_USER+":"+process.env.POSTGRES_APP_USER+":"+process.env.POSTGRES_DATABASE;process.stdout.write(c.createHmac("sha256",process.env.POSTGRES_PASSWORD).update(m).digest("hex"))'
+    )"
+  else
+    echo "python3 or node is required to derive POSTGRES_APP_PASSWORD when unset." >&2
+    exit 1
+  fi
+  [[ "${POSTGRES_APP_PASSWORD}" =~ ^[0-9a-f]{64}$ ]] || {
+    echo "Derived POSTGRES_APP_PASSWORD has an invalid shape." >&2
+    exit 1
+  }
+fi
+[[ "${POSTGRES_APP_PASSWORD}" != "${POSTGRES_PASSWORD}" ]] || {
+  echo "POSTGRES_APP_PASSWORD must be distinct from POSTGRES_PASSWORD." >&2
+  exit 1
+}
 require_safe SESSION_CSRF_SECRET 32
 require_safe AUTH_THROTTLE_SECRET 32
 require_safe TMMIN_BOOTSTRAP_USERNAME 1
@@ -134,6 +204,8 @@ printf 'CADDY_EMAIL=%s\n' "${CADDY_EMAIL}"
 printf '%s\n' 'CADDY_SCHEME=' 'PUBLISHED_HTTP_PORT=80' 'PUBLISHED_HTTPS_PORT=443'
 printf 'POSTGRES_USER=%s\n' "${POSTGRES_USER}"
 printf 'POSTGRES_PASSWORD=%s\n' "${POSTGRES_PASSWORD}"
+printf 'POSTGRES_APP_USER=%s\n' "${POSTGRES_APP_USER}"
+printf 'POSTGRES_APP_PASSWORD=%s\n' "${POSTGRES_APP_PASSWORD}"
 printf 'POSTGRES_DATABASE=%s\n' "${POSTGRES_DATABASE}"
 printf 'SESSION_CSRF_SECRET=%s\n' "${SESSION_CSRF_SECRET}"
 printf 'AUTH_THROTTLE_SECRET=%s\n' "${AUTH_THROTTLE_SECRET}"

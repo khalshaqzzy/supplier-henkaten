@@ -3,7 +3,15 @@ import { createHash } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
 
-import type { AuditQuery, DashboardQuery, TmminDashboardQuery } from '@tmmin-henkaten/contracts';
+import {
+  MAX_DASHBOARD_TREND_BUCKETS,
+  dashboardBucketStart,
+  nextDashboardBucket,
+  subtractDashboardBuckets,
+  type AuditQuery,
+  type DashboardQuery,
+  type TmminDashboardQuery,
+} from '@tmmin-henkaten/contracts';
 import type { Prisma } from '../generated/prisma/client.js';
 
 import { decodeCursor, encodeCursor } from '../administration/presenters.js';
@@ -336,9 +344,10 @@ export class ReadModelService {
       }),
       this.prisma.auditEvent.findMany({
         where: {
-          hiddenAt: null,
-          supplierId: scope.supplierId,
-          ...(auditLineIds ? { lineId: { in: auditLineIds } } : {}),
+          AND: [
+            supplierVisibleAuditWhere(scope.supplierId),
+            ...(auditLineIds ? [{ lineId: { in: auditLineIds } }] : []),
+          ],
         },
         orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
         take: 20,
@@ -363,7 +372,11 @@ export class ReadModelService {
     const [activityActors, activityHenkatens] = await Promise.all([
       activityActorIds.length
         ? this.prisma.user.findMany({
-            where: { id: { in: activityActorIds } },
+            where: {
+              id: { in: activityActorIds },
+              realm: 'SUPPLIER',
+              supplierId: scope.supplierId,
+            },
             select: { id: true, displayName: true },
           })
         : [],
@@ -794,10 +807,14 @@ export class ReadModelService {
     const lineIds = await this.auditLineScope(scope, principal);
     return this.auditPage(
       {
-        supplierId: scope.supplierId,
-        ...(lineIds ? { lineId: { in: lineIds } } : {}),
+        AND: [
+          supplierVisibleAuditWhere(scope.supplierId),
+          ...(lineIds ? [{ lineId: { in: lineIds } }] : []),
+        ],
       },
       query,
+      true,
+      'SUPPLIER',
     );
   }
 
@@ -817,7 +834,12 @@ export class ReadModelService {
             ],
           }
         : {};
-    const page = await this.auditPage(qualityActions, query, principal.role === 'TMMIN_ADMIN');
+    const page = await this.auditPage(
+      qualityActions,
+      query,
+      principal.role === 'TMMIN_ADMIN',
+      'TMMIN',
+    );
     await this.audit.write({
       actorKind: 'USER',
       actorUserId: principal.userId,
@@ -837,6 +859,7 @@ export class ReadModelService {
     where: Prisma.AuditEventWhereInput,
     query: AuditQuery,
     includeReason = true,
+    realm: 'SUPPLIER' | 'TMMIN' = 'TMMIN',
   ) {
     const cursor = decodeCursor(query.cursor);
     const rows = await this.prisma.auditEvent.findMany({
@@ -880,7 +903,7 @@ export class ReadModelService {
         supplierCode: row.supplier?.code ?? null,
         supplierName: row.supplier?.name ?? null,
         lineId: row.lineId,
-        changeSummary: redact(row.changeSummary),
+        changeSummary: redactAuditSummary(row.changeSummary, { realm, action: row.action }),
         result: row.result,
         correlationId: row.correlationId,
         sourceMode: row.sourceMode,
@@ -953,19 +976,31 @@ export function dashboardTrend(
   to?: string,
 ) {
   const now = new Date();
-  const rangeEnd = to ? new Date(to) : (records.at(-1)?.occurredAt ?? now);
-  const fallbackStart = new Date(rangeEnd);
+  const maxBuckets = MAX_DASHBOARD_TREND_BUCKETS[granularity];
+  const latestRecordAt = records.length
+    ? records.reduce(
+        (latest, record) => (record.occurredAt > latest ? record.occurredAt : latest),
+        records[0]!.occurredAt,
+      )
+    : undefined;
+  const rangeEnd = to ? new Date(to) : (latestRecordAt ?? now);
+  const fallbackStart = new Date(rangeEnd.getTime());
   fallbackStart.setUTCDate(fallbackStart.getUTCDate() - 29);
-  const rangeStart = from
-    ? new Date(from)
-    : records.length
-      ? records.reduce(
-          (earliest, record) => (record.occurredAt < earliest ? record.occurredAt : earliest),
-          records[0]!.occurredAt,
-        )
-      : fallbackStart;
-  const first = dashboardBucketStart(rangeStart, granularity);
+  const earliestRecordAt = records.length
+    ? records.reduce(
+        (earliest, record) => (record.occurredAt < earliest ? record.occurredAt : earliest),
+        records[0]!.occurredAt,
+      )
+    : undefined;
+  const rangeStart = from ? new Date(from) : (earliestRecordAt ?? fallbackStart);
+  if (rangeStart.getTime() > rangeEnd.getTime()) return [];
+
   const last = dashboardBucketStart(rangeEnd, granularity);
+  const earliestAllowed = subtractDashboardBuckets(last, maxBuckets - 1, granularity);
+  const rawFirst = dashboardBucketStart(rangeStart, granularity);
+  const first = rawFirst.getTime() < earliestAllowed.getTime() ? earliestAllowed : rawFirst;
+  if (first.getTime() > last.getTime()) return [];
+
   const buckets = new Map<
     string,
     {
@@ -981,7 +1016,7 @@ export function dashboardTrend(
   >();
   for (
     let cursor = first;
-    cursor.getTime() <= last.getTime();
+    cursor.getTime() <= last.getTime() && buckets.size < maxBuckets;
     cursor = nextDashboardBucket(cursor, granularity)
   ) {
     const bucketStart = cursor.toISOString();
@@ -1009,26 +1044,6 @@ export function dashboardTrend(
     if (record.status === 'CANCELLED') bucket.cancelled += 1;
   }
   return [...buckets.values()];
-}
-
-function dashboardBucketStart(value: Date, granularity: 'DAY' | 'WEEK' | 'MONTH') {
-  const result = new Date(
-    Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()),
-  );
-  if (granularity === 'MONTH') {
-    result.setUTCDate(1);
-  } else if (granularity === 'WEEK') {
-    const day = result.getUTCDay();
-    result.setUTCDate(result.getUTCDate() - (day === 0 ? 6 : day - 1));
-  }
-  return result;
-}
-
-function nextDashboardBucket(value: Date, granularity: 'DAY' | 'WEEK' | 'MONTH') {
-  const result = new Date(value);
-  if (granularity === 'MONTH') result.setUTCMonth(result.getUTCMonth() + 1);
-  else result.setUTCDate(result.getUTCDate() + (granularity === 'WEEK' ? 7 : 1));
-  return result;
 }
 
 function ageBucket(
@@ -1076,14 +1091,163 @@ function initials(name: string | null): string | null {
     .join('');
 }
 
-function redact(value: Prisma.JsonValue | null): Record<string, unknown> | null {
+const SUPPLIER_AUDIT_ROLES = ['SUPPLIER_ADMIN', 'SUPERVISOR', 'LINE_LEADER', 'QC'] as const;
+
+export const SUPPLIER_VISIBLE_SYSTEM_AUDIT_ACTIONS = [
+  'SHIFT_TIMES_ROTATED',
+  'HENKATEN_CANCELLED',
+  'HENKATEN_OPENED',
+  'USER_CREATED',
+  'SHIFT_ENDED',
+  'LINE_SHIFT_CONFLICT_CLEARED',
+] as const;
+
+const SUPPLIER_AUDIT_EXCLUDED_ACTION_PREFIXES = [
+  'TMMIN_',
+  'SUPPLIER_ADMIN_MAGIC_LINK_',
+  'EXTERNAL_',
+  'BOOTSTRAP_',
+] as const;
+
+export const SUPPLIER_AUDIT_EXCLUDED_ACTIONS = [
+  'HENKATEN_DELETED',
+  'HENKATEN_SUPPLIER_DELETED',
+  'AUDIT_VIEWED',
+  'PCR_DECISION_CORRECTED',
+  'NOTIFICATION_GENERATED',
+  'SUPPLIER_CREATED',
+  'SUPPLIER_UPDATED',
+  'SUPPLIER_ACTIVATED',
+  'SUPPLIER_DEACTIVATED',
+  'SUPPLIER_ADMIN_CREATED',
+  'SUPPLIER_ADMIN_REPLACED',
+  'SUPPLIER_ADMIN_RESET',
+  'SUPPLIER_ADMIN_RENAMED',
+  'HOSTED_PREPARATION_STARTED',
+  'HOSTED_PREPARATION_CANCELLED',
+  'SUPPLIER_SOURCE_MODE_CHANGED',
+] as const;
+
+const SUPPLIER_AUDIT_EXCLUDED_RESOURCES = [
+  'ExternalHenkatenProjection',
+  'ExternalIngestionEvent',
+  'ExternalApiClient',
+  'SupplierAdminMagicLink',
+  'HenkatenDeletionCommand',
+] as const;
+
+export function supplierVisibleAuditWhere(supplierId: string): Prisma.AuditEventWhereInput {
+  return {
+    hiddenAt: null,
+    supplierId,
+    OR: [{ sourceMode: null }, { sourceMode: 'HOSTED' }],
+    AND: [
+      {
+        OR: [
+          {
+            actorKind: 'USER',
+            actorRole: { in: [...SUPPLIER_AUDIT_ROLES] },
+            OR: [{ actorSupplierId: null }, { actorSupplierId: supplierId }],
+          },
+          {
+            actorKind: 'SYSTEM',
+            actorRole: null,
+            action: { in: [...SUPPLIER_VISIBLE_SYSTEM_AUDIT_ACTIONS] },
+            resourceType: { notIn: [...SUPPLIER_AUDIT_EXCLUDED_RESOURCES] },
+          },
+        ],
+      },
+      {
+        NOT: {
+          OR: [
+            ...SUPPLIER_AUDIT_EXCLUDED_ACTION_PREFIXES.map((prefix) => ({
+              action: { startsWith: prefix },
+            })),
+            { action: { in: [...SUPPLIER_AUDIT_EXCLUDED_ACTIONS] } },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+const BASE_AUDIT_REDACT_KEYS = /password|secret|token|cookie|authorization|registration|photo/i;
+const TMMIN_AUDIT_REDACT_KEYS =
+  /password|secret|token|cookie|authorization|registration|photo|internalPartNumber|internalNumber/i;
+const SUPPLIER_IMPERSONATOR_KEYS = new Set(['tmminOperatorId', 'operatorUserId']);
+const MAX_AUDIT_REDACT_DEPTH = 8;
+
+export function redactAuditSummary(
+  value: Prisma.JsonValue | null,
+  options: { realm: 'SUPPLIER' | 'TMMIN'; action?: string } = { realm: 'TMMIN' },
+): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const denied = /password|secret|token|cookie|authorization|registration|photo/i;
-  return Object.fromEntries(
-    Object.entries(value)
-      .filter(([key]) => !denied.test(key))
-      .map(([key, entry]) => [key, typeof entry === 'string' ? entry.slice(0, 500) : entry]),
-  );
+  const denied = options.realm === 'TMMIN' ? TMMIN_AUDIT_REDACT_KEYS : BASE_AUDIT_REDACT_KEYS;
+  const sanitized = redactObject(value, denied, options, 0);
+  if (
+    options.realm === 'TMMIN' &&
+    options.action === 'HENKATEN_EXPORT_REQUESTED' &&
+    sanitized.filters &&
+    typeof sanitized.filters === 'object' &&
+    !Array.isArray(sanitized.filters)
+  ) {
+    const rawFilters = value.filters;
+    const rawHasPart =
+      rawFilters !== null &&
+      typeof rawFilters === 'object' &&
+      !Array.isArray(rawFilters) &&
+      typeof (rawFilters as Record<string, unknown>).part === 'string' &&
+      ((rawFilters as Record<string, unknown>).part as string).trim().length > 0;
+    const restFilters = Object.fromEntries(
+      Object.entries(sanitized.filters as Record<string, unknown>).filter(
+        ([key]) => key !== 'part',
+      ),
+    );
+    sanitized.filters = restFilters;
+    if (sanitized.partFiltered === undefined) {
+      sanitized.partFiltered = rawHasPart;
+    } else if (rawHasPart) {
+      sanitized.partFiltered = true;
+    }
+  }
+  return sanitized;
+}
+
+function redactObject(
+  input: Record<string, unknown>,
+  denied: RegExp,
+  options: { realm: 'SUPPLIER' | 'TMMIN'; action?: string },
+  depth: number,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  let sawImpersonator = false;
+  for (const [key, entry] of Object.entries(input)) {
+    if (denied.test(key)) continue;
+    if (options.realm === 'SUPPLIER' && SUPPLIER_IMPERSONATOR_KEYS.has(key)) {
+      if (entry !== null && entry !== undefined && entry !== '') sawImpersonator = true;
+      continue;
+    }
+    result[key] = redactValue(entry, denied, options, depth + 1);
+  }
+  if (options.realm === 'SUPPLIER' && sawImpersonator) {
+    result.impersonated = true;
+  }
+  return result;
+}
+
+function redactValue(
+  entry: unknown,
+  denied: RegExp,
+  options: { realm: 'SUPPLIER' | 'TMMIN'; action?: string },
+  depth: number,
+): unknown {
+  if (typeof entry === 'string') return entry.slice(0, 500);
+  if (entry === null || typeof entry !== 'object') return entry;
+  if (depth >= MAX_AUDIT_REDACT_DEPTH) return '[REDACTED]';
+  if (Array.isArray(entry)) {
+    return entry.map((item) => redactValue(item, denied, options, depth + 1));
+  }
+  return redactObject(entry as Record<string, unknown>, denied, options, depth);
 }
 
 function approvalAgingBuckets(createdAt: Date[]) {

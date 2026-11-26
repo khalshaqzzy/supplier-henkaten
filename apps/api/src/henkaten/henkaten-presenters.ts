@@ -29,7 +29,7 @@ export function routeSummary(routes: RouteRow[]) {
   return { supervisor: presentRoute(supervisor), qc: presentRoute(qc) };
 }
 
-export function presentHenkatenSummary(row: SummaryRow) {
+export function presentHenkatenSummary(row: SummaryRow, includeInternal = false) {
   return {
     id: row.id,
     identifier: row.identifier,
@@ -50,7 +50,7 @@ export function presentHenkatenSummary(row: SummaryRow) {
     shiftName: row.shiftNameSnapshot,
     jobName: row.jobNameSnapshot,
     part: { number: row.partNumberSnapshot, name: row.partNameSnapshot },
-    parts: presentHenkatenParts(row),
+    parts: presentHenkatenParts(row, includeInternal),
     routes: routeSummary(row.approvalRoutes),
     version: row.version,
     pcr: presentPcrAssessment(row.pcrAssessment),
@@ -78,21 +78,24 @@ export function henkatenPartSearch(text: string, internal = false): Prisma.Henka
  * Affected parts in submission order; falls back to the primary part snapshot. `internalNumber`
  * is the supplier-internal part number and is only presented to the supplier.
  */
-export function presentHenkatenParts(row: {
-  partId: string | null;
-  partNumberSnapshot: string;
-  partNameSnapshot: string;
-  parts: Array<
-    Pick<
-      HenkatenPart,
-      | 'position'
-      | 'partId'
-      | 'partNumberSnapshot'
-      | 'partNameSnapshot'
-      | 'internalPartNumberSnapshot'
-    >
-  >;
-}) {
+export function presentHenkatenParts(
+  row: {
+    partId: string | null;
+    partNumberSnapshot: string;
+    partNameSnapshot: string;
+    parts: Array<
+      Pick<
+        HenkatenPart,
+        | 'position'
+        | 'partId'
+        | 'partNumberSnapshot'
+        | 'partNameSnapshot'
+        | 'internalPartNumberSnapshot'
+      >
+    >;
+  },
+  includeInternal = false,
+) {
   if (!row.parts.length)
     return [
       {
@@ -108,7 +111,7 @@ export function presentHenkatenParts(row: {
       id: part.partId,
       number: part.partNumberSnapshot,
       name: part.partNameSnapshot,
-      internalNumber: part.internalPartNumberSnapshot,
+      internalNumber: includeInternal ? part.internalPartNumberSnapshot : null,
     }));
 }
 
@@ -124,9 +127,9 @@ type DetailRow = Henkaten & {
   movement: AssignmentMovement | null;
 };
 
-export function presentHenkatenDetail(row: DetailRow) {
+export function presentHenkatenDetail(row: DetailRow, includeInternal = false) {
   return {
-    ...presentHenkatenSummary(row),
+    ...presentHenkatenSummary(row, includeInternal),
     timezone: row.timezoneSnapshot,
     creatorName: row.creatorNameSnapshot,
     cause: row.cause,

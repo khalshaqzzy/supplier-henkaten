@@ -9,7 +9,7 @@ import {
   Users,
   Wrench,
 } from 'lucide-react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
@@ -30,7 +30,7 @@ import {
 } from '@tmmin-henkaten/ui';
 
 import { supplierApi, supplierApiOrigin, supplierAssetUrl } from '../app/api';
-import { scopedKey } from '../app/query';
+import { scopedKey, scopedKeyPrefix } from '../app/query';
 import { useSession } from '../app/session';
 import { PageHeader } from '../components/layout';
 import {
@@ -85,22 +85,28 @@ export function BoardPage() {
         onStateChange: setConnection,
         onInvalidate: (event) => {
           if (event.refresh.includes('assignment-board'))
-            void queryClient.invalidateQueries({ queryKey: boardKey });
+            void queryClient.invalidateQueries({
+              queryKey: scopedKeyPrefix(scope, 'assignment-board'),
+            });
           if (event.refresh.includes('assignment-board-layout'))
             void queryClient.invalidateQueries({
-              queryKey: scopedKey(scope, 'assignment-board-layout'),
+              queryKey: scopedKeyPrefix(scope, 'assignment-board-layout'),
             });
           if (event.refresh.includes('notifications'))
             void queryClient.invalidateQueries({
-              queryKey: scopedKey(scope, 'notification-count'),
+              queryKey: scopedKeyPrefix(scope, 'notification-count'),
             });
           if (event.refresh.includes('dashboard'))
-            void queryClient.invalidateQueries({ queryKey: scopedKey(scope, 'dashboard') });
+            void queryClient.invalidateQueries({
+              queryKey: scopedKeyPrefix(scope, 'dashboard'),
+            });
         },
-        onReconnect: () => void queryClient.invalidateQueries({ queryKey: boardKey }),
-        onResync: () => queryClient.invalidateQueries({ queryKey: boardKey }),
+        onReconnect: () => {
+          void invalidateBoardRealtimeQueries(queryClient, scope);
+        },
+        onResync: () => invalidateBoardRealtimeQueries(queryClient, scope),
       }),
-    [boardKey, lineId, queryClient, scope.purpose, scope.supplierId, scope.userId],
+    [lineId, queryClient, scope.purpose, scope.supplierId, scope.userId],
   );
   useEffect(() => {
     realtime.connect();
@@ -598,6 +604,18 @@ function formatShiftHours(line: {
 }) {
   if (!line.startTime || !line.endTime) return null;
   return `${line.startTime}–${line.endTime}${line.crossesMidnight ? ' (+1)' : ''}`;
+}
+
+export async function invalidateBoardRealtimeQueries(
+  queryClient: Pick<QueryClient, 'invalidateQueries'>,
+  scope: { userId: string; supplierId: string; purpose: string },
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: scopedKeyPrefix(scope, 'assignment-board') }),
+    queryClient.invalidateQueries({ queryKey: scopedKeyPrefix(scope, 'assignment-board-layout') }),
+    queryClient.invalidateQueries({ queryKey: scopedKeyPrefix(scope, 'notification-count') }),
+    queryClient.invalidateQueries({ queryKey: scopedKeyPrefix(scope, 'dashboard') }),
+  ]);
 }
 
 function leaderNames(leaders: ReadonlyArray<{ name: string }>) {

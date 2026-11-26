@@ -286,6 +286,24 @@ jobs:
             [[ "$(docker inspect --format '{{.Config.User}}' "$container_id")" != "0" ]]
           done
           [[ -z "$(docker port "$("${compose[@]}" ps -q postgres)")" ]]
+          api_cid="$("${compose[@]}" ps -q api)"
+          if docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$api_cid" | grep -q '^POSTGRES_PASSWORD='; then
+            echo 'API runtime container unexpectedly received POSTGRES_PASSWORD.' >&2
+            exit 1
+          fi
+          docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$api_cid" | grep -q '^DATABASE_URL=postgresql://supplier_henkaten_app:'
+          [[ "$("${compose[@]}" exec -T -e PGPASSWORD=replace_me_with_32_safe_characters_app postgres psql -h 127.0.0.1 --username supplier_henkaten_app --dbname supplier_henkaten -v ON_ERROR_STOP=1 --tuples-only --no-align --command "SELECT current_setting('is_superuser');")" == "off" ]]
+          for forbidden_sql in \
+            'ALTER TABLE "AuditEvent" DISABLE TRIGGER ALL;' \
+            'DELETE FROM "AuditEvent";' \
+            'TRUNCATE "AuditEvent";' \
+            'CREATE TABLE public.runtime_role_escape_test (id int);'
+          do
+            if "${compose[@]}" exec -T -e PGPASSWORD=replace_me_with_32_safe_characters_app postgres psql -h 127.0.0.1 --username supplier_henkaten_app --dbname supplier_henkaten -v ON_ERROR_STOP=1 --command "$forbidden_sql" >/dev/null 2>&1; then
+              echo "Runtime DB role unexpectedly succeeded on forbidden SQL: $forbidden_sql" >&2
+              exit 1
+            fi
+          done
           "${compose[@]}" --profile operations run --rm bootstrap-admin | grep -F 'already exists; no changes made'
       - name: Verify persistence across restart
         run: |

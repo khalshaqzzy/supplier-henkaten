@@ -509,6 +509,12 @@ export class PcrService implements OnModuleInit, BeforeApplicationShutdown {
     correlationId: string,
   ) {
     if (row.status === 'NO_PCR' && eventType !== 'PCR_DECISION_CORRECTED') return;
+    const hostedHenkaten = row.henkatenId
+      ? await tx.henkaten.findUnique({
+          where: { id: row.henkatenId },
+          select: { lineId: true },
+        })
+      : null;
     await this.outbox.enqueue(
       {
         eventType,
@@ -518,7 +524,11 @@ export class PcrService implements OnModuleInit, BeforeApplicationShutdown {
         supplierId: row.supplierId,
         actor: { kind: row.decisionSource ?? 'SYSTEM' },
         correlationId,
-        payload: { pcrStatus: row.status, assessmentId: row.id },
+        payload: {
+          pcrStatus: row.status,
+          assessmentId: row.id,
+          ...(hostedHenkaten?.lineId ? { lineId: hostedHenkaten.lineId } : {}),
+        },
       },
       tx,
     );

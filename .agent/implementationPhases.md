@@ -1,3 +1,39 @@
+## High-severity security hardening (H-01..H-07) — 26 November 2026
+
+Implementation on `fix/security-high-findings`: remediates all seven in-scope High-severity
+security audit findings (`H-01`..`H-07`; `H-08` staging/production SSH & secret separation / manual
+production approval gate explicitly deferred) with one purely additive index migration (`20261126002800_outbox_realtime_poll_index` on
+`OutboxEvent(occurredAt, id)`; plain `CREATE INDEX` briefly takes a `SHARE` lock during build,
+remains compatible with `db60208` once applied, and requires standard `prisma migrate resolve`
+recovery if interrupted) and bidirectional rollback continuity. Enforces fail-closed `Internal Part Number` exclusion and search blocking on
+TMMIN Henkaten list/detail (with rollback-safe client normalization in `packages/api-client/src/tmmin.ts`) plus write-time and historical read-time `HENKATEN_EXPORT_REQUESTED`
+audit redaction (`H-01`); fail-closed supplier-visible audit/dashboard filtering excluding TMMIN,
+External client and TMMIN-only system records (`H-02`); explicit supplier SSE event allowlist,
+server-side `lineId`/`sourceLineId` routing fixing the strict wire schema, `HENKATEN_DATA_DELETED`
+command ID masking, `MASTER_DATA_REMOVED` unfiltered board invalidation, bounded lookback/overflow
+`RealtimeEventPump` cursor with shutdown halt and UUID cursor validation (`H-03`); inclusive
+UTC bucket ceilings (`DAY=370`, `WEEK=265`, `MONTH=122`) and forward clamping on `dashboardTrend`
+(`H-04`); pre-header SSE `404`/`429` admission caps, `response.once('close')` slot release,
+per-session eviction with long retry hint + socket close grace timer, replay disconnect cancel,
+serialized/coalesced heartbeats, monotonic-epoch revalidation cache with bounded line-load retries,
+bounded live queues with `drain`-deferred resync and `response.destroy()` hard byte-cap, and full
+4-query board invalidation on `onResync`/`onReconnect` (`H-05`); closed-allowlist two-pass
+non-evaluating `.runtime.env` parsing, RFC-1123 FQDN validation, `32..128`-char
+`POSTGRES_APP_PASSWORD` parity, same-SHA failed-candidate retry env refresh vs immutable
+`.activated` rollback snapshots, pre-validated rollback, and a pinned fail-closed deploy/rollback
+state machine (five-image `.activated-images` pins, shared strict rollback driver, verified automatic
+recovery, interruption-safe stops; ADR 0057 Decision 7, deploymentGuide §9) (`H-06`);
+and distroless `apps/api/src/cli/migrate.ts` provisioning a least-privilege non-superuser
+PostgreSQL runtime role (`POSTGRES_APP_USER`) with SCRAM-SHA-256 verifier and staged zero-touch
+credential derivation (`H-07`). See
+[ADR 0057](../docs/adr/0057-high-severity-security-hardening-and-runtime-db-isolation.md) and the
+current handoff. Pre-merge review follow-up: the legacy pin backfill is now restricted to
+non-hardened releases (`release_is_hardened()`); a hardened release missing `.activated-images` is
+refused for same-SHA redeploy and marked `.rollback-unsafe` on cross-SHA deploy. The optional
+read-only production checks in deploymentGuide §9.5 are informational (the deploy enforces steps
+1–4 itself) and do not block the merge to `main`. Phase 15 remains the sole current `in_progress` phase; staging/device/UAT is
+unchanged.
+
 ## Master Data desktop design polish — 24 November 2026
 
 Implementation on `feat/master-data-design-polish`: Supplier Portal Master Data UI polish without

@@ -5,7 +5,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=deploy/scripts/lib.sh
 source "${SCRIPT_DIR}/lib.sh"
 
-[[ $# -eq 1 ]] || die "Usage: validate-runtime-env.sh <runtime-env-file>"
+ALLOW_LEGACY_DB_ROLE=false
+if [[ $# -eq 2 && "$1" == "--allow-legacy-db-role" ]]; then
+  ALLOW_LEGACY_DB_ROLE=true
+  shift
+fi
+[[ $# -eq 1 ]] || die "Usage: validate-runtime-env.sh [--allow-legacy-db-role] <runtime-env-file>"
 RUNTIME_ENV="$1"
 [[ -s "${RUNTIME_ENV}" ]] || die "Runtime env file is missing or empty."
 load_runtime_env "${RUNTIME_ENV}"
@@ -21,6 +26,17 @@ for name in POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DATABASE SESSION_CSRF_SECRE
   [[ "${value}" =~ ^[A-Za-z0-9_-]+$ ]] || die "${name} contains unsupported dotenv or URL characters."
 done
 
+if [[ "${ALLOW_LEGACY_DB_ROLE}" == "false" || -n "${POSTGRES_APP_USER:-}" || -n "${POSTGRES_APP_PASSWORD:-}" ]]; then
+  for name in POSTGRES_APP_USER POSTGRES_APP_PASSWORD; do
+    value="${!name:-}"
+    [[ "${value}" =~ ^[A-Za-z0-9_-]+$ ]] || die "${name} contains unsupported dotenv or URL characters."
+  done
+  [[ "${POSTGRES_APP_USER}" =~ ^[a-z_][a-z0-9_]{0,62}$ ]] || die "POSTGRES_APP_USER must be a valid lowercase PostgreSQL role identifier."
+  [[ "${POSTGRES_APP_USER}" != "${POSTGRES_USER}" ]] || die "POSTGRES_APP_USER must be distinct from POSTGRES_USER."
+  (( ${#POSTGRES_APP_PASSWORD} >= 32 && ${#POSTGRES_APP_PASSWORD} <= 128 )) || die "POSTGRES_APP_PASSWORD must contain 32-128 characters."
+  [[ "${POSTGRES_APP_PASSWORD}" != "${POSTGRES_PASSWORD}" ]] || die "POSTGRES_APP_PASSWORD must be distinct from POSTGRES_PASSWORD."
+fi
+
 (( ${#POSTGRES_PASSWORD} >= 32 )) || die "POSTGRES_PASSWORD must contain at least 32 characters."
 (( ${#SESSION_CSRF_SECRET} >= 32 )) || die "SESSION_CSRF_SECRET must contain at least 32 characters."
 (( ${#AUTH_THROTTLE_SECRET} >= 32 )) || die "AUTH_THROTTLE_SECRET must contain at least 32 characters."
@@ -28,7 +44,7 @@ done
 
 for name in SUPPLIER_DOMAIN TMMIN_DOMAIN API_DOMAIN; do
   value="${!name:-}"
-  [[ "${value}" =~ ^[A-Za-z0-9.-]+$ && "${value}" == *.* ]] || die "${name} is not a valid hostname."
+  validate_fqdn "${value}" || die "${name} is not a valid hostname."
 done
 
 [[ "${CADDY_EMAIL:-}" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || die "CADDY_EMAIL is invalid."
