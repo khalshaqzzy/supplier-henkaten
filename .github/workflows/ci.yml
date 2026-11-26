@@ -237,6 +237,33 @@ jobs:
           docker run --rm -v "$PWD:/repo:ro" ubuntu:22.04@sha256:0e0a0fc6d18feda9db1590da249ac93e8d5abfea8f4c3c0c849ce512b5ef8982 \
             bash /repo/deploy/scripts/bootstrap-vm.sh --check production henkaten-deploy \
             "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGZha2VidXR2YWxpZGJhc2U2NGtleWJ5dGVzZm9ydGVzdA ci" 22
+      - name: Verify containerd image store pin lifecycle (Docker 29 DinD)
+        run: |
+          dind_name="containerd-pin-test-dind"
+          cleanup_dind() {
+            docker rm -f "$dind_name" >/dev/null 2>&1 || true
+          }
+          trap cleanup_dind EXIT
+          docker run -d --rm --privileged --name "$dind_name" \
+            -p 127.0.0.1:23750:2375 \
+            -e DOCKER_TLS_CERTDIR="" \
+            docker:29.10.1-dind@sha256:fbbc96e0af32cdc190aff92ba97a1281a115351a723afe21af78879cc55126b0 \
+            --host=tcp://0.0.0.0:2375 \
+            --feature containerd-snapshotter
+          ready=false
+          for _ in $(seq 1 30); do
+            if DOCKER_HOST=tcp://127.0.0.1:23750 docker info >/dev/null 2>&1; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          [[ "$ready" == "true" ]] || {
+            docker logs "$dind_name" >&2 || true
+            echo "Timed out waiting for Docker 29 DinD daemon." >&2
+            exit 1
+          }
+          CONTAINERD_TEST_DISPOSABLE_DAEMON=true DOCKER_HOST=tcp://127.0.0.1:23750 bash deploy/tests/containerd-image-store.sh
 
   containers:
     name: Production containers and routing

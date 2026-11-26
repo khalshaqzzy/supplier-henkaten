@@ -1,3 +1,50 @@
+# Current Session Handoff: Containerd image-store pin retention and exact-image reconciliation
+
+- Date: 2026-11-26. Branch `fix/deploy-containerd-image-pins` from `main` @ `15c6a12` (PR #54 merged). Delivery authorized: commit, push, open PR to `main`, and run three high-effort reviewers (`codex/gpt-6.2-astra`, `claudeAgent/claude-opus-5-5`, `acpRegistry_devin/swe-2-1-medium`). Phase 15 remains the sole `in_progress` phase.
+- Objective: diagnose and fix the failed production deploy on `main` (`Release CI` run `45825930850`, job `Deploy production / Deploy production`) after PR #54, add comprehensive operational logging, verify against a real Docker 29 containerd image-store daemon in CI, and recover production cleanly via CI/CD.
+- Root cause (empirically reproduced on Docker Engine `29.10.0` + Compose `v5.8.0` + Buildx `v0.39.1` with `driver-type=io.containerd.snapshotter.v1`):
+  - Under Docker's containerd image store, `docker compose build --pull` exports a new OCI manifest-list digest on every rebuild due to default BuildKit provenance attestations even when the underlying platform manifest is identical.
+  - Overwriting the sole mutable tag (`supplier-henkaten-postgres:18.4-pgvector-0.8.5`) causes containerd to delete the old image record immediately (unlike the classic store, which keeps dangling images).
+  - Compose left the running `postgres` container untouched (`Container ...postgres-1 Running`) referencing the deleted image ID; `write_activated_images()` failed silently when `docker image inspect <container .Image>` returned `No such image` (and `note_stderr()` had a pre-existing redirection bug `{ printf ... >&2; } 2>/dev/null` that swallowed all stderr).
+  - Legacy `db60208` had already been marked `.rollback-unsafe` before build for the same reason, so fail-closed recovery stopped Caddy and app services while preserving PostgreSQL.
+- Decisions confirmed with the user:
+  - Keep ADR 0057's strict fail-closed policy when pinning fails after smoke checks pass with no rollback target (no degraded exit 5).
+  - Set `BUILDX_NO_DEFAULT_ATTESTATIONS=1` on `compose build` in `remote-deploy.sh` as an optimization (correctness does not rely on it; CI tests with attestations enabled too).
+  - Amend existing `docs/adr/0057-high-severity-security-hardening-and-runtime-db-isolation.md` Decision 7 instead of creating a duplicate ADR.
+  - Recover production cleanly via this fix PR through CI/CD (document optional `M1` emergency bridge in `.agent/deploymentGuide.md` §9.10).
+  - Add richer operational logging across preflight, deploy, rollback, pin retention, reconciliation, and pruning (zero secrets logged).
+- Files changed:
+  - `deploy/compose/docker-compose.remote.yml`: added `stop_grace_period: 60s` to `postgres`.
+  - `deploy/scripts/remote-preflight.sh`: added Docker Engine/Compose/Buildx/storage driver/`classic|containerd` image-store banner plus milestone logs (archive checksum, shared dirs/UID 70, free GiB, Compose exposure policy).
+  - `deploy/scripts/lib.sh`: bumped `ROLLBACK_DRIVER_CONTRACT="strict-five-image-pins-v3"`; fixed `note_stderr()` redirection bug and added `log_info()` UTC timestamped stderr logger; added `DEPLOY_SERVICES`, `validate_image_id`, `service_image_ref_for`, `resolve_pin_env`, `pin_repo_for_env`, `pin_tag_for_image`, `pin_image_id`, `parse_manifest_file`, `ensure_manifest_pins`, `ensure_service_runs_image`, `prune_unreferenced_pin_tags`; upgraded `verify_running_matches_manifest`, `write_activated_images` (staged manifest support + pin verification + explicit diagnostics), and `restore_pinned_images_file` (re-asserts retention pins).
+  - `deploy/scripts/remote-deploy.sh`: ensures pre-build retention pins for previous release, already-activated target release, and opportunistically for other retained releases (aborts before build if retention fails on verified baseline); builds with `BUILDX_NO_DEFAULT_ATTESTATIONS=1`; captures and pins all 5 built IDs before mutating services; reconciles every service via `ensure_service_runs_image()` (`postgres` before `migrate`/`bootstrap-admin` with `--no-deps --pull never`); stages verified `.activated-images` inside `candidate_deploy()` and commits atomically; splits multi-cause refusal diagnostics; deduplicates & prioritizes activated releases in 5-release retention, removes stale tags with `--no-prune`, and calls `prune_unreferenced_pin_tags()`; emits structured UTC operational logs throughout.
+  - `deploy/scripts/remote-rollback.sh`: validates pointer destinations before any tag mutation; retains outgoing release's pins before retagging; strictly parses, restores, and re-pins all 5 tags; reconciles all 5 services via `ensure_service_runs_image()` and `--provision-role-only --no-deps --pull never`; self-verifies via `verify_running_matches_manifest()` inside the driver before clearing `.rollback-unsafe` and publishing pointers; emits structured UTC logs.
+  - `deploy/scripts/rehearse-staging.sh`: rejects identical `PREVIOUS_SHA == CURRENT_SHA`, checks `strict-five-image-pins-v3`, and runs `verify_running_matches_manifest()` after each transition.
+  - `deploy/tests/deployment-scripts.sh`: upgraded fake `docker` with `TEST_CONTAINERD_STORE=true` tag-backed GC + non-recreating plain `up` semantics, updated contract assertions to `v3`, and added 8 containerd/v3/pinning/pruning/rehearsal scenarios including exact production incident replay.
+  - `deploy/tests/containerd-image-store.sh` (NEW): real-Docker containerd lifecycle test exercising `lib.sh` against a 5-service busybox Compose stack (canary attestation churn, orphaned container repair + volume sentinel persistence, `BUILDX_NO_DEFAULT_ATTESTATIONS=1` no-op stability, retention-pin survival + rollback to Release A, narrow `--no-prune` pin pruning).
+  - `.github/workflows/ci.yml`: added `Verify containerd image store pin lifecycle (Docker 29 DinD)` step in `deployment-quality` using pinned `docker:29.10.1-dind@sha256:fbbc96e0af32cdc190aff92ba97a1281a115351a723afe21af78879cc55126b0` with `--feature containerd-snapshotter`.
+  - Docs: `docs/adr/0057-high-severity-security-hardening-and-runtime-db-isolation.md` (Decision 7 & Validation Plan), `.agent/deploymentGuide.md` (§9.1–§9.10), `.agent/rules.md` (§4.2), `.agent/implementationPhases.md`, `.agent/sessionHandoff.md`.
+- Seed: no edit needed (deployment scripts, remote Compose grace period, tests, CI workflow, and docs only; no database schema, API contract, or shared validation schema change).
+- Local CI parity checks run:
+  - `bash -n deploy/scripts/*.sh deploy/tests/*.sh`: passed.
+  - `bash deploy/tests/deployment-scripts.sh` (Linux with real `flock`): passed.
+  - `deploy/tests/containerd-image-store.sh` on local Docker `29.10.0` (`io.containerd.snapshotter.v1`) AND inside exact CI `docker:29.10.1-dind@sha256:fbbc96e0af32cdc190aff92ba97a1281a115351a723afe21af78879cc55126b0 --feature containerd-snapshotter`: passed.
+  - ShellCheck `v0.11.0` (`koalaman/shellcheck-alpine:v0.11.0@sha256:9955be09...`): 0 findings.
+  - actionlint `1.7.7` (`rhysd/actionlint:1.7.7@sha256:887a259a...`): 0 findings.
+  - `deploy/scripts/validate-runtime-env.sh deploy/env/runtime.staging.env.example` & remote Compose config `--quiet`: passed.
+  - `deploy/scripts/check-security-exceptions.sh .agent/securityExceptions.json`: passed.
+  - Ubuntu 22.04 `bootstrap-vm.sh --check` (staging + production): passed.
+  - Gitleaks `v8.24.3` directory scan (`dir /repo`): no leaks found.
+  - `git diff --check`: clean; zero leftover Docker containers (`docker ps -a` empty).
+- Reviewers & PR status: PR #55 (`https://github.com/khalshaqzzy/supplier-henkaten/pull/55`) opened on `fix/deploy-containerd-image-pins` targeting `main`; all 15 GitHub Actions checks green (including the new Docker 29 DinD `--feature containerd-snapshotter` CI step). Initial review by Codex GPT-6.2-Astra high (`5/10`, `REQUEST CHANGES`) fixed in `452a485`. 3-provider Council review (`codex/gpt-6.2-astra` medium, `antigravity/gemini-4-neon` medium, `claudeAgent/claude-opus-5-5` medium; `swe-2-1-medium` deferred per user request), 4 rounds:
+  - Round 1 (`452a485`): Codex `7/10`, Gemini `9.0/10`, Claude `8/10` — fixed in `09eaa4b`.
+  - Round 2 (`09eaa4b`): Codex `7/10`, Gemini `8.5/10`, Claude `8.5/10` — fixed in `749ee27`.
+  - Round 3 (`749ee27`): Codex `8.5/10`, Gemini `9.5/10`, Claude `9.2/10` — fixed in `56f559f`.
+  - Round 4 (`56f559f`): Codex `8/10`, Gemini `9.7/10` (`APPROVE`), Claude `9.3/10` (`APPROVE`) — all three converged on one final 1-line polish (`{ printf ...; } 2>/dev/null || true` at `remote-deploy.sh:591`), applied in the final commit. All delegates are above the `7.5/10` threshold with zero open findings.
+- Next recommended action: merge the PR to `main` once reviews and GitHub Actions CI are green so `Release CI` deploys the fix cleanly and restores production.
+
+---
+
 # Current Session Handoff: PR #54 pre-merge follow-up (H-1 pin backfill guard, operator docs)
 
 - Date: 2026-11-26. Branch `fix/security-high-findings` (PR #54 to `main`), building on `58c7982`. Phase 15 remains the sole `in_progress` phase.

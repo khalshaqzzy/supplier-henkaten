@@ -280,11 +280,11 @@ menyalakan image yang tidak terverifikasi.
 | Path | Arti |
 | --- | --- |
 | `releases/<sha>/.activated` | Bukti rilis pernah aktif (wajib untuk target rollback hardened). |
-| `releases/<sha>/.activated-images` | Manifest pin lima image (`postgres`, `api`, `supplier-web`, `tmmin-web`, `caddy`) berisi image ID immutable yang dicatat saat aktivasi. |
+| `releases/<sha>/.activated-images` | Manifest pin lima image (`postgres`, `api`, `supplier-web`, `tmmin-web`, `caddy`) berisi image ID immutable yang dicatat saat aktivasi. Setiap ID juga ditahan oleh retention tag content-addressed `supplier-henkaten-pin-<env>:<service>-<digest>` agar tidak terhapus oleh containerd image store saat tag runtime berpindah. |
 | `releases/<sha>/.rollback-unsafe` | Penanda bahwa baseline rilis tidak bisa diverifikasi; rollback ke rilis ini ditolak bila tanpa pin. |
 | `current`, `current_release` | Symlink dan pointer rilis aktif; selalu dipublikasikan dengan rename tepat setelah smoke sukses. |
 | `shared/deployment-state/rollback-driver` | Symlink ke bundle driver strict yang dipublikasikan deploy terakhir. |
-| `shared/deployment-state/rollback-driver.v.*` | Bundle driver berversi (`lib.sh`, `validate-runtime-env.sh`, `remote-rollback.sh`) dengan marker `.driver-contract` = `strict-five-image-pins-v2`. |
+| `shared/deployment-state/rollback-driver.v.*` | Bundle driver berversi (`lib.sh`, `validate-runtime-env.sh`, `remote-rollback.sh`) dengan marker `.driver-contract` = `strict-five-image-pins-v3`. |
 | `shared/deployment-state/rollback-driver.good` | Symlink ke bundle strict milik deploy terakhir yang **berhasil diaktifkan** (tidak ada sebelum aktivasi hardened pertama). |
 | `shared/deployment-state/rollback-driver.legacy.*` | Driver pra-versioning yang dikarantina. **Non-strict — jangan pernah dijalankan.** |
 | `shared/deployment-state/failclosed.log` | Output `compose stop` dari jalur fail-closed (tetap tertulis walau sesi SSH putus). |
@@ -297,21 +297,27 @@ Hanya ke SHA yang masih retained dan memiliki pin terverifikasi:
 ssh -p 22 henkaten-deploy@VM_HOST
 DRIVER=/opt/supplier-henkaten/staging/shared/deployment-state/rollback-driver
 # Jalankan HANYA bila driver adalah bundle strict (marker kontrak cocok); jika tidak, berhenti.
-[[ -L "$DRIVER" && "$(cat "$DRIVER/.driver-contract" 2>/dev/null)" == strict-five-image-pins-v2 ]] &&
+[[ -L "$DRIVER" && "$(cat "$DRIVER/.driver-contract" 2>/dev/null)" == strict-five-image-pins-v3 ]] &&
   "$DRIVER/remote-rollback.sh" staging PREVIOUS_40_CHARACTER_SHA /opt/supplier-henkaten/staging
 ```
 
 Urutan kerja driver:
 
 1. Mengambil deploy lock dan memvalidasi `.runtime.env`, `.source.sha`, `APP_ENV`/`RELEASE_SHA`.
-2. Menolak (exit `4`, tanpa mengubah service apa pun) bila: rilis hardened tanpa `.activated`;
-   `.activated-images`/`.rollback-unsafe` bukan file reguler; manifest tidak lengkap, image ID pin
-   tidak ada secara lokal, atau retag gagal diverifikasi; target ditandai `.rollback-unsafe` tanpa
-   pin; target tidak punya pin sama sekali; `current_release`/`.activated` berupa direktori atau
-   `current` bukan symlink.
-3. Menghentikan Caddy (ingress) lebih dulu, lalu menyalakan PostgreSQL, API, dan frontend dari image
-   yang di-pin, dan baru menyalakan Caddy lagi setelah semuanya sehat; lalu menjalankan smoke check.
-4. Mempublikasikan `.activated`, `current`, dan `current_release`.
+2. Sebelum memodifikasi tag Docker atau service apa pun, menolak (exit `4`) bila: `current_release`/`.activated`
+   berupa direktori atau `current` bukan symlink; rilis hardened tanpa `.activated`;
+   `.activated-images`/`.rollback-unsafe` bukan file reguler; manifest tidak lengkap atau image ID pin
+   terkonfirmasi hilang secara lokal; target ditandai `.rollback-unsafe` tanpa pin; target tidak punya pin
+   sama sekali. Sebelum retag, driver juga menahan pin milik rilis aktif yang sedang digantikan dan
+   membatalkan dengan exit `1` (retryable, tanpa mengubah tag apa pun) bila terjadi error operasional Docker
+   saat melindungi pin outgoing atau saat retag/verifikasi target.
+3. Menghentikan Caddy (ingress) lebih dulu, lalu merekonsiliasi PostgreSQL (memaksa `--force-recreate` bila
+   container berjalan pada image/ref berbeda atau orphaned, dengan `stop_grace_period: 60s`), menjalankan
+   `--provision-role-only` dengan `--no-deps --pull never` bila relevan, merekonsiliasi API dan frontend dari
+   image pin, baru menyalakan Caddy lagi setelah semuanya sehat, lalu menjalankan smoke check.
+4. Memverifikasi sendiri (`verify_running_matches_manifest`) seluruh lima container, tag runtime, dan
+   retention tag terhadap `.activated-images` sebelum menghapus `.rollback-unsafe` dan mempublikasikan
+   `.activated`, `current`, serta `current_release`.
 
 Bila langkah 3–4 gagal atau diinterupsi, driver menghentikan Caddy dan service aplikasi
 (PostgreSQL dipertahankan) dan keluar dengan status `1`. `current_release` tetap menunjuk rilis
@@ -415,10 +421,17 @@ Putuskan merge dengan kesadaran itu.
   **sebelum** men-stage bundle baru; driver itu tidak pernah dikembalikan ke path terdokumentasi.
 - Bila staging atau publikasi symlink gagal (atau proses mati di jendela itu), `rollback-driver` tidak
   ada sampai deploy berikutnya. Gunakan `remote-rollback.sh` dari bundle `rollback-driver.v.*` terbaru
-  yang `.driver-contract`-nya tepat `strict-five-image-pins-v2` (bundle yang sudah di-stage dipertahankan),
+  yang `.driver-contract`-nya tepat `strict-five-image-pins-v3` (bundle yang sudah di-stage dipertahankan),
   atau `rollback-driver.good` bila ada. Bila tidak ada bundle strict, gunakan jalur commit baru (9.4).
 - **Jangan pernah** menjalankan `rollback-driver.legacy.*` — driver itu dapat menyalakan rilis tanpa pin
   dari tag yang bisa berubah.
+- `remote-deploy.sh` membangun image dengan `BUILDX_NO_DEFAULT_ATTESTATIONS=1` agar rebuild image yang
+  tidak berubah (terutama PostgreSQL) tetap stabil di containerd image store, membuat retention tag
+  `supplier-henkaten-pin-<env>:<service>-<digest>` sebelum dan sesudah build, merekonsiliasi setiap
+  service ke image ID yang tepat (`--force-recreate` bila container lama tertinggal atau orphaned), dan
+  hanya memangkas retention tag yang tidak lagi dirujuk manifest tersimpan (gagal aman bila ada manifest
+  rusak). Preflight, deploy, dan rollback mencetak log operasional berstempel waktu UTC ke stderr tanpa
+  mencetak secret.
 
 ### 9.7 Interupsi dan kegagalan host
 
@@ -464,6 +477,28 @@ menambahkan bypass/dispatch publik ke workflow.
 | `remote-rollback.sh` | `0` | Rollback selesai dan pointer dipublikasikan. |
 | `remote-rollback.sh` | `4` | Penolakan kebijakan sebelum service apa pun diubah (final, tidak dicoba ulang). |
 | `remote-rollback.sh` | `1` / lainnya | Gagal; bila service sempat diubah, Caddy dan service aplikasi dihentikan. |
+
+### 9.10 Emergency bridge manual (opsional bila fail-closed menghentikan layanan)
+
+Jalur pemulihan standar ketika deploy gagal tertutup tanpa target rollback adalah mengirim commit
+perbaikan melalui pipeline CI/CD (9.4). Hanya jika layanan harus hidup kembali segera sebelum pipeline
+selesai **dan** operator telah memverifikasi bahwa build/migration/smoke kandidat sebenarnya sudah
+berhasil (hanya pencatatan state yang gagal), operator dapat menyalakan ulang container aplikasi dari
+direktori rilis kandidat yang sedang berhenti sementara menunggu commit perbaikan ter-deploy:
+
+```bash
+# Opsional — hanya untuk jembatan darurat sementara; TIDAK mengubah current_release atau .activated.
+BASE=/opt/supplier-henkaten/production
+CANDIDATE_DIR="$BASE/releases/<CANDIDATE_40_CHAR_SHA>"
+docker compose --project-name supplier-henkaten-production \
+  --env-file "$CANDIDATE_DIR/.runtime.env" \
+  -f "$CANDIDATE_DIR/deploy/compose/docker-compose.remote.yml" \
+  up -d --no-deps --no-build --pull never api supplier-web tmmin-web caddy
+```
+
+Jangan menyentuh `current`, `current_release`, `.activated`, atau `.activated-images` secara manual;
+biarkan deploy commit perbaikan berikutnya membangun, mem-pin, merekonsiliasi, dan mengaktifkan rilis
+secara bersih.
 
 ## 10. Migration
 
