@@ -363,6 +363,9 @@ if [[ "${1:-}" == "compose" ]]; then
     if [[ "${argument}" == "migrate" && "${TEST_MIGRATE_FAIL:-false}" == "true" ]]; then exit 1; fi
   done
   if [[ "${is_build}" == "true" ]]; then
+    if [[ -n "${TEST_BUILD_REMOVE_PATH:-}" ]]; then
+      rm -f -- "${TEST_BUILD_REMOVE_PATH}"
+    fi
     if [[ -n "${TEST_BUILD_ASSERT_EXISTS:-}" && ! -f "${TEST_BUILD_ASSERT_EXISTS}" ]]; then
       printf 'BUILD_PRECONDITION_MISSING %s\n' "${TEST_BUILD_ASSERT_EXISTS}" >>"${TEST_DOCKER_LOG:-/dev/null}"
     fi
@@ -1208,14 +1211,61 @@ fi
 [[ "$(readlink "${driver_link}")" == "${first_driver_target}" ]] || fail "syntactically invalid rollback driver install changed the published bundle"
 install_driver "${SCRIPTS}" "${driver_base}" || fail "second hardened rollback driver install failed"
 [[ "$(readlink "${driver_link}")" != "${first_driver_target}" ]] || fail "second rollback driver install did not publish a new bundle"
-[[ -L "${driver_base}/shared/deployment-state/rollback-driver.good" ]] || fail "migrated legacy rollback driver was not recorded as the known-good fallback"
-good_before_promote="$(readlink "${driver_base}/shared/deployment-state/rollback-driver.good")"
-[[ "${good_before_promote}" == "${driver_base}/shared/deployment-state/rollback-driver.legacy."* ]] || fail "known-good fallback does not point at the migrated legacy driver"
+[[ ! -e "${driver_base}/shared/deployment-state/rollback-driver.good" && ! -L "${driver_base}/shared/deployment-state/rollback-driver.good" ]] || fail "an unproven install (or the non-strict legacy driver) was designated known-good before any activation"
 [[ -d "${first_driver_target}" ]] || fail "an unproven candidate install pruned the previous bundle"
-[[ "$(readlink "${driver_base}/shared/deployment-state/rollback-driver.good")" == "${good_before_promote}" ]] || fail "a later unproven install displaced the known-good rollback driver"
+[[ "$(find "${driver_base}/shared/deployment-state" -mindepth 1 -maxdepth 1 -name 'rollback-driver.legacy.*' | wc -l | tr -d ' ')" == "1" ]] || fail "the migrated legacy driver was pruned before any activation"
+grep -Fxq 'strict-five-image-pins-v1' "${driver_link}/.driver-contract" || fail "published rollback driver bundle lacks the strict pin contract marker"
 PATH="${fake_bin}:${PATH}" bash -c 'set -euo pipefail; source "$1"; promote_rollback_driver "$2"' _ "${SCRIPTS}/lib.sh" "${driver_base}" || fail "promoting the activated rollback driver failed"
 [[ "$(readlink "${driver_base}/shared/deployment-state/rollback-driver.good")" == "$(readlink "${driver_link}")" ]] || fail "promotion did not make the activated bundle the known-good fallback"
 [[ "$(find "${driver_base}/shared/deployment-state" -mindepth 1 -maxdepth 1 -name 'rollback-driver.*' | wc -l | tr -d ' ')" == "2" ]] || fail "promotion did not prune superseded rollback driver bundles (expected only the live bundle and the .good link)"
+
+# Promotion refuses a live bundle that lacks the strict pin contract marker.
+nonstrict_promote_base="${TEST_ROOT}/nonstrict-promote"
+prepare_base "${nonstrict_promote_base}"
+install_driver "${SCRIPTS}" "${nonstrict_promote_base}" || fail "nonstrict-promote fixture install failed"
+rm -f -- "$(readlink "${nonstrict_promote_base}/shared/deployment-state/rollback-driver")/.driver-contract"
+if PATH="${fake_bin}:${PATH}" bash -c 'set -euo pipefail; source "$1"; promote_rollback_driver "$2"' _ "${SCRIPTS}/lib.sh" "${nonstrict_promote_base}" >/dev/null 2>&1; then
+  fail "promotion designated a bundle without the strict pin contract as known-good"
+fi
+[[ ! -L "${nonstrict_promote_base}/shared/deployment-state/rollback-driver.good" ]] || fail "refused promotion still published rollback-driver.good"
+
+# Nanosecond precision + strict ordering: a container recreated later within the SAME second as activation
+# must be refused; one created strictly earlier passes.
+ns_release="${TEST_ROOT}/ns-provenance-release"
+mkdir -p "${ns_release}"
+sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${retry_sha}/" "${rendered_env}" >"${ns_release}/.runtime.env"
+touch -d "2026-01-01T09:00:00.100Z" "${ns_release}/activated-at"
+ns_pin() {
+  local pg_created="$1"
+  {
+    printf 'postgres sha256:pg supplier-henkaten-postgres:18.4-pgvector-0.8.5 %s\n' "${pg_created}"
+    for svc in api supplier-web tmmin-web caddy; do
+      printf '%s sha256:%s supplier-henkaten-%s:%s\n' "${svc}" "${svc}" "${svc}" "${retry_sha}"
+    done
+  } >"${TEST_ROOT}/ns-running.state"
+  TEST_RUNNING_IMAGES_FILE="${TEST_ROOT}/ns-running.state" COMPOSE_PROJECT_NAME=supplier-henkaten-staging PATH="${fake_bin}:${PATH}" bash -c '
+    set -euo pipefail
+    source "$1"
+    if write_activated_images "$2" "$3" "$2/.runtime.env" "$2/activated-at"; then
+      exit 0
+    fi
+    exit 1
+  ' _ "${SCRIPTS}/lib.sh" "${ns_release}" "${retry_sha}" >/dev/null 2>&1
+}
+if ns_pin 2026-01-01T09:00:00.900000000Z; then
+  fail "backfill accepted a postgres container recreated later within the same second as activation"
+fi
+if ns_pin 2026-01-01T09:00:00.100000000Z; then
+  fail "backfill accepted a postgres container created at exactly the activation instant (must be strictly before)"
+fi
+ns_pin 2026-01-01T09:00:00.050000000Z || fail "backfill rejected a container created strictly before activation"
+
+# A failed first hardened candidate's driver must never become known-good on a later attempt.
+firstfail_base="${TEST_ROOT}/first-candidate-driver"
+prepare_base "${firstfail_base}"
+install_driver "${SCRIPTS}" "${firstfail_base}" || fail "first candidate driver install failed"
+install_driver "${SCRIPTS}" "${firstfail_base}" || fail "second candidate driver install failed"
+[[ ! -e "${firstfail_base}/shared/deployment-state/rollback-driver.good" && ! -L "${firstfail_base}/shared/deployment-state/rollback-driver.good" ]] || fail "an unactivated earlier candidate's driver was designated known-good"
 
 # If the candidate's own (unproven) rollback driver fails during automatic recovery, the bundle of the last
 # successfully activated deploy is retried once and completes recovery of the verified pins.
@@ -1250,6 +1300,56 @@ DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=10 TEST_DOCKER_LOG="${fb_l
 [[ "${fb_status}" == "3" ]] || fail "known-good driver fallback did not complete automatic recovery (exit ${fb_status})"
 grep -Fxq 'STARTED postgres=sha256:fb-postgres' "${fb_log}" || fail "known-good driver fallback did not restart the pinned postgres image"
 [[ "$(<"${fallback_base}/current_release")" == "${fallback_prev}" ]] || fail "known-good driver fallback changed the active pointer"
+
+# A deliberate policy refusal (exit 4) by the candidate driver is final: the known-good driver must NOT
+# override it.
+IFS='|' read -r pr_incoming pr_runtime pr_archive pr_checksum < <(prepare_candidate "${fallback_base}" 7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b 12)
+printf '#!/usr/bin/env bash\nexit 4\n' >"${pr_incoming}/deploy/scripts/remote-rollback.sh"
+chmod +x "${pr_incoming}/deploy/scripts/remote-rollback.sh"
+pr_log="${TEST_ROOT}/driver-fallback-policy-refusal.log"
+pr_status=0
+DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=12 TEST_DOCKER_LOG="${pr_log}" TEST_IMAGE_STATE_FILE="${fallback_base}/images.state" \
+  PATH="${fake_bin}:${PATH}" "${pr_incoming}/deploy/scripts/remote-deploy.sh" \
+  staging 7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b 12 "${fallback_base}" "${pr_incoming}" "${pr_runtime}" \
+  "${pr_archive}" "${pr_checksum}" 127.0.0.1 >/dev/null 2>&1 || pr_status=$?
+[[ "${pr_status}" == "1" ]] || fail "candidate driver policy refusal was overridden (exit ${pr_status})"
+if grep -Fxq 'STARTED postgres=sha256:fb-postgres' "${pr_log}"; then
+  fail "known-good driver overrode the candidate driver's deliberate policy refusal"
+fi
+grep -q ' stop ' "${pr_log}" || fail "policy-refused recovery left candidate services running"
+
+# A missing candidate driver (link vanished between install and recovery) falls back to the known-good driver.
+IFS='|' read -r md_incoming md_runtime md_archive md_checksum < <(prepare_candidate "${fallback_base}" 7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c 13)
+md_log="${TEST_ROOT}/driver-fallback-missing.log"
+md_status=0
+DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=13 TEST_DOCKER_LOG="${md_log}" TEST_IMAGE_STATE_FILE="${fallback_base}/images.state" \
+  TEST_BUILD_REMOVE_PATH="${fallback_base}/shared/deployment-state/rollback-driver" \
+  PATH="${fake_bin}:${PATH}" "${md_incoming}/deploy/scripts/remote-deploy.sh" \
+  staging 7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c 13 "${fallback_base}" "${md_incoming}" "${md_runtime}" \
+  "${md_archive}" "${md_checksum}" 127.0.0.1 >/dev/null 2>&1 || md_status=$?
+[[ "${md_status}" == "3" ]] || fail "missing candidate driver did not fall back to the known-good driver (exit ${md_status})"
+grep -Fxq 'STARTED postgres=sha256:fb-postgres' "${md_log}" || fail "known-good fallback for a missing candidate driver did not restart pinned postgres"
+
+# A known-good link to a bundle WITHOUT the strict pin contract (e.g. the pre-versioning driver that could
+# start unpinned releases from mutable tags) must never be used as the fallback.
+nonstrict_good="${fallback_base}/shared/deployment-state/rollback-driver.legacy.nonstrict"
+mkdir -p "${nonstrict_good}"
+printf '#!/usr/bin/env bash\ntouch "%s/nonstrict-driver-ran"\nexit 0\n' "${fallback_base}" >"${nonstrict_good}/remote-rollback.sh"
+chmod +x "${nonstrict_good}/remote-rollback.sh"
+ln -sfn "${nonstrict_good}" "${fallback_base}/shared/deployment-state/rollback-driver.good"
+printf '%s\n' "${fallback_prev}" >"${fallback_base}/current_release"
+IFS='|' read -r ns_incoming ns_runtime ns_archive ns_checksum < <(prepare_candidate "${fallback_base}" 7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a 14)
+printf '#!/usr/bin/env bash\nexit 1\n' >"${ns_incoming}/deploy/scripts/remote-rollback.sh"
+chmod +x "${ns_incoming}/deploy/scripts/remote-rollback.sh"
+ns_log="${TEST_ROOT}/driver-fallback-nonstrict.log"
+ns_status=0
+DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=14 TEST_DOCKER_LOG="${ns_log}" TEST_IMAGE_STATE_FILE="${fallback_base}/images.state" \
+  PATH="${fake_bin}:${PATH}" "${ns_incoming}/deploy/scripts/remote-deploy.sh" \
+  staging 7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a 14 "${fallback_base}" "${ns_incoming}" "${ns_runtime}" \
+  "${ns_archive}" "${ns_checksum}" 127.0.0.1 >/dev/null 2>&1 || ns_status=$?
+[[ ! -f "${fallback_base}/nonstrict-driver-ran" ]] || fail "automatic recovery fell back to a known-good driver lacking the strict pin contract"
+[[ "${ns_status}" == "1" ]] || fail "failed recovery without an eligible strict fallback must exit 1 (got ${ns_status})"
+grep -q ' stop ' "${ns_log}" || fail "failed recovery without an eligible strict fallback left candidate services running"
 
 
 # A candidate that bumps the postgres tag must still snapshot/restore the PREVIOUS release's own pinned

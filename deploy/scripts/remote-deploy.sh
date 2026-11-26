@@ -197,6 +197,18 @@ run_known_good_rollback_driver() {
   candidate_bundle="$(cd "$(dirname "$(hardened_rollback_driver_path "${BASE_DIR}")")" 2>/dev/null && pwd -P)" || candidate_bundle=""
   good_bundle="$(cd "$(dirname "${good_driver}")" 2>/dev/null && pwd -P)" || return 1
   [[ "${good_bundle}" != "${candidate_bundle}" ]] || return 1
+  # Only a strict-contract bundle (refuses unpinned targets) may be retried, and the target's complete
+  # five-image manifest is revalidated (every pinned ID present locally, tags restored and re-verified)
+  # immediately before the retry, since the failed candidate attempt may have touched tags.
+  if ! rollback_driver_bundle_is_strict "${good_bundle}"; then
+    echo "Known-good rollback driver ${good_bundle} lacks the strict pin contract; not retrying." >&2
+    return 1
+  fi
+  if [[ ! -f "${previous_dir}/.activated-images" || -L "${previous_dir}/.activated-images" ]] ||
+    ! restore_pinned_images_file "${previous_dir}/.activated-images" "${previous_dir}" "${previous_release}"; then
+    echo "Target ${previous_release} pins could not be revalidated; not retrying with the known-good driver." >&2
+    return 1
+  fi
   echo "Candidate rollback driver failed; retrying recovery once with the known-good driver ${good_bundle}." >&2
   DEPLOY_LOCK_HELD=true "${good_driver}" "${REQUESTED_ENV}" "${previous_release}" "${BASE_DIR}"
 }
@@ -230,13 +242,19 @@ if ! candidate_deploy; then
     # Always recover through the shared hardened driver (installed from this candidate under the
     # deploy lock) so legacy release scripts that start services from mutable tags are never trusted.
     hardened_rollback_driver="$(hardened_rollback_driver_path "${BASE_DIR}")"
-    if [[ ! -x "${hardened_rollback_driver}" ]]; then
-      echo "Hardened rollback driver is unavailable; stopping failed candidate application services while preserving PostgreSQL." >&2
-      compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
-    elif ! DEPLOY_LOCK_HELD=true "${hardened_rollback_driver}" \
-      "${REQUESTED_ENV}" "${previous_release}" "${BASE_DIR}" &&
-      ! run_known_good_rollback_driver; then
-      echo "Automatic code rollback also failed; stopping failed candidate application services while preserving PostgreSQL." >&2
+    candidate_driver_status=0
+    if [[ -x "${hardened_rollback_driver}" ]]; then
+      DEPLOY_LOCK_HELD=true "${hardened_rollback_driver}" \
+        "${REQUESTED_ENV}" "${previous_release}" "${BASE_DIR}" || candidate_driver_status=$?
+    else
+      echo "Candidate hardened rollback driver is unavailable." >&2
+      candidate_driver_status=127
+    fi
+    # A deliberate policy refusal by the candidate driver is final; only crashes/other failures (or a
+    # missing candidate driver) may be retried once with the strict known-good driver.
+    if (( candidate_driver_status != 0 )) &&
+      { (( candidate_driver_status == ROLLBACK_POLICY_REFUSAL_EXIT )) || ! run_known_good_rollback_driver; }; then
+      echo "Automatic code rollback failed or was refused (candidate driver exit ${candidate_driver_status}); stopping failed candidate application services while preserving PostgreSQL." >&2
       compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
     else
       printf 'DEPLOY_RESULT=automatic-rollback-completed forced_smoke_failure=%s restored=%s\n' \

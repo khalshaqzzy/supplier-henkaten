@@ -274,6 +274,15 @@ rename_exact() {
   fi
 }
 
+ROLLBACK_DRIVER_CONTRACT="strict-five-image-pins-v1"
+# Exit status remote-rollback.sh uses for deliberate policy refusals (never retried by any fallback).
+# shellcheck disable=SC2034 # consumed by remote-rollback.sh and remote-deploy.sh, which source lib.sh
+ROLLBACK_POLICY_REFUSAL_EXIT=4
+
+rollback_driver_bundle_is_strict() {
+  [[ -d "$1" && -x "$1/remote-rollback.sh" && -f "$1/.driver-contract" && "$(<"$1/.driver-contract")" == "${ROLLBACK_DRIVER_CONTRACT}" ]]
+}
+
 hardened_rollback_driver_path() {
   printf '%s\n' "$1/shared/deployment-state/rollback-driver/remote-rollback.sh"
 }
@@ -286,8 +295,7 @@ install_hardened_rollback_driver() {
   local base_dir="$2"
   local state_dir="${base_dir}/shared/deployment-state"
   local driver_link="${state_dir}/rollback-driver"
-  local good_link="${state_dir}/rollback-driver.good"
-  local script_name stage legacy_dir tmp_link previous_target=""
+  local script_name stage legacy_dir tmp_link
   mkdir -p "${state_dir}" || return 1
   for script_name in lib.sh validate-runtime-env.sh remote-rollback.sh; do
     [[ -f "${source_scripts_dir}/${script_name}" && ! -L "${source_scripts_dir}/${script_name}" ]] || return 1
@@ -301,18 +309,17 @@ install_hardened_rollback_driver() {
       return 1
     fi
   done
-  chmod 755 "${stage}" || {
+  # Contract marker: only bundles published by this installer enforce strict five-image pins (refusing
+  # unpinned targets); fallbacks never trust a bundle without it.
+  if ! printf '%s\n' "${ROLLBACK_DRIVER_CONTRACT}" >"${stage}/.driver-contract" || ! chmod 755 "${stage}"; then
     rm -rf -- "${stage}"
     return 1
-  }
+  fi
   # Migrate a pre-versioning real directory out of the way (we hold the deploy lock, so no rollback runs).
   # A directory cannot be atomically replaced by a symlink, so on any publication failure the legacy
   # directory is moved back; if the process dies inside this window the next deploy republishes, and the
   # operator fallback is the newest rollback-driver.legacy.*/remote-rollback.sh (see deploymentGuide §9).
   legacy_dir=""
-  if [[ -L "${driver_link}" ]]; then
-    previous_target="$(readlink "${driver_link}")"
-  fi
   if [[ -e "${driver_link}" && ! -L "${driver_link}" ]]; then
     if [[ ! -d "${driver_link}" ]]; then
       rm -rf -- "${stage}"
@@ -326,7 +333,6 @@ install_hardened_rollback_driver() {
       rm -rf -- "${stage}"
       return 1
     }
-    previous_target="${legacy_dir}"
   fi
   tmp_link="$(mktemp -u "${state_dir}/.rollback-driver.link.XXXXXX")" || tmp_link=""
   if [[ -z "${tmp_link}" ]] || ! ln -s "${stage}" "${tmp_link}" ||
@@ -344,13 +350,9 @@ install_hardened_rollback_driver() {
     rm -rf -- "${stage}"
     return 1
   fi
-  # Superseded bundles are NOT pruned here: the candidate has not proven itself yet. Record the bundle that
-  # was live before this install as the known-good fallback (only if none is recorded yet, so repeated
-  # failed candidates can never displace the bundle of the last successfully activated deploy).
-  if [[ -n "${previous_target}" && -d "${previous_target}" && ! -e "${good_link}" && ! -L "${good_link}" ]]; then
-    publish_driver_link "${previous_target}" "${good_link}" ||
-      echo "Warning: failed to record known-good rollback driver ${previous_target}." >&2
-  fi
+  # Superseded bundles are NOT pruned and rollback-driver.good is NOT touched here: the candidate has not
+  # proven itself. Only promote_rollback_driver(), after this deploy activates, may designate a known-good
+  # bundle, so a failed candidate's driver (or a non-strict pre-versioning driver) can never become it.
 }
 
 publish_driver_link() {
@@ -379,7 +381,7 @@ promote_rollback_driver() {
   local target entry
   [[ -L "${driver_link}" ]] || return 1
   target="$(readlink "${driver_link}")"
-  [[ -d "${target}" && -x "${target}/remote-rollback.sh" ]] || return 1
+  rollback_driver_bundle_is_strict "${target}" || return 1
   publish_driver_link "${target}" "${good_link}" || return 1
   for entry in "${state_dir}"/rollback-driver.v.* "${state_dir}"/rollback-driver.legacy.*; do
     [[ -d "${entry}" && ! -L "${entry}" && "${entry}" != "${target}" ]] || continue
@@ -387,8 +389,30 @@ promote_rollback_driver() {
   done
 }
 
-file_mtime_epoch() {
-  stat -c '%Y' -- "$1" 2>/dev/null || stat -f '%m' -- "$1" 2>/dev/null
+# Full-precision (nanosecond) mtime as "<seconds>.<9 digits>".
+file_mtime_ns() {
+  local value
+  value="$(stat -c '%.9Y' -- "$1" 2>/dev/null || stat -f '%Fm' -- "$1" 2>/dev/null)" || return 1
+  normalize_timestamp_ns "${value}"
+}
+
+normalize_timestamp_ns() {
+  local value="$1" seconds fraction
+  [[ "${value}" =~ ^([0-9]+)(\.([0-9]+))?$ ]] || return 1
+  seconds="${BASH_REMATCH[1]}"
+  fraction="${BASH_REMATCH[3]:-0}"
+  fraction="${fraction}000000000"
+  printf '%s.%s\n' "${seconds}" "${fraction:0:9}"
+}
+
+# Strictly-before comparison of two normalized "<seconds>.<9 digits>" timestamps.
+timestamp_ns_before() {
+  local a_sec="${1%%.*}" a_ns="${1#*.}" b_sec="${2%%.*}" b_ns="${2#*.}"
+  if (( 10#${a_sec} != 10#${b_sec} )); then
+    (( 10#${a_sec} < 10#${b_sec} ))
+  else
+    (( 10#${a_ns} < 10#${b_ns} ))
+  fi
 }
 
 write_activated_images() {
@@ -401,7 +425,7 @@ write_activated_images() {
   # release identity) makes the baseline ambiguous and fails closed.
   local activated_at_file="${4:-}"
   local pg_ref svc image_ref container_ids container_id config_image image_id resolved_id tmp_file dest_file backup_file unsafe_marker had_prev=false
-  local activated_epoch="" created created_epoch
+  local activated_ns="" created created_ns
   dest_file="${release_dir}/.activated-images"
   unsafe_marker="${release_dir}/.rollback-unsafe"
   [[ -d "${release_dir}" && -n "${COMPOSE_PROJECT_NAME:-}" && -f "${compose_env}" ]] || return 1
@@ -414,8 +438,7 @@ write_activated_images() {
     return 1
   fi
   if [[ -n "${activated_at_file}" ]]; then
-    activated_epoch="$(file_mtime_epoch "${activated_at_file}")" || return 1
-    [[ "${activated_epoch}" =~ ^[0-9]+$ ]] || return 1
+    activated_ns="$(file_mtime_ns "${activated_at_file}")" || return 1
   fi
   pg_ref="$(postgres_image_ref_for "${release_dir}")"
   tmp_file="$(mktemp "${release_dir}/.activated-images.tmp.XXXXXX" 2>/dev/null)" || return 1
@@ -445,15 +468,20 @@ write_activated_images() {
       rm -f -- "${tmp_file}"
       return 1
     fi
-    if [[ -n "${activated_epoch}" ]]; then
+    if [[ -n "${activated_ns}" ]]; then
       created="$(docker inspect --format '{{.Created}}' "${container_id}" 2>/dev/null || true)"
-      created_epoch=""
+      created_ns=""
       # GNU date maps an empty string to today's midnight, so never parse an empty timestamp.
       if [[ "${created}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T ]]; then
-        created_epoch="$(date -u -d "${created}" +%s 2>/dev/null || true)"
+        created_ns="$(normalize_timestamp_ns "$(date -u -d "${created}" +%s.%N 2>/dev/null || true)" || true)"
       fi
-      if [[ ! "${created_epoch}" =~ ^[0-9]+$ ]] || (( created_epoch > activated_epoch )); then
-        echo "Refusing to pin ${svc}: running container (created '${created}') does not predate activation of release ${pin_sha}; baseline provenance is ambiguous." >&2
+      # Full nanosecond precision and STRICT ordering: a container (re)created in the same second as, or
+      # after, activation is ambiguous. A plain restart preserves .Created and still passes. Both values are
+      # wall-clock readings of this host, so this legacy-only heuristic assumes current_release was not
+      # touched/restored manually and the clock did not step backwards after activation; the Config.Image
+      # ownership check above still applies regardless.
+      if [[ -z "${created_ns}" ]] || ! timestamp_ns_before "${created_ns}" "${activated_ns}"; then
+        echo "Refusing to pin ${svc}: running container (created '${created}') does not strictly predate activation of release ${pin_sha}; baseline provenance is ambiguous." >&2
         rm -f -- "${tmp_file}"
         return 1
       fi

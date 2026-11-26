@@ -7,6 +7,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=deploy/scripts/lib.sh
 source "${SCRIPT_DIR}/lib.sh"
 
+# Deliberate policy refusals (unsafe/unpinned/unverifiable target) exit with a dedicated status so the
+# automatic known-good fallback in remote-deploy.sh never overrides them; other failures exit 1.
+refuse() {
+  printf '%s\n' "$*" >&2
+  exit "${ROLLBACK_POLICY_REFUSAL_EXIT}"
+}
+
 [[ $# -eq 3 ]] || die "Usage: remote-rollback.sh <app-env> <release-sha> <base-dir>"
 REQUESTED_ENV="$1"
 REQUESTED_SHA="$2"
@@ -32,25 +39,25 @@ if [[ -n "${POSTGRES_APP_USER:-}" || -f "${RELEASE_DIR}/apps/api/src/cli/migrate
   is_hardened_release=true
 fi
 if [[ "${is_hardened_release}" == "true" && ! -f "${RELEASE_DIR}/.activated" ]]; then
-  die "Rollback aborted: release ${REQUESTED_SHA} was never activated."
+  refuse "Rollback aborted: release ${REQUESTED_SHA} was never activated."
 fi
 if [[ -L "${RELEASE_DIR}/.activated-images" || ( -e "${RELEASE_DIR}/.activated-images" && ! -f "${RELEASE_DIR}/.activated-images" ) ]]; then
-  die "Rollback aborted: ${RELEASE_DIR}/.activated-images is not a regular file."
+  refuse "Rollback aborted: ${RELEASE_DIR}/.activated-images is not a regular file."
 fi
 if [[ -L "${RELEASE_DIR}/.rollback-unsafe" || ( -e "${RELEASE_DIR}/.rollback-unsafe" && ! -f "${RELEASE_DIR}/.rollback-unsafe" ) ]]; then
-  die "Rollback aborted: ${RELEASE_DIR}/.rollback-unsafe is not a regular file."
+  refuse "Rollback aborted: ${RELEASE_DIR}/.rollback-unsafe is not a regular file."
 fi
 if [[ -f "${RELEASE_DIR}/.activated-images" ]]; then
   if ! restore_pinned_images_file "${RELEASE_DIR}/.activated-images" "${RELEASE_DIR}" "${REQUESTED_SHA}"; then
     mark_rollback_unsafe "${RELEASE_DIR}" "${REQUESTED_SHA}" || echo "Warning: failed to persist .rollback-unsafe marker for ${REQUESTED_SHA}." >&2
-    die "Rollback aborted: failed to restore and verify pinned activated images for ${REQUESTED_SHA}."
+    refuse "Rollback aborted: failed to restore and verify pinned activated images for ${REQUESTED_SHA}."
   fi
 elif [[ -e "${RELEASE_DIR}/.rollback-unsafe" || -L "${RELEASE_DIR}/.rollback-unsafe" ]]; then
-  die "Rollback aborted: release ${REQUESTED_SHA} is marked rollback-unsafe and has no pinned activated image IDs."
+  refuse "Rollback aborted: release ${REQUESTED_SHA} is marked rollback-unsafe and has no pinned activated image IDs."
 else
   # Never start a retained release from mutable shared tags (e.g. a PostgreSQL tag rebuilt by a later
   # candidate) and never record whatever those tags currently resolve to as the release's pins.
-  die "Rollback aborted: release ${REQUESTED_SHA} has no verified .activated-images pins; ship the desired code as a new commit (for example a git revert) on the deployment branch so the pipeline builds and pins it."
+  refuse "Rollback aborted: release ${REQUESTED_SHA} has no verified .activated-images pins; ship the desired code as a new commit (for example a git revert) on the deployment branch so the pipeline builds and pins it."
 fi
 
 printf 'Rolling code back to %s; database schema and shared volumes are not restored.\n' "${REQUESTED_SHA}"
