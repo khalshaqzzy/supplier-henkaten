@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { Response } from 'express';
-import { Observable } from 'rxjs';
+import { EMPTY, Observable } from 'rxjs';
+import { share, tap } from 'rxjs/operators';
 
 import { opaqueIdSchema } from '@tmmin-henkaten/contracts';
 
@@ -47,6 +48,9 @@ const MAX_REPLAY_SCAN = 2_000;
 const MAX_PENDING_LIVE = 256;
 const MAX_WRITER_BUFFERED_BYTES = 512 * 1024;
 const HEARTBEAT_INTERVAL_MS = 15_000;
+const EVICTION_CLOSE_GRACE_MS = 2_000;
+const MAX_EVICTING_SOCKETS = 16;
+const MAX_LINE_LOAD_RETRIES = 2;
 
 const ALLOWED_EVENT_SET = new Set<string>(SUPPLIER_SSE_ALLOWED_EVENTS);
 const LINE_SCOPED_EVENT_SET = new Set<string>(SUPPLIER_SSE_LINE_SCOPED_EVENTS);
@@ -82,10 +86,15 @@ export class RealtimeService {
   private readonly supplierCounts = new Map<string, number>();
 
   private pendingAdmissionsGlobal = 0;
+  private evictingSockets = 0;
   private readonly pendingAdmissionsByUser = new Map<string, number>();
 
   private readonly sessionCache = new Map<string, CachedEntry<boolean>>();
   private readonly sessionInFlight = new Map<
+    string,
+    { epoch: number; promise: Promise<boolean> }
+  >();
+  private readonly sessionBypassInFlight = new Map<
     string,
     { epoch: number; promise: Promise<boolean> }
   >();
@@ -94,13 +103,67 @@ export class RealtimeService {
   private readonly lineCache = new Map<string, CachedEntry<string[]>>();
   private readonly lineInFlight = new Map<string, { epoch: number; promise: Promise<string[]> }>();
   private readonly lineEpochs = new Map<string, number>();
+  private readonly lineActiveLoads = new Map<string, number>();
+
+  private readonly sharedPumpEvents$: Observable<RealtimeOutboxEvent>;
+  private readonly sharedPumpResyncs$: Observable<void>;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly pump: RealtimeEventPump,
     private readonly sessions: SessionService,
     @Optional() @Inject(APP_CONFIG) private readonly config?: AppConfig,
-  ) {}
+  ) {
+    this.sharedPumpEvents$ = this.pump.events().pipe(
+      tap((event) => this.handleTenantInvalidation(event)),
+      share(),
+    );
+    this.sharedPumpResyncs$ = (this.pump.resyncs?.() ?? EMPTY).pipe(share());
+  }
+
+  private handleTenantInvalidation(event: RealtimeOutboxEvent): void {
+    if (!event.supplierId || !isAllowedSupplierEvent(event)) return;
+    if (!LINE_CACHE_INVALIDATING_EVENTS.has(event.eventType)) return;
+    this.invalidateSupplierLines(event.supplierId);
+    if (event.eventType === 'SUPPLIER_SOURCE_MODE_CHANGED') {
+      const invalidatedSessions = new Set<string>();
+      for (const slot of this.activeSlots) {
+        if (slot.supplierId === event.supplierId && !invalidatedSessions.has(slot.sessionId)) {
+          invalidatedSessions.add(slot.sessionId);
+          this.invalidateSession(slot.sessionId);
+        }
+      }
+    }
+  }
+
+  private scheduleEvictionDestroy(response?: Response): void {
+    if (!response || response.destroyed) return;
+    if (
+      response.writableNeedDrain ||
+      response.writableLength > MAX_WRITER_BUFFERED_BYTES ||
+      this.evictingSockets >= MAX_EVICTING_SOCKETS
+    ) {
+      response.destroy();
+      return;
+    }
+    this.evictingSockets += 1;
+    let settled = false;
+    const release = () => {
+      if (settled) return;
+      settled = true;
+      this.evictingSockets = Math.max(0, this.evictingSockets - 1);
+      clearTimeout(timer);
+    };
+    const timer = setTimeout(() => {
+      release();
+      if (!response.destroyed) {
+        response.destroy();
+      }
+    }, EVICTION_CLOSE_GRACE_MS);
+    timer.unref?.();
+    response.once('close', release);
+    response.once('finish', release);
+  }
 
   async assertLineExists(supplierId: string, lineId: string): Promise<void> {
     const line = await this.prisma.line.findFirst({
@@ -274,6 +337,7 @@ export class RealtimeService {
         if (response && !response.destroyed && !response.writableEnded) {
           response.end();
         }
+        this.scheduleEvictionDestroy(response);
       },
       release: () => {
         if (slot.released) return;
@@ -286,7 +350,10 @@ export class RealtimeService {
             this.sessionSlots.set(slot.sessionId, next);
           } else {
             this.sessionSlots.delete(slot.sessionId);
-            if (!this.sessionInFlight.has(slot.sessionId)) {
+            if (
+              !this.sessionInFlight.has(slot.sessionId) &&
+              !this.sessionBypassInFlight.has(slot.sessionId)
+            ) {
               this.sessionCache.delete(slot.sessionId);
               this.sessionEpochs.delete(slot.sessionId);
             }
@@ -296,8 +363,18 @@ export class RealtimeService {
         if (nextUser > 0) this.userCounts.set(slot.userId, nextUser);
         else this.userCounts.delete(slot.userId);
         const nextSupplier = (this.supplierCounts.get(slot.supplierId) ?? 1) - 1;
-        if (nextSupplier > 0) this.supplierCounts.set(slot.supplierId, nextSupplier);
-        else this.supplierCounts.delete(slot.supplierId);
+        if (nextSupplier > 0) {
+          this.supplierCounts.set(slot.supplierId, nextSupplier);
+        } else {
+          this.supplierCounts.delete(slot.supplierId);
+          if (
+            !this.lineInFlight.has(slot.supplierId) &&
+            (this.lineActiveLoads.get(slot.supplierId) ?? 0) === 0
+          ) {
+            this.lineCache.delete(slot.supplierId);
+            this.lineEpochs.delete(slot.supplierId);
+          }
+        }
       },
     };
 
@@ -337,17 +414,21 @@ export class RealtimeService {
       const seenOrder: string[] = [];
 
       let heartbeatTimer: NodeJS.Timeout | undefined;
+      let heartbeatInFlight = false;
       let pumpSubscription: { unsubscribe(): void } | undefined;
+      let resyncSubscription: { unsubscribe(): void } | undefined;
 
       const teardown = () => {
         if (closed) return;
         closed = true;
         if (heartbeatTimer) {
-          clearInterval(heartbeatTimer);
+          clearTimeout(heartbeatTimer);
           heartbeatTimer = undefined;
         }
         pumpSubscription?.unsubscribe();
         pumpSubscription = undefined;
+        resyncSubscription?.unsubscribe();
+        resyncSubscription = undefined;
         pendingLive.length = 0;
         slot?.release();
       };
@@ -374,6 +455,7 @@ export class RealtimeService {
             data: { at: new Date().toISOString() },
           });
           finish();
+          this.scheduleEvictionDestroy(response);
         };
       }
 
@@ -418,11 +500,8 @@ export class RealtimeService {
         if (closed) return;
         if (event.supplierId !== scope.supplierId) return;
         if (!isAllowedSupplierEvent(event)) return;
-        if (LINE_CACHE_INVALIDATING_EVENTS.has(event.eventType)) {
-          this.invalidateSupplierLines(scope.supplierId);
-          if (event.eventType === 'SUPPLIER_SOURCE_MODE_CHANGED') {
-            this.invalidateSession(principal.sessionId);
-          }
+        if (!slot && event.eventType === 'SUPPLIER_SOURCE_MODE_CHANGED') {
+          this.invalidateSession(principal.sessionId);
         }
         if (writerExceededHardCap()) {
           closeStalledWriter();
@@ -443,7 +522,7 @@ export class RealtimeService {
         try {
           while (!closed && (liveOverflowed || pendingLive.length > 0)) {
             if (writerExceededHardCap()) {
-              finish();
+              closeStalledWriter();
               return;
             }
             if (writerNeedsDrain()) {
@@ -461,7 +540,7 @@ export class RealtimeService {
                 return;
               }
               if (writerExceededHardCap()) {
-                finish();
+                closeStalledWriter();
                 return;
               }
               if (writerNeedsDrain()) {
@@ -489,7 +568,7 @@ export class RealtimeService {
             }
             if (!this.inScope(nextEvent, lineId, allowed)) continue;
             if (writerExceededHardCap()) {
-              finish();
+              closeStalledWriter();
               return;
             }
             if (writerNeedsDrain()) {
@@ -518,13 +597,35 @@ export class RealtimeService {
       // Subscribe to live events BEFORE opening the replay query so no events
       // committed during replay are lost; recordSeen deduplicates the handoff
       // without dropping late-committed transactions.
-      pumpSubscription = this.pump.events().subscribe({
+      pumpSubscription = this.sharedPumpEvents$.subscribe({
         next: enqueueLive,
         complete: finish,
       });
+      resyncSubscription = this.sharedPumpResyncs$.subscribe({
+        next: () => {
+          if (closed) return;
+          if (writerExceededHardCap()) {
+            closeStalledWriter();
+            return;
+          }
+          pendingLive.length = 0;
+          liveOverflowed = true;
+          if (!replaying) void drainLive();
+        },
+      });
+
+      const scheduleNextHeartbeat = () => {
+        if (closed) return;
+        heartbeatTimer = setTimeout(() => {
+          heartbeatTimer = undefined;
+          void sendHeartbeat();
+        }, HEARTBEAT_INTERVAL_MS);
+        heartbeatTimer.unref?.();
+      };
 
       const sendHeartbeat = async () => {
-        if (closed) return;
+        if (closed || heartbeatInFlight) return;
+        heartbeatInFlight = true;
         try {
           const sessionOk = await this.validateSession(scope.supplierId, principal, true);
           if (closed) return;
@@ -541,7 +642,7 @@ export class RealtimeService {
             }
           }
           if (writerExceededHardCap()) {
-            finish();
+            closeStalledWriter();
             return;
           }
           if (!writerNeedsDrain()) {
@@ -553,6 +654,9 @@ export class RealtimeService {
           }
         } catch {
           finish();
+        } finally {
+          heartbeatInFlight = false;
+          if (!closed) scheduleNextHeartbeat();
         }
       };
 
@@ -578,16 +682,14 @@ export class RealtimeService {
             data: { at: new Date().toISOString() },
           });
 
-          heartbeatTimer = setInterval(() => {
-            void sendHeartbeat();
-          }, HEARTBEAT_INTERVAL_MS);
-          heartbeatTimer.unref?.();
+          scheduleNextHeartbeat();
 
           const replayResult = await this.replay(
             scope.supplierId,
             lastEventId,
             lineId,
             initialAllowed,
+            () => closed,
           );
           if (closed) return;
 
@@ -611,7 +713,7 @@ export class RealtimeService {
 
           if (replayResult.resync) {
             if (writerExceededHardCap()) {
-              finish();
+              closeStalledWriter();
               return;
             }
             if (writerNeedsDrain()) {
@@ -626,7 +728,7 @@ export class RealtimeService {
               if (!this.inScope(item, lineId, currentAllowed)) continue;
               if (!recordSeen(item.id)) continue;
               if (writerExceededHardCap()) {
-                finish();
+                closeStalledWriter();
                 return;
               }
               if (writerNeedsDrain()) {
@@ -672,10 +774,16 @@ export class RealtimeService {
       if (inFlight && inFlight.epoch === epoch) {
         return inFlight.promise;
       }
+    } else if (bypassCache) {
+      const bypassInFlight = this.sessionBypassInFlight.get(key);
+      if (bypassInFlight && bypassInFlight.epoch === epoch) {
+        return bypassInFlight.promise;
+      }
     }
 
     const requestEpoch = this.sessionEpochs.get(key) ?? 0;
     let trackedPromise: Promise<boolean> | undefined;
+    let trackedBypassPromise: Promise<boolean> | undefined;
     const promise = (async () => {
       try {
         const current = await this.sessions.resolve(principal.rawSessionToken, 'SUPPLIER', false);
@@ -709,7 +817,17 @@ export class RealtimeService {
             this.sessionInFlight.delete(key);
           }
         }
-        if (!this.sessionSlots.has(key) && !this.sessionInFlight.has(key)) {
+        if (trackedBypassPromise) {
+          const entry = this.sessionBypassInFlight.get(key);
+          if (entry?.promise === trackedBypassPromise) {
+            this.sessionBypassInFlight.delete(key);
+          }
+        }
+        if (
+          !this.sessionSlots.has(key) &&
+          !this.sessionInFlight.has(key) &&
+          !this.sessionBypassInFlight.has(key)
+        ) {
           this.sessionCache.delete(key);
           this.sessionEpochs.delete(key);
         }
@@ -719,12 +837,19 @@ export class RealtimeService {
     if (!bypassCache && ttlMs > 0) {
       trackedPromise = promise;
       this.sessionInFlight.set(key, { epoch: requestEpoch, promise });
+    } else if (bypassCache) {
+      trackedBypassPromise = promise;
+      this.sessionBypassInFlight.set(key, { epoch: requestEpoch, promise });
     }
 
     return promise;
   }
 
-  private async loadAllowedLines(supplierId: string, bypassCache: boolean): Promise<string[]> {
+  private async loadAllowedLines(
+    supplierId: string,
+    bypassCache: boolean,
+    attempt = 0,
+  ): Promise<string[]> {
     const ttlMs = this.limits().revalidationCacheMs;
     const epoch = this.lineEpochs.get(supplierId) ?? 0;
     const now = Date.now();
@@ -741,6 +866,7 @@ export class RealtimeService {
     }
 
     const requestEpoch = this.lineEpochs.get(supplierId) ?? 0;
+    this.lineActiveLoads.set(supplierId, (this.lineActiveLoads.get(supplierId) ?? 0) + 1);
     let trackedPromise: Promise<string[]> | undefined;
     const promise = (async () => {
       try {
@@ -751,7 +877,13 @@ export class RealtimeService {
           })
         ).map(({ id }) => id);
         const currentEpoch = this.lineEpochs.get(supplierId) ?? 0;
-        if (ttlMs > 0 && currentEpoch === requestEpoch) {
+        if (currentEpoch !== requestEpoch) {
+          if (attempt < MAX_LINE_LOAD_RETRIES) {
+            return this.loadAllowedLines(supplierId, false, attempt + 1);
+          }
+          return [];
+        }
+        if (ttlMs > 0 && (this.supplierCounts.get(supplierId) ?? 0) > 0) {
           this.lineCache.set(supplierId, {
             value: lines,
             expiresAt: Date.now() + ttlMs,
@@ -760,11 +892,22 @@ export class RealtimeService {
         }
         return lines;
       } finally {
+        const remainingLoads = (this.lineActiveLoads.get(supplierId) ?? 1) - 1;
+        if (remainingLoads > 0) this.lineActiveLoads.set(supplierId, remainingLoads);
+        else this.lineActiveLoads.delete(supplierId);
         if (trackedPromise) {
           const entry = this.lineInFlight.get(supplierId);
           if (entry?.promise === trackedPromise) {
             this.lineInFlight.delete(supplierId);
           }
+        }
+        if (
+          (this.supplierCounts.get(supplierId) ?? 0) === 0 &&
+          !this.lineInFlight.has(supplierId) &&
+          !this.lineActiveLoads.has(supplierId)
+        ) {
+          this.lineCache.delete(supplierId);
+          this.lineEpochs.delete(supplierId);
         }
       }
     })();
@@ -780,6 +923,7 @@ export class RealtimeService {
   private invalidateSession(sessionId: string): void {
     this.sessionCache.delete(sessionId);
     this.sessionInFlight.delete(sessionId);
+    this.sessionBypassInFlight.delete(sessionId);
     if (this.sessionSlots.has(sessionId)) {
       this.sessionEpochs.set(sessionId, (this.sessionEpochs.get(sessionId) ?? 0) + 1);
     } else {
@@ -788,9 +932,16 @@ export class RealtimeService {
   }
 
   private invalidateSupplierLines(supplierId: string): void {
-    this.lineEpochs.set(supplierId, (this.lineEpochs.get(supplierId) ?? 0) + 1);
     this.lineCache.delete(supplierId);
     this.lineInFlight.delete(supplierId);
+    if (
+      (this.supplierCounts.get(supplierId) ?? 0) > 0 ||
+      (this.lineActiveLoads.get(supplierId) ?? 0) > 0
+    ) {
+      this.lineEpochs.set(supplierId, (this.lineEpochs.get(supplierId) ?? 0) + 1);
+    } else {
+      this.lineEpochs.delete(supplierId);
+    }
   }
 
   private async replay(
@@ -798,10 +949,12 @@ export class RealtimeService {
     lastEventId: string | undefined,
     requestedLineId: string | undefined,
     allowedLineIds: readonly string[],
+    isClosed: () => boolean,
   ): Promise<{
     events: RealtimeOutboxEvent[];
     resync: boolean;
   }> {
+    if (isClosed()) return { events: [], resync: false };
     let cursor: { occurredAt: Date; id: string } | null = null;
     if (lastEventId !== undefined) {
       if (!opaqueIdSchema.safeParse(lastEventId).success) {
@@ -826,6 +979,7 @@ export class RealtimeService {
           payload: true,
         },
       });
+      if (isClosed()) return { events: [], resync: false };
       if (!cursorRow || !this.inScope(cursorRow, requestedLineId, allowedLineIds)) {
         return { events: [], resync: true };
       }
@@ -837,6 +991,7 @@ export class RealtimeService {
     let scanned = 0;
 
     for (;;) {
+      if (isClosed()) return { events: [], resync: false };
       const batch = await this.prisma.outboxEvent.findMany({
         where: {
           suppressedAt: null,
@@ -845,9 +1000,14 @@ export class RealtimeService {
           aggregateType: { notIn: [...SUPPLIER_SSE_BLOCKED_AGGREGATES] },
           ...(scanCursor
             ? {
-                OR: [
-                  { occurredAt: { gt: scanCursor.occurredAt } },
-                  { occurredAt: scanCursor.occurredAt, id: { gt: scanCursor.id } },
+                AND: [
+                  { occurredAt: { gte: scanCursor.occurredAt } },
+                  {
+                    OR: [
+                      { occurredAt: { gt: scanCursor.occurredAt } },
+                      { occurredAt: scanCursor.occurredAt, id: { gt: scanCursor.id } },
+                    ],
+                  },
                 ],
               }
             : { occurredAt: { gte: new Date(Date.now() - 30_000) } }),
@@ -865,7 +1025,7 @@ export class RealtimeService {
           payload: true,
         },
       });
-      if (batch.length === 0) break;
+      if (isClosed() || batch.length === 0) break;
 
       for (const row of batch) {
         scanned += 1;
@@ -916,6 +1076,9 @@ export class RealtimeService {
 
     if (TENANT_WIDE_EVENT_SET.has(event.eventType)) {
       if (eventLineIds.length === 0) return true;
+      if (event.eventType === 'MASTER_DATA_REMOVED' && !requestedLineId) {
+        return true;
+      }
       const inTenant = eventLineIds.some((id) => allowedLineIds.includes(id));
       if (!inTenant) return false;
       return !requestedLineId || eventLineIds.includes(requestedLineId);

@@ -45,6 +45,8 @@ wait_for_service "${RELEASE_DIR}" "${RUNTIME_ENV}" caddy 120
   "https://${TMMIN_DOMAIN}" \
   "https://${API_DOMAIN}"
 
+printf '%s\n' "${REQUESTED_SHA}" >"${RELEASE_DIR}/.activated.tmp"
+mv "${RELEASE_DIR}/.activated.tmp" "${RELEASE_DIR}/.activated"
 activate_symlink "${RELEASE_DIR}" "${BASE_DIR}/current"
 printf '%s\n' "${REQUESTED_SHA}" >"${BASE_DIR}/current_release.tmp"
 mv "${BASE_DIR}/current_release.tmp" "${BASE_DIR}/current_release"

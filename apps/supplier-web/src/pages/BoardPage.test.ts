@@ -1,11 +1,18 @@
 // @vitest-environment jsdom
 
+import { QueryClient } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { BoardHenkatenIndicator, BoardRiskAction, boardOperationalRisks } from './BoardPage';
+import { scopedKey } from '../app/query';
+import {
+  BoardHenkatenIndicator,
+  BoardRiskAction,
+  boardOperationalRisks,
+  invalidateBoardRealtimeQueries,
+} from './BoardPage';
 
 afterEach(cleanup);
 
@@ -134,5 +141,39 @@ describe('Assignment Board operational evidence', () => {
     });
     expect(link.getAttribute('href')).toBe('/henkatens/00000000-0000-4000-8000-000000000002');
     expect(link.querySelector('.hds-4m-dot')?.classList.contains('hds-4m-dot--method')).toBe(true);
+  });
+
+  it('invalidates parameterized board, layout, notification-count, and dashboard caches on SSE resync/reconnect', async () => {
+    const queryClient = new QueryClient();
+    const scope = {
+      userId: 'user-1',
+      supplierId: 'supplier-1',
+      purpose: 'NORMAL',
+    };
+    const otherScope = {
+      userId: 'user-2',
+      supplierId: 'supplier-2',
+      purpose: 'NORMAL',
+    };
+
+    const boardKey = [...scopedKey(scope, 'assignment-board'), 'CURRENT', 'ALL'];
+    const layoutKey = scopedKey(scope, 'assignment-board-layout', { lineId: 'line-1' });
+    const notificationKey = scopedKey(scope, 'notification-count');
+    const dashboardKey = scopedKey(scope, 'dashboard', { range: '7d' });
+    const foreignDashboardKey = scopedKey(otherScope, 'dashboard', { range: '7d' });
+
+    queryClient.setQueryData(boardKey, { lines: [] });
+    queryClient.setQueryData(layoutKey, { nodes: [] });
+    queryClient.setQueryData(notificationKey, { unread: 1 });
+    queryClient.setQueryData(dashboardKey, { totals: {} });
+    queryClient.setQueryData(foreignDashboardKey, { totals: {} });
+
+    await invalidateBoardRealtimeQueries(queryClient, scope);
+
+    expect(queryClient.getQueryState(boardKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(layoutKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(notificationKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(dashboardKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(foreignDashboardKey)?.isInvalidated).toBe(false);
   });
 });

@@ -2,9 +2,10 @@
 
 - **TMMIN Internal Part Number enforcement.** TMMIN Henkaten list and detail endpoints never return
   supplier internal part numbers (`internalNumber: null` in Release 1 for open-tab rollout safety;
-  key omission eligible in Release 2) and never search `internalPartNumberSnapshot`. Export audit
-  summaries record `partFiltered` instead of raw `filters.part`, and TMMIN audit reads redact
-  historical `filters.part` entries retroactively.
+  key omission eligible in Release 2) and never search `internalPartNumberSnapshot`, while the TMMIN
+  API client normalizes any legacy string `internalNumber` to `null` at the client boundary during
+  mixed-version rollbacks. Export audit summaries record `partFiltered` instead of raw
+  `filters.part`, and TMMIN audit reads redact historical `filters.part` entries retroactively.
 - **Cross-realm Supplier audit isolation.** Supplier audit and dashboard recent activity strictly
   exclude TMMIN-authored records (including deletion reasons and magic-link events), External API
   client records, and TMMIN-only system notifications, and resolve actor display names only within

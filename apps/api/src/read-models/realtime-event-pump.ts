@@ -60,15 +60,20 @@ export type RealtimeOutboxEvent = {
 
 @Injectable()
 export class RealtimeEventPump implements OnModuleInit, BeforeApplicationShutdown {
-  private static readonly LATE_COMMIT_LOOKBACK_MS = 10_000;
-  private static readonly MAX_PUBLISHED_IDS = 5_000;
+  static readonly PAGE_SIZE = 500;
+  static readonly LATE_COMMIT_LOOKBACK_MS = 10_000;
+  static readonly MAX_POLL_EVENTS = 2_000;
+  static readonly MAX_PUBLISHED_IDS = 5_000;
   private readonly logger = new Logger(RealtimeEventPump.name);
   private readonly subject = new Subject<RealtimeOutboxEvent>();
+  private readonly resyncSubject = new Subject<void>();
   private readonly startedAt = new Date();
-  private readonly publishedIds = new Set<string>();
-  private readonly publishedOrder: string[] = [];
+  private readonly publishedIds = new Map<string, number>();
   private cursor: Pick<RealtimeOutboxEvent, 'id' | 'occurredAt'> | undefined;
+  private confirmedCursor: Pick<RealtimeOutboxEvent, 'id' | 'occurredAt'> | undefined;
+  private lastActivityMs = 0;
   private timer: NodeJS.Timeout | undefined;
+  private overflowReconcileTimer: NodeJS.Timeout | undefined;
   private inFlight: Promise<void> | undefined;
   private stopping = false;
 
@@ -79,6 +84,10 @@ export class RealtimeEventPump implements OnModuleInit, BeforeApplicationShutdow
 
   events(): Observable<RealtimeOutboxEvent> {
     return this.subject.asObservable();
+  }
+
+  resyncs(): Observable<void> {
+    return this.resyncSubject.asObservable();
   }
 
   onModuleInit(): void {
@@ -103,12 +112,69 @@ export class RealtimeEventPump implements OnModuleInit, BeforeApplicationShutdow
     this.timer.unref();
   }
 
+  private advanceOverflowCursor(
+    target: Pick<RealtimeOutboxEvent, 'id' | 'occurredAt'> | undefined,
+  ) {
+    if (target) {
+      this.confirmedCursor = target;
+    }
+    this.publishedIds.clear();
+    this.lastActivityMs = Date.now();
+    this.resyncSubject.next();
+    if (!this.stopping) {
+      if (this.overflowReconcileTimer) clearTimeout(this.overflowReconcileTimer);
+      this.overflowReconcileTimer = setTimeout(() => {
+        this.overflowReconcileTimer = undefined;
+        if (!this.stopping) {
+          this.resyncSubject.next();
+        }
+      }, RealtimeEventPump.LATE_COMMIT_LOOKBACK_MS);
+      this.overflowReconcileTimer.unref();
+    }
+  }
+
+  private prunePublishedBefore(floorMs: number): void {
+    for (const [id, occurredAtMs] of this.publishedIds) {
+      if (occurredAtMs < floorMs) {
+        this.publishedIds.delete(id);
+      }
+    }
+  }
+
   async poll(): Promise<void> {
-    const initialLowerBound = this.cursor
-      ? new Date(this.cursor.occurredAt.getTime() - RealtimeEventPump.LATE_COMMIT_LOOKBACK_MS)
-      : this.startedAt;
+    if (this.stopping) return;
+
+    const nowMs = Date.now();
+    if (
+      this.cursor &&
+      this.lastActivityMs > 0 &&
+      nowMs - this.lastActivityMs >= RealtimeEventPump.LATE_COMMIT_LOOKBACK_MS
+    ) {
+      this.confirmedCursor = this.cursor;
+      this.publishedIds.clear();
+    }
+
     let pageCursor: Pick<RealtimeOutboxEvent, 'id' | 'occurredAt'> | undefined;
+    let initialLowerBound: Date | undefined;
+
+    if (this.cursor) {
+      const lookbackMs =
+        this.cursor.occurredAt.getTime() - RealtimeEventPump.LATE_COMMIT_LOOKBACK_MS;
+      if (this.confirmedCursor && lookbackMs <= this.confirmedCursor.occurredAt.getTime()) {
+        pageCursor = this.confirmedCursor;
+        this.prunePublishedBefore(this.confirmedCursor.occurredAt.getTime());
+      } else {
+        initialLowerBound = new Date(lookbackMs);
+        this.prunePublishedBefore(lookbackMs);
+      }
+    } else {
+      initialLowerBound = this.startedAt;
+    }
+
+    let scanned = 0;
+
     for (;;) {
+      if (this.stopping) return;
       const events = await this.prisma.outboxEvent.findMany({
         where: {
           suppressedAt: null,
@@ -117,15 +183,20 @@ export class RealtimeEventPump implements OnModuleInit, BeforeApplicationShutdow
           aggregateType: { notIn: [...SUPPLIER_SSE_BLOCKED_AGGREGATES] },
           ...(pageCursor
             ? {
-                OR: [
-                  { occurredAt: { gt: pageCursor.occurredAt } },
-                  { occurredAt: pageCursor.occurredAt, id: { gt: pageCursor.id } },
+                AND: [
+                  { occurredAt: { gte: pageCursor.occurredAt } },
+                  {
+                    OR: [
+                      { occurredAt: { gt: pageCursor.occurredAt } },
+                      { occurredAt: pageCursor.occurredAt, id: { gt: pageCursor.id } },
+                    ],
+                  },
                 ],
               }
-            : { occurredAt: { gte: initialLowerBound } }),
+            : { occurredAt: { gte: initialLowerBound! } }),
         },
         orderBy: [{ occurredAt: 'asc' }, { id: 'asc' }],
-        take: 500,
+        take: RealtimeEventPump.PAGE_SIZE,
         select: {
           id: true,
           eventType: true,
@@ -137,8 +208,11 @@ export class RealtimeEventPump implements OnModuleInit, BeforeApplicationShutdow
           payload: true,
         },
       });
-      if (events.length === 0) return;
+      if (this.stopping || events.length === 0) return;
+
       for (const event of events) {
+        if (this.stopping) return;
+        scanned += 1;
         pageCursor = { id: event.id, occurredAt: event.occurredAt };
         if (
           !this.cursor ||
@@ -149,27 +223,45 @@ export class RealtimeEventPump implements OnModuleInit, BeforeApplicationShutdow
           this.cursor = { id: event.id, occurredAt: event.occurredAt };
         }
         if (this.publishedIds.has(event.id)) continue;
-        this.publishedIds.add(event.id);
-        this.publishedOrder.push(event.id);
-        if (this.publishedOrder.length > RealtimeEventPump.MAX_PUBLISHED_IDS) {
-          const expired = this.publishedOrder.shift();
-          if (expired) this.publishedIds.delete(expired);
+        if (this.publishedIds.size >= RealtimeEventPump.MAX_PUBLISHED_IDS) {
+          this.logger.warn(
+            { scanned },
+            'realtime event pump dedup window exceeded cap; emitting resync',
+          );
+          this.advanceOverflowCursor(this.cursor ?? pageCursor);
+          return;
         }
+        this.publishedIds.set(event.id, event.occurredAt.getTime());
+        this.lastActivityMs = Date.now();
         this.subject.next(event);
       }
-      if (events.length < 500) return;
+
+      if (events.length < RealtimeEventPump.PAGE_SIZE) return;
+      if (scanned >= RealtimeEventPump.MAX_POLL_EVENTS) {
+        this.logger.warn(
+          { scanned },
+          'realtime event pump poll window exceeded cap; emitting resync',
+        );
+        this.advanceOverflowCursor(this.cursor ?? pageCursor);
+        return;
+      }
     }
   }
 
   async beforeApplicationShutdown(): Promise<void> {
     this.stopping = true;
     if (this.timer) clearTimeout(this.timer);
+    if (this.overflowReconcileTimer) {
+      clearTimeout(this.overflowReconcileTimer);
+      this.overflowReconcileTimer = undefined;
+    }
     if (this.inFlight) {
       await Promise.race([
         this.inFlight,
         new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
       ]);
     }
+    this.resyncSubject.complete();
     this.subject.complete();
   }
 }

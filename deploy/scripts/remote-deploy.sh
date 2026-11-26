@@ -45,11 +45,29 @@ load_runtime_env "${RUNTIME_ENV_INCOMING}"
 [[ "${RELEASE_SHA}" == "${REQUESTED_SHA}" ]] || die "Rendered runtime SHA does not match the requested release."
 [[ "${DEPLOY_RUN_NUMBER}" == "${REQUESTED_RUN}" ]] || die "Rendered runtime run number does not match the request."
 
+previous_release=""
+if [[ -f "${BASE_DIR}/current_release" ]]; then
+  previous_release="$(<"${BASE_DIR}/current_release")"
+  require_sha "${previous_release}"
+fi
+
+normalized_runtime_env() {
+  grep -Ev '^[[:space:]]*(#|$|DEPLOY_RUN_NUMBER=)' "$1" | LC_ALL=C sort
+}
+
 RELEASE_DIR="${BASE_DIR}/releases/${REQUESTED_SHA}"
 if [[ -d "${RELEASE_DIR}" ]]; then
   [[ -f "${RELEASE_DIR}/.source.sha" && "$(<"${RELEASE_DIR}/.source.sha")" == "${REQUESTED_SHA}" ]] || die "Existing release directory failed source identity validation."
-  [[ -f "${RELEASE_DIR}/.runtime.env" ]] || die "Existing release runtime env is missing."
-  "${SCRIPT_DIR}/validate-runtime-env.sh" "${RELEASE_DIR}/.runtime.env"
+  if [[ "${previous_release}" == "${REQUESTED_SHA}" || -f "${RELEASE_DIR}/.activated" ]]; then
+    [[ -f "${RELEASE_DIR}/.runtime.env" ]] || die "Existing activated release runtime env is missing."
+    "${SCRIPT_DIR}/validate-runtime-env.sh" "${RELEASE_DIR}/.runtime.env"
+    if ! diff -q <(normalized_runtime_env "${RELEASE_DIR}/.runtime.env") <(normalized_runtime_env "${RUNTIME_ENV_INCOMING}") >/dev/null 2>&1; then
+      die "Existing activated release ${REQUESTED_SHA} has an immutable runtime env that differs from incoming configuration; deploy a new release SHA to apply configuration or secret changes without mutating rollback snapshots."
+    fi
+  else
+    install -m 600 "${RUNTIME_ENV_INCOMING}" "${RELEASE_DIR}/.runtime.env.tmp"
+    mv -f "${RELEASE_DIR}/.runtime.env.tmp" "${RELEASE_DIR}/.runtime.env"
+  fi
   rm -rf -- "${INCOMING_DIR}"
 else
   install -m 600 "${RUNTIME_ENV_INCOMING}" "${INCOMING_DIR}/.runtime.env"
@@ -60,14 +78,10 @@ RUNTIME_ENV="${RELEASE_DIR}/.runtime.env"
 load_runtime_env "${RUNTIME_ENV}"
 [[ "${APP_ENV}" == "${REQUESTED_ENV}" && "${RELEASE_SHA}" == "${REQUESTED_SHA}" ]] || die "Stored runtime environment identity mismatch."
 
-previous_release=""
-if [[ -f "${BASE_DIR}/current_release" ]]; then
-  previous_release="$(<"${BASE_DIR}/current_release")"
-  require_sha "${previous_release}"
-fi
-
+services_mutated=false
 candidate_deploy() {
   compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" build --pull postgres api supplier-web tmmin-web caddy || return 1
+  services_mutated=true
   compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" up -d --no-deps postgres || return 1
   wait_for_service "${RELEASE_DIR}" "${RUNTIME_ENV}" postgres 180 || return 1
   compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" --profile operations run --rm migrate || return 1
@@ -92,9 +106,13 @@ candidate_deploy() {
 
 if ! candidate_deploy; then
   echo "Candidate deployment failed. No database down migration will be attempted." >&2
+  if [[ -n "${previous_release}" && "${services_mutated}" == "false" ]]; then
+    echo "Failure occurred before modifying running services; active release ${previous_release} was preserved untouched." >&2
+    exit 1
+  fi
   previous_dir="${BASE_DIR}/releases/${previous_release}"
   previous_env="${previous_dir}/.runtime.env"
-  if [[ -n "${previous_release}" && "${previous_release}" != "${REQUESTED_SHA}" && -f "${previous_env}" ]] &&
+  if [[ -n "${previous_release}" && -f "${previous_env}" ]] &&
     [[ -f "${previous_dir}/.source.sha" && "$(<"${previous_dir}/.source.sha")" == "${previous_release}" ]] &&
     "${RELEASE_DIR}/deploy/scripts/validate-runtime-env.sh" --allow-legacy-db-role "${previous_env}" >/dev/null &&
     (load_runtime_env "${previous_env}" && [[ "${APP_ENV:-}" == "${REQUESTED_ENV}" && "${RELEASE_SHA:-}" == "${previous_release}" ]]); then
@@ -107,6 +125,8 @@ if ! candidate_deploy; then
   exit 1
 fi
 
+printf '%s\n' "${REQUESTED_SHA}" >"${RELEASE_DIR}/.activated.tmp"
+mv "${RELEASE_DIR}/.activated.tmp" "${RELEASE_DIR}/.activated"
 activate_symlink "${RELEASE_DIR}" "${BASE_DIR}/current"
 printf '%s\n' "${REQUESTED_SHA}" >"${BASE_DIR}/current_release.tmp"
 mv "${BASE_DIR}/current_release.tmp" "${BASE_DIR}/current_release"

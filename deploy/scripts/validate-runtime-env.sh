@@ -33,7 +33,7 @@ if [[ "${ALLOW_LEGACY_DB_ROLE}" == "false" || -n "${POSTGRES_APP_USER:-}" || -n 
   done
   [[ "${POSTGRES_APP_USER}" =~ ^[a-z_][a-z0-9_]{0,62}$ ]] || die "POSTGRES_APP_USER must be a valid lowercase PostgreSQL role identifier."
   [[ "${POSTGRES_APP_USER}" != "${POSTGRES_USER}" ]] || die "POSTGRES_APP_USER must be distinct from POSTGRES_USER."
-  (( ${#POSTGRES_APP_PASSWORD} >= 32 )) || die "POSTGRES_APP_PASSWORD must contain at least 32 characters."
+  (( ${#POSTGRES_APP_PASSWORD} >= 32 && ${#POSTGRES_APP_PASSWORD} <= 128 )) || die "POSTGRES_APP_PASSWORD must contain 32-128 characters."
   [[ "${POSTGRES_APP_PASSWORD}" != "${POSTGRES_PASSWORD}" ]] || die "POSTGRES_APP_PASSWORD must be distinct from POSTGRES_PASSWORD."
 fi
 

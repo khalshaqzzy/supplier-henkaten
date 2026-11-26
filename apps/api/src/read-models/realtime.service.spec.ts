@@ -96,6 +96,106 @@ describe('RealtimeEventPump', () => {
     subscription.unsubscribe();
     await pump.beforeApplicationShutdown();
   });
+
+  it('bounds dense lookback windows via overflow resync + delayed reconciliation without entering an indefinite replay loop', async () => {
+    vi.useFakeTimers();
+    try {
+      const makePage = (offset: number, count: number) =>
+        Array.from({ length: count }, (_, idx) => {
+          const seq = offset + idx;
+          return event({
+            id: `00000000-0000-4000-8000-${seq.toString().padStart(12, '0')}`,
+            occurredAt: new Date(Date.parse('2026-07-25T00:00:00.000Z') + Math.floor(seq / 500)),
+          });
+        });
+
+      const findMany = vi
+        .fn()
+        .mockResolvedValueOnce(makePage(0, 500))
+        .mockResolvedValueOnce(makePage(500, 500))
+        .mockResolvedValueOnce(makePage(1_000, 500))
+        .mockResolvedValueOnce(makePage(1_500, 500))
+        .mockResolvedValueOnce([]);
+      const pump = new RealtimeEventPump(
+        { outboxEvent: { findMany } } as never,
+        { realtimePollMs: 1_000 } as never,
+      );
+      const received: string[] = [];
+      let resyncCount = 0;
+      const subEvents = pump.events().subscribe((item) => received.push(item.id));
+      const subResync = pump.resyncs().subscribe(() => {
+        resyncCount += 1;
+      });
+
+      await pump.poll();
+      expect(received).toHaveLength(2_000);
+      expect(resyncCount).toBe(1);
+      expect(findMany).toHaveBeenCalledTimes(4);
+
+      // Next poll must query strictly after confirmedCursor with an explicit leading occurredAt >= bound.
+      await pump.poll();
+      expect(findMany).toHaveBeenCalledTimes(5);
+      const nextWhere = findMany.mock.calls[4]![0].where;
+      expect(nextWhere).toHaveProperty('AND');
+      expect(nextWhere.AND[0]).toHaveProperty('occurredAt.gte');
+      expect(nextWhere.AND[1]).toHaveProperty('OR');
+      expect(nextWhere).not.toHaveProperty('occurredAt');
+      expect(received).toHaveLength(2_000);
+
+      // After the lookback window, one bounded follow-up resync reconciles any commit that became visible after overflow.
+      await vi.advanceTimersByTimeAsync(RealtimeEventPump.LATE_COMMIT_LOOKBACK_MS);
+      expect(resyncCount).toBe(2);
+
+      subEvents.unsubscribe();
+      subResync.unsubscribe();
+      await pump.beforeApplicationShutdown();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('converges to a strict cursor after idle lookback expiry and stops multi-page polling on shutdown', async () => {
+    vi.useFakeTimers();
+    try {
+      const e1 = event({ id: 'event-idle-1', occurredAt: new Date('2026-07-25T00:00:05.000Z') });
+      const findMany = vi.fn().mockResolvedValueOnce([e1]).mockResolvedValueOnce([]);
+      const pump = new RealtimeEventPump(
+        { outboxEvent: { findMany } } as never,
+        { realtimePollMs: 1_000 } as never,
+      );
+
+      await pump.poll();
+      await vi.advanceTimersByTimeAsync(RealtimeEventPump.LATE_COMMIT_LOOKBACK_MS + 100);
+      await pump.poll();
+
+      expect(findMany.mock.calls[1]![0].where).toHaveProperty('AND');
+      expect(findMany.mock.calls[1]![0].where.AND[0]).toHaveProperty('occurredAt.gte');
+      expect(findMany.mock.calls[1]![0].where.AND[1]).toHaveProperty('OR');
+      await pump.beforeApplicationShutdown();
+    } finally {
+      vi.useRealTimers();
+    }
+
+    // Shutdown during page 1 of a multi-page batch prevents page 2 from executing.
+    let resolvePage1!: (rows: RealtimeOutboxEvent[]) => void;
+    const page1Promise = new Promise<RealtimeOutboxEvent[]>((resolve) => {
+      resolvePage1 = resolve;
+    });
+    const findManyShutdown = vi.fn().mockReturnValueOnce(page1Promise).mockResolvedValue([]);
+    const shutdownPump = new RealtimeEventPump(
+      { outboxEvent: { findMany: findManyShutdown } } as never,
+      { realtimePollMs: 1_000 } as never,
+    );
+    const pollPromise = shutdownPump.poll();
+    const shutdownPromise = shutdownPump.beforeApplicationShutdown();
+    resolvePage1(
+      Array.from({ length: 500 }, (_, idx) =>
+        event({ id: `00000000-0000-4000-8000-${idx.toString().padStart(12, '0')}` }),
+      ),
+    );
+    await Promise.all([pollPromise, shutdownPromise]);
+    expect(findManyShutdown).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('RealtimeService', () => {
@@ -493,5 +593,356 @@ describe('RealtimeService', () => {
     expect(completed).toHaveBeenCalledOnce();
     expect(res.destroy).toHaveBeenCalledOnce();
     sub.unsubscribe();
+  });
+
+  it('destroys stalled HTTP socket through handleHttpStream when drainLive hits hard byte cap', async () => {
+    const events = new Subject<RealtimeOutboxEvent>();
+    let resolveSessionGate!: (value: RequestPrincipal) => void;
+    let calls = 0;
+    const resolveSession = vi.fn().mockImplementation(() => {
+      calls += 1;
+      if (calls <= 2) return Promise.resolve(principal);
+      return new Promise<RequestPrincipal>((resolve) => {
+        resolveSessionGate = resolve;
+      });
+    });
+    const service = new RealtimeService(
+      {
+        line: {
+          findFirst: vi.fn().mockResolvedValue({ id: LINE_A }),
+          findMany: vi.fn().mockResolvedValue([{ id: LINE_A }]),
+        },
+        outboxEvent: { findMany: vi.fn().mockResolvedValue([]) },
+      } as never,
+      { events: () => events } as never,
+      { resolve: resolveSession } as never,
+    );
+    const httpRes = Object.assign(fakeResponse(), {
+      status: vi.fn(),
+      setHeader: vi.fn(),
+      flushHeaders: vi.fn(),
+      write: vi.fn(),
+    });
+
+    await service.handleHttpStream(
+      new TenantScope(SUPPLIER_ID),
+      principal,
+      LINE_A,
+      undefined,
+      httpRes as never,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 15));
+
+    // Enqueue event while below cap; then raise buffer past hard cap before drainLive finishes validation.
+    events.next(event({ id: randomUUID() }));
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    httpRes.writableLength = 600 * 1024;
+    resolveSessionGate(principal);
+    await new Promise((resolve) => setTimeout(resolve, 15));
+
+    expect(httpRes.destroy).toHaveBeenCalledOnce();
+  });
+
+  it('aborts remaining replay DB pages when the stream closes mid-replay', async () => {
+    const events = new Subject<RealtimeOutboxEvent>();
+    let resolveBatch1!: (rows: RealtimeOutboxEvent[]) => void;
+    const batch1 = new Promise<RealtimeOutboxEvent[]>((resolve) => {
+      resolveBatch1 = resolve;
+    });
+    const findMany = vi.fn().mockReturnValueOnce(batch1).mockResolvedValue([]);
+    const service = new RealtimeService(
+      {
+        line: { findMany: vi.fn().mockResolvedValue([{ id: LINE_A }]) },
+        outboxEvent: { findMany },
+      } as never,
+      { events: () => events } as never,
+      { resolve: vi.fn().mockResolvedValue(principal) } as never,
+    );
+
+    const sub = service
+      .stream(new TenantScope(SUPPLIER_ID), principal, undefined, undefined)
+      .subscribe();
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    expect(findMany).toHaveBeenCalledTimes(1);
+
+    sub.unsubscribe();
+    resolveBatch1(
+      Array.from({ length: 501 }, () => event({ id: randomUUID(), payload: { lineId: LINE_B } })),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    expect(findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('serializes slow heartbeats and coalesces concurrent bypass checks across tabs of the same session', async () => {
+    vi.useFakeTimers();
+    try {
+      const events = new Subject<RealtimeOutboxEvent>();
+      let resolveSlowHeartbeat: ((value: RequestPrincipal) => void) | undefined;
+      let calls = 0;
+      const resolve = vi.fn().mockImplementation(() => {
+        calls += 1;
+        // Initial startup + post-replay checks are coalesced across both tabs into call #1;
+        // heartbeat bypass checks stay pending from call #2 onward.
+        if (calls <= 1) return Promise.resolve(principal);
+        return new Promise<RequestPrincipal>((r) => {
+          resolveSlowHeartbeat = r;
+        });
+      });
+      const service = new RealtimeService(
+        {
+          line: { findMany: vi.fn().mockResolvedValue([{ id: LINE_A }]) },
+          outboxEvent: { findMany: vi.fn().mockResolvedValue([]) },
+        } as never,
+        { events: () => events } as never,
+        { resolve } as never,
+        {
+          sseMaxPerSession: 6,
+          sseMaxPerUser: 12,
+          sseMaxPerSupplier: 60,
+          sseMaxGlobal: 300,
+          sseRevalidationCacheMs: 2_000,
+        } as never,
+      );
+
+      const res1 = fakeResponse();
+      const res2 = fakeResponse();
+      const s1 = await service.prepareStream(
+        new TenantScope(SUPPLIER_ID),
+        principal,
+        undefined,
+        undefined,
+        res1 as never,
+      );
+      const s2 = await service.prepareStream(
+        new TenantScope(SUPPLIER_ID),
+        principal,
+        undefined,
+        undefined,
+        res2 as never,
+      );
+      const sub1 = s1.subscribe();
+      const sub2 = s2.subscribe();
+      await vi.advanceTimersByTimeAsync(0);
+      const callsAfterStart = resolve.mock.calls.length;
+
+      // Both tabs hit their 15s heartbeat tick; coalesced into a single live bypass DB lookup.
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(resolve.mock.calls.length).toBe(callsAfterStart + 1);
+
+      // Even after another 30s while the first heartbeat query is stalled, no overlapping heartbeats pile up.
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(resolve.mock.calls.length).toBe(callsAfterStart + 1);
+
+      resolveSlowHeartbeat?.(principal);
+      await vi.advanceTimersByTimeAsync(0);
+      sub1.unsubscribe();
+      sub2.unsubscribe();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('delivers MASTER_DATA_REMOVED for a tombstoned line to unfiltered board streams while closing line-filtered streams', async () => {
+    const events = new Subject<RealtimeOutboxEvent>();
+    let activeLines = [{ id: LINE_A }, { id: LINE_B }];
+    const service = new RealtimeService(
+      {
+        line: {
+          findFirst: vi.fn().mockResolvedValue({ id: LINE_A }),
+          findMany: vi.fn().mockImplementation(() => Promise.resolve(activeLines)),
+        },
+        outboxEvent: { findMany: vi.fn().mockResolvedValue([]) },
+      } as never,
+      { events: () => events } as never,
+      { resolve: vi.fn().mockResolvedValue(principal) } as never,
+    );
+
+    const unfilteredMessages: string[] = [];
+    const lineFilteredCompleted = vi.fn();
+    const resUnfiltered = fakeResponse();
+    const resFiltered = fakeResponse();
+    const unfiltered = await service.prepareStream(
+      new TenantScope(SUPPLIER_ID),
+      principal,
+      undefined,
+      undefined,
+      resUnfiltered as never,
+    );
+    const filtered = await service.prepareStream(
+      new TenantScope(SUPPLIER_ID),
+      principal,
+      LINE_A,
+      undefined,
+      resFiltered as never,
+    );
+    const subUnfiltered = unfiltered.subscribe((m) => unfilteredMessages.push(m.type));
+    const subFiltered = filtered.subscribe({ complete: lineFilteredCompleted });
+    await new Promise((resolve) => setTimeout(resolve, 15));
+
+    // Tombstone LINE_A, then publish MASTER_DATA_REMOVED referencing the deleted lineId.
+    activeLines = [{ id: LINE_B }];
+    events.next(
+      event({
+        id: randomUUID(),
+        eventType: 'MASTER_DATA_REMOVED',
+        aggregateType: 'Line',
+        aggregateId: LINE_A,
+        payload: { kind: 'LINE', mode: 'DELETE', lineId: LINE_A },
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(unfilteredMessages).toContain('invalidate');
+    expect(lineFilteredCompleted).toHaveBeenCalledOnce();
+    subUnfiltered.unsubscribe();
+    subFiltered.unsubscribe();
+  });
+
+  it('requeries allowed lines when invalidated mid-flight instead of returning stale lines', async () => {
+    const events = new Subject<RealtimeOutboxEvent>();
+    let releaseStaleLoad!: (rows: Array<{ id: string }>) => void;
+    let loadCount = 0;
+    const findManyLines = vi.fn().mockImplementation(() => {
+      loadCount += 1;
+      if (loadCount === 1) return Promise.resolve([{ id: LINE_A }]);
+      if (loadCount === 2) {
+        return new Promise<Array<{ id: string }>>((resolve) => {
+          releaseStaleLoad = resolve;
+        });
+      }
+      return Promise.resolve([{ id: LINE_B }]);
+    });
+
+    const service = new RealtimeService(
+      {
+        line: {
+          findFirst: vi.fn().mockResolvedValue({ id: LINE_A }),
+          findMany: findManyLines,
+        },
+        outboxEvent: { findMany: vi.fn().mockResolvedValue([]) },
+      } as never,
+      { events: () => events } as never,
+      { resolve: vi.fn().mockResolvedValue(principal) } as never,
+      {
+        sseMaxPerSession: 6,
+        sseMaxPerUser: 12,
+        sseMaxPerSupplier: 60,
+        sseMaxGlobal: 300,
+        sseRevalidationCacheMs: 0,
+      } as never,
+    );
+
+    const received: string[] = [];
+    const completed = vi.fn();
+    const res = fakeResponse();
+    const stream = await service.prepareStream(
+      new TenantScope(SUPPLIER_ID),
+      principal,
+      LINE_A,
+      undefined,
+      res as never,
+    );
+    const sub = stream.subscribe({
+      next: (msg) => received.push(msg.type),
+      complete: completed,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 15));
+
+    // Trigger a live event that starts load #2 (in-flight).
+    events.next(
+      event({ id: randomUUID(), eventType: 'HENKATEN_OPENED', payload: { lineId: LINE_A } }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // While load #2 is in-flight, MASTER_DATA_REMOVED bumps line epoch once for the tenant.
+    events.next(
+      event({
+        id: randomUUID(),
+        eventType: 'MASTER_DATA_REMOVED',
+        aggregateType: 'Line',
+        aggregateId: LINE_A,
+        payload: { kind: 'LINE', mode: 'DELETE', lineId: LINE_A },
+      }),
+    );
+    // Now resolve the stale load #2 with [LINE_A]; loadAllowedLines must detect epoch mismatch and requery load #3 ([LINE_B]).
+    releaseStaleLoad([{ id: LINE_A }]);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(findManyLines).toHaveBeenCalledTimes(3);
+    expect(received).not.toContain('invalidate');
+    expect(completed).toHaveBeenCalledOnce();
+    sub.unsubscribe();
+  });
+
+  it('forwards RealtimeEventPump overflow resync signals to active streams', async () => {
+    const events = new Subject<RealtimeOutboxEvent>();
+    const resyncs = new Subject<void>();
+    const service = new RealtimeService(
+      {
+        line: { findMany: vi.fn().mockResolvedValue([{ id: LINE_A }]) },
+        outboxEvent: { findMany: vi.fn().mockResolvedValue([]) },
+      } as never,
+      { events: () => events, resyncs: () => resyncs } as never,
+      { resolve: vi.fn().mockResolvedValue(principal) } as never,
+    );
+
+    const received: string[] = [];
+    const sub = service
+      .stream(new TenantScope(SUPPLIER_ID), principal, undefined, undefined)
+      .subscribe((msg) => received.push(msg.type));
+    await new Promise((resolve) => setTimeout(resolve, 15));
+
+    resyncs.next();
+    await new Promise((resolve) => setTimeout(resolve, 15));
+
+    expect(received).toContain('resync');
+    sub.unsubscribe();
+  });
+
+  it('immediately destroys evicted sockets that are already backpressured instead of holding them in grace', async () => {
+    const events = new Subject<RealtimeOutboxEvent>();
+    const service = new RealtimeService(
+      {
+        line: {
+          findFirst: vi.fn().mockResolvedValue({ id: LINE_A }),
+          findMany: vi.fn().mockResolvedValue([{ id: LINE_A }]),
+        },
+        outboxEvent: { findMany: vi.fn().mockResolvedValue([]) },
+      } as never,
+      { events: () => events } as never,
+      { resolve: vi.fn().mockResolvedValue(principal) } as never,
+      {
+        sseMaxPerSession: 1,
+        sseMaxPerUser: 5,
+        sseMaxPerSupplier: 10,
+        sseMaxGlobal: 20,
+        sseRevalidationCacheMs: 2_000,
+      } as never,
+    );
+
+    const stalledRes = fakeResponse();
+    stalledRes.writableNeedDrain = true;
+    const stream1 = await service.prepareStream(
+      new TenantScope(SUPPLIER_ID),
+      principal,
+      LINE_A,
+      undefined,
+      stalledRes as never,
+    );
+    const sub1 = stream1.subscribe();
+
+    const freshRes = fakeResponse();
+    const stream2 = await service.prepareStream(
+      new TenantScope(SUPPLIER_ID),
+      principal,
+      LINE_A,
+      undefined,
+      freshRes as never,
+    );
+    const sub2 = stream2.subscribe();
+
+    expect(stalledRes.destroy).toHaveBeenCalledOnce();
+    sub1.unsubscribe();
+    sub2.unsubscribe();
   });
 });

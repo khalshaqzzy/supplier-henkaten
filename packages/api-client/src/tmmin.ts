@@ -1,4 +1,7 @@
+import { z } from 'zod';
+
 import {
+  MAX_HENKATEN_PARTS,
   henkatenDeletionPreviewSchema,
   henkatenDeletionResultSchema,
   type DeleteHenkatenRequest,
@@ -17,8 +20,10 @@ import {
   externalProjectionPageSchema,
   henkatenExportJobSchema,
   hostedPreparationCredentialSchema,
+  tmminHenkatenPartSchema,
   tmminHostedHenkatenDetailSchema,
   tmminHostedHenkatenPageSchema,
+  tmminHostedHenkatenSummarySchema,
   linePageSchema,
   memberPageSchema,
   notificationPageSchema,
@@ -335,13 +340,13 @@ export class TmminApi {
   supplierHenkatens(supplierId: string, query: QueryRecord = {}) {
     return this.client.request(`/api/v1/tmmin/suppliers/${supplierId}/henkatens`, {
       query,
-      responseSchema: tmminHostedHenkatenPageSchema,
+      responseSchema: rollbackSafeTmminHostedHenkatenPageSchema,
     });
   }
 
   hostedHenkaten(supplierId: string, id: string) {
     return this.client.request(`/api/v1/tmmin/suppliers/${supplierId}/henkatens/${id}`, {
-      responseSchema: tmminHostedHenkatenDetailSchema,
+      responseSchema: rollbackSafeTmminHostedHenkatenDetailSchema,
     });
   }
 
@@ -525,3 +530,30 @@ export class TmminApi {
 function asQuery(value: object): QueryRecord {
   return value as QueryRecord;
 }
+
+const rollbackSafeTmminHenkatenPartSchema = tmminHenkatenPartSchema
+  .extend({
+    internalNumber: z
+      .union([z.string(), z.null()])
+      .optional()
+      .transform((value) => (value === undefined ? undefined : null)),
+  })
+  .strict();
+
+const rollbackSafeTmminHostedHenkatenPageSchema = tmminHostedHenkatenPageSchema
+  .extend({
+    items: z.array(
+      tmminHostedHenkatenSummarySchema
+        .extend({
+          parts: z.array(rollbackSafeTmminHenkatenPartSchema).min(1).max(MAX_HENKATEN_PARTS),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+const rollbackSafeTmminHostedHenkatenDetailSchema = tmminHostedHenkatenDetailSchema
+  .extend({
+    parts: z.array(rollbackSafeTmminHenkatenPartSchema).min(1).max(MAX_HENKATEN_PARTS),
+  })
+  .strict();

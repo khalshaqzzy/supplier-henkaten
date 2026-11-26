@@ -5,7 +5,7 @@ REPOSITORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCRIPTS="${REPOSITORY_ROOT}/deploy/scripts"
 EXAMPLE_ENV="${REPOSITORY_ROOT}/deploy/env/runtime.staging.env.example"
 COMPOSE_FILE="${REPOSITORY_ROOT}/deploy/compose/docker-compose.remote.yml"
-TEST_ROOT="$(mktemp -d)"
+TEST_ROOT="$(mktemp -d /tmp/deployment-scripts.XXXXXX)"
 trap 'rm -rf -- "${TEST_ROOT}"' EXIT
 
 fail() {
@@ -138,6 +138,30 @@ if "${SCRIPTS}/validate-runtime-env.sh" --allow-legacy-db-role "${partial_app_en
   fail "half-configured POSTGRES_APP_USER without POSTGRES_APP_PASSWORD was accepted"
 fi
 
+overlong_app_password="$(printf 'a%.0s' {1..129})"
+max_app_password="$(printf 'b%.0s' {1..128})"
+overlong_app_env="${TEST_ROOT}/overlong-app-password.env"
+sed "s/^POSTGRES_APP_PASSWORD=.*/POSTGRES_APP_PASSWORD=${overlong_app_password}/" "${rendered_env}" >"${overlong_app_env}"
+if "${SCRIPTS}/validate-runtime-env.sh" "${overlong_app_env}" >/dev/null 2>&1; then
+  fail "129-character POSTGRES_APP_PASSWORD passed validate-runtime-env.sh"
+fi
+max_app_env="${TEST_ROOT}/max-app-password.env"
+sed "s/^POSTGRES_APP_PASSWORD=.*/POSTGRES_APP_PASSWORD=${max_app_password}/" "${rendered_env}" >"${max_app_env}"
+"${SCRIPTS}/validate-runtime-env.sh" "${max_app_env}" >/dev/null || fail "128-character POSTGRES_APP_PASSWORD was rejected"
+
+if (
+  set -a
+  # shellcheck disable=SC1090
+  source "${EXAMPLE_ENV}"
+  set +a
+  PCR_OPENAI_BASE_URL=https://inference.example.invalid/v1 \
+  PCR_OPENAI_API_KEY=synthetic_gateway_key_for_test_only \
+  POSTGRES_APP_PASSWORD="${overlong_app_password}" \
+    "${SCRIPTS}/render-runtime-env.sh" staging cccccccccccccccccccccccccccccccccccccccc 43 >/dev/null 2>&1
+); then
+  fail "129-character POSTGRES_APP_PASSWORD passed render-runtime-env.sh"
+fi
+
 if (
   set -a
   # shellcheck disable=SC1090
@@ -240,6 +264,9 @@ if [[ "${1:-}" == "logs" ]]; then
   exit 0
 fi
 if [[ "${1:-}" == "compose" ]]; then
+  if [[ -n "${TEST_DOCKER_LOG:-}" ]]; then
+    printf '%s\n' "$*" >>"${TEST_DOCKER_LOG}"
+  fi
   for argument in "$@"; do
     if [[ "${argument}" == "build" && "${TEST_BUILD_FAIL:-false}" == "true" ]]; then exit 1; fi
     if [[ "${argument}" == "migrate" && "${TEST_MIGRATE_FAIL:-false}" == "true" ]]; then exit 1; fi
@@ -401,7 +428,86 @@ if TEST_MIGRATE_FAIL=true run_candidate "${migration_base}" 33333333333333333333
   fail "failed migration returned success"
 fi
 [[ ! -f "${migration_base}/current_release" ]] || fail "failed migration changed current_release"
+[[ ! -f "${migration_base}/releases/3333333333333333333333333333333333333333/.activated" ]] || fail "failed migration created .activated marker"
 [[ -d "${migration_base}/shared/postgres-data" && -d "${migration_base}/shared/member-photos" ]] || fail "failed migration removed persistent storage"
+
+# Same-SHA retry after a failed candidate refreshes .runtime.env with the updated config.
+retry_sha=3333333333333333333333333333333333333333
+updated_app_password="$(printf 'c%.0s' {1..40})"
+IFS='|' read -r retry_incoming retry_runtime retry_archive retry_checksum < <(
+  prepare_candidate "${migration_base}" "${retry_sha}" 34
+)
+sed -i.bak "s/^POSTGRES_APP_PASSWORD=.*/POSTGRES_APP_PASSWORD=${updated_app_password}/" "${retry_runtime}"
+rm -f "${retry_runtime}.bak"
+PATH="${fake_bin}:${PATH}" "${retry_incoming}/deploy/scripts/remote-deploy.sh" \
+  staging "${retry_sha}" 34 "${migration_base}" "${retry_incoming}" "${retry_runtime}" \
+  "${retry_archive}" "${retry_checksum}" 127.0.0.1 >/dev/null
+[[ "$(<"${migration_base}/current_release")" == "${retry_sha}" ]] || fail "same-SHA retry after failure did not activate"
+[[ -f "${migration_base}/releases/${retry_sha}/.activated" ]] || fail "activated release is missing .activated marker"
+grep -Fxq "POSTGRES_APP_PASSWORD=${updated_app_password}" "${migration_base}/releases/${retry_sha}/.runtime.env" || fail "same-SHA retry after failure kept stale .runtime.env"
+
+# Re-deploying an already-activated release with identical config (only run number incremented) succeeds.
+IFS='|' read -r idempotent_incoming idempotent_runtime idempotent_archive idempotent_checksum < <(
+  prepare_candidate "${migration_base}" "${retry_sha}" 35
+)
+sed -i.bak "s/^POSTGRES_APP_PASSWORD=.*/POSTGRES_APP_PASSWORD=${updated_app_password}/" "${idempotent_runtime}"
+rm -f "${idempotent_runtime}.bak"
+PATH="${fake_bin}:${PATH}" "${idempotent_incoming}/deploy/scripts/remote-deploy.sh" \
+  staging "${retry_sha}" 35 "${migration_base}" "${idempotent_incoming}" "${idempotent_runtime}" \
+  "${idempotent_archive}" "${idempotent_checksum}" 127.0.0.1 >/dev/null
+
+# Re-deploying an already-activated release with mutated secrets must fail explicitly and preserve the snapshot.
+IFS='|' read -r mutated_incoming mutated_runtime mutated_archive mutated_checksum < <(
+  prepare_candidate "${migration_base}" "${retry_sha}" 36
+)
+if PATH="${fake_bin}:${PATH}" "${mutated_incoming}/deploy/scripts/remote-deploy.sh" \
+  staging "${retry_sha}" 36 "${migration_base}" "${mutated_incoming}" "${mutated_runtime}" \
+  "${mutated_archive}" "${mutated_checksum}" 127.0.0.1 >/dev/null 2>&1; then
+  fail "same-SHA redeploy of an activated release with changed config was accepted"
+fi
+grep -Fxq "POSTGRES_APP_PASSWORD=${updated_app_password}" "${migration_base}/releases/${retry_sha}/.runtime.env" || fail "rejected same-SHA redeploy mutated activated rollback snapshot"
+
+# Same-SHA build failure on an active release must NOT stop running services.
+same_sha_docker_log="${TEST_ROOT}/same-sha-build-fail.log"
+IFS='|' read -r buildfail_incoming buildfail_runtime buildfail_archive buildfail_checksum < <(
+  prepare_candidate "${migration_base}" "${retry_sha}" 37
+)
+sed -i.bak "s/^POSTGRES_APP_PASSWORD=.*/POSTGRES_APP_PASSWORD=${updated_app_password}/" "${buildfail_runtime}"
+rm -f "${buildfail_runtime}.bak"
+if TEST_BUILD_FAIL=true TEST_DOCKER_LOG="${same_sha_docker_log}" \
+  PATH="${fake_bin}:${PATH}" "${buildfail_incoming}/deploy/scripts/remote-deploy.sh" \
+  staging "${retry_sha}" 37 "${migration_base}" "${buildfail_incoming}" "${buildfail_runtime}" \
+  "${buildfail_archive}" "${buildfail_checksum}" 127.0.0.1 >/dev/null 2>&1; then
+  fail "same-SHA build failure unexpectedly succeeded"
+fi
+if grep -q ' stop ' "${same_sha_docker_log}"; then
+  fail "same-SHA build failure stopped running active services"
+fi
+[[ "$(<"${migration_base}/current_release")" == "${retry_sha}" ]] || fail "same-SHA build failure altered current_release"
+
+# Same-SHA post-mutation failure recovers via verified rollback script instead of stopping the app.
+cat >"${migration_base}/releases/${retry_sha}/deploy/scripts/remote-rollback.sh" <<EOF
+#!/usr/bin/env bash
+touch "${migration_base}/same-sha-rollback-called"
+exit 0
+EOF
+chmod +x "${migration_base}/releases/${retry_sha}/deploy/scripts/remote-rollback.sh"
+same_sha_smoke_log="${TEST_ROOT}/same-sha-smoke-fail.log"
+IFS='|' read -r smokefail_incoming smokefail_runtime smokefail_archive smokefail_checksum < <(
+  prepare_candidate "${migration_base}" "${retry_sha}" 38
+)
+sed -i.bak "s/^POSTGRES_APP_PASSWORD=.*/POSTGRES_APP_PASSWORD=${updated_app_password}/" "${smokefail_runtime}"
+rm -f "${smokefail_runtime}.bak"
+if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_DOCKER_LOG="${same_sha_smoke_log}" \
+  PATH="${fake_bin}:${PATH}" "${smokefail_incoming}/deploy/scripts/remote-deploy.sh" \
+  staging "${retry_sha}" 38 "${migration_base}" "${smokefail_incoming}" "${smokefail_runtime}" \
+  "${smokefail_archive}" "${smokefail_checksum}" 127.0.0.1 >/dev/null 2>&1; then
+  fail "same-SHA forced smoke failure unexpectedly succeeded"
+fi
+[[ -f "${migration_base}/same-sha-rollback-called" ]] || fail "same-SHA post-mutation failure did not invoke snapshot recovery"
+if grep -q ' stop ' "${same_sha_smoke_log}"; then
+  fail "same-SHA post-mutation failure stopped application services instead of recovering"
+fi
 
 rollback_base="${TEST_ROOT}/rollback"
 prepare_base "${rollback_base}"

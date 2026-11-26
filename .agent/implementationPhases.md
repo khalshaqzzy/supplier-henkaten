@@ -2,18 +2,25 @@
 
 Implementation on `fix/security-high-findings`: remediates all seven in-scope High-severity
 security audit findings (`H-01`..`H-07`; `H-08` staging/production SSH & secret separation / manual
-production approval gate explicitly deferred) with zero Prisma schema/migration changes and full
-rollback continuity. Enforces fail-closed `Internal Part Number` exclusion and search blocking on
-TMMIN Henkaten list/detail plus write-time and historical read-time `HENKATEN_EXPORT_REQUESTED`
+production approval gate explicitly deferred) with one purely additive index migration (`20261126002800_outbox_realtime_poll_index` on
+`OutboxEvent(occurredAt, id)`; plain `CREATE INDEX` briefly takes a `SHARE` lock during build,
+remains compatible with `db60208` once applied, and requires standard `prisma migrate resolve`
+recovery if interrupted) and bidirectional rollback continuity. Enforces fail-closed `Internal Part Number` exclusion and search blocking on
+TMMIN Henkaten list/detail (with rollback-safe client normalization in `packages/api-client/src/tmmin.ts`) plus write-time and historical read-time `HENKATEN_EXPORT_REQUESTED`
 audit redaction (`H-01`); fail-closed supplier-visible audit/dashboard filtering excluding TMMIN,
 External client and TMMIN-only system records (`H-02`); explicit supplier SSE event allowlist,
 server-side `lineId`/`sourceLineId` routing fixing the strict wire schema, `HENKATEN_DATA_DELETED`
-command ID masking, monotonic replay-to-live handoff and UUID cursor validation (`H-03`); inclusive
+command ID masking, `MASTER_DATA_REMOVED` unfiltered board invalidation, bounded lookback/overflow
+`RealtimeEventPump` cursor with shutdown halt and UUID cursor validation (`H-03`); inclusive
 UTC bucket ceilings (`DAY=370`, `WEEK=265`, `MONTH=122`) and forward clamping on `dashboardTrend`
 (`H-04`); pre-header SSE `404`/`429` admission caps, `response.once('close')` slot release,
-per-session eviction with long retry hint, coalesced monotonic-epoch revalidation cache, bounded
-live queues and client exponential-backoff reconnect (`H-05`); closed-allowlist two-pass
-non-evaluating `.runtime.env` parsing, RFC-1123 FQDN validation and pre-validated rollback (`H-06`);
+per-session eviction with long retry hint + socket close grace timer, replay disconnect cancel,
+serialized/coalesced heartbeats, monotonic-epoch revalidation cache with bounded line-load retries,
+bounded live queues with `drain`-deferred resync and `response.destroy()` hard byte-cap, and full
+4-query board invalidation on `onResync`/`onReconnect` (`H-05`); closed-allowlist two-pass
+non-evaluating `.runtime.env` parsing, RFC-1123 FQDN validation, `32..128`-char
+`POSTGRES_APP_PASSWORD` parity, same-SHA failed-candidate retry env refresh vs immutable
+`.activated` rollback snapshots, and pre-validated rollback (`H-06`);
 and distroless `apps/api/src/cli/migrate.ts` provisioning a least-privilege non-superuser
 PostgreSQL runtime role (`POSTGRES_APP_USER`) with SCRAM-SHA-256 verifier and staged zero-touch
 credential derivation (`H-07`). See

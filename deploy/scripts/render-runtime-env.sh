@@ -78,6 +78,7 @@ require_value() {
 require_safe() {
   local name="$1"
   local minimum="${2:-1}"
+  local maximum="${3:-0}"
   local value
   require_value "${name}"
   value="${!name}"
@@ -85,6 +86,10 @@ require_safe() {
     echo "${name} must use only A-Z, a-z, 0-9, underscore, or hyphen and contain at least ${minimum} characters." >&2
     exit 1
   }
+  if (( maximum > 0 && ${#value} > maximum )); then
+    echo "${name} must contain at most ${maximum} characters." >&2
+    exit 1
+  fi
 }
 
 for domain_name in SUPPLIER_DOMAIN TMMIN_DOMAIN API_DOMAIN; do
@@ -122,7 +127,7 @@ fi
 }
 
 if [[ -n "${POSTGRES_APP_PASSWORD:-}" ]]; then
-  require_safe POSTGRES_APP_PASSWORD 32
+  require_safe POSTGRES_APP_PASSWORD 32 128
 else
   echo "Warning: POSTGRES_APP_PASSWORD is not set; deriving a one-way HMAC-SHA256 runtime password (staged zero-touch). Provision an independent POSTGRES_APP_PASSWORD secret when ready." >&2
   if command -v python3 >/dev/null 2>&1; then
