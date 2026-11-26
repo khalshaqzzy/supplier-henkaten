@@ -60,14 +60,21 @@ if [[ -L "${RELEASE_DIR}/.rollback-unsafe" || ( -e "${RELEASE_DIR}/.rollback-uns
   refuse "Rollback aborted: ${RELEASE_DIR}/.rollback-unsafe is not a regular file."
 fi
 
-# Retain pins for the outgoing active release (when different and pinned) before retagging the shared
-# PostgreSQL tag so rolling back never garbage-collects the outgoing release's PostgreSQL image.
+# Retain pins for the outgoing active release (when different and pinned) BEFORE retagging the
+# shared PostgreSQL tag so rolling back never garbage-collects the outgoing release's PostgreSQL
+# image. An operational retention/inspect error aborts before touching any runtime tag.
 if [[ -f "${BASE_DIR}/current_release" && ! -L "${BASE_DIR}/current_release" ]]; then
   outgoing_sha="$(<"${BASE_DIR}/current_release")"
   if [[ "${outgoing_sha}" =~ ^[0-9a-f]{40}$ && "${outgoing_sha}" != "${REQUESTED_SHA}" ]]; then
     outgoing_dir="${BASE_DIR}/releases/${outgoing_sha}"
     if [[ -f "${outgoing_dir}/.activated-images" && ! -L "${outgoing_dir}/.activated-images" ]]; then
-      ensure_manifest_pins "${REQUESTED_ENV}" "${outgoing_dir}" "${outgoing_sha}" || note_stderr "Warning: could not retain all pins for outgoing release ${outgoing_sha} before rollback."
+      outgoing_pin_status=0
+      ensure_manifest_pins "${REQUESTED_ENV}" "${outgoing_dir}" "${outgoing_sha}" || outgoing_pin_status=$?
+      if (( outgoing_pin_status == 1 )); then
+        die "Rollback aborted before moving runtime tags: operational Docker error protecting outgoing release ${outgoing_sha} pins."
+      elif (( outgoing_pin_status != 0 )); then
+        note_stderr "Warning: outgoing release ${outgoing_sha} had confirmed-missing local image(s) or an invalid manifest (status ${outgoing_pin_status}); any locally present outgoing images were retained before proceeding."
+      fi
     fi
   fi
 fi
@@ -88,9 +95,13 @@ if [[ -f "${RELEASE_DIR}/.activated-images" ]]; then
     mark_rollback_unsafe "${RELEASE_DIR}" "${REQUESTED_SHA}" || echo "Warning: failed to persist .rollback-unsafe marker for ${REQUESTED_SHA}." >&2
     refuse "Rollback aborted: ${RELEASE_DIR}/.activated-images failed strict manifest validation."
   fi
-  if ! restore_pinned_images_file "${RELEASE_DIR}/.activated-images" "${RELEASE_DIR}" "${REQUESTED_SHA}" "${REQUESTED_ENV}"; then
+  restore_status=0
+  restore_pinned_images_file "${RELEASE_DIR}/.activated-images" "${RELEASE_DIR}" "${REQUESTED_SHA}" "${REQUESTED_ENV}" || restore_status=$?
+  if (( restore_status == 2 )); then
     mark_rollback_unsafe "${RELEASE_DIR}" "${REQUESTED_SHA}" || echo "Warning: failed to persist .rollback-unsafe marker for ${REQUESTED_SHA}." >&2
-    refuse "Rollback aborted: failed to restore and verify pinned activated images for ${REQUESTED_SHA}."
+    refuse "Rollback aborted: one or more pinned activated image IDs for ${REQUESTED_SHA} are confirmed missing locally."
+  elif (( restore_status != 0 )); then
+    die "Rollback aborted: operational Docker error while restoring or verifying pinned image tags for ${REQUESTED_SHA}."
   fi
   while IFS=' ' read -r rb_svc rb_ref rb_id; do
     case "${rb_svc}" in

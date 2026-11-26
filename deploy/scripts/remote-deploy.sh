@@ -130,12 +130,18 @@ if [[ -n "${previous_release}" ]]; then
         log_info "[deploy] Verified and retained all 5 pre-build pins for previous release ${previous_release} (snapshotted ${#saved_image_refs[@]} tag(s) for rollback restoration)."
       elif (( pin_status == 2 )); then
         if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
-          die "Cannot safely redeploy active release ${REQUESTED_SHA}: one or more pinned Docker image IDs in .activated-images are unavailable locally."
+          die "Cannot safely redeploy active release ${REQUESTED_SHA}: one or more pinned Docker image IDs in .activated-images are confirmed missing locally."
         fi
         image_snapshot_complete=false
-        echo "Warning: previous release ${previous_release} has pinned image IDs unavailable locally; automatic rollback will be unavailable." >&2
+        echo "Warning: previous release ${previous_release} has confirmed-missing pinned image ID(s) locally (any still-present images were retained); automatic rollback will be unavailable." >&2
+      elif (( pin_status == 3 )); then
+        if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
+          die "Cannot safely redeploy active release ${REQUESTED_SHA}: .activated-images manifest is invalid."
+        fi
+        image_snapshot_complete=false
+        echo "Warning: previous release ${previous_release} has an invalid .activated-images manifest before build." >&2
       else
-        die "Cannot safely proceed with build: failed to create or verify Docker retention tags for previous release ${previous_release}; aborting before overwriting runtime tags."
+        die "Cannot safely proceed with build: operational Docker error verifying or retaining pins for previous release ${previous_release}; aborting before overwriting runtime tags."
       fi
     else
       if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
@@ -286,7 +292,12 @@ candidate_deploy() {
     note_stderr "Candidate deploy failed during database migration / runtime role provisioning for ${REQUESTED_SHA}."
     return 1
   fi
-  log_info "[deploy] Running idempotent bootstrap-admin (--no-deps --pull never)."
+  api_tag_id="$(docker image inspect --format '{{.Id}}' "${api_ref}" 2>/dev/null || true)"
+  if [[ "${api_tag_id}" != "${candidate_api_id}" ]]; then
+    note_stderr "Candidate deploy failed before bootstrap-admin: ${api_ref} resolved to '${api_tag_id:-<empty>}', expected '${candidate_api_id}'."
+    return 1
+  fi
+  log_info "[deploy] Running idempotent bootstrap-admin (--no-deps --pull never) using ${api_ref} (${candidate_api_id})."
   if ! compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" --profile operations run --rm --no-deps --pull never bootstrap-admin; then
     note_stderr "Candidate deploy failed during bootstrap-admin for ${REQUESTED_SHA}."
     return 1
@@ -507,9 +518,10 @@ kept_releases=("${RELEASE_DIR}")
 if [[ -n "${previous_release}" && "${previous_release}" != "${REQUESTED_SHA}" && -d "${BASE_DIR}/releases/${previous_release}" ]]; then
   kept_releases+=("${BASE_DIR}/releases/${previous_release}")
 fi
-# Prioritize rollback-capable activated releases over failed unactivated directories so failed
-# candidates cannot evict valid rollback targets from the 5-release retention budget.
-for pass in activated other; do
+# Prioritize locally verified rollback-capable activated releases over broken or unactivated
+# directories so a recent malformed/missing-image release cannot evict a healthy rollback target
+# from the 5-release retention budget.
+for pass in verified_activated activated other; do
   for release_entry in "${release_directories[@]}"; do
     (( ${#kept_releases[@]} < 5 )) || break
     already_kept=false
@@ -520,7 +532,9 @@ for pass in activated other; do
       fi
     done
     [[ "${already_kept}" == "false" ]] || continue
-    if [[ "${pass}" == "activated" ]]; then
+    if [[ "${pass}" == "verified_activated" ]]; then
+      release_is_verified_rollback_target "${release_entry}" || continue
+    elif [[ "${pass}" == "activated" ]]; then
       [[ -f "${release_entry}/.activated" && -f "${release_entry}/.activated-images" ]] || continue
     fi
     kept_releases+=("${release_entry}")

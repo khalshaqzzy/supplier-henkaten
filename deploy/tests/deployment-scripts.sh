@@ -13,6 +13,16 @@ fail() {
   exit 1
 }
 
+fake_hex() {
+  local sum
+  sum="$(printf '%s' "$1" | sha256sum)"
+  printf '%s\n' "${sum%% *}"
+}
+
+fake_id() {
+  printf 'sha256:%s\n' "$(fake_hex "$1")"
+}
+
 for script in "${SCRIPTS}"/*.sh; do
   bash -n "${script}"
 done
@@ -256,6 +266,11 @@ mkdir -p "${fake_bin}"
 cat >"${fake_bin}/docker" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+fake_id() {
+  local sum
+  sum="$(printf '%s' "$1" | sha256sum)"
+  printf 'sha256:%s\n' "${sum%% *}"
+}
 set_image_tag() {
   local ref="$1"
   local id="$2"
@@ -274,6 +289,15 @@ remove_image_tag() {
 }
 get_image_tag() {
   local ref="$1"
+  if [[ -n "${TEST_INSPECT_DAEMON_ERROR_ONCE_FILE:-}" && -f "${TEST_INSPECT_DAEMON_ERROR_ONCE_FILE}" ]]; then
+    local once_target
+    once_target="$(<"${TEST_INSPECT_DAEMON_ERROR_ONCE_FILE}")"
+    if [[ -z "${once_target}" || "${once_target}" == "${ref}" ]]; then
+      rm -f -- "${TEST_INSPECT_DAEMON_ERROR_ONCE_FILE}"
+      printf 'Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n' >&2
+      return 1
+    fi
+  fi
   if [[ -n "${TEST_MISSING_IMAGE_FILE:-}" && -f "${TEST_MISSING_IMAGE_FILE}" ]] && grep -Fxq "${ref}" "${TEST_MISSING_IMAGE_FILE}"; then
     printf 'Error response from daemon: No such image: %s\n' "${ref}" >&2
     return 1
@@ -307,11 +331,11 @@ get_image_tag() {
     fi
     return 0
   fi
-  if [[ "${ref}" =~ ^supplier-henkaten-pin-(staging|production):(postgres|api|supplier-web|tmmin-web|caddy)-(.+)$ ]]; then
+  if [[ "${ref}" =~ ^supplier-henkaten-pin-(staging|production):(postgres|api|supplier-web|tmmin-web|caddy)-([0-9a-f]{64})$ ]]; then
     printf 'sha256:%s\n' "${BASH_REMATCH[3]}"
     return 0
   fi
-  printf 'sha256:existing-%s\n' "${ref//:/-}"
+  fake_id "existing-${ref//:/-}"
 }
 if [[ "${1:-}" == "version" ]]; then
   echo "29.10.0"
@@ -371,6 +395,18 @@ if [[ "${1:-}" == "tag" ]]; then
     if [[ "${TEST_TAG_FAIL:-false}" == "true" ]]; then
       printf 'Error response from daemon: simulated tag failure\n' >&2
       exit 1
+    fi
+    if [[ -n "${TEST_TAG_FAIL_ON_REF:-}" && "$3" == "${TEST_TAG_FAIL_ON_REF}" ]]; then
+      printf 'Error response from daemon: simulated tag failure on %s\n' "$3" >&2
+      exit 1
+    fi
+    if [[ -n "${TEST_TAG_FAIL_ONCE_FILE:-}" && -f "${TEST_TAG_FAIL_ONCE_FILE}" ]]; then
+      once_tag_ref="$(<"${TEST_TAG_FAIL_ONCE_FILE}")"
+      if [[ -z "${once_tag_ref}" || "${once_tag_ref}" == "$3" ]]; then
+        rm -f -- "${TEST_TAG_FAIL_ONCE_FILE}"
+        printf 'Error response from daemon: simulated one-time tag failure on %s\n' "$3" >&2
+        exit 1
+      fi
     fi
     if [[ "${TEST_TAG_SILENT_NOOP:-false}" == "true" ]]; then
       exit 0
@@ -477,6 +513,9 @@ if [[ "${1:-}" == "compose" ]]; then
     if [[ "${argument}" == "--force-recreate" ]]; then is_force_recreate=true; fi
     if [[ "${argument}" == "--all" ]]; then is_ps_all=true; fi
     if [[ "${argument}" == "migrate" && "${TEST_MIGRATE_FAIL:-false}" == "true" ]]; then exit 1; fi
+    if [[ "${argument}" == "migrate" && "${TEST_DRIFT_API_TAG_ON_MIGRATE:-false}" == "true" && -n "${RELEASE_SHA:-}" ]]; then
+      set_image_tag "supplier-henkaten-api:${RELEASE_SHA}" "$(fake_id "drifted-during-migrate")"
+    fi
   done
   if [[ "${is_build}" == "true" ]]; then
     if [[ -n "${TEST_DOCKER_LOG:-}" ]]; then
@@ -491,11 +530,11 @@ if [[ "${1:-}" == "compose" ]]; then
     if [[ -n "${TEST_IMAGE_STATE_FILE:-}" ]]; then
       build_suffix="${TEST_BUILD_TAG_SUFFIX:-${DEPLOY_RUN_NUMBER:-0}}"
       if [[ "${TEST_STABLE_BUILD_IDS:-false}" != "true" ]] || ! get_image_tag "supplier-henkaten-postgres:18.4-pgvector-0.8.5" >/dev/null 2>&1; then
-        set_image_tag "supplier-henkaten-postgres:18.4-pgvector-0.8.5" "sha256:candidate-postgres-${build_suffix}"
+        set_image_tag "supplier-henkaten-postgres:18.4-pgvector-0.8.5" "$(fake_id "candidate-postgres-${build_suffix}")"
       fi
       if [[ -n "${RELEASE_SHA:-}" ]]; then
         for svc in api supplier-web tmmin-web caddy; do
-          set_image_tag "supplier-henkaten-${svc}:${RELEASE_SHA}" "sha256:candidate-${svc}-${build_suffix}"
+          set_image_tag "supplier-henkaten-${svc}:${RELEASE_SHA}" "$(fake_id "candidate-${svc}-${build_suffix}")"
         done
       fi
     fi
@@ -535,7 +574,7 @@ if [[ "${1:-}" == "compose" ]]; then
             fi
           else
             if [[ "${is_force_recreate}" == "true" && "${TEST_FORCE_RECREATE_WRONG_ID:-}" == "${argument}" ]]; then
-              started_id="sha256:wrong-after-recreate-${argument}"
+              started_id="$(fake_id "wrong-after-recreate-${argument}")"
             fi
             if [[ -n "${TEST_DOCKER_LOG:-}" ]]; then
               printf 'STARTED %s=%s\n' "${argument}" "${started_id}" >>"${TEST_DOCKER_LOG}"
@@ -563,6 +602,9 @@ if [[ "${1:-}" == "compose" ]]; then
       compose_env_file="${argument}"
     fi
     if [[ "${previous}" == "-q" ]]; then
+      if [[ -n "${TEST_COMPOSE_PS_WARNING:-}" ]]; then
+        printf '%s\n' "${TEST_COMPOSE_PS_WARNING}" >&2
+      fi
       if [[ "${is_ps_all}" == "false" && -n "${TEST_STOPPED_SERVICES_FILE:-}" && -f "${TEST_STOPPED_SERVICES_FILE}" ]] && grep -Fxq "${argument}" "${TEST_STOPPED_SERVICES_FILE}"; then
         exit 0
       fi
@@ -767,11 +809,11 @@ grep -Fxq "POSTGRES_APP_PASSWORD=${updated_app_password}" "${migration_base}/rel
 # Same-SHA build failure on an active release must NOT stop running services and must restore pre-build image tags.
 same_sha_images="${TEST_ROOT}/same-sha-images.state"
 cat >"${same_sha_images}" <<EOF
-supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:good-postgres
-supplier-henkaten-api:${retry_sha} sha256:good-api
-supplier-henkaten-supplier-web:${retry_sha} sha256:good-supplier-web
-supplier-henkaten-tmmin-web:${retry_sha} sha256:good-tmmin-web
-supplier-henkaten-caddy:${retry_sha} sha256:good-caddy
+supplier-henkaten-postgres:18.4-pgvector-0.8.5 $(fake_id good-postgres)
+supplier-henkaten-api:${retry_sha} $(fake_id good-api)
+supplier-henkaten-supplier-web:${retry_sha} $(fake_id good-supplier-web)
+supplier-henkaten-tmmin-web:${retry_sha} $(fake_id good-tmmin-web)
+supplier-henkaten-caddy:${retry_sha} $(fake_id good-caddy)
 EOF
 cp "${same_sha_images}" "${migration_base}/releases/${retry_sha}/.activated-images"
 chmod 600 "${migration_base}/releases/${retry_sha}/.activated-images"
@@ -790,8 +832,8 @@ fi
 if grep -q ' stop ' "${same_sha_docker_log}"; then
   fail "same-SHA build failure stopped running active services"
 fi
-grep -Fxq "supplier-henkaten-api:${retry_sha} sha256:good-api" "${same_sha_images}" || fail "same-SHA partial build failure did not restore pre-build api image tag"
-grep -Fxq "supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:good-postgres" "${same_sha_images}" || fail "same-SHA partial build failure did not restore pre-build postgres image tag"
+grep -Fxq "supplier-henkaten-api:${retry_sha} $(fake_id good-api)" "${same_sha_images}" || fail "same-SHA partial build failure did not restore pre-build api image tag"
+grep -Fxq "supplier-henkaten-postgres:18.4-pgvector-0.8.5 $(fake_id good-postgres)" "${same_sha_images}" || fail "same-SHA partial build failure did not restore pre-build postgres image tag"
 [[ "$(<"${migration_base}/current_release")" == "${retry_sha}" ]] || fail "same-SHA build failure altered current_release"
 
 # Same-SHA post-mutation failure runs the real remote-rollback.sh and restarts the restored pre-build image IDs.
@@ -812,11 +854,11 @@ fi
 if grep -Eq ' stop caddy supplier-web tmmin-web api$' "${same_sha_smoke_log}"; then
   fail "same-SHA post-mutation failure stopped application services instead of recovering"
 fi
-grep -Fxq 'STARTED postgres=sha256:good-postgres' "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build postgres image"
-grep -Fxq 'STARTED api=sha256:good-api' "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build api image"
-grep -Fxq 'STARTED supplier-web=sha256:good-supplier-web' "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build supplier-web image"
-grep -Fxq 'STARTED tmmin-web=sha256:good-tmmin-web' "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build tmmin-web image"
-grep -Fxq 'STARTED caddy=sha256:good-caddy' "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build caddy image"
+grep -Fxq "STARTED postgres=$(fake_id good-postgres)" "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build postgres image"
+grep -Fxq "STARTED api=$(fake_id good-api)" "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build api image"
+grep -Fxq "STARTED supplier-web=$(fake_id good-supplier-web)" "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build supplier-web image"
+grep -Fxq "STARTED tmmin-web=$(fake_id good-tmmin-web)" "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build tmmin-web image"
+grep -Fxq "STARTED caddy=$(fake_id good-caddy)" "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build caddy image"
 
 # Missing pre-build image on same-SHA active redeploy must abort BEFORE building.
 missing_img_log="${TEST_ROOT}/same-sha-missing-image.log"
@@ -825,7 +867,7 @@ IFS='|' read -r missing_incoming missing_runtime missing_archive missing_checksu
 )
 sed -i.bak "s/^POSTGRES_APP_PASSWORD=.*/POSTGRES_APP_PASSWORD=${updated_app_password}/" "${missing_runtime}"
 rm -f "${missing_runtime}.bak"
-if TEST_MISSING_IMAGE="sha256:good-api" TEST_DOCKER_LOG="${missing_img_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
+if TEST_MISSING_IMAGE="$(fake_id good-api)" TEST_DOCKER_LOG="${missing_img_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
   PATH="${fake_bin}:${PATH}" "${missing_incoming}/deploy/scripts/remote-deploy.sh" \
   staging "${retry_sha}" 39 "${migration_base}" "${missing_incoming}" "${missing_runtime}" \
   "${missing_archive}" "${missing_checksum}" 127.0.0.1 >/dev/null 2>&1; then
@@ -852,7 +894,7 @@ grep -q ' stop ' "${tag_fail_log}" || fail "failed image tag restore did not sto
 [[ "$(grep -c '^STARTED api=' "${tag_fail_log}")" == "1" ]] || fail "failed image tag restore invoked rollback and restarted the broken candidate api image"
 [[ -f "${migration_base}/releases/${retry_sha}/.rollback-unsafe" ]] || fail "failed image tag restore did not write .rollback-unsafe marker"
 # At this point same_sha_images STILL holds the rejected candidate-*-40 tags!
-grep -Fxq "supplier-henkaten-api:${retry_sha} sha256:candidate-api-40" "${same_sha_images}" || fail "expected dirty rejected candidate tag to remain after failed restore"
+grep -Fxq "supplier-henkaten-api:${retry_sha} $(fake_id candidate-api-40)" "${same_sha_images}" || fail "expected dirty rejected candidate tag to remain after failed restore"
 
 # Manual rollback while tag restoration still fails must refuse to start the rejected candidate build.
 manual_rb_fail_log="${TEST_ROOT}/manual-rollback-tag-fail.log"
@@ -878,10 +920,10 @@ if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=41 TEST_DOCKER_LOG="${c
   "${carry_archive}" "${carry_checksum}" 127.0.0.1 >/dev/null 2>&1; then
   fail "second same-SHA smoke failure unexpectedly succeeded"
 fi
-grep -Fxq 'STARTED api=sha256:good-api' "${carryover_log}" || fail "second same-SHA invocation did not restore pinned sha256:good-api image"
+grep -Fxq "STARTED api=$(fake_id good-api)" "${carryover_log}" || fail "second same-SHA invocation did not restore pinned sha256:good-api image"
 first_api_tag="$(grep " supplier-henkaten-api:${retry_sha}\$" "${carryover_log}" | head -n 1)"
-[[ "${first_api_tag}" == "TAG sha256:good-api supplier-henkaten-api:${retry_sha}" ]] || fail "first api restore on carry-over run did not target sha256:good-api (got: ${first_api_tag})"
-if grep -q 'STARTED api=sha256:candidate-api-40' "${carryover_log}"; then
+[[ "${first_api_tag}" == "TAG $(fake_id good-api) supplier-henkaten-api:${retry_sha}" ]] || fail "first api restore on carry-over run did not target $(fake_id good-api) (got: ${first_api_tag})"
+if grep -q "STARTED api=$(fake_id candidate-api-40)" "${carryover_log}"; then
   fail "second same-SHA invocation promoted rejected candidate-api-40 build into rollback"
 fi
 [[ ! -f "${migration_base}/releases/${retry_sha}/.rollback-unsafe" ]] || fail "successful pinned rollback recovery did not clear .rollback-unsafe"
@@ -916,11 +958,11 @@ if TEST_DOCKER_LOG="${unactivated_rb_log}" TEST_IMAGE_STATE_FILE="${same_sha_ima
 fi
 # Even if a complete 5-image .activated-images exists without .activated (crash between steps), manual rollback must reject it.
 cat >"${migration_base}/releases/${unactivated_sha}/.activated-images" <<EOF
-supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:good-postgres
-supplier-henkaten-api:${unactivated_sha} sha256:good-api
-supplier-henkaten-supplier-web:${unactivated_sha} sha256:good-supplier-web
-supplier-henkaten-tmmin-web:${unactivated_sha} sha256:good-tmmin-web
-supplier-henkaten-caddy:${unactivated_sha} sha256:good-caddy
+supplier-henkaten-postgres:18.4-pgvector-0.8.5 $(fake_id good-postgres)
+supplier-henkaten-api:${unactivated_sha} $(fake_id good-api)
+supplier-henkaten-supplier-web:${unactivated_sha} $(fake_id good-supplier-web)
+supplier-henkaten-tmmin-web:${unactivated_sha} $(fake_id good-tmmin-web)
+supplier-henkaten-caddy:${unactivated_sha} $(fake_id good-caddy)
 EOF
 if TEST_DOCKER_LOG="${unactivated_rb_log}" TEST_IMAGE_STATE_FILE="${same_sha_images}" \
   PATH="${fake_bin}:${PATH}" "${migration_base}/releases/${unactivated_sha}/deploy/scripts/remote-rollback.sh" \
@@ -970,7 +1012,7 @@ fi
 unsafe_dir_release="${TEST_ROOT}/unsafe-dir-release"
 mkdir -p "${unsafe_dir_release}/.rollback-unsafe"
 sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${retry_sha}/" "${rendered_env}" >"${unsafe_dir_release}/.runtime.env"
-printf 'supplier-henkaten-api:%s sha256:original-pinned-api\n' "${retry_sha}" >"${unsafe_dir_release}/.activated-images"
+printf "supplier-henkaten-api:%s $(fake_id original-pinned-api)\n" "${retry_sha}" >"${unsafe_dir_release}/.activated-images"
 if COMPOSE_PROJECT_NAME=supplier-henkaten-staging PATH="${fake_bin}:${PATH}" bash -c '
   set -euo pipefail
   source "$1"
@@ -981,13 +1023,13 @@ if COMPOSE_PROJECT_NAME=supplier-henkaten-staging PATH="${fake_bin}:${PATH}" bas
 ' _ "${SCRIPTS}/lib.sh" "${unsafe_dir_release}" "${retry_sha}" >/dev/null 2>&1; then
   fail "write_activated_images succeeded when .rollback-unsafe was a directory"
 fi
-grep -Fxq "supplier-henkaten-api:${retry_sha} sha256:original-pinned-api" "${unsafe_dir_release}/.activated-images" || fail "failed write_activated_images overwrote previous .activated-images manifest"
+grep -Fxq "supplier-henkaten-api:${retry_sha} $(fake_id original-pinned-api)" "${unsafe_dir_release}/.activated-images" || fail "failed write_activated_images overwrote previous .activated-images manifest"
 
 # Pre-existing .activated-images.prev directory must NOT break write_activated_images (uses mktemp), AND post-rename rm failure must restore the previous manifest.
 prev_dir_release="${TEST_ROOT}/prev-dir-release"
 mkdir -p "${prev_dir_release}/.activated-images.prev"
 sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${retry_sha}/" "${rendered_env}" >"${prev_dir_release}/.runtime.env"
-printf 'supplier-henkaten-api:%s sha256:prior-pinned-api\n' "${retry_sha}" >"${prev_dir_release}/.activated-images"
+printf "supplier-henkaten-api:%s $(fake_id prior-pinned-api)\n" "${retry_sha}" >"${prev_dir_release}/.activated-images"
 if ! COMPOSE_PROJECT_NAME=supplier-henkaten-staging RELEASE_SHA="${retry_sha}" PATH="${fake_bin}:${PATH}" bash -c '
   set -euo pipefail
   source "$1"
@@ -998,7 +1040,7 @@ fi
 post_rename_release="${TEST_ROOT}/post-rename-restore-release"
 mkdir -p "${post_rename_release}"
 sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${retry_sha}/" "${rendered_env}" >"${post_rename_release}/.runtime.env"
-printf 'supplier-henkaten-api:%s sha256:preserved-before-post-rename-fail\n' "${retry_sha}" >"${post_rename_release}/.activated-images"
+printf "supplier-henkaten-api:%s $(fake_id preserved-before-post-rename-fail)\n" "${retry_sha}" >"${post_rename_release}/.activated-images"
 printf 'unsafe\n' >"${post_rename_release}/.rollback-unsafe"
 fail_rm_bin="${TEST_ROOT}/fail-rm-bin"
 mkdir -p "${fail_rm_bin}"
@@ -1022,7 +1064,7 @@ if COMPOSE_PROJECT_NAME=supplier-henkaten-staging RELEASE_SHA="${retry_sha}" PAT
 ' _ "${SCRIPTS}/lib.sh" "${post_rename_release}" "${retry_sha}" >/dev/null 2>&1; then
   fail "write_activated_images succeeded when post-rename .rollback-unsafe removal failed"
 fi
-grep -Fxq "supplier-henkaten-api:${retry_sha} sha256:preserved-before-post-rename-fail" "${post_rename_release}/.activated-images" || fail "post-rename failure did not restore previous .activated-images manifest"
+grep -Fxq "supplier-henkaten-api:${retry_sha} $(fake_id preserved-before-post-rename-fail)" "${post_rename_release}/.activated-images" || fail "post-rename failure did not restore previous .activated-images manifest"
 
 # Successful cross-SHA upgrade over an unpinned legacy release must backfill .activated-images from the ACTIVE RUNNING containers (even if mutable postgres tag already drifted).
 drift_base="${TEST_ROOT}/legacy-drift-upgrade"
@@ -1035,25 +1077,25 @@ printf '%s\n' "${drift_prev_sha}" >"${drift_base}/releases/${drift_prev_sha}/.so
 printf '%s\n' "${drift_prev_sha}" >"${drift_base}/current_release"
 drift_images="${TEST_ROOT}/drift-images.state"
 cat >"${drift_images}" <<EOF
-supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:drifted-postgres-tag
-supplier-henkaten-api:${drift_prev_sha} sha256:legacy-api
-supplier-henkaten-supplier-web:${drift_prev_sha} sha256:legacy-supplier-web
-supplier-henkaten-tmmin-web:${drift_prev_sha} sha256:legacy-tmmin-web
-supplier-henkaten-caddy:${drift_prev_sha} sha256:legacy-caddy
+supplier-henkaten-postgres:18.4-pgvector-0.8.5 $(fake_id drifted-postgres-tag)
+supplier-henkaten-api:${drift_prev_sha} $(fake_id legacy-api)
+supplier-henkaten-supplier-web:${drift_prev_sha} $(fake_id legacy-supplier-web)
+supplier-henkaten-tmmin-web:${drift_prev_sha} $(fake_id legacy-tmmin-web)
+supplier-henkaten-caddy:${drift_prev_sha} $(fake_id legacy-caddy)
 EOF
 drift_running="${TEST_ROOT}/drift-running.state"
 cat >"${drift_running}" <<EOF
-postgres sha256:true-running-legacy-postgres
-api sha256:legacy-api
-supplier-web sha256:legacy-supplier-web
-tmmin-web sha256:legacy-tmmin-web
-caddy sha256:legacy-caddy
+postgres $(fake_id true-running-legacy-postgres)
+api $(fake_id legacy-api)
+supplier-web $(fake_id legacy-supplier-web)
+tmmin-web $(fake_id legacy-tmmin-web)
+caddy $(fake_id legacy-caddy)
 EOF
 TEST_BUILD_TAG_SUFFIX=50 TEST_IMAGE_STATE_FILE="${drift_images}" TEST_RUNNING_IMAGES_FILE="${drift_running}" \
   run_candidate "${drift_base}" "${drift_new_sha}" 50 >/dev/null
 [[ "$(<"${drift_base}/current_release")" == "${drift_new_sha}" ]] || fail "cross-SHA upgrade over legacy release did not activate"
-grep -Fxq 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:true-running-legacy-postgres' "${drift_base}/releases/${drift_prev_sha}/.activated-images" || fail "legacy backfill used drifted tag instead of active running postgres container image"
-grep -Fxq 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:candidate-postgres-50' "${drift_base}/releases/${drift_new_sha}/.activated-images" || fail "new release did not record its own running postgres image ID"
+grep -Fxq "supplier-henkaten-postgres:18.4-pgvector-0.8.5 $(fake_id true-running-legacy-postgres)" "${drift_base}/releases/${drift_prev_sha}/.activated-images" || fail "legacy backfill used drifted tag instead of active running postgres container image"
+grep -Fxq "supplier-henkaten-postgres:18.4-pgvector-0.8.5 $(fake_id candidate-postgres-50)" "${drift_base}/releases/${drift_new_sha}/.activated-images" || fail "new release did not record its own running postgres image ID"
 [[ -x "${drift_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" ]] || fail "hardened rollback driver was not installed in shared/deployment-state/rollback-driver"
 # An OLDER retained legacy release (never current during a hardened deploy) has neither pins nor an unsafe
 # marker; the shared driver must refuse it rather than start PostgreSQL from the candidate-rebuilt tag and
@@ -1098,19 +1140,19 @@ printf '%s\n' "${hardened_prev_sha}" >"${hardened_base}/releases/${hardened_prev
 printf '%s\n' "${hardened_prev_sha}" >"${hardened_base}/current_release"
 hardened_images="${TEST_ROOT}/hardened-images.state"
 cat >"${hardened_images}" <<EOF
-supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:hardened-postgres
-supplier-henkaten-api:${hardened_prev_sha} sha256:hardened-api
-supplier-henkaten-supplier-web:${hardened_prev_sha} sha256:hardened-supplier-web
-supplier-henkaten-tmmin-web:${hardened_prev_sha} sha256:hardened-tmmin-web
-supplier-henkaten-caddy:${hardened_prev_sha} sha256:hardened-caddy
+supplier-henkaten-postgres:18.4-pgvector-0.8.5 $(fake_id hardened-postgres)
+supplier-henkaten-api:${hardened_prev_sha} $(fake_id hardened-api)
+supplier-henkaten-supplier-web:${hardened_prev_sha} $(fake_id hardened-supplier-web)
+supplier-henkaten-tmmin-web:${hardened_prev_sha} $(fake_id hardened-tmmin-web)
+supplier-henkaten-caddy:${hardened_prev_sha} $(fake_id hardened-caddy)
 EOF
 hardened_running="${TEST_ROOT}/hardened-running.state"
 cat >"${hardened_running}" <<EOF
-postgres sha256:hardened-postgres
-api sha256:hardened-api
-supplier-web sha256:hardened-supplier-web
-tmmin-web sha256:hardened-tmmin-web
-caddy sha256:hardened-caddy
+postgres $(fake_id hardened-postgres)
+api $(fake_id hardened-api)
+supplier-web $(fake_id hardened-supplier-web)
+tmmin-web $(fake_id hardened-tmmin-web)
+caddy $(fake_id hardened-caddy)
 EOF
 # Same-SHA redeploy of the hardened active release must refuse before build and must not reconstruct pins.
 hardened_same_log="${TEST_ROOT}/hardened-same-sha.log"
@@ -1220,10 +1262,10 @@ printf '%s\n' "${incomplete_prev_sha}" >"${incomplete_snap_base}/releases/${inco
 printf '%s\n' "${incomplete_prev_sha}" >"${incomplete_snap_base}/current_release"
 incomplete_snap_images="${TEST_ROOT}/incomplete-snap-images.state"
 cat >"${incomplete_snap_images}" <<EOF
-supplier-henkaten-api:${incomplete_prev_sha} sha256:legacy-api
-supplier-henkaten-supplier-web:${incomplete_prev_sha} sha256:legacy-supplier-web
-supplier-henkaten-tmmin-web:${incomplete_prev_sha} sha256:legacy-tmmin-web
-supplier-henkaten-caddy:${incomplete_prev_sha} sha256:legacy-caddy
+supplier-henkaten-api:${incomplete_prev_sha} $(fake_id legacy-api)
+supplier-henkaten-supplier-web:${incomplete_prev_sha} $(fake_id legacy-supplier-web)
+supplier-henkaten-tmmin-web:${incomplete_prev_sha} $(fake_id legacy-tmmin-web)
+supplier-henkaten-caddy:${incomplete_prev_sha} $(fake_id legacy-caddy)
 EOF
 incomplete_snap_log="${TEST_ROOT}/incomplete-snap.log"
 if TEST_BUILD_FAIL=true TEST_BUILD_TAG_SUFFIX=10 \
@@ -1237,7 +1279,7 @@ if grep -q '^BUILD_PRECONDITION_MISSING ' "${incomplete_snap_log}"; then
 fi
 [[ -f "${incomplete_snap_base}/releases/${incomplete_prev_sha}/.rollback-unsafe" ]] || fail "incomplete snapshot on failed build did not mark legacy target .rollback-unsafe"
 # The candidate build recreated the shared postgres tag, yet subsequent manual rollback through the documented hardened rollback driver must STILL refuse the untouched legacy target.
-grep -Fxq "supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:candidate-postgres-10" "${incomplete_snap_images}" || fail "expected build to recreate shared postgres tag in incomplete-snapshot test"
+grep -Fxq "supplier-henkaten-postgres:18.4-pgvector-0.8.5 $(fake_id candidate-postgres-10)" "${incomplete_snap_images}" || fail "expected build to recreate shared postgres tag in incomplete-snapshot test"
 incomplete_snap_rb_log="${TEST_ROOT}/incomplete-snap-rollback.log"
 if TEST_DOCKER_LOG="${incomplete_snap_rb_log}" TEST_IMAGE_STATE_FILE="${incomplete_snap_images}" \
   PATH="${fake_bin}:${PATH}" "${incomplete_snap_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" \
@@ -1290,16 +1332,16 @@ printf '#!/usr/bin/env bash\nexit 0\n' >"${rollback_base}/releases/${previous_sh
 chmod +x "${rollback_base}/releases/${previous_sha}/deploy/scripts/"*.sh
 rollback_images="${TEST_ROOT}/rollback-images.state"
 {
-  printf 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:legacy-postgres\n'
+  printf 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 %s\n' "$(fake_id legacy-postgres)"
   for svc in api supplier-web tmmin-web caddy; do
-    printf 'supplier-henkaten-%s:%s sha256:legacy-%s\n' "${svc}" "${previous_sha}" "${svc}"
+    printf 'supplier-henkaten-%s:%s %s\n' "${svc}" "${previous_sha}" "$(fake_id "legacy-${svc}")"
   done
 } >"${rollback_images}"
 rollback_running="${TEST_ROOT}/rollback-running.state"
 {
-  printf 'postgres sha256:legacy-postgres\n'
+  printf 'postgres %s\n' "$(fake_id legacy-postgres)"
   for svc in api supplier-web tmmin-web caddy; do
-    printf '%s sha256:legacy-%s\n' "${svc}" "${svc}"
+    printf '%s %s\n' "${svc}" "$(fake_id "legacy-${svc}")"
   done
 } >"${rollback_running}"
 rollback_log="${TEST_ROOT}/rollback-auto.log"
@@ -1311,9 +1353,9 @@ DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=40 TEST_DOCKER_LOG="${roll
 [[ "${rollback_status}" == "3" ]] || fail "completed hardened automatic recovery did not exit with the dedicated status 3 (got ${rollback_status})"
 grep -Fxq "DEPLOY_RESULT=automatic-rollback-completed forced_smoke_failure=true restored=${previous_sha}" "${rollback_stdout}" || fail "automatic recovery result line did not prove the forced smoke failure and restored SHA"
 [[ ! -f "${rollback_base}/legacy-rollback-called" ]] || fail "automatic rollback trusted the legacy target's own remote-rollback.sh instead of the shared hardened driver"
-grep -Fxq 'STARTED postgres=sha256:legacy-postgres' "${rollback_log}" || fail "automatic rollback did not restart the pinned legacy postgres image after the build moved the shared tag"
+grep -Fxq "STARTED postgres=$(fake_id legacy-postgres)" "${rollback_log}" || fail "automatic rollback did not restart the pinned legacy postgres image after the build moved the shared tag"
 for svc in api supplier-web tmmin-web caddy; do
-  grep -Fxq "STARTED ${svc}=sha256:legacy-${svc}" "${rollback_log}" || fail "automatic rollback did not restart pinned legacy ${svc} image"
+  grep -Fxq "STARTED ${svc}=$(fake_id "legacy-${svc}")" "${rollback_log}" || fail "automatic rollback did not restart pinned legacy ${svc} image"
 done
 if grep -Eq ' stop caddy supplier-web tmmin-web api$' "${rollback_log}"; then
   fail "successful hardened automatic rollback stopped application services"
@@ -1361,10 +1403,10 @@ printf '%s\n' "${mixed_prev}" >"${mixed_base}/releases/${mixed_prev}/.source.sha
 printf '%s\n' "${mixed_prev}" >"${mixed_base}/current_release"
 mixed_running="${TEST_ROOT}/mixed-running.state"
 {
-  printf 'postgres sha256:legacy-postgres supplier-henkaten-postgres:18.4-pgvector-0.8.5\n'
-  printf 'api sha256:stray-candidate-api supplier-henkaten-api:%s\n' "${mixed_stray}"
+  printf 'postgres %s supplier-henkaten-postgres:18.4-pgvector-0.8.5\n' "$(fake_id legacy-postgres)"
+  printf "api $(fake_id stray-candidate-api) supplier-henkaten-api:%s\n" "${mixed_stray}"
   for svc in supplier-web tmmin-web caddy; do
-    printf '%s sha256:legacy-%s supplier-henkaten-%s:%s\n' "${svc}" "${svc}" "${svc}" "${mixed_prev}"
+    printf '%s %s supplier-henkaten-%s:%s\n' "${svc}" "$(fake_id "legacy-${svc}")" "${svc}" "${mixed_prev}"
   done
 } >"${mixed_running}"
 mixed_log="${TEST_ROOT}/mixed-baseline.log"
@@ -1460,9 +1502,9 @@ touch -d "2026-01-01T09:00:00.100Z" "${ns_release}/activated-at"
 ns_pin() {
   local pg_created="$1"
   {
-    printf 'postgres sha256:pg supplier-henkaten-postgres:18.4-pgvector-0.8.5 %s\n' "${pg_created}"
+    printf "postgres $(fake_id pg) supplier-henkaten-postgres:18.4-pgvector-0.8.5 %s\n" "${pg_created}"
     for svc in api supplier-web tmmin-web caddy; do
-      printf '%s sha256:%s supplier-henkaten-%s:%s\n' "${svc}" "${svc}" "${svc}" "${retry_sha}"
+      printf '%s %s supplier-henkaten-%s:%s\n' "${svc}" "$(fake_id "${svc}")" "${svc}" "${retry_sha}"
     done
   } >"${TEST_ROOT}/ns-running.state"
   TEST_RUNNING_IMAGES_FILE="${TEST_ROOT}/ns-running.state" COMPOSE_PROJECT_NAME=supplier-henkaten-staging PATH="${fake_bin}:${PATH}" bash -c '
@@ -1501,9 +1543,9 @@ printf '%s\n' "${fallback_prev}" >"${fallback_base}/current_release"
 printf '#!/usr/bin/env bash\nexit 0\n' >"${fallback_base}/releases/${fallback_prev}/deploy/scripts/smoke-check.sh"
 chmod +x "${fallback_base}/releases/${fallback_prev}/deploy/scripts/smoke-check.sh"
 {
-  printf 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:fb-postgres\n'
+  printf 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 %s\n' "$(fake_id fb-postgres)"
   for svc in api supplier-web tmmin-web caddy; do
-    printf 'supplier-henkaten-%s:%s sha256:fb-%s\n' "${svc}" "${fallback_prev}" "${svc}"
+    printf 'supplier-henkaten-%s:%s %s\n' "${svc}" "${fallback_prev}" "$(fake_id "fb-${svc}")"
   done
 } >"${fallback_base}/releases/${fallback_prev}/.activated-images"
 cp "${fallback_base}/releases/${fallback_prev}/.activated-images" "${fallback_base}/images.state"
@@ -1520,7 +1562,7 @@ DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=10 TEST_DOCKER_LOG="${fb_l
   "${fb_archive}" "${fb_checksum}" 127.0.0.1 >/dev/null 2>&1 || fb_status=$?
 [[ -f "${fallback_base}/broken-candidate-driver-ran" ]] || fail "automatic recovery did not try the candidate's driver first"
 [[ "${fb_status}" == "3" ]] || fail "known-good driver fallback did not complete automatic recovery (exit ${fb_status})"
-grep -Fxq 'STARTED postgres=sha256:fb-postgres' "${fb_log}" || fail "known-good driver fallback did not restart the pinned postgres image"
+grep -Fxq "STARTED postgres=$(fake_id fb-postgres)" "${fb_log}" || fail "known-good driver fallback did not restart the pinned postgres image"
 [[ "$(<"${fallback_base}/current_release")" == "${fallback_prev}" ]] || fail "known-good driver fallback changed the active pointer"
 
 # A deliberate policy refusal (exit 4) by the candidate driver is final: the known-good driver must NOT
@@ -1535,7 +1577,7 @@ DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=12 TEST_DOCKER_LOG="${pr_l
   staging 7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b 12 "${fallback_base}" "${pr_incoming}" "${pr_runtime}" \
   "${pr_archive}" "${pr_checksum}" 127.0.0.1 >/dev/null 2>&1 || pr_status=$?
 [[ "${pr_status}" == "1" ]] || fail "candidate driver policy refusal was overridden (exit ${pr_status})"
-if grep -Fxq 'STARTED postgres=sha256:fb-postgres' "${pr_log}"; then
+if grep -Fxq "STARTED postgres=$(fake_id fb-postgres)" "${pr_log}"; then
   fail "known-good driver overrode the candidate driver's deliberate policy refusal"
 fi
 grep -q ' stop ' "${pr_log}" || fail "policy-refused recovery left candidate services running"
@@ -1550,7 +1592,7 @@ DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=13 TEST_DOCKER_LOG="${md_l
   staging 7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c 13 "${fallback_base}" "${md_incoming}" "${md_runtime}" \
   "${md_archive}" "${md_checksum}" 127.0.0.1 >/dev/null 2>&1 || md_status=$?
 [[ "${md_status}" == "3" ]] || fail "missing candidate driver did not fall back to the known-good driver (exit ${md_status})"
-grep -Fxq 'STARTED postgres=sha256:fb-postgres' "${md_log}" || fail "known-good fallback for a missing candidate driver did not restart pinned postgres"
+grep -Fxq "STARTED postgres=$(fake_id fb-postgres)" "${md_log}" || fail "known-good fallback for a missing candidate driver did not restart pinned postgres"
 
 # If the parent cannot revalidate the target's pins (a pinned ID disappears after the candidate build/driver)
 # after the candidate driver failed, the known-good driver must NOT run: exit 1, candidate app services stopped.
@@ -1560,7 +1602,7 @@ rv_missing_file="${TEST_ROOT}/revalidation-missing-images"
 cat >"${rv_incoming}/deploy/scripts/remote-rollback.sh" <<EOF
 #!/usr/bin/env bash
 touch "${fallback_base}/revalidation-candidate-driver-ran"
-printf 'sha256:fb-caddy\n' >"${rv_missing_file}"
+printf "$(fake_id fb-caddy)\n" >"${rv_missing_file}"
 exit 1
 EOF
 chmod +x "${rv_incoming}/deploy/scripts/remote-rollback.sh"
@@ -1581,7 +1623,7 @@ DEPLOY_FORCE_SMOKE_FAILURE=true TEST_MISSING_IMAGE_FILE="${rv_missing_file}" TES
 [[ -f "${fallback_base}/revalidation-candidate-driver-ran" ]] || fail "revalidation test never reached the candidate driver"
 [[ ! -f "${fallback_base}/revalidation-probe-ran" ]] || fail "known-good driver was invoked although the parent could not revalidate the target's pins"
 [[ "${rv_status}" == "1" ]] || fail "known-good retry ran although target pins could not be revalidated (exit ${rv_status})"
-if grep -Fxq 'STARTED postgres=sha256:fb-postgres' "${rv_log}"; then
+if grep -Fxq "STARTED postgres=$(fake_id fb-postgres)" "${rv_log}"; then
   fail "known-good driver started services although target pins could not be revalidated"
 fi
 grep -q ' stop ' "${rv_log}" || fail "failed pin revalidation left candidate services running"
@@ -1593,9 +1635,9 @@ printf '#!/usr/bin/env bash\nexit 0\n' >"${fs_incoming}/deploy/scripts/remote-ro
 chmod +x "${fs_incoming}/deploy/scripts/remote-rollback.sh"
 fs_running="${TEST_ROOT}/false-success-running.state"
 {
-  printf 'postgres sha256:fb-postgres supplier-henkaten-postgres:18.4-pgvector-0.8.5\n'
+  printf 'postgres %s supplier-henkaten-postgres:18.4-pgvector-0.8.5\n' "$(fake_id fb-postgres)"
   for svc in api supplier-web tmmin-web caddy; do
-    printf '%s sha256:fb-%s supplier-henkaten-%s:%s\n' "${svc}" "${svc}" "${svc}" "${fallback_prev}"
+    printf '%s %s supplier-henkaten-%s:%s\n' "${svc}" "$(fake_id "fb-${svc}")" "${svc}" "${fallback_prev}"
   done
 } >"${fs_running}"
 fs_log="${TEST_ROOT}/driver-false-success.log"
@@ -1643,9 +1685,9 @@ sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${pgbump_prev}/" "${legacy_env}" >"${pgbump_b
 printf '%s\n' "${pgbump_prev}" >"${pgbump_base}/releases/${pgbump_prev}/.source.sha"
 printf '%s\n' "${pgbump_prev}" >"${pgbump_base}/current_release"
 {
-  printf '%s sha256:old-postgres\n' "${pgbump_old_ref}"
+  printf "%s $(fake_id old-postgres)\n" "${pgbump_old_ref}"
   for svc in api supplier-web tmmin-web caddy; do
-    printf 'supplier-henkaten-%s:%s sha256:old-%s\n' "${svc}" "${pgbump_prev}" "${svc}"
+    printf 'supplier-henkaten-%s:%s %s\n' "${svc}" "${pgbump_prev}" "$(fake_id "old-${svc}")"
   done
 } >"${pgbump_base}/releases/${pgbump_prev}/.activated-images"
 pgbump_images="${TEST_ROOT}/pg-tag-bump-images.state"
@@ -1655,7 +1697,7 @@ if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=60 TEST_DOCKER_LOG="${p
   run_candidate "${pgbump_base}" 7575757575757575757575757575757575757575 60 >/dev/null 2>&1; then
   fail "pg-tag-bump candidate with forced smoke failure unexpectedly succeeded"
 fi
-grep -Fxq "TAG sha256:old-postgres ${pgbump_old_ref}" "${pgbump_log}" || fail "previous release's own postgres pin was not restored when the candidate bumped the postgres tag"
+grep -Fxq "TAG $(fake_id old-postgres) ${pgbump_old_ref}" "${pgbump_log}" || fail "previous release's own postgres pin was not restored when the candidate bumped the postgres tag"
 [[ ! -e "${pgbump_base}/releases/${pgbump_prev}/.rollback-unsafe" ]] || fail "postgres tag bump degraded the previous release's snapshot to rollback-unsafe"
 
 # PostgreSQL's Config.Image is a shared tag with no release identity: if only the postgres container was
@@ -1670,9 +1712,9 @@ printf '%s\n' "${pgprov_prev}" >"${pgprov_base}/releases/${pgprov_prev}/.source.
 printf '%s\n' "${pgprov_prev}" >"${pgprov_base}/current_release"
 pgprov_running="${TEST_ROOT}/pg-provenance-running.state"
 {
-  printf 'postgres sha256:interrupted-candidate-postgres supplier-henkaten-postgres:18.4-pgvector-0.8.5 2099-01-01T00:00:00.000000000Z\n'
+  printf 'postgres %s supplier-henkaten-postgres:18.4-pgvector-0.8.5 2099-01-01T00:00:00.000000000Z\n' "$(fake_id interrupted-candidate-postgres)"
   for svc in api supplier-web tmmin-web caddy; do
-    printf '%s sha256:legacy-%s supplier-henkaten-%s:%s\n' "${svc}" "${svc}" "${svc}" "${pgprov_prev}"
+    printf '%s %s supplier-henkaten-%s:%s\n' "${svc}" "$(fake_id "legacy-${svc}")" "${svc}" "${pgprov_prev}"
   done
 } >"${pgprov_running}"
 pgprov_log="${TEST_ROOT}/pg-provenance.log"
@@ -1694,9 +1736,9 @@ sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${retry_sha}/" "${rendered_env}" >"${pgempty_
 touch "${pgempty_release}/activated-at"
 pgempty_running="${TEST_ROOT}/pg-empty-created-running.state"
 {
-  printf 'postgres sha256:pg supplier-henkaten-postgres:18.4-pgvector-0.8.5 EMPTY\n'
+  printf 'postgres %s supplier-henkaten-postgres:18.4-pgvector-0.8.5 EMPTY\n' "$(fake_id pg)"
   for svc in api supplier-web tmmin-web caddy; do
-    printf '%s sha256:%s supplier-henkaten-%s:%s\n' "${svc}" "${svc}" "${svc}" "${retry_sha}"
+    printf '%s %s supplier-henkaten-%s:%s\n' "${svc}" "$(fake_id "${svc}")" "${svc}" "${retry_sha}"
   done
 } >"${pgempty_running}"
 if TEST_RUNNING_IMAGES_FILE="${pgempty_running}" COMPOSE_PROJECT_NAME=supplier-henkaten-staging PATH="${fake_bin}:${PATH}" bash -c '
@@ -1801,9 +1843,9 @@ setup_rehearsal_base() {
     printf '%s\n' "${sha}" >"${dir}/.source.sha"
     printf '%s\n' "${sha}" >"${dir}/.activated"
     {
-      printf 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:%s-postgres\n' "${sha:0:6}"
+      printf 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 %s\n' "$(fake_id "${sha:0:6}-postgres")"
       for svc in api supplier-web tmmin-web caddy; do
-        printf 'supplier-henkaten-%s:%s sha256:%s-%s\n' "${svc}" "${sha}" "${sha:0:6}" "${svc}"
+        printf 'supplier-henkaten-%s:%s %s\n' "${svc}" "${sha}" "$(fake_id "${sha:0:6}-${svc}")"
       done
     } >"${dir}/.activated-images"
   done
@@ -1843,9 +1885,9 @@ printf '%s\n' "${rbfail_target}" >"${rbfail_base}/releases/${rbfail_target}/.sou
 printf '#!/usr/bin/env bash\nexit 0\n' >"${rbfail_base}/releases/${rbfail_target}/deploy/scripts/smoke-check.sh"
 chmod +x "${rbfail_base}/releases/${rbfail_target}/deploy/scripts/smoke-check.sh"
 {
-  printf 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:rbf-postgres\n'
+  printf 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 %s\n' "$(fake_id rbf-postgres)"
   for svc in api supplier-web tmmin-web caddy; do
-    printf 'supplier-henkaten-%s:%s sha256:rbf-%s\n' "${svc}" "${rbfail_target}" "${svc}"
+    printf 'supplier-henkaten-%s:%s %s\n' "${svc}" "${rbfail_target}" "$(fake_id "rbf-${svc}")"
   done
 } >"${rbfail_base}/releases/${rbfail_target}/.activated-images"
 cp "${rbfail_base}/releases/${rbfail_target}/.activated-images" "${rbfail_base}/target.manifest"
@@ -1995,19 +2037,19 @@ chmod +x "${inc_v2_bundle}/remote-rollback.sh"
 ln -s "${inc_v2_bundle}" "${inc_base}/shared/deployment-state/rollback-driver"
 inc_images="${TEST_ROOT}/incident-images.state"
 cat >"${inc_images}" <<EOF
-supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:15c6a12-unpinned-pg
-supplier-henkaten-api:${inc_failed_sha} sha256:15c6a12-api
-supplier-henkaten-supplier-web:${inc_failed_sha} sha256:15c6a12-supplier
-supplier-henkaten-tmmin-web:${inc_failed_sha} sha256:15c6a12-tmmin
-supplier-henkaten-caddy:${inc_failed_sha} sha256:15c6a12-caddy
+supplier-henkaten-postgres:18.4-pgvector-0.8.5 $(fake_id 15c6a12-unpinned-pg)
+supplier-henkaten-api:${inc_failed_sha} $(fake_id 15c6a12-api)
+supplier-henkaten-supplier-web:${inc_failed_sha} $(fake_id 15c6a12-supplier)
+supplier-henkaten-tmmin-web:${inc_failed_sha} $(fake_id 15c6a12-tmmin)
+supplier-henkaten-caddy:${inc_failed_sha} $(fake_id 15c6a12-caddy)
 EOF
 inc_running="${TEST_ROOT}/incident-running.state"
 cat >"${inc_running}" <<EOF
-postgres sha256:deleted-orphaned-postgres-id supplier-henkaten-postgres:18.4-pgvector-0.8.5 2026-11-20T00:00:00Z
-api sha256:15c6a12-api supplier-henkaten-api:${inc_failed_sha} 2026-11-26T13:22:00Z
-supplier-web sha256:15c6a12-supplier supplier-henkaten-supplier-web:${inc_failed_sha} 2026-11-26T13:22:00Z
-tmmin-web sha256:15c6a12-tmmin supplier-henkaten-tmmin-web:${inc_failed_sha} 2026-11-26T13:22:00Z
-caddy sha256:15c6a12-caddy supplier-henkaten-caddy:${inc_failed_sha} 2026-11-26T13:22:00Z
+postgres $(fake_id deleted-orphaned-postgres-id) supplier-henkaten-postgres:18.4-pgvector-0.8.5 2026-11-20T00:00:00Z
+api $(fake_id 15c6a12-api) supplier-henkaten-api:${inc_failed_sha} 2026-11-26T13:22:00Z
+supplier-web $(fake_id 15c6a12-supplier) supplier-henkaten-supplier-web:${inc_failed_sha} 2026-11-26T13:22:00Z
+tmmin-web $(fake_id 15c6a12-tmmin) supplier-henkaten-tmmin-web:${inc_failed_sha} 2026-11-26T13:22:00Z
+caddy $(fake_id 15c6a12-caddy) supplier-henkaten-caddy:${inc_failed_sha} 2026-11-26T13:22:00Z
 EOF
 inc_stopped="${TEST_ROOT}/incident-stopped.state"
 printf 'api\nsupplier-web\ntmmin-web\ncaddy\n' >"${inc_stopped}"
@@ -2025,7 +2067,7 @@ pg_recreate_line="$(grep -n -- '--force-recreate postgres' "${inc_log}" | head -
 migrate_line="$(grep -n -- 'run --rm --no-deps --pull never migrate' "${inc_log}" | head -n 1 | cut -d: -f1)"
 [[ -n "${pg_recreate_line}" && -n "${migrate_line}" && "${pg_recreate_line}" -lt "${migrate_line}" ]] || fail "postgres force-recreate did not run before migrate --no-deps --pull never"
 grep -q -- 'run --rm --no-deps --pull never bootstrap-admin' "${inc_log}" || fail "bootstrap-admin did not pass --no-deps --pull never"
-grep -Fxq 'supplier-henkaten-pin-staging:postgres-candidate-postgres-186 sha256:candidate-postgres-186' "${inc_images}" || fail "incident replay did not create content-addressed postgres retention tag"
+grep -Fxq "supplier-henkaten-pin-staging:postgres-$(fake_hex candidate-postgres-186) $(fake_id candidate-postgres-186)" "${inc_images}" || fail "incident replay did not create content-addressed postgres retention tag"
 grep -Fxq 'strict-five-image-pins-v3' "${inc_base}/shared/deployment-state/rollback-driver.good/.driver-contract" || fail "incident replay did not promote v3 driver to .good"
 [[ ! -d "${inc_v2_bundle}" ]] || fail "incident replay promotion did not prune superseded v2 driver bundle"
 
@@ -2044,8 +2086,8 @@ DEPLOY_FORCE_SMOKE_FAILURE=true TEST_CONTAINERD_STORE=true TEST_BUILD_TAG_SUFFIX
   run_candidate "${inc_base}" "${inc_next_sha}" 187 >"${inc_rb_out}" 2>"${inc_rb_err}" || inc_rb_status=$?
 [[ "${inc_rb_status}" == "3" ]] || fail "containerd cross-SHA automatic rollback did not exit 3 (got ${inc_rb_status}): $(cat "${inc_rb_err}")"
 grep -Fxq "DEPLOY_RESULT=automatic-rollback-completed forced_smoke_failure=true restored=${inc_fix_sha}" "${inc_rb_out}" || fail "containerd cross-SHA rollback missing DEPLOY_RESULT proof"
-grep -Fxq 'STARTED postgres=sha256:candidate-postgres-186' "${inc_rb_log}" || fail "containerd cross-SHA rollback did not restore & recreate pinned postgres image"
-[[ "$(awk '$1 == "postgres" {print $2}' "${inc_running}")" == "sha256:candidate-postgres-186" ]] || fail "running postgres image does not match F's pinned ID after rollback"
+grep -Fxq "STARTED postgres=$(fake_id candidate-postgres-186)" "${inc_rb_log}" || fail "containerd cross-SHA rollback did not restore & recreate pinned postgres image"
+[[ "$(awk '$1 == "postgres" {print $2}' "${inc_running}")" == "$(fake_id candidate-postgres-186)" ]] || fail "running postgres image does not match F's pinned ID after rollback"
 
 # 3. Same-SHA active redeploy under containerd GC (failure -> restores all 5 F IDs; success -> updates pins & prunes old F pins):
 inc_same_fail_log="${TEST_ROOT}/incident-same-sha-fail.log"
@@ -2055,16 +2097,16 @@ DEPLOY_FORCE_SMOKE_FAILURE=true TEST_CONTAINERD_STORE=true TEST_BUILD_TAG_SUFFIX
   TEST_RUNNING_IMAGES_FILE="${inc_running}" \
   run_candidate "${inc_base}" "${inc_fix_sha}" 188 >/dev/null 2>&1 || inc_same_fail_status=$?
 [[ "${inc_same_fail_status}" == "3" ]] || fail "containerd same-SHA failure did not recover via retention pins (exit ${inc_same_fail_status})"
-grep -Fxq "supplier-henkaten-api:${inc_fix_sha} sha256:candidate-api-186" "${inc_base}/releases/${inc_fix_sha}/.activated-images" || fail "failed same-SHA redeploy overwrote committed .activated-images"
-[[ "$(awk '$1 == "api" {print $2}' "${inc_running}")" == "sha256:candidate-api-186" ]] || fail "failed same-SHA redeploy did not restore running api container to prior ID"
+grep -Fxq "supplier-henkaten-api:${inc_fix_sha} $(fake_id candidate-api-186)" "${inc_base}/releases/${inc_fix_sha}/.activated-images" || fail "failed same-SHA redeploy overwrote committed .activated-images"
+[[ "$(awk '$1 == "api" {print $2}' "${inc_running}")" == "$(fake_id candidate-api-186)" ]] || fail "failed same-SHA redeploy did not restore running api container to prior ID"
 
 inc_same_ok_log="${TEST_ROOT}/incident-same-sha-ok.log"
 TEST_CONTAINERD_STORE=true TEST_BUILD_TAG_SUFFIX=189 TEST_DOCKER_LOG="${inc_same_ok_log}" \
   TEST_IMAGE_STATE_FILE="${inc_images}" TEST_RUNNING_IMAGES_FILE="${inc_running}" \
   run_candidate "${inc_base}" "${inc_fix_sha}" 189 >/dev/null 2>&1 || fail "containerd same-SHA redeploy success failed"
-grep -Fxq "supplier-henkaten-api:${inc_fix_sha} sha256:candidate-api-189" "${inc_base}/releases/${inc_fix_sha}/.activated-images" || fail "successful same-SHA redeploy did not commit new manifest"
-grep -q -- 'IMAGE_RM image rm --no-prune supplier-henkaten-pin-staging:api-candidate-api-186' "${inc_same_ok_log}" || fail "successful same-SHA redeploy did not prune unreferenced prior pin tag with --no-prune"
-grep -Fxq 'supplier-henkaten-pin-staging:api-candidate-api-189 sha256:candidate-api-189' "${inc_images}" || fail "successful same-SHA redeploy missing new retention pin tag"
+grep -Fxq "supplier-henkaten-api:${inc_fix_sha} $(fake_id candidate-api-189)" "${inc_base}/releases/${inc_fix_sha}/.activated-images" || fail "successful same-SHA redeploy did not commit new manifest"
+grep -q -- "IMAGE_RM image rm --no-prune supplier-henkaten-pin-staging:api-$(fake_hex candidate-api-186)" "${inc_same_ok_log}" || fail "successful same-SHA redeploy did not prune unreferenced prior pin tag with --no-prune"
+grep -Fxq "supplier-henkaten-pin-staging:api-$(fake_hex candidate-api-189) $(fake_id candidate-api-189)" "${inc_images}" || fail "successful same-SHA redeploy missing new retention pin tag"
 
 # 4. Pre-build retention failure on a verified baseline lacking retention tags must abort BEFORE docker compose build!
 pinfail_pre_log="${TEST_ROOT}/pinfail-prebuild.log"
@@ -2088,7 +2130,7 @@ if TEST_CONTAINERD_STORE=true TEST_FORCE_RECREATE_WRONG_ID=postgres TEST_BUILD_T
   run_candidate "${inc_base}" 9494949494949494949494949494949494949494 191 >/dev/null 2>"${convfail_err}"; then
   fail "deploy succeeded despite postgres running wrong image ID after --force-recreate"
 fi
-grep -q 'wrong-after-recreate-postgres' "${convfail_err}" || fail "convergence failure did not report observed wrong ID: $(cat "${convfail_err}")"
+grep -q "$(fake_id wrong-after-recreate-postgres)" "${convfail_err}" || fail "convergence failure did not report observed wrong ID: $(cat "${convfail_err}")"
 [[ "$(<"${inc_base}/current_release")" == "${inc_fix_sha}" ]] || fail "convergence failure altered current_release"
 
 # 6. Manual rollback with non-recreating Compose + v2 bundle rejection + pointer check before tag mutation.
@@ -2122,9 +2164,9 @@ fi
 
 # 7. Pin pruning fail-safe: malformed kept manifest skips pruning completely (preserves all retention tags).
 prune_safe_images="${TEST_ROOT}/prune-safe-images.state"
-cat >"${prune_safe_images}" <<'EOF'
-supplier-henkaten-pin-staging:postgres-keepme sha256:keepme
-supplier-henkaten-pin-staging:postgres-orphan sha256:orphan
+cat >"${prune_safe_images}" <<EOF
+supplier-henkaten-pin-staging:postgres-$(fake_hex keepme) $(fake_id keepme)
+supplier-henkaten-pin-staging:postgres-$(fake_hex orphan) $(fake_id orphan)
 EOF
 prune_bad_rel="${TEST_ROOT}/prune-bad/releases/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 mkdir -p "${prune_bad_rel}"
@@ -2134,7 +2176,7 @@ TEST_IMAGE_STATE_FILE="${prune_safe_images}" PATH="${fake_bin}:${PATH}" bash -c 
   source "$1"
   prune_unreferenced_pin_tags staging "$2"
 ' _ "${SCRIPTS}/lib.sh" "${prune_bad_rel}" >/dev/null 2>"${TEST_ROOT}/prune-safe.err"
-grep -Fxq 'supplier-henkaten-pin-staging:postgres-orphan sha256:orphan' "${prune_safe_images}" || fail "pin pruning deleted tags despite malformed kept manifest"
+grep -Fxq "supplier-henkaten-pin-staging:postgres-$(fake_hex orphan) $(fake_id orphan)" "${prune_safe_images}" || fail "pin pruning deleted tags despite malformed kept manifest"
 grep -q 'Skipping pin-tag pruning' "${TEST_ROOT}/prune-safe.err" || fail "pin pruning did not warn when skipping malformed manifest"
 
 # 8. End-to-end staging rehearsal under containerd store GC mode.
@@ -2143,17 +2185,17 @@ setup_rehearsal_base "${rehearsal_c_base}"
 # Seed images.state and running.state with both releases' pins + retention tags
 cat "${rehearsal_c_base}/releases/${rehearsal_prev}/.activated-images" "${rehearsal_c_base}/releases/${rehearsal_cur}/.activated-images" >"${rehearsal_c_base}/images.state"
 {
-  printf 'supplier-henkaten-pin-staging:postgres-%s-postgres sha256:%s-postgres\n' "${rehearsal_prev:0:6}" "${rehearsal_prev:0:6}"
-  printf 'supplier-henkaten-pin-staging:postgres-%s-postgres sha256:%s-postgres\n' "${rehearsal_cur:0:6}" "${rehearsal_cur:0:6}"
+  printf 'supplier-henkaten-pin-staging:postgres-%s %s\n' "$(fake_hex "${rehearsal_prev:0:6}-postgres")" "$(fake_id "${rehearsal_prev:0:6}-postgres")"
+  printf 'supplier-henkaten-pin-staging:postgres-%s %s\n' "$(fake_hex "${rehearsal_cur:0:6}-postgres")" "$(fake_id "${rehearsal_cur:0:6}-postgres")"
   for svc in api supplier-web tmmin-web caddy; do
-    printf 'supplier-henkaten-pin-staging:%s-%s-%s sha256:%s-%s\n' "${svc}" "${rehearsal_prev:0:6}" "${svc}" "${rehearsal_prev:0:6}" "${svc}"
-    printf 'supplier-henkaten-pin-staging:%s-%s-%s sha256:%s-%s\n' "${svc}" "${rehearsal_cur:0:6}" "${svc}" "${rehearsal_cur:0:6}" "${svc}"
+    printf 'supplier-henkaten-pin-staging:%s-%s %s\n' "${svc}" "$(fake_hex "${rehearsal_prev:0:6}-${svc}")" "$(fake_id "${rehearsal_prev:0:6}-${svc}")"
+    printf 'supplier-henkaten-pin-staging:%s-%s %s\n' "${svc}" "$(fake_hex "${rehearsal_cur:0:6}-${svc}")" "$(fake_id "${rehearsal_cur:0:6}-${svc}")"
   done
 } >>"${rehearsal_c_base}/images.state"
 {
-  printf 'postgres sha256:%s-postgres supplier-henkaten-postgres:18.4-pgvector-0.8.5 2026-01-01T00:00:00Z\n' "${rehearsal_cur:0:6}"
+  printf 'postgres %s supplier-henkaten-postgres:18.4-pgvector-0.8.5 2026-01-01T00:00:00Z\n' "$(fake_id "${rehearsal_cur:0:6}-postgres")"
   for svc in api supplier-web tmmin-web caddy; do
-    printf '%s sha256:%s-%s supplier-henkaten-%s:%s 2026-01-01T00:00:00Z\n' "${svc}" "${rehearsal_cur:0:6}" "${svc}" "${svc}" "${rehearsal_cur}"
+    printf '%s %s supplier-henkaten-%s:%s 2026-01-01T00:00:00Z\n' "${svc}" "$(fake_id "${rehearsal_cur:0:6}-${svc}")" "${svc}" "${rehearsal_cur}"
   done
 } >"${rehearsal_c_base}/running.state"
 TEST_CONTAINERD_STORE=true TEST_IMAGE_STATE_FILE="${rehearsal_c_base}/images.state" \
@@ -2166,6 +2208,224 @@ TEST_CONTAINERD_STORE=true TEST_IMAGE_STATE_FILE="${rehearsal_c_base}/images.sta
 # Rehearsal must reject identical PREVIOUS_SHA == CURRENT_SHA.
 if PATH="${fake_bin}:${PATH}" "${SCRIPTS}/rehearse-staging.sh" "${rehearsal_cur}" "${rehearsal_cur}" "${rehearsal_c_base}" 127.0.0.1 I_ACCEPT_STAGING_INTERRUPTION >/dev/null 2>&1; then
   fail "staging rehearsal accepted identical PREVIOUS_SHA and CURRENT_SHA"
+fi
+
+# 9. Outgoing release pin-protection failure during rollback must abort BEFORE moving the shared
+#    PostgreSQL tag (exit 1, not 4, with shared tag preserved on the outgoing image ID).
+outprot_base="${TEST_ROOT}/rollback-outgoing-protect"
+setup_rehearsal_base "${outprot_base}"
+outprot_images="${TEST_ROOT}/rollback-outgoing-protect-images.state"
+{
+  printf 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 %s\n' "$(fake_id "${rehearsal_cur:0:6}-postgres")"
+  for svc in api supplier-web tmmin-web caddy; do
+    printf 'supplier-henkaten-%s:%s %s\n' "${svc}" "${rehearsal_cur}" "$(fake_id "${rehearsal_cur:0:6}-${svc}")"
+    printf 'supplier-henkaten-%s:%s %s\n' "${svc}" "${rehearsal_prev}" "$(fake_id "${rehearsal_prev:0:6}-${svc}")"
+  done
+  printf 'supplier-henkaten-pin-staging:postgres-%s %s\n' "$(fake_hex "${rehearsal_prev:0:6}-postgres")" "$(fake_id "${rehearsal_prev:0:6}-postgres")"
+} >"${outprot_images}"
+outprot_log="${TEST_ROOT}/rollback-outgoing-protect.log"
+outprot_status=0
+TEST_CONTAINERD_STORE=true TEST_PIN_TAG_FAIL=true TEST_IMAGE_STATE_FILE="${outprot_images}" \
+  TEST_DOCKER_LOG="${outprot_log}" PATH="${fake_bin}:${PATH}" \
+  "${outprot_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" \
+  staging "${rehearsal_prev}" "${outprot_base}" >/dev/null 2>&1 || outprot_status=$?
+[[ "${outprot_status}" == "1" ]] || fail "rollback did not abort with operational exit 1 when outgoing pin protection failed (got ${outprot_status})"
+grep -Fxq "supplier-henkaten-postgres:18.4-pgvector-0.8.5 $(fake_id "${rehearsal_cur:0:6}-postgres")" "${outprot_images}" || fail "rollback moved the shared postgres tag despite failing to protect the outgoing release"
+
+# 10. Transient Docker daemon error during pre-build pin inspection must abort BEFORE build (never
+#     misclassified as a confirmed-missing image), while a confirmed missing non-postgres image still
+#     pins the remaining locally present images (including postgres) before cross-SHA proceeds.
+trerr_base="${TEST_ROOT}/transient-inspect-error"
+setup_rehearsal_base "${trerr_base}"
+trerr_images="${TEST_ROOT}/transient-inspect-images.state"
+grep -v '^supplier-henkaten-pin-' "${trerr_base}/images.state" >"${trerr_images}"
+trerr_once="${TEST_ROOT}/transient-inspect.once"
+printf '%s\n' "$(fake_id "${rehearsal_cur:0:6}-postgres")" >"${trerr_once}"
+trerr_log="${TEST_ROOT}/transient-inspect.log"
+if TEST_CONTAINERD_STORE=true TEST_INSPECT_DAEMON_ERROR_ONCE_FILE="${trerr_once}" \
+  TEST_IMAGE_STATE_FILE="${trerr_images}" TEST_DOCKER_LOG="${trerr_log}" \
+  run_candidate "${trerr_base}" 9595959595959595959595959595959595959595 200 >/dev/null 2>&1; then
+  fail "deploy proceeded after a transient Docker daemon error during pre-build pin inspection"
+fi
+if [[ -f "${trerr_log}" ]] && grep -q ' build ' "${trerr_log}"; then
+  fail "transient Docker inspect error was misclassified as missing and still executed docker compose build"
+fi
+
+# Confirmed missing caddy image on previous release still pins its locally present postgres image!
+partmiss_images="${TEST_ROOT}/partmiss-images.state"
+grep -v '^supplier-henkaten-pin-' "${trerr_base}/images.state" | grep -v "supplier-henkaten-caddy:${rehearsal_cur} " >"${partmiss_images}"
+partmiss_log="${TEST_ROOT}/partmiss.log"
+if TEST_CONTAINERD_STORE=true TEST_BUILD_FAIL=true TEST_IMAGE_STATE_FILE="${partmiss_images}" \
+  TEST_DOCKER_LOG="${partmiss_log}" \
+  run_candidate "${trerr_base}" 9595959595959595959595959595959595959595 201 >/dev/null 2>&1; then
+  fail "partial-missing build-fail fixture unexpectedly succeeded"
+fi
+grep -Fxq "supplier-henkaten-pin-staging:postgres-$(fake_hex "${rehearsal_cur:0:6}-postgres") $(fake_id "${rehearsal_cur:0:6}-postgres")" "${partmiss_images}" || fail "confirmed missing caddy image prevented pinning the locally present previous postgres image"
+
+# 11. Operational docker tag failure partway through target restoration in remote-rollback.sh must exit 1
+#     (retryable by known-good driver), NOT policy refusal 4, and must NOT mark target .rollback-unsafe.
+optag_base="${TEST_ROOT}/rollback-operational-tag-fail"
+setup_rehearsal_base "${optag_base}"
+optag_images="${TEST_ROOT}/rollback-operational-tag-images.state"
+cat "${optag_base}/releases/${rehearsal_prev}/.activated-images" "${optag_base}/releases/${rehearsal_cur}/.activated-images" >"${optag_images}"
+printf 'supplier-henkaten-pin-staging:postgres-%s %s\n' "$(fake_hex "${rehearsal_prev:0:6}-postgres")" "$(fake_id "${rehearsal_prev:0:6}-postgres")" >>"${optag_images}"
+printf 'supplier-henkaten-pin-staging:postgres-%s %s\n' "$(fake_hex "${rehearsal_cur:0:6}-postgres")" "$(fake_id "${rehearsal_cur:0:6}-postgres")" >>"${optag_images}"
+optag_status=0
+TEST_CONTAINERD_STORE=true TEST_TAG_FAIL_ON_REF="supplier-henkaten-api:${rehearsal_prev}" \
+  TEST_IMAGE_STATE_FILE="${optag_images}" PATH="${fake_bin}:${PATH}" \
+  "${optag_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" \
+  staging "${rehearsal_prev}" "${optag_base}" >/dev/null 2>&1 || optag_status=$?
+[[ "${optag_status}" == "1" ]] || fail "operational docker tag failure during rollback returned ${optag_status}, expected retryable exit 1"
+[[ ! -e "${optag_base}/releases/${rehearsal_prev}/.rollback-unsafe" ]] || fail "operational docker tag failure falsely marked valid rollback target .rollback-unsafe"
+
+# Automatic recovery retries with rollback-driver.good after a one-time tag failure in the candidate driver!
+optag_auto_base="${TEST_ROOT}/rollback-operational-tag-auto"
+setup_rehearsal_base "${optag_auto_base}"
+PATH="${fake_bin}:${PATH}" bash -c 'set -euo pipefail; source "$1"; promote_rollback_driver "$2"' _ "${SCRIPTS}/lib.sh" "${optag_auto_base}" || fail "failed promoting good driver for operational tag retry test"
+optag_auto_images="${TEST_ROOT}/rollback-operational-tag-auto-images.state"
+cat "${optag_auto_base}/releases/${rehearsal_cur}/.activated-images" >"${optag_auto_images}"
+for svc in postgres api supplier-web tmmin-web caddy; do
+  printf 'supplier-henkaten-pin-staging:%s-%s %s\n' "${svc}" "$(fake_hex "${rehearsal_cur:0:6}-${svc}")" "$(fake_id "${rehearsal_cur:0:6}-${svc}")" >>"${optag_auto_images}"
+done
+optag_auto_running="${TEST_ROOT}/rollback-operational-tag-auto-running.state"
+{
+  printf 'postgres %s supplier-henkaten-postgres:18.4-pgvector-0.8.5 2026-01-01T00:00:00Z\n' "$(fake_id "${rehearsal_cur:0:6}-postgres")"
+  for svc in api supplier-web tmmin-web caddy; do
+    printf '%s %s supplier-henkaten-%s:%s 2026-01-01T00:00:00Z\n' "${svc}" "$(fake_id "${rehearsal_cur:0:6}-${svc}")" "${svc}" "${rehearsal_cur}"
+  done
+} >"${optag_auto_running}"
+optag_once_file="${TEST_ROOT}/rollback-operational-tag.once"
+printf 'supplier-henkaten-api:%s\n' "${rehearsal_cur}" >"${optag_once_file}"
+optag_auto_status=0
+DEPLOY_FORCE_SMOKE_FAILURE=true TEST_CONTAINERD_STORE=true TEST_TAG_FAIL_ONCE_FILE="${optag_once_file}" \
+  TEST_IMAGE_STATE_FILE="${optag_auto_images}" TEST_RUNNING_IMAGES_FILE="${optag_auto_running}" \
+  run_candidate "${optag_auto_base}" 9696969696969696969696969696969696969696 205 >/dev/null 2>&1 || optag_auto_status=$?
+[[ "${optag_auto_status}" == "3" ]] || fail "automatic recovery did not retry with rollback-driver.good after operational tag failure (exit ${optag_auto_status})"
+
+# 12. Compose warnings on stderr during `compose ps -q` must never be parsed as extra container IDs.
+pswarn_base="${TEST_ROOT}/compose-ps-stderr-warning"
+prepare_base "${pswarn_base}"
+TEST_COMPOSE_PS_WARNING='level=warning msg="The UNUSED_VAR variable is not set. Defaulting to a blank string."' \
+  run_candidate "${pswarn_base}" 9797979797979797979797979797979797979797 10 >/dev/null 2>&1 || fail "deploy failed when docker compose ps emitted a warning on stderr"
+
+# 13. Exact-image tag checks before bootstrap-admin AND before candidate activation commit.
+bsdrift_base="${TEST_ROOT}/bootstrap-tag-drift"
+prepare_base "${bsdrift_base}"
+bsdrift_images="${TEST_ROOT}/bootstrap-tag-drift-images.state"
+bsdrift_running="${TEST_ROOT}/bootstrap-tag-drift-running.state"
+bsdrift_log="${TEST_ROOT}/bootstrap-tag-drift.log"
+if TEST_CONTAINERD_STORE=true TEST_DRIFT_API_TAG_ON_MIGRATE=true \
+  TEST_IMAGE_STATE_FILE="${bsdrift_images}" TEST_RUNNING_IMAGES_FILE="${bsdrift_running}" \
+  TEST_DOCKER_LOG="${bsdrift_log}" \
+  run_candidate "${bsdrift_base}" 9898989898989898989898989898989898989898 10 >/dev/null 2>&1; then
+  fail "deploy proceeded to bootstrap-admin despite api tag drifting during migrate"
+fi
+if grep -q ' bootstrap-admin' "${bsdrift_log}"; then
+  fail "bootstrap-admin ran after api runtime tag drifted during migrate"
+fi
+
+# Candidate activation must fail if a runtime tag drifts after service reconciliation (before write_activated_images).
+actdrift_rel="${TEST_ROOT}/activation-tag-drift/releases/${retry_sha}"
+mkdir -p "${actdrift_rel}"
+sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${retry_sha}/" "${rendered_env}" >"${actdrift_rel}/.runtime.env"
+actdrift_cand="${TEST_ROOT}/activation-tag-drift.cand"
+actdrift_images="${TEST_ROOT}/activation-tag-drift.images"
+actdrift_running="${TEST_ROOT}/activation-tag-drift.running"
+{
+  printf 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 %s\n' "$(fake_id actdrift-pg)"
+  for svc in api supplier-web tmmin-web caddy; do
+    printf 'supplier-henkaten-%s:%s %s\n' "${svc}" "${retry_sha}" "$(fake_id "actdrift-${svc}")"
+  done
+} >"${actdrift_cand}"
+cp "${actdrift_cand}" "${actdrift_images}"
+# Drift the caddy runtime tag to a different valid digest while keeping the running container on actdrift-caddy!
+grep -v "^supplier-henkaten-caddy:${retry_sha} " "${actdrift_images}" >"${actdrift_images}.tmp"
+printf 'supplier-henkaten-caddy:%s %s\n' "${retry_sha}" "$(fake_id drifted-caddy-tag)" >>"${actdrift_images}.tmp"
+mv "${actdrift_images}.tmp" "${actdrift_images}"
+{
+  printf 'postgres %s supplier-henkaten-postgres:18.4-pgvector-0.8.5 2026-01-01T00:00:00Z\n' "$(fake_id actdrift-pg)"
+  for svc in api supplier-web tmmin-web caddy; do
+    printf '%s %s supplier-henkaten-%s:%s 2026-01-01T00:00:00Z\n' "${svc}" "$(fake_id "actdrift-${svc}")" "${svc}" "${retry_sha}"
+  done
+} >"${actdrift_running}"
+if TEST_IMAGE_STATE_FILE="${actdrift_images}" TEST_RUNNING_IMAGES_FILE="${actdrift_running}" \
+  APP_ENV=staging COMPOSE_PROJECT_NAME=supplier-henkaten-staging PATH="${fake_bin}:${PATH}" bash -c '
+    set -euo pipefail
+    source "$1"
+    write_activated_images "$2" "$3" "$2/.runtime.env" "" "$4" "$2/.staged"
+  ' _ "${SCRIPTS}/lib.sh" "${actdrift_rel}" "${retry_sha}" "${actdrift_cand}" >/dev/null 2>&1; then
+  fail "write_activated_images accepted a candidate whose runtime tag drifted after reconciliation"
+fi
+
+# 14. Retention ranking prioritizes locally verified rollback targets over newer broken manifests.
+retprio_base="${TEST_ROOT}/retention-priority"
+prepare_base "${retprio_base}"
+retprio_images="${TEST_ROOT}/retention-priority-images.state"
+retprio_running="${TEST_ROOT}/retention-priority-running.state"
+: >"${retprio_images}"
+: >"${retprio_running}"
+retprio_shas=(
+  a100000000000000000000000000000000000001
+  a100000000000000000000000000000000000002
+  a100000000000000000000000000000000000003
+  a100000000000000000000000000000000000004
+  a100000000000000000000000000000000000005
+)
+# Create 4 older verified releases (indices 0..3) and 1 newer broken release (index 4)
+ts_idx=1
+for rsha in "${retprio_shas[@]}"; do
+  rdir="${retprio_base}/releases/${rsha}"
+  mkdir -p "${rdir}/deploy/scripts" "${rdir}/deploy/compose"
+  cp "${COMPOSE_FILE}" "${rdir}/deploy/compose/docker-compose.remote.yml"
+  sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${rsha}/" "${rendered_env}" >"${rdir}/.runtime.env"
+  printf '%s\n' "${rsha}" >"${rdir}/.source.sha"
+  printf '%s\n' "${rsha}" >"${rdir}/.activated"
+  if [[ "${rsha}" == "${retprio_shas[4]}" ]]; then
+    printf 'malformed-entry\n' >"${rdir}/.activated-images"
+  else
+    {
+      printf 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 %s\n' "$(fake_id "rp-${rsha:0:8}-pg")"
+      for svc in api supplier-web tmmin-web caddy; do
+        printf 'supplier-henkaten-%s:%s %s\n' "${svc}" "${rsha}" "$(fake_id "rp-${rsha:0:8}-${svc}")"
+      done
+    } >"${rdir}/.activated-images"
+    printf 'supplier-henkaten-pin-staging:postgres-%s %s\n' "$(fake_hex "rp-${rsha:0:8}-pg")" "$(fake_id "rp-${rsha:0:8}-pg")" >>"${retprio_images}"
+    for svc in api supplier-web tmmin-web caddy; do
+      printf 'supplier-henkaten-%s:%s %s\n' "${svc}" "${rsha}" "$(fake_id "rp-${rsha:0:8}-${svc}")" >>"${retprio_images}"
+      printf 'supplier-henkaten-pin-staging:%s-%s %s\n' "${svc}" "$(fake_hex "rp-${rsha:0:8}-${svc}")" "$(fake_id "rp-${rsha:0:8}-${svc}")" >>"${retprio_images}"
+    done
+  fi
+  touch -d "2026-01-0${ts_idx} 00:00:00 UTC" "${rdir}"
+  ts_idx=$((ts_idx + 1))
+done
+# Make oldest verified release (index 0) the oldest mtime, index 3 current, index 4 newest broken
+printf '%s\n' "${retprio_shas[3]}" >"${retprio_base}/current_release"
+printf 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 %s\n' "$(fake_id "rp-${retprio_shas[3]:0:8}-pg")" >>"${retprio_images}"
+{
+  printf 'postgres %s supplier-henkaten-postgres:18.4-pgvector-0.8.5 2026-01-01T00:00:00Z\n' "$(fake_id "rp-${retprio_shas[3]:0:8}-pg")"
+  for svc in api supplier-web tmmin-web caddy; do
+    printf '%s %s supplier-henkaten-%s:%s 2026-01-01T00:00:00Z\n' "${svc}" "$(fake_id "rp-${retprio_shas[3]:0:8}-${svc}")" "${svc}" "${retprio_shas[3]}"
+  done
+} >"${retprio_running}"
+TEST_CONTAINERD_STORE=true TEST_IMAGE_STATE_FILE="${retprio_images}" TEST_RUNNING_IMAGES_FILE="${retprio_running}" \
+  run_candidate "${retprio_base}" a100000000000000000000000000000000000006 10 >/dev/null 2>&1 || fail "retention-priority deploy failed"
+[[ -d "${retprio_base}/releases/${retprio_shas[0]}" ]] || fail "retention evicted an older locally verified rollback target"
+[[ ! -d "${retprio_base}/releases/${retprio_shas[4]}" ]] || fail "retention kept a newer broken manifest release instead of evicting it first"
+
+# 15. Strict 64-hex SHA-256 digest validation rejects non-hex synthetic strings like sha256:orphan.
+if PATH="${fake_bin}:${PATH}" bash -c '
+  set -euo pipefail
+  source "$1"
+  validate_image_id "sha256:orphan"
+' _ "${SCRIPTS}/lib.sh" >/dev/null 2>&1; then
+  fail "validate_image_id accepted non-64-hex digest sha256:orphan"
+fi
+if PATH="${fake_bin}:${PATH}" bash -c '
+  set -euo pipefail
+  source "$1"
+  validate_image_id "sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+' _ "${SCRIPTS}/lib.sh" >/dev/null 2>&1; then
+  fail "validate_image_id accepted uppercase hex digest"
 fi
 
 lock_base="${TEST_ROOT}/lock"

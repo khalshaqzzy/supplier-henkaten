@@ -299,7 +299,65 @@ rollback_driver_bundle_is_strict() {
 }
 
 validate_image_id() {
-  [[ "${1:-}" =~ ^sha256:[A-Za-z0-9._-]{1,96}$ ]]
+  [[ "${1:-}" =~ ^sha256:[0-9a-f]{64}$ ]]
+}
+
+# Capture container IDs from `docker compose ps` stdout ONLY so Compose warnings on stderr
+# are never parsed as extra container IDs.
+compose_ps_ids() {
+  local release_dir="$1"
+  local runtime_env="$2"
+  shift 2
+  local err_file ids_out status=0 err_text=""
+  err_file="$(mktemp)" || return 1
+  ids_out="$(compose_for "${release_dir}" "${runtime_env}" "$@" 2>"${err_file}")" || status=$?
+  if [[ -s "${err_file}" ]]; then
+    err_text="$(cat "${err_file}")"
+  fi
+  rm -f -- "${err_file}"
+  if (( status != 0 )); then
+    note_stderr "docker compose $* failed (exit ${status}): ${err_text:-no stderr}"
+    return "${status}"
+  fi
+  if [[ -n "${err_text}" ]]; then
+    note_stderr "docker compose $* stderr warning: ${err_text}"
+  fi
+  printf '%s\n' "${ids_out}" | awk 'NF'
+}
+
+# Inspect a local Docker image ID while separating confirmed "not found" from indeterminate
+# daemon/operational failures.
+# Returns:
+#   0: image exists locally and its .Id matches image_id
+#   2: Docker explicitly reported the image does not exist locally (confirmed missing)
+#   1: indeterminate/operational error (daemon unreachable, timeout, permission error, ID mismatch)
+inspect_local_image_state() {
+  local image_id="$1"
+  local context="${2:-image inspect}"
+  local err_file out status=0 err_text=""
+  validate_image_id "${image_id}" || {
+    note_stderr "${context}: invalid image ID '${image_id}'."
+    return 1
+  }
+  err_file="$(mktemp)" || return 1
+  out="$(docker image inspect --format '{{.Id}}' "${image_id}" 2>"${err_file}")" || status=$?
+  if [[ -s "${err_file}" ]]; then
+    err_text="$(cat "${err_file}")"
+  fi
+  rm -f -- "${err_file}"
+  if (( status == 0 )); then
+    if [[ "${out}" == "${image_id}" ]]; then
+      return 0
+    fi
+    note_stderr "${context}: local image '${image_id}' resolved to unexpected ID '${out:-<empty>}'."
+    return 1
+  fi
+  if printf '%s\n' "${err_text}" | grep -Eiq 'no such image|not found'; then
+    note_stderr "${context}: pinned image ID '${image_id}' is confirmed missing locally (${err_text})."
+    return 2
+  fi
+  note_stderr "${context}: indeterminate Docker inspect error for '${image_id}' (exit ${status}): ${err_text:-no stderr}."
+  return 1
 }
 
 service_image_ref_for() {
@@ -472,42 +530,65 @@ parse_manifest_file() {
 }
 
 # Ensure all 5 image IDs recorded in a release's .activated-images manifest exist locally and have
-# verified content-addressed retention tags.
+# verified content-addressed retention tags. Individually verified local images are always pinned
+# even if another service's image is confirmed missing.
 # Returns:
 #   0: all 5 rows valid, present locally, and retained with verified pin tags
-#   2: manifest valid, but >= 1 pinned image ID is missing locally (unrecoverable)
-#   1: manifest malformed or retention tagging failed on a locally present image
+#   2: manifest valid, all locally present images pinned, and >= 1 image confirmed missing locally
+#   3: manifest malformed or invalid
+#   1: operational/indeterminate Docker failure (daemon error, inspect error, or pin-tag failure)
 ensure_manifest_pins() {
   local app_env="$1"
   local release_dir="$2"
   local pin_sha="$3"
   local manifest="${release_dir}/.activated-images"
-  local parsed_lines svc ref expected_id resolved_id
+  local parsed_lines svc ref expected_id
   local -a svcs=() ids=()
-  local i missing_local=false
+  local i inspect_rc had_confirmed_missing=false had_operational_err=false
 
-  parsed_lines="$(parse_manifest_file "${manifest}" "${release_dir}" "${pin_sha}")" || return 1
+  parsed_lines="$(parse_manifest_file "${manifest}" "${release_dir}" "${pin_sha}")" || return 3
   while IFS=' ' read -r svc ref expected_id; do
     svcs+=("${svc}")
     ids+=("${expected_id}")
   done <<<"${parsed_lines}"
 
   for ((i = 0; i < ${#svcs[@]}; i++)); do
-    if ! resolved_id="$(docker image inspect --format '{{.Id}}' "${ids[i]}" 2>&1)"; then
-      note_stderr "Manifest pin check for ${pin_sha} (${svcs[i]}): pinned image ID '${ids[i]}' is unavailable locally (${resolved_id:-inspect failed})."
-      missing_local=true
-    elif [[ "${resolved_id}" != "${ids[i]}" ]]; then
-      note_stderr "Manifest pin check for ${pin_sha} (${svcs[i]}): pinned image ID '${ids[i]}' resolved to '${resolved_id}'."
-      missing_local=true
+    inspect_rc=0
+    inspect_local_image_state "${ids[i]}" "Manifest pin check for ${pin_sha} (${svcs[i]})" || inspect_rc=$?
+    if (( inspect_rc == 0 )); then
+      if ! pin_image_id "${app_env}" "${svcs[i]}" "${ids[i]}"; then
+        had_operational_err=true
+      fi
+    elif (( inspect_rc == 2 )); then
+      had_confirmed_missing=true
+    else
+      had_operational_err=true
     fi
   done
-  if [[ "${missing_local}" == "true" ]]; then
+
+  if [[ "${had_operational_err}" == "true" ]]; then
+    return 1
+  fi
+  if [[ "${had_confirmed_missing}" == "true" ]]; then
     return 2
   fi
+  return 0
+}
 
-  for ((i = 0; i < ${#svcs[@]}; i++)); do
-    pin_image_id "${app_env}" "${svcs[i]}" "${ids[i]}" || return 1
-  done
+# Return 0 iff a retained release directory is a complete, locally verifiable rollback target.
+release_is_verified_rollback_target() {
+  local release_dir="$1"
+  local pin_sha parsed_lines svc ref expected_id
+  [[ -d "${release_dir}" ]] || return 1
+  pin_sha="$(basename "${release_dir}")"
+  [[ "${pin_sha}" =~ ^[0-9a-f]{40}$ ]] || return 1
+  [[ -f "${release_dir}/.activated" && ! -L "${release_dir}/.activated" ]] || return 1
+  [[ -f "${release_dir}/.activated-images" && ! -L "${release_dir}/.activated-images" ]] || return 1
+  [[ ! -e "${release_dir}/.rollback-unsafe" && ! -L "${release_dir}/.rollback-unsafe" ]] || return 1
+  parsed_lines="$(parse_manifest_file "${release_dir}/.activated-images" "${release_dir}" "${pin_sha}" 2>/dev/null)" || return 1
+  while IFS=' ' read -r svc ref expected_id; do
+    inspect_local_image_state "${expected_id}" "Retention check for ${pin_sha} (${svc})" 2>/dev/null || return 1
+  done <<<"${parsed_lines}"
 }
 
 # Reconcile a single Compose service so it runs the exact expected image ref and ID.
@@ -539,11 +620,10 @@ ensure_service_runs_image() {
     return 1
   fi
 
-  if ! container_ids="$(compose_for "${release_dir}" "${runtime_env}" ps --all -q "${svc}" 2>&1)"; then
-    note_stderr "Reconciliation failed for ${svc}: docker compose ps --all failed (${container_ids:-unknown error})."
+  if ! container_ids="$(compose_ps_ids "${release_dir}" "${runtime_env}" ps --all -q "${svc}")"; then
+    note_stderr "Reconciliation failed for ${svc}: docker compose ps --all failed."
     return 1
   fi
-  container_ids="$(printf '%s\n' "${container_ids}" | awk 'NF')"
   if [[ "${container_ids}" == *$'\n'* ]]; then
     note_stderr "Reconciliation failed for ${svc}: expected at most one existing container, found '${container_ids//$'\n'/ }'."
     return 1
@@ -583,11 +663,10 @@ ensure_service_runs_image() {
 
   wait_for_service "${release_dir}" "${runtime_env}" "${svc}" "${timeout_seconds}" || return 1
 
-  if ! running_ids="$(compose_for "${release_dir}" "${runtime_env}" ps -q "${svc}" 2>&1)"; then
-    note_stderr "Post-reconciliation check failed for ${svc}: docker compose ps failed (${running_ids:-unknown error})."
+  if ! running_ids="$(compose_ps_ids "${release_dir}" "${runtime_env}" ps -q "${svc}")"; then
+    note_stderr "Post-reconciliation check failed for ${svc}: docker compose ps failed."
     return 1
   fi
-  running_ids="$(printf '%s\n' "${running_ids}" | awk 'NF')"
   if [[ -z "${running_ids}" || "${running_ids}" == *$'\n'* ]]; then
     note_stderr "Post-reconciliation check failed for ${svc}: expected exactly one running container, found '${running_ids//$'\n'/ }'."
     return 1
@@ -618,11 +697,10 @@ verify_running_matches_manifest() {
   pin_env="$(resolve_pin_env "${explicit_env}" || true)"
 
   while IFS=' ' read -r svc image_ref expected_id; do
-    if ! container_ids="$(compose_for "${release_dir}" "${compose_env}" ps -q "${svc}" 2>&1)"; then
-      note_stderr "Manifest verification failed for ${pin_sha} (${svc}): docker compose ps failed (${container_ids:-unknown error})."
+    if ! container_ids="$(compose_ps_ids "${release_dir}" "${compose_env}" ps -q "${svc}")"; then
+      note_stderr "Manifest verification failed for ${pin_sha} (${svc}): docker compose ps failed."
       return 1
     fi
-    container_ids="$(printf '%s\n' "${container_ids}" | awk 'NF')"
     if [[ -z "${container_ids}" || "${container_ids}" == *$'\n'* ]]; then
       note_stderr "Manifest verification failed for ${pin_sha} (${svc}): expected exactly one running container, found '${container_ids//$'\n'/ }'."
       return 1
@@ -961,12 +1039,11 @@ write_activated_images() {
     else
       image_ref="supplier-henkaten-${svc}:${pin_sha}"
     fi
-    if ! container_ids="$(compose_for "${release_dir}" "${compose_env}" ps -q "${svc}" 2>&1)"; then
-      note_stderr "Refusing to pin ${svc} for ${pin_sha}: docker compose ps failed (${container_ids:-unknown error})."
+    if ! container_ids="$(compose_ps_ids "${release_dir}" "${compose_env}" ps -q "${svc}")"; then
+      note_stderr "Refusing to pin ${svc} for ${pin_sha}: docker compose ps failed."
       rm -f -- "${tmp_file}"
       return 1
     fi
-    container_ids="$(printf '%s\n' "${container_ids}" | awk 'NF')"
     container_id="${container_ids%%$'\n'*}"
     if [[ -z "${container_id}" || "${container_ids}" == *$'\n'* ]]; then
       note_stderr "Refusing to pin ${svc} for ${pin_sha}: expected exactly one running container, found '${container_ids//$'\n'/ }'."
@@ -1025,10 +1102,11 @@ write_activated_images() {
         rm -f -- "${tmp_file}"
         return 1
       fi
-    elif [[ -z "${activated_at_file}" ]]; then
+    fi
+    if [[ -z "${activated_at_file}" ]]; then
       tag_id="$(docker image inspect --format '{{.Id}}' "${image_ref}" 2>/dev/null || true)"
-      if [[ -n "${tag_id}" && "${tag_id}" != "${image_id}" ]]; then
-        note_stderr "Refusing to pin ${svc} for ${pin_sha}: running container ${container_id} uses '${image_id}', which differs from runtime tag ${image_ref} ('${tag_id}')."
+      if [[ -z "${tag_id}" || "${tag_id}" != "${image_id}" ]]; then
+        note_stderr "Refusing to pin ${svc} for ${pin_sha}: runtime tag ${image_ref} resolves to '${tag_id:-<empty>}', expected '${image_id}'."
         rm -f -- "${tmp_file}"
         return 1
       fi
@@ -1102,16 +1180,22 @@ write_activated_images() {
   fi
 }
 
+# Restore all 5 runtime tags from a verified .activated-images manifest and re-assert their
+# content-addressed retention tags.
+# Returns:
+#   0: all 5 IDs verified locally, runtime tags restored & verified, retention tags verified
+#   2: policy violation (manifest malformed or >= 1 pinned ID confirmed missing locally)
+#   1: operational/indeterminate Docker failure (retryable; e.g. daemon error, tag/verify failure)
 restore_pinned_images_file() {
   local pinned_file="$1"
   local release_dir="$2"
   local pin_sha="$3"
   local explicit_env="${4:-}"
-  local parsed_lines svc ref expected_id restored_id resolved_id tag_err pin_env
+  local parsed_lines svc ref expected_id restored_id tag_err pin_env
   local -a parsed_svcs=() parsed_refs=() parsed_ids=()
-  local i status=0
+  local i inspect_rc status=0 had_confirmed_missing=false had_operational_err=false
 
-  parsed_lines="$(parse_manifest_file "${pinned_file}" "${release_dir}" "${pin_sha}")" || return 1
+  parsed_lines="$(parse_manifest_file "${pinned_file}" "${release_dir}" "${pin_sha}")" || return 2
   while IFS=' ' read -r svc ref expected_id; do
     parsed_svcs+=("${svc}")
     parsed_refs+=("${ref}")
@@ -1120,15 +1204,20 @@ restore_pinned_images_file() {
 
   # Pass 1: verify every pinned image ID exists locally before modifying any tag.
   for ((i = 0; i < ${#parsed_refs[@]}; i++)); do
-    if ! resolved_id="$(docker image inspect --format '{{.Id}}' "${parsed_ids[i]}" 2>&1)"; then
-      note_stderr "Pinned Docker image ID ${parsed_ids[i]} for ${parsed_refs[i]} is unavailable locally (${resolved_id:-inspect failed})."
-      return 1
-    fi
-    if [[ "${resolved_id}" != "${parsed_ids[i]}" ]]; then
-      note_stderr "Pinned Docker image ID ${parsed_ids[i]} for ${parsed_refs[i]} resolved to '${resolved_id}'."
-      return 1
+    inspect_rc=0
+    inspect_local_image_state "${parsed_ids[i]}" "Pinned image check for ${parsed_refs[i]}" || inspect_rc=$?
+    if (( inspect_rc == 2 )); then
+      had_confirmed_missing=true
+    elif (( inspect_rc != 0 )); then
+      had_operational_err=true
     fi
   done
+  if [[ "${had_operational_err}" == "true" ]]; then
+    return 1
+  fi
+  if [[ "${had_confirmed_missing}" == "true" ]]; then
+    return 2
+  fi
 
   # Pass 2: restore every runtime tag, re-verify it resolves to its exact pinned ID, and re-assert
   # its content-addressed retention tag so subsequent builds never GC it.

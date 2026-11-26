@@ -263,7 +263,7 @@ jobs:
             echo "Timed out waiting for Docker 29 DinD daemon." >&2
             exit 1
           }
-          DOCKER_HOST=tcp://127.0.0.1:23750 bash deploy/tests/containerd-image-store.sh
+          CONTAINERD_TEST_DISPOSABLE_DAEMON=true DOCKER_HOST=tcp://127.0.0.1:23750 bash deploy/tests/containerd-image-store.sh
 
   containers:
     name: Production containers and routing

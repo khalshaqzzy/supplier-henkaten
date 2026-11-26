@@ -16,6 +16,10 @@ fail() {
   exit 1
 }
 
+if [[ "${CONTAINERD_TEST_DISPOSABLE_DAEMON:-false}" != "true" ]]; then
+  fail "Refusing to run against an arbitrary Docker daemon: set CONTAINERD_TEST_DISPOSABLE_DAEMON=true only when targeting a disposable containerd daemon (e.g. Docker 29 DinD)."
+fi
+
 docker_version="$(docker version --format '{{.Server.Version}}' 2>/dev/null || true)"
 compose_version="$(docker compose version --short 2>/dev/null || true)"
 buildx_version="$(docker buildx version 2>/dev/null | awk '{print $2}' || true)"
@@ -27,8 +31,21 @@ if [[ "${driver_status}" != *"io.containerd.snapshotter"* ]]; then
   fail "Docker daemon is not using the containerd image store (DriverStatus='${driver_status}')."
 fi
 
+# Safety guard: refuse to touch any daemon that has live/stopped staging or production Compose
+# containers or existing staging retention pin tags.
+for live_project in supplier-henkaten-staging supplier-henkaten-production; do
+  existing_live="$(docker ps -a -q --filter "label=com.docker.compose.project=${live_project}" 2>/dev/null || true)"
+  if [[ -n "${existing_live}" ]]; then
+    fail "Refusing to run: target Docker daemon has existing containers for Compose project '${live_project}'."
+  fi
+done
+existing_staging_pins="$(docker image ls --format '{{.Repository}}:{{.Tag}}' supplier-henkaten-pin-staging 2>/dev/null | awk 'NF && $0 !~ /:<none>$/' || true)"
+if [[ -n "${existing_staging_pins}" ]]; then
+  fail "Refusing to run: target Docker daemon already has tags in supplier-henkaten-pin-staging."
+fi
+
 TEST_ROOT="$(mktemp -d /tmp/containerd-lifecycle.XXXXXX)"
-PROJECT_NAME="supplier-henkaten-staging"
+PROJECT_NAME="containerd-pin-test-$$"
 APP_ENV="staging"
 COMPOSE_PROJECT_NAME="${PROJECT_NAME}"
 export APP_ENV COMPOSE_PROJECT_NAME
@@ -38,21 +55,20 @@ SHA_B="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 REL_A="${TEST_ROOT}/releases/${SHA_A}"
 REL_B="${TEST_ROOT}/releases/${SHA_B}"
 PG_REF="supplier-henkaten-postgres:18.4-pgvector-0.8.5"
-PIN_REPO="$(pin_repo_for_env "${APP_ENV}")"
+CREATED_PIN_TAGS=()
 
 cleanup() {
-  local dir
+  local dir pin_tag ref
   for dir in "${REL_A}" "${REL_B}"; do
     if [[ -f "${dir}/deploy/compose/docker-compose.remote.yml" && -f "${dir}/.runtime.env" ]]; then
       docker compose --project-name "${PROJECT_NAME}" --env-file "${dir}/.runtime.env" \
         -f "${dir}/deploy/compose/docker-compose.remote.yml" down --remove-orphans -v >/dev/null 2>&1 || true
     fi
   done
-  local pin_tag
-  while IFS= read -r pin_tag; do
-    [[ -n "${pin_tag}" && "${pin_tag}" != *":<none>" ]] || continue
+  for pin_tag in "${CREATED_PIN_TAGS[@]}"; do
+    [[ -n "${pin_tag}" ]] || continue
     docker image rm --no-prune "${pin_tag}" >/dev/null 2>&1 || true
-  done < <(docker image ls --format '{{.Repository}}:{{.Tag}}' "${PIN_REPO}" 2>/dev/null || true)
+  done
   for ref in \
     "${PG_REF}" \
     "supplier-henkaten-api:${SHA_A}" "supplier-henkaten-supplier-web:${SHA_A}" \
@@ -173,6 +189,7 @@ for svc in "${DEPLOY_SERVICES[@]}"; do
   ref="$(service_image_ref_for "${REL_A}" "${SHA_A}" "${svc}")"
   id="$(docker image inspect --format '{{.Id}}' "${ref}")"
   pin_image_id "${APP_ENV}" "${svc}" "${id}"
+  CREATED_PIN_TAGS+=("$(pin_tag_for_image "${APP_ENV}" "${svc}" "${id}")")
   ensure_service_runs_image "${REL_A}" "${REL_A}/.runtime.env" "${svc}" "${ref}" "${id}" 30
 done
 write_activated_images "${REL_A}" "${SHA_A}" "${REL_A}/.runtime.env"
@@ -198,6 +215,7 @@ for svc in "${DEPLOY_SERVICES[@]}"; do
   ref="$(service_image_ref_for "${REL_B}" "${SHA_B}" "${svc}")"
   id="$(docker image inspect --format '{{.Id}}' "${ref}")"
   pin_image_id "${APP_ENV}" "${svc}" "${id}"
+  CREATED_PIN_TAGS+=("$(pin_tag_for_image "${APP_ENV}" "${svc}" "${id}")")
   ensure_service_runs_image "${REL_B}" "${REL_B}/.runtime.env" "${svc}" "${ref}" "${id}" 30
 done
 write_activated_images "${REL_B}" "${SHA_B}" "${REL_B}/.runtime.env"

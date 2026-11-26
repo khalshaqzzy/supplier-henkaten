@@ -306,10 +306,11 @@ Urutan kerja driver:
 1. Mengambil deploy lock dan memvalidasi `.runtime.env`, `.source.sha`, `APP_ENV`/`RELEASE_SHA`.
 2. Sebelum memodifikasi tag Docker atau service apa pun, menolak (exit `4`) bila: `current_release`/`.activated`
    berupa direktori atau `current` bukan symlink; rilis hardened tanpa `.activated`;
-   `.activated-images`/`.rollback-unsafe` bukan file reguler; manifest tidak lengkap, image ID pin
-   tidak ada secara lokal, atau retag/retention tag gagal diverifikasi; target ditandai `.rollback-unsafe`
-   tanpa pin; target tidak punya pin sama sekali. Sebelum retag, driver juga menahan pin milik rilis aktif
-   yang sedang digantikan agar image PostgreSQL-nya tidak ter-GC oleh containerd.
+   `.activated-images`/`.rollback-unsafe` bukan file reguler; manifest tidak lengkap atau image ID pin
+   terkonfirmasi hilang secara lokal; target ditandai `.rollback-unsafe` tanpa pin; target tidak punya pin
+   sama sekali. Sebelum retag, driver juga menahan pin milik rilis aktif yang sedang digantikan dan
+   membatalkan dengan exit `1` (retryable, tanpa mengubah tag apa pun) bila terjadi error operasional Docker
+   saat melindungi pin outgoing atau saat retag/verifikasi target.
 3. Menghentikan Caddy (ingress) lebih dulu, lalu merekonsiliasi PostgreSQL (memaksa `--force-recreate` bila
    container berjalan pada image/ref berbeda atau orphaned, dengan `stop_grace_period: 60s`), menjalankan
    `--provision-role-only` dengan `--no-deps --pull never` bila relevan, merekonsiliasi API dan frontend dari
