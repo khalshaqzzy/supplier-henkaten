@@ -264,43 +264,66 @@ mark_rollback_unsafe() {
   [[ -f "${dest_file}" && ! -L "${dest_file}" ]] || return 1
 }
 
+hardened_rollback_driver_path() {
+  printf '%s\n' "$1/shared/deployment-state/rollback-driver/remote-rollback.sh"
+}
+
+# Publish lib.sh, validate-runtime-env.sh and remote-rollback.sh as ONE immutable bundle: stage them in a
+# fresh versioned directory, then atomically repoint the rollback-driver symlink. A failed or interrupted
+# install leaves the previous bundle (or no bundle) in place, never a mixture of versions.
 install_hardened_rollback_driver() {
   local source_scripts_dir="$1"
   local base_dir="$2"
-  local driver_dir="${base_dir}/shared/deployment-state/rollback-driver"
-  local script_name src tmp dest
-  mkdir -p "${driver_dir}" || return 1
+  local state_dir="${base_dir}/shared/deployment-state"
+  local driver_link="${state_dir}/rollback-driver"
+  local script_name stage entry legacy_dir
+  mkdir -p "${state_dir}" || return 1
   for script_name in lib.sh validate-runtime-env.sh remote-rollback.sh; do
-    src="${source_scripts_dir}/${script_name}"
-    [[ -f "${src}" ]] || return 1
-    dest="${driver_dir}/${script_name}"
-    if [[ -L "${dest}" || ( -e "${dest}" && ! -f "${dest}" ) ]]; then
+    [[ -f "${source_scripts_dir}/${script_name}" && ! -L "${source_scripts_dir}/${script_name}" ]] || return 1
+  done
+  stage="$(mktemp -d "${state_dir}/rollback-driver.v.XXXXXX")" || return 1
+  for script_name in lib.sh validate-runtime-env.sh remote-rollback.sh; do
+    if ! cp "${source_scripts_dir}/${script_name}" "${stage}/${script_name}" ||
+      ! chmod 755 "${stage}/${script_name}" ||
+      ! bash -n "${stage}/${script_name}"; then
+      rm -rf -- "${stage}"
       return 1
     fi
-    tmp="$(mktemp "${driver_dir}/.${script_name}.tmp.XXXXXX")" || return 1
-    cp "${src}" "${tmp}" && chmod 755 "${tmp}" || {
-      rm -f -- "${tmp}"
+  done
+  chmod 755 "${stage}" || {
+    rm -rf -- "${stage}"
+    return 1
+  }
+  # Migrate a pre-versioning real directory out of the way (we hold the deploy lock, so no rollback runs).
+  if [[ -e "${driver_link}" && ! -L "${driver_link}" ]]; then
+    if [[ ! -d "${driver_link}" ]]; then
+      rm -rf -- "${stage}"
+      return 1
+    fi
+    legacy_dir="$(mktemp -u "${state_dir}/rollback-driver.legacy.XXXXXX")" || {
+      rm -rf -- "${stage}"
       return 1
     }
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-      mv -f "${tmp}" "${dest}" || {
-        rm -f -- "${tmp}"
-        return 1
-      }
-    else
-      mv -Tf "${tmp}" "${dest}" || {
-        rm -f -- "${tmp}"
-        return 1
-      }
-    fi
+    mv -- "${driver_link}" "${legacy_dir}" || {
+      rm -rf -- "${stage}"
+      return 1
+    }
+  fi
+  if ! activate_symlink "${stage}" "${driver_link}" || [[ ! -L "${driver_link}" || "$(readlink "${driver_link}")" != "${stage}" ]]; then
+    rm -rf -- "${stage}"
+    return 1
+  fi
+  for entry in "${state_dir}"/rollback-driver.v.* "${state_dir}"/rollback-driver.legacy.*; do
+    [[ -d "${entry}" && ! -L "${entry}" && "${entry}" != "${stage}" ]] || continue
+    rm -rf -- "${entry}" >/dev/null 2>&1 || true
   done
 }
 
 write_activated_images() {
   local release_dir="$1"
-  local release_sha="$2"
+  local pin_sha="$2"
   local compose_env="${3:-${release_dir}/.runtime.env}"
-  local pg_ref svc image_ref container_id image_id resolved_id tmp_file dest_file backup_file unsafe_marker had_prev=false
+  local pg_ref svc image_ref container_ids container_id config_image image_id resolved_id tmp_file dest_file backup_file unsafe_marker had_prev=false
   dest_file="${release_dir}/.activated-images"
   unsafe_marker="${release_dir}/.rollback-unsafe"
   [[ -d "${release_dir}" && -n "${COMPOSE_PROJECT_NAME:-}" && -f "${compose_env}" ]] || return 1
@@ -322,10 +345,21 @@ write_activated_images() {
     if [[ "${svc}" == "postgres" ]]; then
       image_ref="${pg_ref}"
     else
-      image_ref="supplier-henkaten-${svc}:${release_sha}"
+      image_ref="supplier-henkaten-${svc}:${pin_sha}"
     fi
-    container_id="$(compose_for "${release_dir}" "${compose_env}" ps -q "${svc}" 2>/dev/null | head -n 1 || true)"
-    if [[ -z "${container_id}" ]]; then
+    container_ids="$(compose_for "${release_dir}" "${compose_env}" ps -q "${svc}" 2>/dev/null || true)"
+    container_id="${container_ids%%$'\n'*}"
+    if [[ -z "${container_id}" || "${container_ids}" == *$'\n'* ]]; then
+      echo "Refusing to pin ${svc}: expected exactly one running container, found '${container_ids//$'\n'/ }'." >&2
+      rm -f -- "${tmp_file}"
+      return 1
+    fi
+    # Release ownership: the container must have been created from this release's exact image reference
+    # (versioned services embed the release SHA), so an interrupted rollout's candidate containers sharing
+    # the Compose project can never be recorded as another release's pins.
+    config_image="$(docker inspect --format '{{.Config.Image}}' "${container_id}" 2>/dev/null || true)"
+    if [[ "${config_image}" != "${image_ref}" ]]; then
+      echo "Refusing to pin ${svc}: running container was created from '${config_image}', expected '${image_ref}' for release ${pin_sha}." >&2
       rm -f -- "${tmp_file}"
       return 1
     fi
@@ -387,7 +421,7 @@ write_activated_images() {
 restore_pinned_images_file() {
   local pinned_file="$1"
   local release_dir="$2"
-  local release_sha="$3"
+  local pin_sha="$3"
   local pg_ref expected_ref ref expected_id restored_id resolved_id extra
   local -a expected_refs parsed_refs parsed_ids
   local seen_refs=" "
@@ -397,10 +431,10 @@ restore_pinned_images_file() {
   pg_ref="$(postgres_image_ref_for "${release_dir}")"
   expected_refs=(
     "${pg_ref}"
-    "supplier-henkaten-api:${release_sha}"
-    "supplier-henkaten-supplier-web:${release_sha}"
-    "supplier-henkaten-tmmin-web:${release_sha}"
-    "supplier-henkaten-caddy:${release_sha}"
+    "supplier-henkaten-api:${pin_sha}"
+    "supplier-henkaten-supplier-web:${pin_sha}"
+    "supplier-henkaten-tmmin-web:${pin_sha}"
+    "supplier-henkaten-caddy:${pin_sha}"
   )
 
   parsed_refs=()

@@ -17,6 +17,9 @@ require_sha "${CURRENT_SHA}"
 [[ -n "${EXPECTED_HOST}" && ! "${EXPECTED_HOST}" =~ [[:space:]] ]] || die "Expected VM host is invalid."
 [[ -f "${BASE_DIR}/current_release" && "$(<"${BASE_DIR}/current_release")" == "${CURRENT_SHA}" ]] || die "The requested current release is not active."
 
+ROLLBACK_DRIVER="$(hardened_rollback_driver_path "${BASE_DIR}")"
+[[ -x "${ROLLBACK_DRIVER}" ]] || die "Hardened shared rollback driver is unavailable; deploy a hardened release first."
+
 PREVIOUS_DIR="${BASE_DIR}/releases/${PREVIOUS_SHA}"
 CURRENT_DIR="${BASE_DIR}/releases/${CURRENT_SHA}"
 [[ -d "${PREVIOUS_DIR}" && -f "${PREVIOUS_DIR}/.runtime.env" ]] || die "Previous release is unavailable."
@@ -53,7 +56,7 @@ DATABASE_IDENTITY="$(database_identity "${CURRENT_DIR}" "${CURRENT_DIR}/.runtime
 [[ "${DATABASE_IDENTITY}" =~ ^[0-9]+$ ]] || die "Could not capture the PostgreSQL cluster identity."
 printf '%s\n' "${CURRENT_SHA}" >"${SENTINEL}"
 
-"${CURRENT_DIR}/deploy/scripts/remote-rollback.sh" staging "${PREVIOUS_SHA}" "${BASE_DIR}"
+"${ROLLBACK_DRIVER}" staging "${PREVIOUS_SHA}" "${BASE_DIR}"
 [[ -f "${SENTINEL}" && "$(<"${SENTINEL}")" == "${CURRENT_SHA}" ]] || die "Photo-volume sentinel was not preserved by rollback."
 load_runtime_env "${PREVIOUS_DIR}/.runtime.env"
 [[ "$(database_identity "${PREVIOUS_DIR}" "${PREVIOUS_DIR}/.runtime.env")" == "${DATABASE_IDENTITY}" ]] || die "PostgreSQL cluster identity changed during rollback."
@@ -77,7 +80,7 @@ fi
 load_runtime_env "${PREVIOUS_DIR}/.runtime.env"
 [[ "$(database_identity "${PREVIOUS_DIR}" "${PREVIOUS_DIR}/.runtime.env")" == "${DATABASE_IDENTITY}" ]] || die "PostgreSQL cluster identity changed during automatic rollback."
 
-"${CURRENT_DIR}/deploy/scripts/remote-rollback.sh" staging "${CURRENT_SHA}" "${BASE_DIR}"
+"${ROLLBACK_DRIVER}" staging "${CURRENT_SHA}" "${BASE_DIR}"
 [[ "$(<"${BASE_DIR}/current_release")" == "${CURRENT_SHA}" ]] || die "Latest release was not restored."
 [[ -f "${SENTINEL}" ]] || die "Photo-volume sentinel was not preserved while restoring the latest release."
 load_runtime_env "${CURRENT_DIR}/.runtime.env"

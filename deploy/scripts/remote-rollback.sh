@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve the physical directory so a concurrently republished shared driver symlink can never
+# mix lib.sh / validate-runtime-env.sh from different driver versions within one run.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=deploy/scripts/lib.sh
 source "${SCRIPT_DIR}/lib.sh"
 
@@ -45,6 +47,10 @@ if [[ -f "${RELEASE_DIR}/.activated-images" ]]; then
   fi
 elif [[ -e "${RELEASE_DIR}/.rollback-unsafe" || -L "${RELEASE_DIR}/.rollback-unsafe" ]]; then
   die "Rollback aborted: release ${REQUESTED_SHA} is marked rollback-unsafe and has no pinned activated image IDs."
+else
+  # Never start a retained release from mutable shared tags (e.g. a PostgreSQL tag rebuilt by a later
+  # candidate) and never record whatever those tags currently resolve to as the release's pins.
+  die "Rollback aborted: release ${REQUESTED_SHA} has no verified .activated-images pins; redeploy that SHA through the pipeline instead."
 fi
 
 printf 'Rolling code back to %s; database schema and shared volumes are not restored.\n' "${REQUESTED_SHA}"
@@ -67,14 +73,7 @@ wait_for_service "${RELEASE_DIR}" "${RUNTIME_ENV}" caddy 120
   "https://${TMMIN_DOMAIN}" \
   "https://${API_DOMAIN}"
 
-if [[ ! -f "${RELEASE_DIR}/.activated-images" ]]; then
-  if ! write_activated_images "${RELEASE_DIR}" "${REQUESTED_SHA}" "${RUNTIME_ENV}"; then
-    compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
-    die "Failed to persist verified .activated-images after rollback for ${REQUESTED_SHA}; stopped application services while preserving PostgreSQL."
-  fi
-else
-  rm -f -- "${RELEASE_DIR}/.rollback-unsafe"
-fi
+rm -f -- "${RELEASE_DIR}/.rollback-unsafe"
 printf '%s\n' "${REQUESTED_SHA}" >"${RELEASE_DIR}/.activated.tmp"
 mv "${RELEASE_DIR}/.activated.tmp" "${RELEASE_DIR}/.activated"
 activate_symlink "${RELEASE_DIR}" "${BASE_DIR}/current"

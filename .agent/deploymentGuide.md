@@ -259,7 +259,7 @@ Untuk membuktikan ordering, merge dua candidate berdekatan. Hasil akhir harus se
 Rollback hanya menghidupkan code/image dan env dari release lama. Ia tidak menjalankan down
 migration, tidak menghapus volume, dan tidak mengembalikan schema/data.
 
-Rollback operator ke SHA yang masih retained (selalu jalankan driver rollback hardened di `shared/deployment-state/rollback-driver` agar validasi `.activated-images` dan `.rollback-unsafe` tetap aktif meski `current` sedang menunjuk ke rilis legacy):
+Rollback operator ke SHA yang masih retained (selalu jalankan driver rollback hardened di `shared/deployment-state/rollback-driver` agar validasi `.activated-images` dan `.rollback-unsafe` tetap aktif meski `current` sedang menunjuk ke rilis legacy). `rollback-driver` adalah symlink ke satu bundle berversi (`rollback-driver.v.*`) berisi `lib.sh`, `validate-runtime-env.sh`, dan `remote-rollback.sh` yang dipublikasikan secara atomik oleh setiap deploy hardened; automatic rollback di `remote-deploy.sh` juga selalu memakai driver ini, tidak pernah script milik rilis target. Driver menolak target tanpa manifest `.activated-images` lima image yang terverifikasi (misalnya rilis legacy lama yang tidak pernah menjadi `current` saat deploy hardened, atau baseline campuran yang ditandai `.rollback-unsafe`); untuk SHA seperti itu, deploy ulang lewat pipeline alih-alih rollback manual:
 
 ```bash
 ssh -p 22 henkaten-deploy@VM_HOST
@@ -275,7 +275,7 @@ Sesudah minimal dua release sukses, rehearsal staging yang confirmation-gated:
   /opt/supplier-henkaten/staging VM_HOST I_ACCEPT_STAGING_INTERRUPTION
 ```
 
-Rehearsal mengganti code ke previous release, menjalankan current release dengan forced smoke
+Rehearsal memakai driver rollback hardened bersama (bukan `current/deploy/scripts/remote-rollback.sh`) untuk kedua langkah rollback manual, dan menolak berjalan bila driver tersebut belum terpasang. Rehearsal mengganti code ke previous release, menjalankan current release dengan forced smoke
 failure, membuktikan automatic rollback, memvalidasi identitas cluster PostgreSQL dan sentinel foto,
 lalu mengembalikan release terbaru. Jalankan hanya dalam maintenance window staging. Mekanisme
 `DEPLOY_FORCE_SMOKE_FAILURE` tetap internal pada controlled direct-VM rehearsal; jangan menambahkan

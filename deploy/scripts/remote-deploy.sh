@@ -80,14 +80,15 @@ load_runtime_env "${RUNTIME_ENV}"
 
 install_hardened_rollback_driver "${RELEASE_DIR}/deploy/scripts" "${BASE_DIR}" || die "Failed to install hardened rollback driver."
 
-postgres_image_ref="$(postgres_image_ref_for "${RELEASE_DIR}")"
 saved_image_refs=()
 saved_image_ids=()
 image_snapshot_complete=true
 if [[ -n "${previous_release}" ]]; then
   previous_dir_for_snapshot="${BASE_DIR}/releases/${previous_release}"
   previous_pinned_images="${previous_dir_for_snapshot}/.activated-images"
-  snapshot_candidates=("${postgres_image_ref}")
+  # Look up the PREVIOUS release's own PostgreSQL reference so a candidate that bumps the postgres tag
+  # still finds (and restores) the previous release's pinned image instead of degrading the snapshot.
+  snapshot_candidates=("$(postgres_image_ref_for "${previous_dir_for_snapshot}")")
   if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
     snapshot_candidates+=(
       "supplier-henkaten-api:${REQUESTED_SHA}"
@@ -207,7 +208,13 @@ if ! candidate_deploy; then
     [[ -f "${previous_dir}/.source.sha" && "$(<"${previous_dir}/.source.sha")" == "${previous_release}" ]] &&
     "${RELEASE_DIR}/deploy/scripts/validate-runtime-env.sh" --allow-legacy-db-role "${previous_env}" >/dev/null &&
     (load_runtime_env "${previous_env}" && [[ "${APP_ENV:-}" == "${REQUESTED_ENV}" && "${RELEASE_SHA:-}" == "${previous_release}" ]]); then
-    if ! DEPLOY_LOCK_HELD=true "${previous_dir}/deploy/scripts/remote-rollback.sh" \
+    # Always recover through the shared hardened driver (installed from this candidate under the
+    # deploy lock) so legacy release scripts that start services from mutable tags are never trusted.
+    hardened_rollback_driver="$(hardened_rollback_driver_path "${BASE_DIR}")"
+    if [[ ! -x "${hardened_rollback_driver}" ]]; then
+      echo "Hardened rollback driver is unavailable; stopping failed candidate application services while preserving PostgreSQL." >&2
+      compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
+    elif ! DEPLOY_LOCK_HELD=true "${hardened_rollback_driver}" \
       "${REQUESTED_ENV}" "${previous_release}" "${BASE_DIR}"; then
       echo "Automatic code rollback also failed; stopping failed candidate application services while preserving PostgreSQL." >&2
       compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true

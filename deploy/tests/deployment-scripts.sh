@@ -298,19 +298,33 @@ if [[ "${1:-}" == "tag" ]]; then
   exit 0
 fi
 if [[ "${1:-}" == "inspect" ]]; then
+  container_name="${!#}"
+  container_base="${container_name%-container}"
+  svc_name="${container_base%%--*}"
+  container_sha="${RELEASE_SHA:-}"
+  if [[ "${container_base}" == *--* ]]; then
+    container_sha="${container_base#*--}"
+  fi
+  if [[ "${svc_name}" == "postgres" ]]; then
+    default_ref="supplier-henkaten-postgres:18.4-pgvector-0.8.5"
+  else
+    default_ref="supplier-henkaten-${svc_name}:${container_sha}"
+  fi
   if [[ "${3:-}" == "{{.Image}}" ]]; then
-    container_name="${!#}"
-    svc_name="${container_name%-container}"
     if [[ -n "${TEST_RUNNING_IMAGES_FILE:-}" && -f "${TEST_RUNNING_IMAGES_FILE}" ]]; then
       awk -v target="${svc_name}" '$1 == target {print $2; exit}' "${TEST_RUNNING_IMAGES_FILE}"
       exit 0
     fi
-    if [[ "${svc_name}" == "postgres" ]]; then
-      get_image_tag "supplier-henkaten-postgres:18.4-pgvector-0.8.5"
-    else
-      get_image_tag "supplier-henkaten-${svc_name}:${RELEASE_SHA:-}"
-    fi
+    get_image_tag "${default_ref}"
     exit $?
+  fi
+  if [[ "${3:-}" == "{{.Config.Image}}" ]]; then
+    config_ref=""
+    if [[ -n "${TEST_RUNNING_IMAGES_FILE:-}" && -f "${TEST_RUNNING_IMAGES_FILE}" ]]; then
+      config_ref="$(awk -v target="${svc_name}" '$1 == target {print $3; exit}' "${TEST_RUNNING_IMAGES_FILE}")"
+    fi
+    printf '%s\n' "${config_ref:-${default_ref}}"
+    exit 0
   fi
   echo healthy
   exit 0
@@ -355,7 +369,7 @@ if [[ "${1:-}" == "compose" ]]; then
           if [[ -n "${TEST_RUNNING_IMAGES_FILE:-}" ]]; then
             tmp_run="${TEST_RUNNING_IMAGES_FILE}.tmp"
             grep -Ev '^postgres ' "${TEST_RUNNING_IMAGES_FILE}" >"${tmp_run}" 2>/dev/null || true
-            printf 'postgres %s\n' "${started_id}" >>"${tmp_run}"
+            printf 'postgres %s supplier-henkaten-postgres:18.4-pgvector-0.8.5\n' "${started_id}" >>"${tmp_run}"
             mv "${tmp_run}" "${TEST_RUNNING_IMAGES_FILE}"
           fi
           ;;
@@ -367,7 +381,7 @@ if [[ "${1:-}" == "compose" ]]; then
           if [[ -n "${TEST_RUNNING_IMAGES_FILE:-}" ]]; then
             tmp_run="${TEST_RUNNING_IMAGES_FILE}.tmp"
             grep -Ev "^${argument} " "${TEST_RUNNING_IMAGES_FILE}" >"${tmp_run}" 2>/dev/null || true
-            printf '%s %s\n' "${argument}" "${started_id}" >>"${tmp_run}"
+            printf '%s %s supplier-henkaten-%s:%s\n' "${argument}" "${started_id}" "${argument}" "${RELEASE_SHA:-}" >>"${tmp_run}"
             mv "${tmp_run}" "${TEST_RUNNING_IMAGES_FILE}"
           fi
           ;;
@@ -375,9 +389,17 @@ if [[ "${1:-}" == "compose" ]]; then
     done
   fi
   previous=""
+  compose_env_file=""
   for argument in "$@"; do
+    if [[ "${previous}" == "--env-file" ]]; then
+      compose_env_file="${argument}"
+    fi
     if [[ "${previous}" == "-q" ]]; then
-      echo "${argument}-container"
+      ps_sha="$(awk -F= '$1 == "RELEASE_SHA" {print $2; exit}' "${compose_env_file}" 2>/dev/null || true)"
+      echo "${argument}--${ps_sha}-container"
+      if [[ "${TEST_PS_DUPLICATE_SERVICE:-}" == "${argument}" ]]; then
+        echo "${argument}--duplicate-container"
+      fi
       exit 0
     fi
     previous="${argument}"
@@ -776,7 +798,7 @@ fi
 # If .rollback-unsafe is a directory, write_activated_images must fail AND preserve the existing .activated-images manifest untouched.
 unsafe_dir_release="${TEST_ROOT}/unsafe-dir-release"
 mkdir -p "${unsafe_dir_release}/.rollback-unsafe"
-cp "${rendered_env}" "${unsafe_dir_release}/.runtime.env"
+sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${retry_sha}/" "${rendered_env}" >"${unsafe_dir_release}/.runtime.env"
 printf 'supplier-henkaten-api:%s sha256:original-pinned-api\n' "${retry_sha}" >"${unsafe_dir_release}/.activated-images"
 if COMPOSE_PROJECT_NAME=supplier-henkaten-staging PATH="${fake_bin}:${PATH}" bash -c '
   set -euo pipefail
@@ -793,7 +815,7 @@ grep -Fxq "supplier-henkaten-api:${retry_sha} sha256:original-pinned-api" "${uns
 # Pre-existing .activated-images.prev directory must NOT break write_activated_images (uses mktemp), AND post-rename rm failure must restore the previous manifest.
 prev_dir_release="${TEST_ROOT}/prev-dir-release"
 mkdir -p "${prev_dir_release}/.activated-images.prev"
-cp "${rendered_env}" "${prev_dir_release}/.runtime.env"
+sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${retry_sha}/" "${rendered_env}" >"${prev_dir_release}/.runtime.env"
 printf 'supplier-henkaten-api:%s sha256:prior-pinned-api\n' "${retry_sha}" >"${prev_dir_release}/.activated-images"
 if ! COMPOSE_PROJECT_NAME=supplier-henkaten-staging RELEASE_SHA="${retry_sha}" PATH="${fake_bin}:${PATH}" bash -c '
   set -euo pipefail
@@ -804,7 +826,7 @@ if ! COMPOSE_PROJECT_NAME=supplier-henkaten-staging RELEASE_SHA="${retry_sha}" P
 fi
 post_rename_release="${TEST_ROOT}/post-rename-restore-release"
 mkdir -p "${post_rename_release}"
-cp "${rendered_env}" "${post_rename_release}/.runtime.env"
+sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${retry_sha}/" "${rendered_env}" >"${post_rename_release}/.runtime.env"
 printf 'supplier-henkaten-api:%s sha256:preserved-before-post-rename-fail\n' "${retry_sha}" >"${post_rename_release}/.activated-images"
 printf 'unsafe\n' >"${post_rename_release}/.rollback-unsafe"
 fail_rm_bin="${TEST_ROOT}/fail-rm-bin"
@@ -862,6 +884,26 @@ TEST_BUILD_TAG_SUFFIX=50 TEST_IMAGE_STATE_FILE="${drift_images}" TEST_RUNNING_IM
 grep -Fxq 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:true-running-legacy-postgres' "${drift_base}/releases/${drift_prev_sha}/.activated-images" || fail "legacy backfill used drifted tag instead of active running postgres container image"
 grep -Fxq 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:candidate-postgres-50' "${drift_base}/releases/${drift_new_sha}/.activated-images" || fail "new release did not record its own running postgres image ID"
 [[ -x "${drift_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" ]] || fail "hardened rollback driver was not installed in shared/deployment-state/rollback-driver"
+# An OLDER retained legacy release (never current during a hardened deploy) has neither pins nor an unsafe
+# marker; the shared driver must refuse it rather than start PostgreSQL from the candidate-rebuilt tag and
+# record that image as the legacy release's pin.
+drift_older_sha=6060606060606060606060606060606060606061
+mkdir -p "${drift_base}/releases/${drift_older_sha}/deploy/scripts"
+sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${drift_older_sha}/" "${legacy_env}" >"${drift_base}/releases/${drift_older_sha}/.runtime.env"
+printf '%s\n' "${drift_older_sha}" >"${drift_base}/releases/${drift_older_sha}/.source.sha"
+printf '#!/usr/bin/env bash\nexit 0\n' >"${drift_base}/releases/${drift_older_sha}/deploy/scripts/smoke-check.sh"
+chmod +x "${drift_base}/releases/${drift_older_sha}/deploy/scripts/smoke-check.sh"
+drift_older_log="${TEST_ROOT}/drift-older-unpinned-rollback.log"
+if TEST_DOCKER_LOG="${drift_older_log}" TEST_IMAGE_STATE_FILE="${drift_images}" TEST_RUNNING_IMAGES_FILE="${drift_running}" \
+  PATH="${fake_bin}:${PATH}" "${drift_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" \
+  staging "${drift_older_sha}" "${drift_base}" >/dev/null 2>&1; then
+  fail "shared rollback driver accepted an older retained release without verified pins"
+fi
+if [[ -f "${drift_older_log}" ]] && grep -Eq '^(STARTED|TAG) ' "${drift_older_log}"; then
+  fail "shared rollback driver started or tagged containers for an unpinned older release"
+fi
+[[ ! -e "${drift_base}/releases/${drift_older_sha}/.activated-images" ]] || fail "shared rollback driver recorded pins for an unpinned older release"
+[[ "$(<"${drift_base}/current_release")" == "${drift_new_sha}" ]] || fail "refused rollback to unpinned older release changed current_release"
 
 # Pre-build cross-SHA abort when NEITHER backfill NOR mark_rollback_unsafe can succeed (unwritable legacy dir).
 unwritable_prev_base="${TEST_ROOT}/unwritable-prev-cross-sha"
@@ -995,6 +1037,9 @@ fi
 [[ ! -f "${migration_base}/unsafe-cross-sha-rollback-called" ]] || fail "cross-SHA failure invoked legacy rollback script despite .rollback-unsafe without pins"
 grep -q ' stop ' "${cross_sha_unsafe_log}" || fail "cross-SHA refusal against unsafe legacy release did not stop failed candidate services"
 
+# Cross-SHA automatic rollback must go through the shared hardened driver (never the legacy target's own
+# remote-rollback.sh, which starts services from mutable tags) and must restart all five pinned image IDs
+# even though the candidate build already re-pointed the shared PostgreSQL tag.
 rollback_base="${TEST_ROOT}/rollback"
 prepare_base "${rollback_base}"
 previous_sha=dddddddddddddddddddddddddddddddddddddddd
@@ -1002,18 +1047,43 @@ mkdir -p "${rollback_base}/releases/${previous_sha}/deploy/scripts"
 sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${previous_sha}/" "${legacy_env}" >"${rollback_base}/releases/${previous_sha}/.runtime.env"
 printf '%s\n' "${previous_sha}" >"${rollback_base}/releases/${previous_sha}/.source.sha"
 printf '%s\n' "${previous_sha}" >"${rollback_base}/current_release"
-cat >"${rollback_base}/releases/${previous_sha}/deploy/scripts/remote-rollback.sh" <<EOF
-#!/usr/bin/env bash
-touch "${rollback_base}/rollback-called"
-exit 0
-EOF
-chmod +x "${rollback_base}/releases/${previous_sha}/deploy/scripts/remote-rollback.sh"
-if DEPLOY_FORCE_SMOKE_FAILURE=true run_candidate "${rollback_base}" eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee 40 >/dev/null 2>&1; then
+printf '#!/usr/bin/env bash\ntouch "%s/legacy-rollback-called"\nexit 0\n' "${rollback_base}" \
+  >"${rollback_base}/releases/${previous_sha}/deploy/scripts/remote-rollback.sh"
+printf '#!/usr/bin/env bash\nexit 0\n' >"${rollback_base}/releases/${previous_sha}/deploy/scripts/smoke-check.sh"
+chmod +x "${rollback_base}/releases/${previous_sha}/deploy/scripts/"*.sh
+rollback_images="${TEST_ROOT}/rollback-images.state"
+{
+  printf 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:legacy-postgres\n'
+  for svc in api supplier-web tmmin-web caddy; do
+    printf 'supplier-henkaten-%s:%s sha256:legacy-%s\n' "${svc}" "${previous_sha}" "${svc}"
+  done
+} >"${rollback_images}"
+rollback_running="${TEST_ROOT}/rollback-running.state"
+{
+  printf 'postgres sha256:legacy-postgres\n'
+  for svc in api supplier-web tmmin-web caddy; do
+    printf '%s sha256:legacy-%s\n' "${svc}" "${svc}"
+  done
+} >"${rollback_running}"
+rollback_log="${TEST_ROOT}/rollback-auto.log"
+if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=40 TEST_DOCKER_LOG="${rollback_log}" \
+  TEST_IMAGE_STATE_FILE="${rollback_images}" TEST_RUNNING_IMAGES_FILE="${rollback_running}" \
+  run_candidate "${rollback_base}" eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee 40 >/dev/null 2>&1; then
   fail "failed candidate returned success after rollback"
 fi
-[[ -f "${rollback_base}/rollback-called" ]] || fail "automatic rollback was not invoked"
+[[ ! -f "${rollback_base}/legacy-rollback-called" ]] || fail "automatic rollback trusted the legacy target's own remote-rollback.sh instead of the shared hardened driver"
+grep -Fxq 'STARTED postgres=sha256:legacy-postgres' "${rollback_log}" || fail "automatic rollback did not restart the pinned legacy postgres image after the build moved the shared tag"
+for svc in api supplier-web tmmin-web caddy; do
+  grep -Fxq "STARTED ${svc}=sha256:legacy-${svc}" "${rollback_log}" || fail "automatic rollback did not restart pinned legacy ${svc} image"
+done
+if grep -q ' stop ' "${rollback_log}"; then
+  fail "successful hardened automatic rollback stopped application services"
+fi
 [[ "$(<"${rollback_base}/current_release")" == "${previous_sha}" ]] || fail "failed candidate changed the active pointer"
+[[ "$(readlink "${rollback_base}/current")" == "${rollback_base}/releases/${previous_sha}" ]] || fail "hardened automatic rollback did not re-point current at the previous release"
 
+# A failing hardened automatic rollback (here: hardened target never proven .activated) must stop the
+# failed candidate application services and never invoke the target's own script.
 rollback_failure_base="${TEST_ROOT}/rollback-failure"
 prepare_base "${rollback_failure_base}"
 rollback_failure_previous=4444444444444444444444444444444444444444
@@ -1021,19 +1091,131 @@ mkdir -p "${rollback_failure_base}/releases/${rollback_failure_previous}/deploy/
 sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${rollback_failure_previous}/" "${rendered_env}" >"${rollback_failure_base}/releases/${rollback_failure_previous}/.runtime.env"
 printf '%s\n' "${rollback_failure_previous}" >"${rollback_failure_base}/releases/${rollback_failure_previous}/.source.sha"
 printf '%s\n' "${rollback_failure_previous}" >"${rollback_failure_base}/current_release"
-cat >"${rollback_failure_base}/releases/${rollback_failure_previous}/deploy/scripts/remote-rollback.sh" <<EOF
-#!/usr/bin/env bash
-touch "${rollback_failure_base}/rollback-failure-called"
-exit 1
-EOF
+printf '#!/usr/bin/env bash\ntouch "%s/rollback-failure-called"\nexit 0\n' "${rollback_failure_base}" \
+  >"${rollback_failure_base}/releases/${rollback_failure_previous}/deploy/scripts/remote-rollback.sh"
 chmod +x "${rollback_failure_base}/releases/${rollback_failure_previous}/deploy/scripts/remote-rollback.sh"
 rollback_failure_log="${TEST_ROOT}/rollback-failure.log"
 if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_DOCKER_LOG="${rollback_failure_log}" run_candidate "${rollback_failure_base}" 5555555555555555555555555555555555555555 41 >/dev/null 2>&1; then
   fail "candidate returned success when automatic rollback failed"
 fi
-[[ -f "${rollback_failure_base}/rollback-failure-called" ]] || fail "failing automatic rollback was not invoked"
-grep -q ' stop ' "${rollback_failure_log}" || fail "failed automatic rollback child left candidate services running"
+[[ ! -f "${rollback_failure_base}/rollback-failure-called" ]] || fail "automatic rollback invoked the target's own remote-rollback.sh"
+grep -q ' stop ' "${rollback_failure_log}" || fail "failed hardened automatic rollback left candidate services running"
 [[ "$(<"${rollback_failure_base}/current_release")" == "${rollback_failure_previous}" ]] || fail "rollback failure changed the previous pointer"
+
+# Backfill must verify release ownership: if an interrupted legacy rollout left a candidate container running
+# while current_release still names the previous SHA, the mixed baseline must NOT be pinned; the previous
+# release must instead be durably marked .rollback-unsafe before build.
+mixed_base="${TEST_ROOT}/mixed-baseline"
+prepare_base "${mixed_base}"
+mixed_prev=7171717171717171717171717171717171717171
+mixed_stray=7272727272727272727272727272727272727272
+mkdir -p "${mixed_base}/releases/${mixed_prev}/deploy/scripts"
+sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${mixed_prev}/" "${legacy_env}" >"${mixed_base}/releases/${mixed_prev}/.runtime.env"
+printf '%s\n' "${mixed_prev}" >"${mixed_base}/releases/${mixed_prev}/.source.sha"
+printf '%s\n' "${mixed_prev}" >"${mixed_base}/current_release"
+mixed_running="${TEST_ROOT}/mixed-running.state"
+{
+  printf 'postgres sha256:legacy-postgres supplier-henkaten-postgres:18.4-pgvector-0.8.5\n'
+  printf 'api sha256:stray-candidate-api supplier-henkaten-api:%s\n' "${mixed_stray}"
+  for svc in supplier-web tmmin-web caddy; do
+    printf '%s sha256:legacy-%s supplier-henkaten-%s:%s\n' "${svc}" "${svc}" "${svc}" "${mixed_prev}"
+  done
+} >"${mixed_running}"
+mixed_log="${TEST_ROOT}/mixed-baseline.log"
+if TEST_BUILD_FAIL=true TEST_RUNNING_IMAGES_FILE="${mixed_running}" TEST_DOCKER_LOG="${mixed_log}" \
+  TEST_BUILD_ASSERT_EXISTS="${mixed_base}/releases/${mixed_prev}/.rollback-unsafe" \
+  run_candidate "${mixed_base}" 7373737373737373737373737373737373737373 10 >/dev/null 2>&1; then
+  fail "candidate build failure unexpectedly succeeded in mixed-baseline test"
+fi
+[[ ! -e "${mixed_base}/releases/${mixed_prev}/.activated-images" ]] || fail "backfill pinned a mixed baseline containing another release's container"
+[[ -f "${mixed_base}/releases/${mixed_prev}/.rollback-unsafe" ]] || fail "mixed baseline was not durably marked .rollback-unsafe"
+grep -q ' build ' "${mixed_log}" || fail "mixed-baseline test never reached the build step"
+if grep -q '^BUILD_PRECONDITION_MISSING ' "${mixed_log}"; then
+  fail "mixed baseline .rollback-unsafe marker was not written before build"
+fi
+# Multiple running containers for one service are an unverifiable baseline.
+dup_release="${TEST_ROOT}/dup-container-release"
+mkdir -p "${dup_release}"
+sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${retry_sha}/" "${rendered_env}" >"${dup_release}/.runtime.env"
+if TEST_PS_DUPLICATE_SERVICE=api COMPOSE_PROJECT_NAME=supplier-henkaten-staging PATH="${fake_bin}:${PATH}" bash -c '
+  set -euo pipefail
+  source "$1"
+  if write_activated_images "$2" "$3" "$2/.runtime.env"; then
+    exit 0
+  fi
+  exit 1
+' _ "${SCRIPTS}/lib.sh" "${dup_release}" "${retry_sha}" >/dev/null 2>&1; then
+  fail "write_activated_images pinned a service with more than one running container"
+fi
+[[ ! -e "${dup_release}/.activated-images" ]] || fail "duplicate-container failure published .activated-images"
+# Control: the same fixture without the duplicate succeeds, so the refusal above is attributable to it.
+COMPOSE_PROJECT_NAME=supplier-henkaten-staging PATH="${fake_bin}:${PATH}" bash -c '
+  set -euo pipefail
+  source "$1"
+  write_activated_images "$2" "$3" "$2/.runtime.env"
+' _ "${SCRIPTS}/lib.sh" "${dup_release}" "${retry_sha}" >/dev/null 2>&1 || fail "write_activated_images control case without duplicate container failed"
+
+# The rollback driver is published as one versioned bundle behind an atomically swapped symlink; a failed
+# install keeps the previous bundle intact, and a pre-versioning real directory is migrated.
+driver_base="${TEST_ROOT}/driver-bundle"
+prepare_base "${driver_base}"
+mkdir -p "${driver_base}/shared/deployment-state/rollback-driver"
+printf 'old\n' >"${driver_base}/shared/deployment-state/rollback-driver/remote-rollback.sh"
+install_driver() {
+  PATH="${fake_bin}:${PATH}" bash -c 'set -euo pipefail; source "$1"; install_hardened_rollback_driver "$2" "$3"' \
+    _ "${SCRIPTS}/lib.sh" "$1" "$2"
+}
+install_driver "${SCRIPTS}" "${driver_base}" || fail "hardened rollback driver install failed"
+driver_link="${driver_base}/shared/deployment-state/rollback-driver"
+[[ -L "${driver_link}" ]] || fail "rollback driver was not published behind a symlink"
+first_driver_target="$(readlink "${driver_link}")"
+for script_name in lib.sh validate-runtime-env.sh remote-rollback.sh; do
+  cmp -s "${SCRIPTS}/${script_name}" "${driver_link}/${script_name}" || fail "published rollback driver bundle is missing or stale: ${script_name}"
+done
+broken_source="${TEST_ROOT}/broken-driver-source"
+mkdir -p "${broken_source}"
+cp "${SCRIPTS}/lib.sh" "${SCRIPTS}/validate-runtime-env.sh" "${broken_source}/"
+if install_driver "${broken_source}" "${driver_base}" >/dev/null 2>&1; then
+  fail "rollback driver install succeeded with an incomplete source bundle"
+fi
+[[ "$(readlink "${driver_link}")" == "${first_driver_target}" ]] || fail "failed rollback driver install changed the published bundle"
+cp "${SCRIPTS}/remote-rollback.sh" "${broken_source}/remote-rollback.sh"
+printf 'if then\n' >>"${broken_source}/remote-rollback.sh"
+if install_driver "${broken_source}" "${driver_base}" >/dev/null 2>&1; then
+  fail "rollback driver install published a syntactically invalid script"
+fi
+[[ "$(readlink "${driver_link}")" == "${first_driver_target}" ]] || fail "syntactically invalid rollback driver install changed the published bundle"
+install_driver "${SCRIPTS}" "${driver_base}" || fail "second hardened rollback driver install failed"
+[[ "$(readlink "${driver_link}")" != "${first_driver_target}" ]] || fail "second rollback driver install did not publish a new bundle"
+[[ "$(find "${driver_base}/shared/deployment-state" -mindepth 1 -maxdepth 1 -name 'rollback-driver.*' | wc -l | tr -d ' ')" == "1" ]] || fail "superseded rollback driver bundles were not pruned"
+
+# A candidate that bumps the postgres tag must still snapshot/restore the PREVIOUS release's own pinned
+# postgres reference (not the candidate's) so automatic recovery is not needlessly refused.
+pgbump_base="${TEST_ROOT}/pg-tag-bump"
+prepare_base "${pgbump_base}"
+pgbump_prev=7474747474747474747474747474747474747474
+pgbump_old_ref=supplier-henkaten-postgres:17.9-pgvector-0.8.0
+mkdir -p "${pgbump_base}/releases/${pgbump_prev}/deploy/scripts" "${pgbump_base}/releases/${pgbump_prev}/deploy/compose"
+sed "s#^\([[:space:]]*image:[[:space:]]*\)supplier-henkaten-postgres:.*#\1${pgbump_old_ref}#" "${COMPOSE_FILE}" \
+  >"${pgbump_base}/releases/${pgbump_prev}/deploy/compose/docker-compose.remote.yml"
+sed "s/^RELEASE_SHA=.*/RELEASE_SHA=${pgbump_prev}/" "${legacy_env}" >"${pgbump_base}/releases/${pgbump_prev}/.runtime.env"
+printf '%s\n' "${pgbump_prev}" >"${pgbump_base}/releases/${pgbump_prev}/.source.sha"
+printf '%s\n' "${pgbump_prev}" >"${pgbump_base}/current_release"
+{
+  printf '%s sha256:old-postgres\n' "${pgbump_old_ref}"
+  for svc in api supplier-web tmmin-web caddy; do
+    printf 'supplier-henkaten-%s:%s sha256:old-%s\n' "${svc}" "${pgbump_prev}" "${svc}"
+  done
+} >"${pgbump_base}/releases/${pgbump_prev}/.activated-images"
+pgbump_images="${TEST_ROOT}/pg-tag-bump-images.state"
+cp "${pgbump_base}/releases/${pgbump_prev}/.activated-images" "${pgbump_images}"
+pgbump_log="${TEST_ROOT}/pg-tag-bump.log"
+if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_BUILD_TAG_SUFFIX=60 TEST_DOCKER_LOG="${pgbump_log}" TEST_IMAGE_STATE_FILE="${pgbump_images}" \
+  run_candidate "${pgbump_base}" 7575757575757575757575757575757575757575 60 >/dev/null 2>&1; then
+  fail "pg-tag-bump candidate with forced smoke failure unexpectedly succeeded"
+fi
+grep -Fxq "TAG sha256:old-postgres ${pgbump_old_ref}" "${pgbump_log}" || fail "previous release's own postgres pin was not restored when the candidate bumped the postgres tag"
+[[ ! -e "${pgbump_base}/releases/${pgbump_prev}/.rollback-unsafe" ]] || fail "postgres tag bump degraded the previous release's snapshot to rollback-unsafe"
 
 lock_base="${TEST_ROOT}/lock"
 prepare_base "${lock_base}"
