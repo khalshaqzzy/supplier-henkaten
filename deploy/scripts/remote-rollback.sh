@@ -32,16 +32,18 @@ fi
 if [[ "${is_hardened_release}" == "true" && ! -f "${RELEASE_DIR}/.activated" ]]; then
   die "Rollback aborted: release ${REQUESTED_SHA} was never activated."
 fi
-if [[ -e "${RELEASE_DIR}/.activated-images" && ( ! -f "${RELEASE_DIR}/.activated-images" || -L "${RELEASE_DIR}/.activated-images" ) ]]; then
+if [[ -L "${RELEASE_DIR}/.activated-images" || ( -e "${RELEASE_DIR}/.activated-images" && ! -f "${RELEASE_DIR}/.activated-images" ) ]]; then
   die "Rollback aborted: ${RELEASE_DIR}/.activated-images is not a regular file."
+fi
+if [[ -L "${RELEASE_DIR}/.rollback-unsafe" || ( -e "${RELEASE_DIR}/.rollback-unsafe" && ! -f "${RELEASE_DIR}/.rollback-unsafe" ) ]]; then
+  die "Rollback aborted: ${RELEASE_DIR}/.rollback-unsafe is not a regular file."
 fi
 if [[ -f "${RELEASE_DIR}/.activated-images" ]]; then
   if ! restore_pinned_images_file "${RELEASE_DIR}/.activated-images" "${RELEASE_DIR}" "${REQUESTED_SHA}"; then
-    printf '%s\n' "${REQUESTED_SHA}" >"${RELEASE_DIR}/.rollback-unsafe.tmp"
-    mv -f "${RELEASE_DIR}/.rollback-unsafe.tmp" "${RELEASE_DIR}/.rollback-unsafe"
+    mark_rollback_unsafe "${RELEASE_DIR}" "${REQUESTED_SHA}" || echo "Warning: failed to persist .rollback-unsafe marker for ${REQUESTED_SHA}." >&2
     die "Rollback aborted: failed to restore and verify pinned activated images for ${REQUESTED_SHA}."
   fi
-elif [[ -f "${RELEASE_DIR}/.rollback-unsafe" ]]; then
+elif [[ -e "${RELEASE_DIR}/.rollback-unsafe" || -L "${RELEASE_DIR}/.rollback-unsafe" ]]; then
   die "Rollback aborted: release ${REQUESTED_SHA} is marked rollback-unsafe and has no pinned activated image IDs."
 fi
 

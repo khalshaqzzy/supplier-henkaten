@@ -239,17 +239,48 @@ postgres_image_ref_for() {
   printf '%s\n' "${ref:-supplier-henkaten-postgres:18.4-pgvector-0.8.5}"
 }
 
+mark_rollback_unsafe() {
+  local release_dir="$1"
+  local reason_sha="$2"
+  local dest_file="${release_dir}/.rollback-unsafe"
+  local tmp_file="${release_dir}/.rollback-unsafe.tmp"
+  [[ -d "${release_dir}" ]] || return 1
+  if [[ -L "${dest_file}" || ( -e "${dest_file}" && ! -f "${dest_file}" ) ]]; then
+    echo "Refusing to overwrite non-regular rollback-unsafe marker at ${dest_file}." >&2
+    return 1
+  fi
+  printf '%s\n' "${reason_sha}" >"${tmp_file}" || return 1
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    if [[ -d "${dest_file}" || -L "${dest_file}" ]] || ! mv -f "${tmp_file}" "${dest_file}"; then
+      rm -f -- "${tmp_file}"
+      return 1
+    fi
+  else
+    if ! mv -Tf "${tmp_file}" "${dest_file}"; then
+      rm -f -- "${tmp_file}"
+      return 1
+    fi
+  fi
+  [[ -f "${dest_file}" && ! -L "${dest_file}" ]] || return 1
+}
+
 write_activated_images() {
   local release_dir="$1"
   local release_sha="$2"
-  local pg_ref image_ref image_id tmp_file dest_file
+  local pg_ref image_ref image_id tmp_file dest_file backup_file unsafe_marker had_prev=false
   dest_file="${release_dir}/.activated-images"
-  if [[ -e "${dest_file}" && ( ! -f "${dest_file}" || -L "${dest_file}" ) ]]; then
+  unsafe_marker="${release_dir}/.rollback-unsafe"
+  if [[ -L "${dest_file}" || ( -e "${dest_file}" && ! -f "${dest_file}" ) ]]; then
     echo "Refusing to publish pinned image manifest: ${dest_file} is not a regular file." >&2
+    return 1
+  fi
+  if [[ -L "${unsafe_marker}" || ( -e "${unsafe_marker}" && ! -f "${unsafe_marker}" ) ]]; then
+    echo "Refusing to publish pinned image manifest: ${unsafe_marker} is not a regular file." >&2
     return 1
   fi
   pg_ref="$(postgres_image_ref_for "${release_dir}")"
   tmp_file="${release_dir}/.activated-images.tmp"
+  backup_file="${release_dir}/.activated-images.prev"
   : >"${tmp_file}" || return 1
   chmod 600 "${tmp_file}" || {
     rm -f -- "${tmp_file}"
@@ -271,21 +302,37 @@ write_activated_images() {
       return 1
     }
   done
+  if [[ -f "${dest_file}" && ! -L "${dest_file}" ]]; then
+    cp -p "${dest_file}" "${backup_file}" || {
+      rm -f -- "${tmp_file}" "${backup_file}"
+      return 1
+    }
+    had_prev=true
+  fi
   if [[ "$(uname -s)" == "Darwin" ]]; then
     if [[ -d "${dest_file}" || -L "${dest_file}" ]] || ! mv -f "${tmp_file}" "${dest_file}"; then
-      rm -f -- "${tmp_file}"
+      rm -f -- "${tmp_file}" "${backup_file}"
       return 1
     fi
   else
     if ! mv -Tf "${tmp_file}" "${dest_file}"; then
-      rm -f -- "${tmp_file}"
+      rm -f -- "${tmp_file}" "${backup_file}"
       return 1
     fi
   fi
-  if [[ ! -f "${dest_file}" || -L "${dest_file}" ]]; then
+  if [[ ! -f "${dest_file}" || -L "${dest_file}" ]] || ! rm -f -- "${unsafe_marker}" || [[ -e "${unsafe_marker}" || -L "${unsafe_marker}" ]]; then
+    if [[ "${had_prev}" == "true" ]]; then
+      if [[ "$(uname -s)" == "Darwin" ]]; then
+        mv -f "${backup_file}" "${dest_file}" >/dev/null 2>&1 || true
+      else
+        mv -Tf "${backup_file}" "${dest_file}" >/dev/null 2>&1 || true
+      fi
+    else
+      rm -f -- "${dest_file}" >/dev/null 2>&1 || true
+    fi
     return 1
   fi
-  rm -f -- "${release_dir}/.rollback-unsafe"
+  rm -f -- "${backup_file}"
 }
 
 restore_pinned_images_file() {

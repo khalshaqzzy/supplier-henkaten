@@ -94,7 +94,16 @@ if [[ -n "${previous_release}" ]]; then
       "supplier-henkaten-caddy:${REQUESTED_SHA}"
     )
   fi
-  if [[ -f "${previous_pinned_images}" ]]; then
+  if [[ ! -f "${previous_pinned_images}" && ! -e "${previous_dir_for_snapshot}/.rollback-unsafe" && ! -L "${previous_dir_for_snapshot}/.rollback-unsafe" && -d "${previous_dir_for_snapshot}" ]]; then
+    if ! write_activated_images "${previous_dir_for_snapshot}" "${previous_release}"; then
+      if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
+        die "Cannot safely redeploy active release ${REQUESTED_SHA}: unable to persist pre-build baseline pins in .activated-images."
+      fi
+      image_snapshot_complete=false
+      mark_rollback_unsafe "${previous_dir_for_snapshot}" "${previous_release}" || echo "Warning: failed to persist .rollback-unsafe marker for ${previous_release} before build." >&2
+    fi
+  fi
+  if [[ -f "${previous_pinned_images}" && ! -L "${previous_pinned_images}" ]]; then
     for image_ref in "${snapshot_candidates[@]}"; do
       pinned_id="$(awk -v target="${image_ref}" '$1 == target {print $2; exit}' "${previous_pinned_images}" 2>/dev/null || true)"
       if [[ -z "${pinned_id}" ]]; then
@@ -118,27 +127,11 @@ if [[ -n "${previous_release}" ]]; then
       saved_image_ids+=("${pinned_id}")
     done
   else
-    if [[ -f "${previous_dir_for_snapshot}/.rollback-unsafe" ]]; then
-      if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
-        die "Cannot safely redeploy active release ${REQUESTED_SHA}: release is marked rollback-unsafe without pinned .activated-images."
-      fi
-      image_snapshot_complete=false
-      echo "Warning: previous release ${previous_release} is marked rollback-unsafe without pinned .activated-images." >&2
-    else
-      for image_ref in "${snapshot_candidates[@]}"; do
-        image_id="$(docker image inspect --format '{{.Id}}' "${image_ref}" 2>/dev/null || true)"
-        if [[ -z "${image_id}" ]]; then
-          if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
-            die "Cannot safely redeploy active release ${REQUESTED_SHA}: missing local Docker image ID for ${image_ref}."
-          fi
-          image_snapshot_complete=false
-          echo "Warning: unable to snapshot existing Docker image ID for ${image_ref} before build." >&2
-        else
-          saved_image_refs+=("${image_ref}")
-          saved_image_ids+=("${image_id}")
-        fi
-      done
+    if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
+      die "Cannot safely redeploy active release ${REQUESTED_SHA}: release lacks verified .activated-images or is marked rollback-unsafe."
     fi
+    image_snapshot_complete=false
+    echo "Warning: previous release ${previous_release} lacks verified .activated-images before build." >&2
   fi
 fi
 
@@ -195,15 +188,14 @@ if ! candidate_deploy; then
   fi
   if [[ "${images_restored}" != "true" || "${image_snapshot_complete}" != "true" ]]; then
     if [[ -n "${previous_release}" && -d "${previous_dir}" ]]; then
-      printf '%s\n' "${REQUESTED_SHA}" >"${previous_dir}/.rollback-unsafe.tmp"
-      mv -f "${previous_dir}/.rollback-unsafe.tmp" "${previous_dir}/.rollback-unsafe"
+      mark_rollback_unsafe "${previous_dir}" "${REQUESTED_SHA}" || echo "Warning: failed to persist .rollback-unsafe marker for ${previous_release}." >&2
     fi
   fi
   if [[ -n "${previous_release}" && "${services_mutated}" == "false" ]]; then
     echo "Failure occurred before modifying running services; active release ${previous_release} was preserved untouched." >&2
     exit 1
   fi
-  if [[ -n "${previous_release}" && ( "${images_restored}" != "true" || "${image_snapshot_complete}" != "true" || ( -f "${previous_dir}/.rollback-unsafe" && ! -f "${previous_dir}/.activated-images" ) ) ]]; then
+  if [[ -n "${previous_release}" && ( "${images_restored}" != "true" || "${image_snapshot_complete}" != "true" || ( ( -e "${previous_dir}/.rollback-unsafe" || -L "${previous_dir}/.rollback-unsafe" ) && ! -f "${previous_dir}/.activated-images" ) ) ]]; then
     compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
     echo "Refusing automatic rollback because pre-build Docker image tags could not be verified as restored or target release ${previous_release} is marked rollback-unsafe; failed application services were stopped while persistent PostgreSQL was preserved." >&2
     exit 1
