@@ -1,0 +1,70 @@
+# ADR 0057: High-Severity Security Hardening, Realtime SSE Isolation and Least-Privilege Runtime Database Role
+
+- Status: Accepted
+- Date: 2026-11-26
+
+## Context
+
+A comprehensive security review of the application, realtime streaming, audit boundaries, deployment scripts, and hosted container topology identified seven high-severity security weaknesses requiring immediate remediation without disrupting live deployments or rollback continuity:
+
+1. **TMMIN Internal Part Number leakage (H-01):** Shared Henkaten list and detail handlers exposed `parts[].internalNumber` and searched `internalPartNumberSnapshot` unconditionally on TMMIN endpoints, and `HENKATEN_EXPORT_REQUESTED` audit rows persisted raw `filters.part` strings readable by TMMIN roles.
+2. **Cross-realm audit disclosure to Supplier roles (H-02):** `supplierAudit` and `supplierDashboard.recentActivity` filtered only by `supplierId`, allowing `SUPPLIER_ADMIN` and `QC` accounts to read TMMIN-authored audit events (including `HENKATEN_DELETED` reasons, magic-link impersonation events, TMMIN read logs, `EXTERNAL_CLIENT` records, and TMMIN-only `NOTIFICATION_GENERATED` system rows) and resolve TMMIN user display names.
+3. **Supplier SSE event allowlist and wire-schema alignment (H-03):** `RealtimeEventPump` and `RealtimeService` forwarded non-supplier outbox events (`PCR_REVIEW_REQUIRED`, `EXTERNAL_*`, `MEMBER_PHOTO_CLEANUP_REQUESTED`, and external PCR aggregates) to supplier streams, omitted `payload.lineId` on multiple line-scoped producers, exposed TMMIN `HenkatenDeletionCommand` IDs, and serialized `lineId` onto wire messages rejected by the strict client `realtimeInvalidationSchema`.
+4. **Unbounded `dashboardTrend` bucket allocation (H-04):** `tmminDashboardQuerySchema` accepted arbitrary date spans and `dashboardTrend()` iterated across every interval synchronously (while taking `records.at(-1)` on unordered queries), enabling CPU/OOM exhaustion.
+5. **Unbounded concurrent SSE streams and DB query amplification (H-05):** `GET /api/v1/supplier/realtime` imposed no concurrent stream limits, held open heartbeat streams for unknown `lineId` parameters, and executed 4–8 SQL queries per emitted message (including up to 500 replayed events per reconnect) against a bounded PostgreSQL pool.
+6. **Shell evaluation during `.env` validation and loading (H-06):** `deploy/scripts/lib.sh:load_runtime_env()` invoked Bash `source` on unvalidated `.env` files before validation, and `render-runtime-env.sh` accepted unvalidated `PRODUCTION_*_DOMAIN` hostnames.
+7. **Superuser runtime PostgreSQL connection (H-07):** The internet-facing `api` container shared the `POSTGRES_USER` bootstrap superuser role with `migrate`, permitting a compromised API runtime to disable audit-immutability triggers or run privileged SQL.
+
+An eighth organizational item—separating staging/production SSH keys and adding a manual production GitHub Environment approval gate (H-08)—is explicitly deferred to a separate infrastructure governance task.
+
+## Decision
+
+1. **Realm-scoped Internal Part Number enforcement with staged Release 1 wire compatibility (H-01):**
+   - `HenkatenService.list()` and `.get()` derive `includeInternal = principal?.realm === 'SUPPLIER'` (fail-closed `false` for TMMIN), blocking both `henkatenPartSearch` on internal numbers and output disclosure while preserving all supplier read, write, and export (`presentHenkatenParts(row, supplierView)`) paths.
+   - TMMIN hosted Henkaten list/detail responses emit `internalNumber: null` in Release 1 alongside dedicated `tmminHenkatenPartSchema` (`internalNumber: z.null().optional()`), `tmminHostedHenkatenPageSchema`, and `tmminHostedHenkatenDetailSchema` contracts. Keeping the key as `null` in Release 1 prevents transient strict-Zod parse errors on already-open `tmmin-web` tabs while `api` updates ahead of `tmmin-web`; omitting the key entirely can proceed in a follow-up contract release once old bundles cycle out.
+   - `HenkatenExportService.create()` omits raw `filters.part` from `AuditEvent.changeSummary` and records `partFiltered: Boolean(part)`. `redactAuditSummary()` recursively sanitizes nested objects/arrays (failing closed at recursion depth 8 with `'[REDACTED]'`), strips historical `HENKATEN_EXPORT_REQUESTED` `filters.part` values for TMMIN reads, and replaces `tmminOperatorId`/`operatorUserId` with `impersonated: true` on Supplier audit reads. Impersonated TMMIN support sessions operating inside the `SUPPLIER` realm intentionally retain Supplier Admin view semantics per existing support-access rules.
+
+2. **Fail-closed Supplier audit and dashboard isolation (H-02):**
+   - Both `supplierAudit()` and `supplierDashboard()` apply a shared `supplierVisibleAuditWhere(supplierId)` predicate before pagination/`take: 20`: `sourceMode` must be null or `HOSTED`; `USER` events require a supplier role and matching `actorSupplierId` (when populated); `SYSTEM` events require an explicit allowlist of supplier-visible actions (`SHIFT_TIMES_ROTATED`, `HENKATEN_CANCELLED`, `HENKATEN_OPENED`, `USER_CREATED`, `SHIFT_ENDED`, `LINE_SHIFT_CONFLICT_CLEARED`) and non-external/non-TMMIN resource types; and TMMIN/External action prefixes and names are excluded as defense in depth.
+   - `supplierDashboard()` restricts actor display-name lookup to `realm: 'SUPPLIER'` and `supplierId: scope.supplierId`.
+
+3. **Allowlisted Supplier SSE, server-side line routing and monotonic replay handoff (H-03 & H-05):**
+   - `RealtimeEventPump.poll()`, `RealtimeService.replay()`, and `RealtimeService.inScope()` enforce a shared allowlist (`SUPPLIER_SSE_LINE_SCOPED_EVENTS` and `SUPPLIER_SSE_TENANT_WIDE_EVENTS`) and block `ExternalHenkatenProjection` and `ExternalApiClient` aggregates.
+   - Line-scoped outbox producers (`WARNING_OPENED`, `HENKATEN_APPROVAL_RECORDED`, `OperationalFinalizationService.closeTerminalEffects` across withdraw/decide/shift-end, `ManMovementService`, and hosted `PcrService`) populate `payload.lineId` (and `sourceLineId` for cross-line `MP_MOVED`).
+   - Routing metadata (`lineId`/`sourceLineId`) stays strictly server-side and is omitted from wire `StreamMessage.data` so events match the strict `realtimeInvalidationSchema`. `HENKATEN_DATA_DELETED` rewrites wire metadata to `aggregateType: 'Supplier'` and `aggregateId: supplierId`.
+   - `replay()` validates `Last-Event-ID` as UUID before querying, filters suppressed/non-allowlisted/out-of-scope cursors and replay rows before counting `REPLAY_LIMIT`, and buffers live pump events before replay starts so events at or below the replay high-water mark are suppressed.
+   - `SupplierReadModelController.realtimeEvents()` validates `lineId` (`404`) and acquires per-process connection slots (`SSE_MAX_PER_SESSION=6`, `SSE_MAX_PER_USER=12`, `SSE_MAX_PER_SUPPLIER=60`, `SSE_MAX_GLOBAL=300`) **before** SSE headers commit. Slot release is bound idempotently to `response.once('close', release)` and RxJS teardown (never `request.once('close')`, which fires prematurely on Node 22 when `express.json()` drains zero-length bodies). Per-session overflow evicts the oldest stream with a 30–60 s jittered `retry` hint before checking user/supplier/global `429` limits; `packages/api-client/src/realtime.ts` adds bounded exponential-backoff reconnect when `EventSource` enters `CLOSED`. Session and line-scope checks run once per replay batch, on an independent 15 s cache-bypassing heartbeat, and through a monotonic-epoch coalesced micro-cache (`SSE_REVALIDATION_CACHE_MS=2000`) on live bursts; pending live events are bounded (256 items / 512 KiB writer buffer) and collapse to wire-compatible `CURSOR_UNAVAILABLE` resyncs.
+
+4. **Inclusive UTC bucket ceilings on `dashboardTrend` (H-04):**
+   - Shared UTC bucket helpers (`packages/contracts/src/tmmin.ts`) normalize years cleanly with `setUTCFullYear` and enforce inclusive ceilings with timezone slack (`DAY=370`, `WEEK=265`, `MONTH=122`) on two-sided and single-ended queries in `tmminDashboardQuerySchema`, rejecting raw `from > to`, pre-1970, and post-2100 timestamps.
+   - `dashboardTrend()` computes the true `max(occurredAt)` on unordered records, returns `[]` on raw inverted ranges, clamps wide derived spans forward to the most recent `N` buckets, and enforces a hard loop ceiling.
+
+5. **Non-evaluating closed-allowlist `.env` loader and strict FQDN validation (H-06):**
+   - `deploy/scripts/lib.sh:load_runtime_env()` replaces `source` with a two-pass non-evaluating Bash parser backed by a closed allowlist of known runtime environment keys (rejecting CRLF, duplicates, unknown keys such as `PATH`/`BASH_ENV`, and shell metacharacters before resetting prior allowlisted variables and assigning via `printf -v` + `export`).
+   - Strict RFC-1123 FQDN validation (`validate_fqdn`) applies in both `render-runtime-env.sh` and `validate-runtime-env.sh`.
+   - `remote-deploy.sh` validates existing-SHA `.runtime.env` files before Compose and pre-validates the previous release's `.runtime.env` with the hardened loader before invoking automatic rollback.
+
+6. **Staged zero-touch least-privilege PostgreSQL runtime role (H-07):**
+   - `apps/api/src/cli/migrate.ts` provides a distroless Node entrypoint invoked by the existing `migrate` Compose service (preserving the 7-service topology). After `prisma migrate deploy`, it idempotently creates or reconciles `POSTGRES_APP_USER` (`LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS`) using a Node-computed SCRAM-SHA-256 verifier passed via `set_config` so plaintext passwords never enter SQL statements or PostgreSQL logs.
+   - Effective privileges are verified and reconciled on every deploy: zero owned objects and zero role memberships; `REVOKE` on `PUBLIC` and table-level privileges before granting `SELECT, INSERT, UPDATE, DELETE` on mutable app tables, `SELECT` only on `_prisma_migrations` (for `/ready`), `SELECT, INSERT, UPDATE ("hiddenAt")` on `AuditEvent` and `ExternalIngestionEvent`, no `DELETE`/`TRUNCATE` on `Henkaten` and `ExternalHenkatenProjection`, and `SELECT, INSERT` only on immutable append-only ledger tables, followed by a live `pg.Client` non-superuser login check.
+   - `docker-compose.remote.yml` passes only `POSTGRES_APP_USER`/`POSTGRES_APP_PASSWORD` into `api` and `bootstrap-admin` (never `POSTGRES_PASSWORD`).
+   - **Staged zero-touch provisioning:** `deploy-reusable.yml` forwards optional `POSTGRES_APP_USER` and `POSTGRES_APP_PASSWORD` secrets; when `POSTGRES_APP_PASSWORD` is unset, `render-runtime-env.sh` derives a one-way 64-hex `HMAC-SHA256` credential via `python3`/`node` reading `POSTGRES_PASSWORD` from the environment (never CLI arguments) so existing staging and production environments upgrade seamlessly without manual pre-steps, while allowing independent secret adoption at any time.
+
+## Rationale and Alternatives Considered
+
+- **Immediate removal vs. staged `internalNumber: null` (H-01):** Dropping the JSON key immediately breaks polling on open `tmmin-web` tabs during single-host deploy where `api` updates before `tmmin-web`. Emitting `null` closes the privacy leak immediately while maintaining zero-error forward rollout.
+- **Hard-requiring `POSTGRES_APP_PASSWORD` vs. staged zero-touch (H-07):** Requiring a brand-new secret immediately would halt automated staging/production deploys until manual secret creation. One-way HMAC derivation keeps `POSTGRES_PASSWORD` completely absent from `api` containers immediately while preserving an effortless upgrade path to an independent secret.
+- **Separate Compose provisioning service vs. unified `migrate` CLI (H-07):** Keeping provisioning inside `migrate` preserves the verified 7-service Compose contract and ensures grants are always reconciled atomically right after schema migrations.
+
+## Consequences and Rollback Continuity
+
+- **Database schema:** Zero Prisma schema or SQL migration changes are required; existing 27 migrations remain unchanged and fully compatible.
+- **Emergency rollback:** Legacy `POSTGRES_USER` and `POSTGRES_PASSWORD` remain intact on PostgreSQL, so `remote-rollback.sh` to `db60208` remains functional as an emergency availability fallback (noting that rolling back to `db60208` temporarily resumes superuser API access and pre-fix behavior until a hardened rollback target is established). Once two hardened releases exist, rollback between hardened releases keeps least-privilege isolation intact provided `POSTGRES_APP_PASSWORD` is not rotated mid-rollback window.
+- **Single-instance deploy window:** Container replacement still incurs the existing brief reconnect window during `api` swap; SSE client backoff ensures unattended displays reconnect automatically.
+- **Deferred work:** Staging/production SSH key & secret separation and production manual approval gates (H-08) remain explicitly deferred for dedicated ops/governance execution.
+
+## Validation Plan
+
+- Unit tests: `dashboard-trend.spec.ts` (H-04 bounds/clamping/unordered max), `realtime.service.spec.ts` (H-03 allowlist, wire schema, `MP_MOVED`, `HENKATEN_DATA_DELETED`, non-UUID cursor; H-05 404/eviction/429/`response.close` release), `migrate.spec.ts` (H-07 SCRAM-SHA-256 & credential validation), plus full workspace unit suites.
+- Integration tests against Docker PostgreSQL: `audit-security.integration.spec.ts` verifying H-01 (TMMIN list/detail/search/historical export audit redaction), H-02 (Supplier audit & dashboard cross-realm exclusion), and H-07 (real `provisionRuntimeRole()` login, `_prisma_migrations` read, `AuditEvent` insert/`hiddenAt` update, and permission-denied rejections for trigger disable, delete, truncate, non-`hiddenAt` update, and DDL).
+- Deployment & CI validation: `deployment-scripts.sh` (H-06 shell-injection canaries, CRLF, duplicates, `PATH`/`BASH_ENV`, RFC-1123 domain rejection, rollback fixture validation; H-07 Compose `jq` secret isolation), `ci.yml` production-like container runtime verification over TCP `psql`, ShellCheck, actionlint, Gitleaks, Prettier, ESLint, TypeScript, OpenAPI/client parity, and full production builds.

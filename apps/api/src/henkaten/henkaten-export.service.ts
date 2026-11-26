@@ -136,6 +136,7 @@ export class HenkatenExportService implements OnModuleInit, BeforeApplicationShu
           expiresAt: new Date(Date.now() + EXPIRES_MS),
         },
       });
+      const { part: partFilter, ...safeFilters } = filters;
       await this.audit.write(
         {
           actorKind: 'USER',
@@ -147,7 +148,8 @@ export class HenkatenExportService implements OnModuleInit, BeforeApplicationShu
           resourceType: 'HenkatenExportJob',
           resourceId: created.id,
           changeSummary: {
-            filters,
+            filters: safeFilters,
+            partFiltered: Boolean(partFilter),
             ...(principal.impersonatedBy
               ? { tmminOperatorId: principal.impersonatedBy.userId }
               : {}),
@@ -651,7 +653,7 @@ function writeRecord(
 ) {
   const supervisor = row.approvalRoutes.find((route) => route.route === 'SUPERVISOR');
   const qc = row.approvalRoutes.find((route) => route.route === 'QC');
-  const affectedParts = presentHenkatenParts(row);
+  const affectedParts = presentHenkatenParts(row, supplierView);
   records.add([
     row.identifier,
     row.businessDate.toISOString().slice(0, 10),

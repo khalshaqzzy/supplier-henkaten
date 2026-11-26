@@ -5,6 +5,48 @@ import { Subject, type Observable } from 'rxjs';
 import { APP_CONFIG, type AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../persistence/prisma.service.js';
 
+export const SUPPLIER_SSE_LINE_SCOPED_EVENTS = [
+  'HENKATEN_OPENED',
+  'WARNING_OPENED',
+  'HENKATEN_APPROVAL_RECORDED',
+  'HENKATEN_APPROVED',
+  'HENKATEN_REJECTED',
+  'HENKATEN_CANCELLED',
+  'WARNING_CLOSED',
+  'MP_RESERVATION_RELEASED',
+  'MP_MOVED',
+  'ASSIGNMENT_ISSUE_OPENED',
+  'ASSIGNMENT_ISSUE_RESOLVED',
+  'NOTIFICATION_REQUESTED',
+  'SHIFT_STARTED',
+  'SHIFT_STARTED_WITH_OVERRIDE',
+  'SHIFT_START_BLOCKED',
+  'SHIFT_ENDED',
+  'BOARD_LAYOUT_UPDATED',
+  'HENKATEN_DATA_DELETED',
+  'PCR_ASSESSED',
+  'PCR_DECISION_CORRECTED',
+] as const;
+
+export const SUPPLIER_SSE_TENANT_WIDE_EVENTS = [
+  'MASTER_DATA_CHANGED',
+  'MASTER_DATA_REMOVED',
+  'MEMBER_PHOTO_CHANGED',
+  'SHIFT_TEMPLATE_UPDATED',
+  'SHIFT_TIMES_SWAPPED',
+  'SUPPLIER_SOURCE_MODE_CHANGED',
+] as const;
+
+export const SUPPLIER_SSE_ALLOWED_EVENTS = [
+  ...SUPPLIER_SSE_LINE_SCOPED_EVENTS,
+  ...SUPPLIER_SSE_TENANT_WIDE_EVENTS,
+] as const;
+
+export const SUPPLIER_SSE_BLOCKED_AGGREGATES = [
+  'ExternalHenkatenProjection',
+  'ExternalApiClient',
+] as const;
+
 export type RealtimeOutboxEvent = {
   id: string;
   eventType: string;
@@ -63,6 +105,8 @@ export class RealtimeEventPump implements OnModuleInit, BeforeApplicationShutdow
         where: {
           suppressedAt: null,
           supplierId: { not: null },
+          eventType: { in: [...SUPPLIER_SSE_ALLOWED_EVENTS] },
+          aggregateType: { notIn: [...SUPPLIER_SSE_BLOCKED_AGGREGATES] },
           ...(this.cursor
             ? {
                 OR: [

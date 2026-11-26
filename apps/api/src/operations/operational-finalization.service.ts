@@ -19,6 +19,7 @@ export class OperationalFinalizationService {
     input: {
       supplierId: string;
       henkatenId: string;
+      lineId: string;
       henkatenVersion: number;
       toStatus: Exclude<HenkatenStatus, 'OPEN'>;
       reason: string;
@@ -84,13 +85,19 @@ export class OperationalFinalizationService {
         : input.toStatus === 'REJECTED'
           ? 'HENKATEN_REJECTED'
           : 'HENKATEN_CANCELLED';
-    await this.outbox.enqueue(event(terminalEvent, input, { reason: input.reason }), tx);
+    await this.outbox.enqueue(
+      event(terminalEvent, input, { lineId: input.lineId, reason: input.reason }),
+      tx,
+    );
     if (warnings.count) {
-      await this.outbox.enqueue(event('WARNING_CLOSED', input, { reason: input.reason }), tx);
+      await this.outbox.enqueue(
+        event('WARNING_CLOSED', input, { lineId: input.lineId, reason: input.reason }),
+        tx,
+      );
     }
     if (reservations.count) {
       await this.outbox.enqueue(
-        event('MP_RESERVATION_RELEASED', input, { reason: input.reason }),
+        event('MP_RESERVATION_RELEASED', input, { lineId: input.lineId, reason: input.reason }),
         tx,
       );
     }

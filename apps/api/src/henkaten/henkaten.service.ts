@@ -467,6 +467,7 @@ export class HenkatenService {
           actor: { userId: principal.userId, role: principal.role },
           correlationId: context.correlationId,
           payload: {
+            lineId: created.lineId,
             partNumber: created.partNumberSnapshot,
             partNumbers: affectedParts.map((part) => part.partNumberSnapshot),
           },
@@ -538,6 +539,7 @@ export class HenkatenService {
       await this.finalization.closeTerminalEffects(tx, {
         supplierId: scope.supplierId,
         henkatenId: id,
+        lineId: current.lineId,
         henkatenVersion: updated.version,
         toStatus: 'CANCELLED',
         reason: 'WITHDRAWN',
@@ -565,6 +567,7 @@ export class HenkatenService {
   }
 
   async list(scope: TenantScope, query: HenkatenListQuery, principal?: RequestPrincipal) {
+    const includeInternal = principal?.realm === 'SUPPLIER';
     const cursor = decodePriorityCursor(query.cursor);
     const baseWhere: Prisma.HenkatenWhereInput = {
       deletedAt: null,
@@ -574,7 +577,7 @@ export class HenkatenService {
       ...(query.pcrStatus ? { pcrAssessment: { status: query.pcrStatus } } : {}),
       ...(query.lineId ? { lineId: query.lineId } : {}),
       ...(query.shiftRunId ? { shiftRunId: query.shiftRunId } : {}),
-      ...(query.part ? henkatenPartSearch(query.part, true) : {}),
+      ...(query.part ? henkatenPartSearch(query.part, includeInternal) : {}),
       ...(query.from || query.to
         ? {
             occurredAt: {
@@ -631,7 +634,7 @@ export class HenkatenService {
     const hasNextPage = rows.length > query.limit;
     const items = rows.slice(0, query.limit);
     return {
-      items: items.map(({ row }) => presentHenkatenSummary(row)),
+      items: items.map(({ row }) => presentHenkatenSummary(row, includeInternal)),
       pageInfo: {
         hasNextPage,
         nextCursor:
@@ -647,6 +650,7 @@ export class HenkatenService {
   }
 
   async get(scope: TenantScope, id: string, principal?: RequestPrincipal) {
+    const includeInternal = principal?.realm === 'SUPPLIER';
     const row = await this.prisma.henkaten.findFirst({
       where: { deletedAt: null, id, supplierId: scope.supplierId },
       include: henkatenDetailInclude,
@@ -658,7 +662,7 @@ export class HenkatenService {
         })) > 0
       : false;
     return {
-      ...presentHenkatenDetail(row),
+      ...presentHenkatenDetail(row, includeInternal),
       permissions: henkatenPermissions(row, principal, assigned),
     };
   }

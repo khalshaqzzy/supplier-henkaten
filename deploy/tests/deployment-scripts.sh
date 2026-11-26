@@ -24,7 +24,13 @@ jq -e '
   and (.services.postgres.ports // [] | length) == 0
   and ([.services | to_entries[] | select(.key != "caddy") | (.value.ports // []) | length] | add) == 0
   and (.networks.data.internal == true)
-' <<<"${config_json}" >/dev/null || fail "Compose topology or exposure policy drifted"
+  and (.services.api.environment.POSTGRES_PASSWORD == null)
+  and (.services["bootstrap-admin"].environment.POSTGRES_PASSWORD == null)
+  and (.services.api.environment.DATABASE_URL | startswith("postgresql://supplier_henkaten_app:replace_me_with_32_safe_characters_app@"))
+  and (.services["bootstrap-admin"].environment.DATABASE_URL | startswith("postgresql://supplier_henkaten_app:replace_me_with_32_safe_characters_app@"))
+  and (.services.migrate.environment.DATABASE_URL | startswith("postgresql://supplier_henkaten:replace_me_with_32_safe_characters@"))
+  and (.services.migrate.environment.REQUIRE_APP_DB_ROLE == "true")
+' <<<"${config_json}" >/dev/null || fail "Compose topology, exposure policy, or least-privilege DB isolation drifted"
 
 rendered_env="${TEST_ROOT}/rendered.env"
 CADDY_EMAIL=operator@example.com \
@@ -48,6 +54,11 @@ chmod 600 "${rendered_env}"
 "${SCRIPTS}/validate-runtime-env.sh" "${rendered_env}" >/dev/null
 grep -Fxq 'DEPLOY_RUN_NUMBER=42' "${rendered_env}" || fail "rendered run number is missing"
 grep -Fxq 'PCR_OPENAI_API_KEY=synthetic_gateway_key_for_test_only' "${rendered_env}" || fail "PCR gateway key was not rendered"
+grep -Fxq 'POSTGRES_APP_USER=supplier_henkaten_app' "${rendered_env}" || fail "derived POSTGRES_APP_USER is missing"
+grep -Eq '^POSTGRES_APP_PASSWORD=[0-9a-f]{64}$' "${rendered_env}" || fail "derived POSTGRES_APP_PASSWORD is missing"
+if grep -Fxq 'POSTGRES_APP_PASSWORD=0123456789abcdef0123456789abcdef' "${rendered_env}"; then
+  fail "derived POSTGRES_APP_PASSWORD matched POSTGRES_PASSWORD"
+fi
 
 production_env="${TEST_ROOT}/production.env"
 (
@@ -75,6 +86,58 @@ invalid_env="${TEST_ROOT}/invalid.env"
 sed 's/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=unsafe$password/' "${rendered_env}" >"${invalid_env}"
 if "${SCRIPTS}/validate-runtime-env.sh" "${invalid_env}" >/dev/null 2>&1; then
   fail "unsafe dotenv password was accepted"
+fi
+
+canary_file="${TEST_ROOT}/env-injection-canary"
+for malicious_line in \
+  "POSTGRES_PASSWORD=\$(touch ${canary_file})" \
+  "POSTGRES_PASSWORD=\`touch ${canary_file}\`" \
+  "TMMIN_BOOTSTRAP_DISPLAY_NAME=\"\$(touch ${canary_file})\"" \
+  "PATH=/tmp/attacker" \
+  "BASH_ENV=${canary_file}" \
+  "UNKNOWN_CUSTOM_KEY=value"
+do
+  malicious_env="${TEST_ROOT}/malicious.env"
+  cp "${rendered_env}" "${malicious_env}"
+  printf '%s\n' "${malicious_line}" >>"${malicious_env}"
+  if "${SCRIPTS}/validate-runtime-env.sh" "${malicious_env}" >/dev/null 2>&1; then
+    fail "malicious dotenv line was accepted: ${malicious_line}"
+  fi
+  [[ ! -e "${canary_file}" ]] || fail "dotenv validation executed embedded shell command for: ${malicious_line}"
+done
+
+duplicate_env="${TEST_ROOT}/duplicate.env"
+cp "${rendered_env}" "${duplicate_env}"
+printf 'LOG_LEVEL=debug\n' >>"${duplicate_env}"
+if "${SCRIPTS}/validate-runtime-env.sh" "${duplicate_env}" >/dev/null 2>&1; then
+  fail "duplicate dotenv key was accepted"
+fi
+
+crlf_env="${TEST_ROOT}/crlf.env"
+awk '{printf "%s\r\n", $0}' "${rendered_env}" >"${crlf_env}"
+if "${SCRIPTS}/validate-runtime-env.sh" "${crlf_env}" >/dev/null 2>&1; then
+  fail "CRLF dotenv file was accepted"
+fi
+
+same_app_password_env="${TEST_ROOT}/same-app-password.env"
+sed 's/^POSTGRES_APP_PASSWORD=.*/POSTGRES_APP_PASSWORD=0123456789abcdef0123456789abcdef/' "${rendered_env}" >"${same_app_password_env}"
+if "${SCRIPTS}/validate-runtime-env.sh" "${same_app_password_env}" >/dev/null 2>&1; then
+  fail "identical POSTGRES_APP_PASSWORD and POSTGRES_PASSWORD were accepted"
+fi
+
+if (
+  set -a
+  # shellcheck disable=SC1090
+  source "${EXAMPLE_ENV}"
+  set +a
+  PCR_OPENAI_BASE_URL=https://inference.example.invalid/v1 \
+  PCR_OPENAI_API_KEY=synthetic_gateway_key_for_test_only \
+  PRODUCTION_SUPPLIER_DOMAIN='-invalid..domain' \
+  PRODUCTION_TMMIN_DOMAIN=admin-henkaten.qualitydivision.com \
+  PRODUCTION_API_DOMAIN=henkaten-api.qualitydivision.com \
+    "${SCRIPTS}/render-runtime-env.sh" production cccccccccccccccccccccccccccccccccccccccc 44 >/dev/null 2>&1
+); then
+  fail "invalid production domain was accepted"
 fi
 
 migration_repo="${TEST_ROOT}/migration-policy"
@@ -329,6 +392,7 @@ rollback_base="${TEST_ROOT}/rollback"
 prepare_base "${rollback_base}"
 previous_sha=dddddddddddddddddddddddddddddddddddddddd
 mkdir -p "${rollback_base}/releases/${previous_sha}/deploy/scripts"
+cp "${rendered_env}" "${rollback_base}/releases/${previous_sha}/.runtime.env"
 printf '%s\n' "${previous_sha}" >"${rollback_base}/current_release"
 cat >"${rollback_base}/releases/${previous_sha}/deploy/scripts/remote-rollback.sh" <<EOF
 #!/usr/bin/env bash
@@ -346,6 +410,7 @@ rollback_failure_base="${TEST_ROOT}/rollback-failure"
 prepare_base "${rollback_failure_base}"
 rollback_failure_previous=4444444444444444444444444444444444444444
 mkdir -p "${rollback_failure_base}/releases/${rollback_failure_previous}/deploy/scripts"
+cp "${rendered_env}" "${rollback_failure_base}/releases/${rollback_failure_previous}/.runtime.env"
 printf '%s\n' "${rollback_failure_previous}" >"${rollback_failure_base}/current_release"
 cat >"${rollback_failure_base}/releases/${rollback_failure_previous}/deploy/scripts/remote-rollback.sh" <<EOF
 #!/usr/bin/env bash

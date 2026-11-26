@@ -30,6 +30,11 @@ const environmentSchema = z
     OUTBOX_LOCK_LEASE_MS: z.coerce.number().int().min(1_000).default(30_000),
     OUTBOX_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(100).default(10),
     REALTIME_POLL_MS: z.coerce.number().int().min(100).max(5_000).default(1_000),
+    SSE_MAX_PER_SESSION: z.coerce.number().int().min(1).max(50).default(6),
+    SSE_MAX_PER_USER: z.coerce.number().int().min(1).max(100).default(12),
+    SSE_MAX_PER_SUPPLIER: z.coerce.number().int().min(1).max(500).default(60),
+    SSE_MAX_GLOBAL: z.coerce.number().int().min(1).max(5_000).default(300),
+    SSE_REVALIDATION_CACHE_MS: z.coerce.number().int().min(0).max(15_000).default(2_000),
     PUSH_ENABLED: booleanEnvironmentSchema('false'),
     PUSH_VAPID_PUBLIC_KEY: z.string().default(''),
     PUSH_VAPID_PRIVATE_KEY: z.string().default(''),
@@ -136,6 +141,11 @@ export type AppConfig = {
   outboxLockLeaseMs: number;
   outboxMaxAttempts: number;
   realtimePollMs: number;
+  sseMaxPerSession: number;
+  sseMaxPerUser: number;
+  sseMaxPerSupplier: number;
+  sseMaxGlobal: number;
+  sseRevalidationCacheMs: number;
   pushEnabled: boolean;
   pushVapidPublicKey: string;
   pushVapidPrivateKey: string;
@@ -192,6 +202,11 @@ export function loadAppConfig(environment: NodeJS.ProcessEnv = process.env): App
     outboxLockLeaseMs: parsed.OUTBOX_LOCK_LEASE_MS,
     outboxMaxAttempts: parsed.OUTBOX_MAX_ATTEMPTS,
     realtimePollMs: parsed.REALTIME_POLL_MS,
+    sseMaxPerSession: parsed.SSE_MAX_PER_SESSION,
+    sseMaxPerUser: parsed.SSE_MAX_PER_USER,
+    sseMaxPerSupplier: parsed.SSE_MAX_PER_SUPPLIER,
+    sseMaxGlobal: parsed.SSE_MAX_GLOBAL,
+    sseRevalidationCacheMs: parsed.SSE_REVALIDATION_CACHE_MS,
     pushEnabled: parsed.PUSH_ENABLED,
     pushVapidPublicKey: parsed.PUSH_VAPID_PUBLIC_KEY,
     pushVapidPrivateKey: parsed.PUSH_VAPID_PRIVATE_KEY,

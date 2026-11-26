@@ -48226,17 +48226,13 @@
                                   "type": "string"
                                 },
                                 "internalNumber": {
-                                  "type": [
-                                    "string",
-                                    "null"
-                                  ]
+                                  "type": "null"
                                 }
                               },
                               "required": [
                                 "id",
                                 "number",
-                                "name",
-                                "internalNumber"
+                                "name"
                               ],
                               "additionalProperties": false
                             }
@@ -49823,17 +49819,13 @@
                             "type": "string"
                           },
                           "internalNumber": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
+                            "type": "null"
                           }
                         },
                         "required": [
                           "id",
                           "number",
-                          "name",
-                          "internalNumber"
+                          "name"
                         ],
                         "additionalProperties": false
                       }

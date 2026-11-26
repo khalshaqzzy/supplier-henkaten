@@ -115,6 +115,72 @@ export const hostedPreparationCredentialSchema = z
   })
   .strict();
 
+export type DashboardTrendGranularity = 'DAY' | 'WEEK' | 'MONTH';
+
+/**
+ * Inclusive UTC bucket ceilings per granularity. Values include timezone slack so
+ * a full local-calendar year (e.g. Asia/Jakarta) stays valid while blocking DoS spans.
+ */
+export const MAX_DASHBOARD_TREND_BUCKETS: Readonly<Record<DashboardTrendGranularity, number>> = {
+  DAY: 370,
+  WEEK: 265,
+  MONTH: 122,
+};
+
+const MIN_TREND_YEAR = 1970;
+const MAX_TREND_YEAR = 2100;
+const FUTURE_SLACK_MS = 24 * 60 * 60 * 1_000;
+
+export function dashboardBucketStart(value: Date, granularity: DashboardTrendGranularity): Date {
+  const result = new Date(0);
+  result.setUTCFullYear(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate());
+  result.setUTCHours(0, 0, 0, 0);
+  if (granularity === 'MONTH') {
+    result.setUTCDate(1);
+  } else if (granularity === 'WEEK') {
+    const day = result.getUTCDay();
+    result.setUTCDate(result.getUTCDate() - (day === 0 ? 6 : day - 1));
+  }
+  return result;
+}
+
+export function nextDashboardBucket(value: Date, granularity: DashboardTrendGranularity): Date {
+  const result = new Date(value.getTime());
+  if (granularity === 'MONTH') result.setUTCMonth(result.getUTCMonth() + 1);
+  else result.setUTCDate(result.getUTCDate() + (granularity === 'WEEK' ? 7 : 1));
+  return result;
+}
+
+export function subtractDashboardBuckets(
+  value: Date,
+  count: number,
+  granularity: DashboardTrendGranularity,
+): Date {
+  const result = new Date(value.getTime());
+  if (granularity === 'MONTH') result.setUTCMonth(result.getUTCMonth() - count);
+  else result.setUTCDate(result.getUTCDate() - count * (granularity === 'WEEK' ? 7 : 1));
+  return result;
+}
+
+export function countDashboardBuckets(
+  rangeStart: Date,
+  rangeEnd: Date,
+  granularity: DashboardTrendGranularity,
+): number {
+  const first = dashboardBucketStart(rangeStart, granularity);
+  const last = dashboardBucketStart(rangeEnd, granularity);
+  if (first.getTime() > last.getTime()) return 0;
+  if (granularity === 'MONTH') {
+    return (
+      (last.getUTCFullYear() - first.getUTCFullYear()) * 12 +
+      (last.getUTCMonth() - first.getUTCMonth()) +
+      1
+    );
+  }
+  const stepMs = (granularity === 'WEEK' ? 7 : 1) * 24 * 60 * 60 * 1_000;
+  return Math.floor((last.getTime() - first.getTime()) / stepMs) + 1;
+}
+
 export const tmminDashboardQuerySchema = z
   .object({
     supplierId: opaqueIdSchema.optional(),
@@ -131,7 +197,79 @@ export const tmminDashboardQuerySchema = z
     freshness: z.enum(['FRESH', 'WARNING', 'STALE', 'NO_DATA']).optional(),
     granularity: z.enum(['DAY', 'WEEK', 'MONTH']).default('DAY'),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    const now = Date.now();
+    const maxBuckets = MAX_DASHBOARD_TREND_BUCKETS[value.granularity];
+    const fromDate = value.from ? new Date(value.from) : undefined;
+    const toDate = value.to ? new Date(value.to) : undefined;
+
+    if (fromDate) {
+      const year = fromDate.getUTCFullYear();
+      if (year < MIN_TREND_YEAR || year > MAX_TREND_YEAR) {
+        context.addIssue({
+          code: 'custom',
+          path: ['from'],
+          message: `Tanggal awal harus berada di antara tahun ${MIN_TREND_YEAR} dan ${MAX_TREND_YEAR}.`,
+        });
+        return;
+      }
+    }
+    if (toDate) {
+      const year = toDate.getUTCFullYear();
+      if (year < MIN_TREND_YEAR || year > MAX_TREND_YEAR) {
+        context.addIssue({
+          code: 'custom',
+          path: ['to'],
+          message: `Tanggal akhir harus berada di antara tahun ${MIN_TREND_YEAR} dan ${MAX_TREND_YEAR}.`,
+        });
+        return;
+      }
+    }
+    if (fromDate && toDate) {
+      if (fromDate.getTime() > toDate.getTime()) {
+        context.addIssue({
+          code: 'custom',
+          path: ['to'],
+          message: 'Tanggal akhir harus setelah atau sama dengan tanggal awal.',
+        });
+        return;
+      }
+      if (countDashboardBuckets(fromDate, toDate, value.granularity) > maxBuckets) {
+        context.addIssue({
+          code: 'custom',
+          path: ['to'],
+          message: `Rentang tanggal melebihi batas maksimum ${maxBuckets} interval untuk granularitas ${value.granularity}.`,
+        });
+      }
+      return;
+    }
+    if (fromDate && !toDate) {
+      if (fromDate.getTime() > now + FUTURE_SLACK_MS) {
+        context.addIssue({
+          code: 'custom',
+          path: ['from'],
+          message: 'Tanggal awal tidak boleh jauh di masa depan tanpa tanggal akhir.',
+        });
+        return;
+      }
+      if (countDashboardBuckets(fromDate, new Date(now), value.granularity) > maxBuckets) {
+        context.addIssue({
+          code: 'custom',
+          path: ['from'],
+          message: `Rentang tanggal melebihi batas maksimum ${maxBuckets} interval untuk granularitas ${value.granularity}.`,
+        });
+      }
+      return;
+    }
+    if (!fromDate && toDate && toDate.getTime() > now + FUTURE_SLACK_MS) {
+      context.addIssue({
+        code: 'custom',
+        path: ['to'],
+        message: 'Tanggal akhir tidak boleh jauh di masa depan tanpa tanggal awal.',
+      });
+    }
+  });
 export type TmminDashboardQuery = z.infer<typeof tmminDashboardQuerySchema>;
 
 const countByLabelSchema = z.array(

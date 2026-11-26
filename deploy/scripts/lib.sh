@@ -20,6 +20,11 @@ require_safe_path() {
   [[ -n "${path}" && "${path}" == "${base}"/* ]] || die "Path is outside the deployment base directory: ${path}"
 }
 
+validate_fqdn() {
+  local host="$1"
+  [[ "${#host}" -ge 4 && "${#host}" -le 253 && "${host}" =~ ^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$ ]]
+}
+
 version_ge() {
   local current="$1"
   local minimum="$2"
@@ -79,13 +84,138 @@ wait_for_service() {
   done
 }
 
+RUNTIME_ENV_ALLOWLIST=(
+  APP_ENV
+  RELEASE_SHA
+  DEPLOY_RUN_NUMBER
+  COMPOSE_PROJECT_NAME
+  SHARED_DIR
+  SUPPLIER_DOMAIN
+  TMMIN_DOMAIN
+  API_DOMAIN
+  CADDY_EMAIL
+  CADDY_SCHEME
+  PUBLISHED_HTTP_PORT
+  PUBLISHED_HTTPS_PORT
+  POSTGRES_USER
+  POSTGRES_PASSWORD
+  POSTGRES_APP_USER
+  POSTGRES_APP_PASSWORD
+  POSTGRES_DATABASE
+  SESSION_CSRF_SECRET
+  AUTH_THROTTLE_SECRET
+  TMMIN_BOOTSTRAP_USERNAME
+  TMMIN_BOOTSTRAP_DISPLAY_NAME
+  TMMIN_BOOTSTRAP_PASSWORD
+  LOG_LEVEL
+  DB_POOL_MAX
+  DB_CONNECTION_TIMEOUT_MS
+  DB_IDLE_TIMEOUT_MS
+  OUTBOX_POLL_MS
+  OUTBOX_BATCH_SIZE
+  OUTBOX_LOCK_LEASE_MS
+  OUTBOX_MAX_ATTEMPTS
+  PCR_OPENAI_BASE_URL
+  PCR_OPENAI_API_KEY
+  PCR_OPENAI_MODEL
+  PCR_CONFIDENCE_THRESHOLD
+  PCR_INFERENCE_TIMEOUT_MS
+  PCR_WORKER_ENABLED
+  PCR_WORKER_POLL_MS
+  REALTIME_POLL_MS
+  SSE_MAX_PER_SESSION
+  SSE_MAX_PER_USER
+  SSE_MAX_PER_SUPPLIER
+  SSE_MAX_GLOBAL
+  SSE_REVALIDATION_CACHE_MS
+  PUSH_ENABLED
+  PUSH_VAPID_PUBLIC_KEY
+  PUSH_VAPID_PRIVATE_KEY
+  PUSH_VAPID_SUBJECT
+  PUSH_ENDPOINT_HOSTS
+  PUSH_DELIVERY_TTL_SECONDS
+  PUSH_DELIVERY_MAX_ATTEMPTS
+  PUSH_DELIVERY_BATCH_SIZE
+  PUSH_DELIVERY_POLL_MS
+  AUTH_IP_LOGIN_LIMIT
+  AUTH_GLOBAL_LIMIT_PER_MINUTE
+  ARGON2_MEMORY_KIB
+  ARGON2_ITERATIONS
+  ARGON2_PARALLELISM
+)
+
+is_allowed_runtime_env_key() {
+  local candidate="$1"
+  local allowed
+  for allowed in "${RUNTIME_ENV_ALLOWLIST[@]}"; do
+    if [[ "${candidate}" == "${allowed}" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 load_runtime_env() {
   local runtime_env="$1"
   [[ -f "${runtime_env}" ]] || die "Runtime env file does not exist: ${runtime_env}"
-  set -a
-  # shellcheck disable=SC1090
-  source "${runtime_env}"
-  set +a
+
+  local -a parsed_keys=()
+  local -a parsed_values=()
+  local seen_keys=" "
+  local line key raw_value value line_no=0
+
+  # Pass 1: strictly parse and validate the entire file without shell evaluation.
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    line_no=$((line_no + 1))
+    if [[ "${line}" == *$'\r'* ]]; then
+      die "Runtime env contains unsupported CRLF at line ${line_no}."
+    fi
+    if [[ -z "${line}" || "${line}" =~ ^[[:space:]]*# ]]; then
+      continue
+    fi
+    if [[ ! "${line}" =~ ^([A-Z][A-Z0-9_]*)=(.*)$ ]]; then
+      die "Runtime env has invalid assignment syntax at line ${line_no}."
+    fi
+    key="${BASH_REMATCH[1]}"
+    raw_value="${BASH_REMATCH[2]}"
+
+    is_allowed_runtime_env_key "${key}" || die "Runtime env contains unsupported key: ${key}"
+    if [[ "${seen_keys}" == *" ${key} "* ]]; then
+      die "Runtime env contains duplicate key: ${key}"
+    fi
+    seen_keys+="${key} "
+
+    if [[ "${raw_value}" == \"* ]]; then
+      if [[ "${#raw_value}" -lt 2 || "${raw_value}" != *\" ]]; then
+        die "Runtime env has unterminated double-quoted value for ${key} at line ${line_no}."
+      fi
+      value="${raw_value:1:${#raw_value}-2}"
+      if [[ "${value}" =~ [\"\`\$\\] ]]; then
+        die "Runtime env contains unsafe characters in quoted value for ${key} at line ${line_no}."
+      fi
+    else
+      if [[ -n "${raw_value}" && ! "${raw_value}" =~ ^[A-Za-z0-9._:/@+,%=-]+$ ]]; then
+        die "Runtime env contains unsupported characters in value for ${key} at line ${line_no}."
+      fi
+      value="${raw_value}"
+    fi
+
+    parsed_keys+=("${key}")
+    parsed_values+=("${value}")
+  done < "${runtime_env}"
+
+  # Pass 2: reset all allowlisted keys so prior loads cannot leak across files,
+  # then assign validated values safely without eval or source.
+  local allowed i
+  for allowed in "${RUNTIME_ENV_ALLOWLIST[@]}"; do
+    unset "${allowed}" || true
+  done
+  for ((i = 0; i < ${#parsed_keys[@]}; i++)); do
+    key="${parsed_keys[i]}"
+    value="${parsed_values[i]}"
+    printf -v "${key}" '%s' "${value}"
+    export "${key?}"
+  done
 }
 
 activate_symlink() {

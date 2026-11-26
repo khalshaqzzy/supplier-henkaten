@@ -15,10 +15,10 @@ import {
   externalHealthSchema,
   externalProjectionDetailSchema,
   externalProjectionPageSchema,
-  henkatenDetailSchema,
   henkatenExportJobSchema,
-  henkatenPageSchema,
   hostedPreparationCredentialSchema,
+  tmminHostedHenkatenDetailSchema,
+  tmminHostedHenkatenPageSchema,
   linePageSchema,
   memberPageSchema,
   notificationPageSchema,
@@ -335,13 +335,13 @@ export class TmminApi {
   supplierHenkatens(supplierId: string, query: QueryRecord = {}) {
     return this.client.request(`/api/v1/tmmin/suppliers/${supplierId}/henkatens`, {
       query,
-      responseSchema: henkatenPageSchema,
+      responseSchema: tmminHostedHenkatenPageSchema,
     });
   }
 
   hostedHenkaten(supplierId: string, id: string) {
     return this.client.request(`/api/v1/tmmin/suppliers/${supplierId}/henkatens/${id}`, {
-      responseSchema: henkatenDetailSchema,
+      responseSchema: tmminHostedHenkatenDetailSchema,
     });
   }
 

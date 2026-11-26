@@ -1,3 +1,26 @@
+## High-severity security hardening (H-01..H-07) — 26 November 2026
+
+Implementation on `fix/security-high-findings`: remediates all seven in-scope High-severity
+security audit findings (`H-01`..`H-07`; `H-08` staging/production SSH & secret separation / manual
+production approval gate explicitly deferred) with zero Prisma schema/migration changes and full
+rollback continuity. Enforces fail-closed `Internal Part Number` exclusion and search blocking on
+TMMIN Henkaten list/detail plus write-time and historical read-time `HENKATEN_EXPORT_REQUESTED`
+audit redaction (`H-01`); fail-closed supplier-visible audit/dashboard filtering excluding TMMIN,
+External client and TMMIN-only system records (`H-02`); explicit supplier SSE event allowlist,
+server-side `lineId`/`sourceLineId` routing fixing the strict wire schema, `HENKATEN_DATA_DELETED`
+command ID masking, monotonic replay-to-live handoff and UUID cursor validation (`H-03`); inclusive
+UTC bucket ceilings (`DAY=370`, `WEEK=265`, `MONTH=122`) and forward clamping on `dashboardTrend`
+(`H-04`); pre-header SSE `404`/`429` admission caps, `response.once('close')` slot release,
+per-session eviction with long retry hint, coalesced monotonic-epoch revalidation cache, bounded
+live queues and client exponential-backoff reconnect (`H-05`); closed-allowlist two-pass
+non-evaluating `.runtime.env` parsing, RFC-1123 FQDN validation and pre-validated rollback (`H-06`);
+and distroless `apps/api/src/cli/migrate.ts` provisioning a least-privilege non-superuser
+PostgreSQL runtime role (`POSTGRES_APP_USER`) with SCRAM-SHA-256 verifier and staged zero-touch
+credential derivation (`H-07`). See
+[ADR 0057](../docs/adr/0057-high-severity-security-hardening-and-runtime-db-isolation.md) and the
+current handoff. Phase 15 remains the sole current `in_progress` phase; staging/device/UAT is
+unchanged.
+
 ## Master Data desktop design polish — 24 November 2026
 
 Implementation on `feat/master-data-design-polish`: Supplier Portal Master Data UI polish without

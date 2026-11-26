@@ -1,4 +1,5 @@
-import { Controller, Get, Param, Patch, Put, Req, Sse } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Put, Req, Res, Sse } from '@nestjs/common';
+import type { Response } from 'express';
 
 import {
   auditQuerySchema,
@@ -151,12 +152,14 @@ export class SupplierReadModelController {
   realtimeEvents(
     @ValidatedQuery(realtimeQuerySchema) query: RealtimeQuery,
     @Req() request: ContextRequest,
+    @Res({ passthrough: true }) response: Response,
   ) {
-    return this.realtime.stream(
+    return this.realtime.prepareStream(
       this.access.supplierScope(request),
       this.access.principal(request),
       query.lineId,
       request.header('Last-Event-ID'),
+      response,
     );
   }
 }

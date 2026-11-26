@@ -16,19 +16,23 @@ require_sha "${RELEASE_SHA:-}"
 [[ "${COMPOSE_PROJECT_NAME:-}" == "supplier-henkaten-${APP_ENV}" ]] || die "COMPOSE_PROJECT_NAME does not match APP_ENV."
 [[ "${SHARED_DIR:-}" == "/opt/supplier-henkaten/${APP_ENV}/shared" || "${SHARED_DIR:-}" == /tmp/* ]] || die "SHARED_DIR is outside the approved environment path."
 
-for name in POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DATABASE SESSION_CSRF_SECRET AUTH_THROTTLE_SECRET TMMIN_BOOTSTRAP_USERNAME TMMIN_BOOTSTRAP_PASSWORD; do
+for name in POSTGRES_USER POSTGRES_PASSWORD POSTGRES_APP_USER POSTGRES_APP_PASSWORD POSTGRES_DATABASE SESSION_CSRF_SECRET AUTH_THROTTLE_SECRET TMMIN_BOOTSTRAP_USERNAME TMMIN_BOOTSTRAP_PASSWORD; do
   value="${!name:-}"
   [[ "${value}" =~ ^[A-Za-z0-9_-]+$ ]] || die "${name} contains unsupported dotenv or URL characters."
 done
 
+[[ "${POSTGRES_APP_USER}" =~ ^[a-z_][a-z0-9_]{0,62}$ ]] || die "POSTGRES_APP_USER must be a valid lowercase PostgreSQL role identifier."
+[[ "${POSTGRES_APP_USER}" != "${POSTGRES_USER}" ]] || die "POSTGRES_APP_USER must be distinct from POSTGRES_USER."
 (( ${#POSTGRES_PASSWORD} >= 32 )) || die "POSTGRES_PASSWORD must contain at least 32 characters."
+(( ${#POSTGRES_APP_PASSWORD} >= 32 )) || die "POSTGRES_APP_PASSWORD must contain at least 32 characters."
+[[ "${POSTGRES_APP_PASSWORD}" != "${POSTGRES_PASSWORD}" ]] || die "POSTGRES_APP_PASSWORD must be distinct from POSTGRES_PASSWORD."
 (( ${#SESSION_CSRF_SECRET} >= 32 )) || die "SESSION_CSRF_SECRET must contain at least 32 characters."
 (( ${#AUTH_THROTTLE_SECRET} >= 32 )) || die "AUTH_THROTTLE_SECRET must contain at least 32 characters."
 (( ${#TMMIN_BOOTSTRAP_PASSWORD} >= 12 )) || die "TMMIN_BOOTSTRAP_PASSWORD must contain at least 12 characters."
 
 for name in SUPPLIER_DOMAIN TMMIN_DOMAIN API_DOMAIN; do
   value="${!name:-}"
-  [[ "${value}" =~ ^[A-Za-z0-9.-]+$ && "${value}" == *.* ]] || die "${name} is not a valid hostname."
+  validate_fqdn "${value}" || die "${name} is not a valid hostname."
 done
 
 [[ "${CADDY_EMAIL:-}" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || die "CADDY_EMAIL is invalid."

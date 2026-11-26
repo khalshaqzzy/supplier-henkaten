@@ -1,3 +1,35 @@
+## Amendment — 26 November 2026: High-severity security hardening and least-privilege runtime database isolation
+
+- **TMMIN Internal Part Number enforcement.** TMMIN Henkaten list and detail endpoints never return
+  supplier internal part numbers (`internalNumber: null` in Release 1 for open-tab rollout safety;
+  key omission eligible in Release 2) and never search `internalPartNumberSnapshot`. Export audit
+  summaries record `partFiltered` instead of raw `filters.part`, and TMMIN audit reads redact
+  historical `filters.part` entries retroactively.
+- **Cross-realm Supplier audit isolation.** Supplier audit and dashboard recent activity strictly
+  exclude TMMIN-authored records (including deletion reasons and magic-link events), External API
+  client records, and TMMIN-only system notifications, and resolve actor display names only within
+  the supplier realm. Impersonation operator UUIDs are summarized as `impersonated: true` on
+  supplier views.
+- **Supplier SSE allowlist, connection bounds and wire alignment.** Supplier realtime streams
+  publish only allowlisted supplier-facing events (blocking TMMIN-only and External ingestion
+  outbox events), route `lineId`/`sourceLineId` exclusively server-side so wire payloads satisfy the
+  strict client schema, mask `HENKATEN_DATA_DELETED` command IDs, validate `Last-Event-ID` syntax
+  and scope before replay, reject unknown `lineId` with `404`, enforce per-session/user/supplier/global
+  connection limits with bounded queues and client exponential-backoff reconnect, and coalesce
+  session/line revalidation to prevent database pool exhaustion.
+- **Bounded TMMIN dashboard trend windows.** TMMIN dashboard queries enforce inclusive UTC bucket
+  ceilings (`DAY <= 370`, `WEEK <= 265`, `MONTH <= 122`), reject inverted or extreme timestamps, and
+  clamp data-derived trend windows to the most recent buckets.
+- **Hardened deployment environment loading and least-privilege PostgreSQL runtime role.**
+  Deployment scripts parse `.runtime.env` with a closed-allowlist non-evaluating loader (never
+  `source`) and strict RFC-1123 FQDN validation. The hosted `api` and `bootstrap-admin` containers
+  connect through a dedicated non-superuser PostgreSQL runtime role (`POSTGRES_APP_USER`) provisioned
+  idempotently during `migrate` with least-privilege table/column grants and staged zero-touch
+  credential derivation (overridable by an explicit `POSTGRES_APP_PASSWORD` secret). Staging vs.
+  production SSH/secret separation and manual production approval gates remain deferred.
+
+See [ADR 0057](../docs/adr/0057-high-severity-security-hardening-and-runtime-db-isolation.md).
+
 ## Amendment — 24 November 2026: Master Data desktop design polish
 
 - **Master Data hub.** Each area card shows its own icon, the active count and a readiness badge

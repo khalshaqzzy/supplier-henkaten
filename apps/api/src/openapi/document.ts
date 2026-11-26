@@ -127,6 +127,8 @@ import {
   henkatenListQuerySchema,
   henkatenPageSchema,
   henkatenTransitionSchema,
+  tmminHostedHenkatenDetailSchema,
+  tmminHostedHenkatenPageSchema,
   rerouteSupervisorRequestSchema,
   shiftListQuerySchema,
   shiftRunDetailSchema,
@@ -877,7 +879,7 @@ function operationalPaths() {
       },
       get: {
         requestParams: { ...supplierOnly, query: henkatenListQuerySchema },
-        responses: { '200': json('Supplier Henkaten records', henkatenPageSchema) },
+        responses: { '200': json('Supplier Henkaten records', tmminHostedHenkatenPageSchema) },
       },
     },
     '/api/v1/tmmin/suppliers/{supplierId}/henkatens/exports': {
@@ -935,7 +937,7 @@ function operationalPaths() {
       get: {
         requestParams: supplierAndId,
         responses: {
-          '200': json('Supplier Henkaten detail', henkatenDetailSchema),
+          '200': json('Supplier Henkaten detail', tmminHostedHenkatenDetailSchema),
           '404': problem,
         },
       },

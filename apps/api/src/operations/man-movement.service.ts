@@ -215,6 +215,7 @@ export class ManMovementService {
       if (!resolved) throw assignmentConflict();
       await this.outbox.enqueue(
         event('ASSIGNMENT_ISSUE_RESOLVED', resolved.id, resolved.version, supplierId, actor, {
+          lineId: target.lineId,
           henkatenId,
           jobId: target.jobId,
         }),
@@ -223,6 +224,8 @@ export class ManMovementService {
     }
     await this.outbox.enqueue(
       event('MP_MOVED', henkatenId, henkatenVersion, supplierId, actor, {
+        lineId: target.lineId,
+        ...(source ? { sourceLineId: source.lineId } : {}),
         movementId: movement.id,
         replacementMpMemberId: replacement.id,
         targetWorkingAssignmentId: target.id,
@@ -232,6 +235,7 @@ export class ManMovementService {
     );
     await this.outbox.enqueue(
       event('MP_RESERVATION_RELEASED', henkatenId, henkatenVersion, supplierId, actor, {
+        lineId: target.lineId,
         reason: 'APPROVED',
       }),
       tx,

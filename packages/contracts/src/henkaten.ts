@@ -37,6 +37,18 @@ export const henkatenPartSchema = z
   .strict();
 export type HenkatenPart = z.infer<typeof henkatenPartSchema>;
 
+export const tmminHenkatenPartSchema = z
+  .object({
+    id: opaqueIdSchema.nullable(),
+    /** TMMIN part number. */
+    number: z.string(),
+    name: z.string(),
+    /** Always null on TMMIN responses in Release 1 for rollout compatibility; omitted in Release 2. */
+    internalNumber: z.null().optional(),
+  })
+  .strict();
+export type TmminHenkatenPart = z.infer<typeof tmminHenkatenPartSchema>;
+
 export const checklistSubmissionAnswerSchema = z
   .object({ itemId: opaqueIdSchema, answer: checklistAnswerSchema })
   .strict();
@@ -333,6 +345,22 @@ export type HenkatenExportJob = z.infer<typeof henkatenExportJobSchema>;
 
 export const henkatenPageSchema = z
   .object({ items: z.array(henkatenSummarySchema), pageInfo: pageInfoSchema })
+  .strict();
+
+export const tmminHostedHenkatenSummarySchema = henkatenSummarySchema
+  .extend({
+    parts: z.array(tmminHenkatenPartSchema).min(1).max(MAX_HENKATEN_PARTS),
+  })
+  .strict();
+
+export const tmminHostedHenkatenPageSchema = z
+  .object({ items: z.array(tmminHostedHenkatenSummarySchema), pageInfo: pageInfoSchema })
+  .strict();
+
+export const tmminHostedHenkatenDetailSchema = henkatenDetailSchema
+  .extend({
+    parts: z.array(tmminHenkatenPartSchema).min(1).max(MAX_HENKATEN_PARTS),
+  })
   .strict();
 
 export const henkatenFormOptionsQuerySchema = z

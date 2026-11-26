@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { MAX_DASHBOARD_TREND_BUCKETS, tmminDashboardQuerySchema } from '@tmmin-henkaten/contracts';
+
 import { dashboardTrend, type DashboardRecord } from './read-model.service.js';
 
 function record(
@@ -89,5 +91,68 @@ describe('dashboardTrend', () => {
         cancelled: 1,
       }),
     ]);
+  });
+
+  it('computes max occurredAt for unordered records when to is omitted and clamps wide spans to most recent buckets', () => {
+    const result = dashboardTrend(
+      [
+        record('2026-11-20T09:00:00.000Z', 'HOSTED', 'OPEN'),
+        record('2020-01-01T00:00:00.000Z', 'EXTERNAL', 'APPROVED'),
+      ],
+      'DAY',
+    );
+    expect(result).toHaveLength(MAX_DASHBOARD_TREND_BUCKETS.DAY);
+    expect(result.at(-1)?.bucketStart).toBe('2026-11-20T00:00:00.000Z');
+    expect(result.at(-1)?.hosted).toBe(1);
+  });
+
+  it('returns empty when raw from is after raw to even within the same UTC day', () => {
+    const result = dashboardTrend(
+      [record('2026-07-01T08:00:00.000Z', 'HOSTED', 'OPEN')],
+      'DAY',
+      '2026-07-01T12:00:00.000Z',
+      '2026-07-01T06:00:00.000Z',
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('validates tmminDashboardQuerySchema date bounds against DoS spans', () => {
+    expect(
+      tmminDashboardQuerySchema.safeParse({
+        from: '2025-11-25T17:00:00.000Z',
+        to: '2026-11-26T16:59:59.999Z',
+        granularity: 'DAY',
+      }).success,
+    ).toBe(true);
+
+    expect(
+      tmminDashboardQuerySchema.safeParse({
+        from: '2020-01-01T00:00:00.000Z',
+        to: '2026-11-26T00:00:00.000Z',
+        granularity: 'DAY',
+      }).success,
+    ).toBe(false);
+
+    expect(
+      tmminDashboardQuerySchema.safeParse({
+        from: '0001-01-01T00:00:00.000Z',
+        granularity: 'DAY',
+      }).success,
+    ).toBe(false);
+
+    expect(
+      tmminDashboardQuerySchema.safeParse({
+        to: '2099-01-01T00:00:00.000Z',
+        granularity: 'DAY',
+      }).success,
+    ).toBe(false);
+
+    expect(
+      tmminDashboardQuerySchema.safeParse({
+        from: '2026-07-02T00:00:00.000Z',
+        to: '2026-07-01T00:00:00.000Z',
+        granularity: 'DAY',
+      }).success,
+    ).toBe(false);
   });
 });

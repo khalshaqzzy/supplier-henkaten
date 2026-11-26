@@ -18345,7 +18345,7 @@ export interface paths {
                   id: string | null;
                   number: string;
                   name: string;
-                  internalNumber: string | null;
+                  internalNumber?: null;
                 }[];
                 routes: {
                   supervisor: {
@@ -19030,7 +19030,7 @@ export interface paths {
                 id: string | null;
                 number: string;
                 name: string;
-                internalNumber: string | null;
+                internalNumber?: null;
               }[];
               routes: {
                 supervisor: {

@@ -168,6 +168,7 @@ export class ApprovalService {
           await this.finalization.closeTerminalEffects(tx, {
             supplierId: scope.supplierId,
             henkatenId: current.id,
+            lineId: current.lineId,
             henkatenVersion: updated.version,
             toStatus: terminal,
             reason: terminal === 'APPROVED' ? 'APPROVED' : 'REJECTED',
@@ -199,7 +200,12 @@ export class ApprovalService {
             supplierId: scope.supplierId,
             actor: { userId: principal.userId, role: principal.role },
             correlationId: context.correlationId,
-            payload: { route, decision: input.decision, terminalStatus: terminal },
+            payload: {
+              lineId: current.lineId,
+              route,
+              decision: input.decision,
+              terminalStatus: terminal,
+            },
           },
           tx,
         );
