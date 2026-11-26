@@ -956,6 +956,72 @@ fi
 [[ ! -e "${drift_base}/releases/${drift_older_sha}/.activated-images" ]] || fail "shared rollback driver recorded pins for an unpinned older release"
 [[ "$(<"${drift_base}/current_release")" == "${drift_new_sha}" ]] || fail "refused rollback to unpinned older release changed current_release"
 
+# H-1: a HARDENED previous release that lost .activated-images must never be backfilled with the legacy
+# wall-clock heuristic. Cross-SHA: mark it rollback-unsafe before build, leave pins absent, still deploy.
+# Same-SHA: refuse before build. Fixtures provide running containers so the legacy backfill WOULD succeed.
+hardened_base="${TEST_ROOT}/hardened-missing-pins"
+prepare_base "${hardened_base}"
+hardened_prev_sha=6767676767676767676767676767676767676767
+hardened_new_sha=6868686868686868686868686868686868686868
+mkdir -p "${hardened_base}/releases/${hardened_prev_sha}/deploy/scripts"
+cp "${SCRIPTS}"/*.sh "${hardened_base}/releases/${hardened_prev_sha}/deploy/scripts/"
+printf '#!/usr/bin/env bash\nexit 0\n' >"${hardened_base}/releases/${hardened_prev_sha}/deploy/scripts/smoke-check.sh"
+printf '#!/usr/bin/env bash\nexit 0\n' >"${hardened_base}/releases/${hardened_prev_sha}/deploy/scripts/remote-preflight.sh"
+chmod +x "${hardened_base}/releases/${hardened_prev_sha}/deploy/scripts/"*.sh
+sed \
+  -e "s/^RELEASE_SHA=.*/RELEASE_SHA=${hardened_prev_sha}/" \
+  -e "s#^SHARED_DIR=.*#SHARED_DIR=${hardened_base}/shared#" \
+  "${EXAMPLE_ENV}" >"${hardened_base}/releases/${hardened_prev_sha}/.runtime.env"
+grep -Eq '^POSTGRES_APP_USER=.' "${hardened_base}/releases/${hardened_prev_sha}/.runtime.env" || fail "hardened fixture env lacks POSTGRES_APP_USER"
+printf '%s\n' "${hardened_prev_sha}" >"${hardened_base}/releases/${hardened_prev_sha}/.source.sha"
+printf '%s\n' "${hardened_prev_sha}" >"${hardened_base}/releases/${hardened_prev_sha}/.activated"
+printf '%s\n' "${hardened_prev_sha}" >"${hardened_base}/current_release"
+hardened_images="${TEST_ROOT}/hardened-images.state"
+cat >"${hardened_images}" <<EOF
+supplier-henkaten-postgres:18.4-pgvector-0.8.5 sha256:hardened-postgres
+supplier-henkaten-api:${hardened_prev_sha} sha256:hardened-api
+supplier-henkaten-supplier-web:${hardened_prev_sha} sha256:hardened-supplier-web
+supplier-henkaten-tmmin-web:${hardened_prev_sha} sha256:hardened-tmmin-web
+supplier-henkaten-caddy:${hardened_prev_sha} sha256:hardened-caddy
+EOF
+hardened_running="${TEST_ROOT}/hardened-running.state"
+cat >"${hardened_running}" <<EOF
+postgres sha256:hardened-postgres
+api sha256:hardened-api
+supplier-web sha256:hardened-supplier-web
+tmmin-web sha256:hardened-tmmin-web
+caddy sha256:hardened-caddy
+EOF
+# Same-SHA redeploy of the hardened active release must refuse before build and must not reconstruct pins.
+hardened_same_log="${TEST_ROOT}/hardened-same-sha.log"
+if TEST_BUILD_TAG_SUFFIX=60 TEST_DOCKER_LOG="${hardened_same_log}" TEST_IMAGE_STATE_FILE="${hardened_images}" TEST_RUNNING_IMAGES_FILE="${hardened_running}" \
+  run_candidate "${hardened_base}" "${hardened_prev_sha}" 60 >/dev/null 2>"${TEST_ROOT}/hardened-same-sha.err"; then
+  fail "same-SHA redeploy of a hardened release missing .activated-images was accepted"
+fi
+grep -q 'legacy pin backfill is not permitted for hardened releases' "${TEST_ROOT}/hardened-same-sha.err" || fail "same-SHA redeploy of an unpinned hardened release was refused for an unexpected reason: $(tail -n 1 "${TEST_ROOT}/hardened-same-sha.err")"
+if [[ -f "${hardened_same_log}" ]] && grep -q ' build ' "${hardened_same_log}"; then
+  fail "same-SHA redeploy of a hardened release missing .activated-images reached docker compose build"
+fi
+[[ ! -e "${hardened_base}/releases/${hardened_prev_sha}/.activated-images" ]] || fail "same-SHA redeploy backfilled legacy pins for a hardened release"
+# Cross-SHA deploy must mark the hardened previous release rollback-unsafe BEFORE build and never backfill it.
+hardened_cross_log="${TEST_ROOT}/hardened-cross-sha.log"
+TEST_BUILD_TAG_SUFFIX=61 TEST_DOCKER_LOG="${hardened_cross_log}" TEST_IMAGE_STATE_FILE="${hardened_images}" TEST_RUNNING_IMAGES_FILE="${hardened_running}" \
+  TEST_BUILD_ASSERT_EXISTS="${hardened_base}/releases/${hardened_prev_sha}/.rollback-unsafe" \
+  run_candidate "${hardened_base}" "${hardened_new_sha}" 61 >/dev/null 2>&1 || fail "cross-SHA deploy over a hardened release missing .activated-images failed"
+if grep -q '^BUILD_PRECONDITION_MISSING ' "${hardened_cross_log}"; then
+  fail ".rollback-unsafe was NOT written before build for a hardened release missing .activated-images"
+fi
+[[ "$(<"${hardened_base}/current_release")" == "${hardened_new_sha}" ]] || fail "cross-SHA deploy over a hardened release missing pins did not activate"
+[[ ! -e "${hardened_base}/releases/${hardened_prev_sha}/.activated-images" ]] || fail "cross-SHA deploy backfilled legacy pins for a hardened release"
+[[ -f "${hardened_base}/releases/${hardened_prev_sha}/.rollback-unsafe" ]] || fail "cross-SHA deploy did not mark the unpinned hardened release rollback-unsafe"
+hardened_rb_log="${TEST_ROOT}/hardened-rollback.log"
+if TEST_DOCKER_LOG="${hardened_rb_log}" TEST_IMAGE_STATE_FILE="${hardened_images}" TEST_RUNNING_IMAGES_FILE="${hardened_running}" \
+  PATH="${fake_bin}:${PATH}" "${hardened_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" \
+  staging "${hardened_prev_sha}" "${hardened_base}" >/dev/null 2>&1; then
+  fail "rollback driver accepted a hardened release that was never pinned"
+fi
+[[ "$(<"${hardened_base}/current_release")" == "${hardened_new_sha}" ]] || fail "refused rollback to unpinned hardened release changed current_release"
+
 # Pre-build cross-SHA abort when NEITHER backfill NOR mark_rollback_unsafe can succeed (unwritable legacy dir).
 unwritable_prev_base="${TEST_ROOT}/unwritable-prev-cross-sha"
 prepare_base "${unwritable_prev_base}"

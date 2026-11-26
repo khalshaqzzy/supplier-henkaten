@@ -105,7 +105,16 @@ if [[ -n "${previous_release}" ]]; then
       "supplier-henkaten-caddy:${REQUESTED_SHA}"
     )
   fi
-  if [[ ! -f "${previous_pinned_images}" && ! -e "${previous_dir_for_snapshot}/.rollback-unsafe" && ! -L "${previous_dir_for_snapshot}/.rollback-unsafe" && -d "${previous_dir_for_snapshot}" ]]; then
+  if [[ ! -f "${previous_pinned_images}" && ! -L "${previous_pinned_images}" && -d "${previous_dir_for_snapshot}" ]] && release_is_hardened "${previous_dir_for_snapshot}"; then
+    # Hardened releases record .activated-images at activation. A missing manifest is lost evidence, so the
+    # legacy wall-clock backfill must never reconstruct pins from whatever containers are running now.
+    if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
+      die "Cannot safely redeploy active release ${REQUESTED_SHA}: hardened release is missing .activated-images; legacy pin backfill is not permitted for hardened releases."
+    fi
+    image_snapshot_complete=false
+    mark_rollback_unsafe "${previous_dir_for_snapshot}" "${previous_release}" || die "Cannot safely proceed with build: hardened previous release ${previous_release} is missing .activated-images and .rollback-unsafe could not be persisted."
+    echo "Warning: hardened previous release ${previous_release} is missing .activated-images; marked rollback-unsafe instead of backfilling legacy pins." >&2
+  elif [[ ! -f "${previous_pinned_images}" && ! -e "${previous_dir_for_snapshot}/.rollback-unsafe" && ! -L "${previous_dir_for_snapshot}/.rollback-unsafe" && -d "${previous_dir_for_snapshot}" ]]; then
     if ! write_activated_images "${previous_dir_for_snapshot}" "${previous_release}" "${previous_dir_for_snapshot}/.runtime.env" "${BASE_DIR}/current_release"; then
       if [[ "${previous_release}" == "${REQUESTED_SHA}" ]]; then
         die "Cannot safely redeploy active release ${REQUESTED_SHA}: unable to persist pre-build baseline pins in .activated-images."

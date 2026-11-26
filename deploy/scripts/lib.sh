@@ -239,6 +239,16 @@ postgres_image_ref_for() {
   printf '%s\n' "${ref:-supplier-henkaten-postgres:18.4-pgvector-0.8.5}"
 }
 
+# A release is "hardened" (ADR 0057) when its stored runtime env provisions a distinct runtime DB role or
+# its source tree ships the migrate CLI. Only NON-hardened (legacy) releases may ever have their image pins
+# reconstructed from running containers with the wall-clock provenance heuristic; a hardened release always
+# records .activated-images at activation, so a missing manifest means lost evidence, not a legacy baseline.
+release_is_hardened() {
+  local release_dir="$1"
+  [[ -f "${release_dir}/apps/api/src/cli/migrate.ts" ]] && return 0
+  [[ -f "${release_dir}/.runtime.env" ]] && grep -Eq '^POSTGRES_APP_USER="?[^"[:space:]]' "${release_dir}/.runtime.env"
+}
+
 mark_rollback_unsafe() {
   local release_dir="$1"
   local reason_sha="$2"

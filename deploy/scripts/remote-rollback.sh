@@ -35,7 +35,7 @@ load_runtime_env "${RUNTIME_ENV}"
 [[ "${REQUESTED_ENV}" == "${APP_ENV:-}" && "${REQUESTED_SHA}" == "${RELEASE_SHA:-}" ]] || die "Rollback environment or release SHA mismatch."
 
 is_hardened_release=false
-if [[ -n "${POSTGRES_APP_USER:-}" || -f "${RELEASE_DIR}/apps/api/src/cli/migrate.ts" ]]; then
+if [[ -n "${POSTGRES_APP_USER:-}" ]] || release_is_hardened "${RELEASE_DIR}"; then
   is_hardened_release=true
 fi
 if [[ "${is_hardened_release}" == "true" && ! -f "${RELEASE_DIR}/.activated" ]]; then
