@@ -60,6 +60,21 @@ const LINE_CACHE_INVALIDATING_EVENTS = new Set<string>([
   'SUPPLIER_SOURCE_MODE_CHANGED',
 ]);
 
+export function formatSseFrame(message: StreamMessage): string {
+  const lines: string[] = [];
+  // Only include `id:` on invalidation events so heartbeats/resyncs never overwrite
+  // the browser's Last-Event-ID outbox UUID cursor.
+  if (message.type === 'invalidate' && message.id) {
+    lines.push(`id: ${message.id}`);
+  }
+  lines.push(`event: ${message.type}`);
+  if (typeof message.retry === 'number') {
+    lines.push(`retry: ${message.retry}`);
+  }
+  lines.push(`data: ${JSON.stringify(message.data)}`);
+  return `${lines.join('\n')}\n\n`;
+}
+
 @Injectable()
 export class RealtimeService {
   private readonly logger = new Logger(RealtimeService.name);
@@ -88,7 +103,7 @@ export class RealtimeService {
 
   async assertLineExists(supplierId: string, lineId: string): Promise<void> {
     const line = await this.prisma.line.findFirst({
-      where: { id: lineId, supplierId },
+      where: { id: lineId, supplierId, deletedAt: null },
       select: { id: true },
     });
     if (!line) {
@@ -99,6 +114,53 @@ export class RealtimeService {
         detail: 'The requested line does not exist.',
       });
     }
+  }
+
+  /**
+   * Direct HTTP SSE handler guaranteeing 404/429 admission decisions complete
+   * before 200 text/event-stream headers commit, avoiding NestJS SseStream's
+   * auto-incrementing numeric IDs and hidden concatMap writer buffer.
+   */
+  async handleHttpStream(
+    scope: TenantScope,
+    principal: RequestPrincipal,
+    lineId: string | undefined,
+    lastEventId: string | undefined,
+    response: Response,
+  ): Promise<void> {
+    const observable = await this.prepareStream(scope, principal, lineId, lastEventId, response);
+    if (response.destroyed || response.writableEnded) return;
+
+    response.status(200);
+    response.setHeader('Content-Type', 'text/event-stream');
+    response.setHeader('Cache-Control', 'no-cache, no-transform');
+    response.setHeader('Connection', 'keep-alive');
+    response.setHeader('X-Accel-Buffering', 'no');
+    response.flushHeaders?.();
+
+    const subscription = observable.subscribe({
+      next: (message) => {
+        if (response.destroyed || response.writableEnded) {
+          subscription.unsubscribe();
+          return;
+        }
+        response.write(formatSseFrame(message));
+      },
+      complete: () => {
+        if (!response.destroyed && !response.writableEnded) {
+          response.end();
+        }
+      },
+      error: () => {
+        if (!response.destroyed && !response.writableEnded) {
+          response.end();
+        }
+      },
+    });
+
+    response.once('close', () => {
+      subscription.unsubscribe();
+    });
   }
 
   async prepareStream(
@@ -165,8 +227,11 @@ export class RealtimeService {
     }
 
     if (evictCandidate) {
-      evictCandidate.evict();
-      evictCandidate.release();
+      try {
+        evictCandidate.evict();
+      } finally {
+        evictCandidate.release();
+      }
     }
 
     const slot: ActiveStreamSlot = {
@@ -174,7 +239,11 @@ export class RealtimeService {
       userId: principal.userId,
       supplierId,
       released: false,
-      evict: () => undefined,
+      evict: () => {
+        if (response && !response.destroyed && !response.writableEnded) {
+          response.end();
+        }
+      },
       release: () => {
         if (slot.released) return;
         slot.released = true;
@@ -182,8 +251,15 @@ export class RealtimeService {
         const list = this.sessionSlots.get(slot.sessionId);
         if (list) {
           const next = list.filter((entry) => entry !== slot);
-          if (next.length) this.sessionSlots.set(slot.sessionId, next);
-          else this.sessionSlots.delete(slot.sessionId);
+          if (next.length) {
+            this.sessionSlots.set(slot.sessionId, next);
+          } else {
+            this.sessionSlots.delete(slot.sessionId);
+            if (!this.sessionInFlight.has(slot.sessionId)) {
+              this.sessionCache.delete(slot.sessionId);
+              this.sessionEpochs.delete(slot.sessionId);
+            }
+          }
         }
         const nextUser = (this.userCounts.get(slot.userId) ?? 1) - 1;
         if (nextUser > 0) this.userCounts.set(slot.userId, nextUser);
@@ -214,6 +290,12 @@ export class RealtimeService {
     slot?: ActiveStreamSlot,
   ): Observable<StreamMessage> {
     return new Observable<StreamMessage>((subscriber) => {
+      if (slot?.released || response?.destroyed || response?.writableEnded) {
+        slot?.release();
+        subscriber.complete();
+        return;
+      }
+
       let closed = false;
       let replaying = true;
       let highWater: EventOrderPoint | null = null;
@@ -254,9 +336,6 @@ export class RealtimeService {
             data: { at: new Date().toISOString() },
           });
           finish();
-          if (response && !response.writableEnded && !response.destroyed) {
-            response.end();
-          }
         };
       }
 
@@ -281,7 +360,10 @@ export class RealtimeService {
       };
 
       const writerBackpressured = () =>
-        Boolean(response && response.writableLength > MAX_WRITER_BUFFERED_BYTES);
+        Boolean(
+          response &&
+          (response.writableNeedDrain || response.writableLength > MAX_WRITER_BUFFERED_BYTES),
+        );
 
       const enqueueLive = (event: RealtimeOutboxEvent) => {
         if (closed) return;
@@ -336,7 +418,6 @@ export class RealtimeService {
               liveOverflowed = true;
               continue;
             }
-            highWater = { occurredAt: nextEvent.occurredAt, id: nextEvent.id };
             subscriber.next(this.invalidation(nextEvent, scope.supplierId));
           }
         } catch {
@@ -388,6 +469,11 @@ export class RealtimeService {
           const initialAllowed = await this.loadAllowedLines(scope.supplierId, true);
           if (closed) return;
 
+          if (lineId && !initialAllowed.includes(lineId)) {
+            finish();
+            return;
+          }
+
           subscriber.next({
             type: 'heartbeat',
             retry: 3_000,
@@ -398,11 +484,6 @@ export class RealtimeService {
             void sendHeartbeat();
           }, HEARTBEAT_INTERVAL_MS);
           heartbeatTimer.unref?.();
-
-          if (lineId && !initialAllowed.includes(lineId)) {
-            replaying = false;
-            return;
-          }
 
           const replayResult = await this.replay(
             scope.supplierId,
@@ -474,40 +555,50 @@ export class RealtimeService {
     }
 
     const requestEpoch = this.sessionEpochs.get(key) ?? 0;
+    let trackedPromise: Promise<boolean> | undefined;
     const promise = (async () => {
-      const current = await this.sessions.resolve(principal.rawSessionToken, 'SUPPLIER', false);
-      const valid = Boolean(
-        current &&
-        current.sessionId === principal.sessionId &&
-        current.supplierId === supplierId &&
-        !current.mustChangePassword &&
-        capabilitiesForPrincipal(current).has('SUPPLIER_BOARD_READ'),
-      );
-      if (!valid) {
-        this.invalidateSession(key);
-        return false;
+      try {
+        const current = await this.sessions.resolve(principal.rawSessionToken, 'SUPPLIER', false);
+        const valid = Boolean(
+          current &&
+          current.sessionId === principal.sessionId &&
+          current.supplierId === supplierId &&
+          !current.mustChangePassword &&
+          capabilitiesForPrincipal(current).has('SUPPLIER_BOARD_READ'),
+        );
+        if (!valid) {
+          this.invalidateSession(key);
+          return false;
+        }
+        const currentEpoch = this.sessionEpochs.get(key) ?? 0;
+        if (currentEpoch !== requestEpoch) {
+          return false;
+        }
+        if (ttlMs > 0) {
+          this.sessionCache.set(key, {
+            value: true,
+            expiresAt: Date.now() + ttlMs,
+            epoch: requestEpoch,
+          });
+        }
+        return true;
+      } finally {
+        if (trackedPromise) {
+          const entry = this.sessionInFlight.get(key);
+          if (entry?.promise === trackedPromise) {
+            this.sessionInFlight.delete(key);
+          }
+          if (!this.sessionSlots.has(key)) {
+            this.sessionCache.delete(key);
+            this.sessionEpochs.delete(key);
+          }
+        }
       }
-      const currentEpoch = this.sessionEpochs.get(key) ?? 0;
-      if (currentEpoch !== requestEpoch) {
-        // An invalidation occurred while this check was in flight; never cache or trust stale true.
-        return false;
-      }
-      if (ttlMs > 0) {
-        this.sessionCache.set(key, {
-          value: true,
-          expiresAt: Date.now() + ttlMs,
-          epoch: requestEpoch,
-        });
-      }
-      return true;
     })();
 
     if (!bypassCache && ttlMs > 0) {
+      trackedPromise = promise;
       this.sessionInFlight.set(key, { epoch: requestEpoch, promise });
-      void promise.finally(() => {
-        const entry = this.sessionInFlight.get(key);
-        if (entry?.promise === promise) this.sessionInFlight.delete(key);
-      });
     }
 
     return promise;
@@ -530,30 +621,37 @@ export class RealtimeService {
     }
 
     const requestEpoch = this.lineEpochs.get(supplierId) ?? 0;
+    let trackedPromise: Promise<string[]> | undefined;
     const promise = (async () => {
-      const lines = (
-        await this.prisma.line.findMany({
-          where: { supplierId },
-          select: { id: true },
-        })
-      ).map(({ id }) => id);
-      const currentEpoch = this.lineEpochs.get(supplierId) ?? 0;
-      if (ttlMs > 0 && currentEpoch === requestEpoch) {
-        this.lineCache.set(supplierId, {
-          value: lines,
-          expiresAt: Date.now() + ttlMs,
-          epoch: requestEpoch,
-        });
+      try {
+        const lines = (
+          await this.prisma.line.findMany({
+            where: { supplierId, deletedAt: null },
+            select: { id: true },
+          })
+        ).map(({ id }) => id);
+        const currentEpoch = this.lineEpochs.get(supplierId) ?? 0;
+        if (ttlMs > 0 && currentEpoch === requestEpoch) {
+          this.lineCache.set(supplierId, {
+            value: lines,
+            expiresAt: Date.now() + ttlMs,
+            epoch: requestEpoch,
+          });
+        }
+        return lines;
+      } finally {
+        if (trackedPromise) {
+          const entry = this.lineInFlight.get(supplierId);
+          if (entry?.promise === trackedPromise) {
+            this.lineInFlight.delete(supplierId);
+          }
+        }
       }
-      return lines;
     })();
 
     if (!bypassCache && ttlMs > 0) {
+      trackedPromise = promise;
       this.lineInFlight.set(supplierId, { epoch: requestEpoch, promise });
-      void promise.finally(() => {
-        const entry = this.lineInFlight.get(supplierId);
-        if (entry?.promise === promise) this.lineInFlight.delete(supplierId);
-      });
     }
 
     return promise;
@@ -738,7 +836,7 @@ function extractEventLineIds(event: Pick<RealtimeOutboxEvent, 'payload'>): strin
 function compareEventOrder(left: EventOrderPoint, right: EventOrderPoint): number {
   const diff = left.occurredAt.getTime() - right.occurredAt.getTime();
   if (diff !== 0) return diff;
-  return left.id.localeCompare(right.id);
+  return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
 }
 
 function rateLimited(): ProblemException {

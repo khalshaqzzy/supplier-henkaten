@@ -127,13 +127,13 @@ else
   echo "Warning: POSTGRES_APP_PASSWORD is not set; deriving a one-way HMAC-SHA256 runtime password (staged zero-touch). Provision an independent POSTGRES_APP_PASSWORD secret when ready." >&2
   if command -v python3 >/dev/null 2>&1; then
     POSTGRES_APP_PASSWORD="$(
-      APP_ENV="${APP_ENV}" POSTGRES_USER="${POSTGRES_USER}" POSTGRES_DATABASE="${POSTGRES_DATABASE}" POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
-        python3 -c 'import hashlib, hmac, os; msg = ("supplier-henkaten:postgres-app-role:v1:" + os.environ["APP_ENV"] + ":" + os.environ["POSTGRES_USER"] + ":" + os.environ["POSTGRES_DATABASE"]).encode(); print(hmac.new(os.environ["POSTGRES_PASSWORD"].encode(), msg, hashlib.sha256).hexdigest())'
+      APP_ENV="${APP_ENV}" POSTGRES_USER="${POSTGRES_USER}" POSTGRES_APP_USER="${POSTGRES_APP_USER}" POSTGRES_DATABASE="${POSTGRES_DATABASE}" POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
+        python3 -c 'import hashlib, hmac, os; msg = ("supplier-henkaten:postgres-app-role:v1:" + os.environ["APP_ENV"] + ":" + os.environ["POSTGRES_USER"] + ":" + os.environ["POSTGRES_APP_USER"] + ":" + os.environ["POSTGRES_DATABASE"]).encode(); print(hmac.new(os.environ["POSTGRES_PASSWORD"].encode(), msg, hashlib.sha256).hexdigest())'
     )"
   elif command -v node >/dev/null 2>&1; then
     POSTGRES_APP_PASSWORD="$(
-      APP_ENV="${APP_ENV}" POSTGRES_USER="${POSTGRES_USER}" POSTGRES_DATABASE="${POSTGRES_DATABASE}" POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
-        node -e 'const c=require("node:crypto");const m="supplier-henkaten:postgres-app-role:v1:"+process.env.APP_ENV+":"+process.env.POSTGRES_USER+":"+process.env.POSTGRES_DATABASE;process.stdout.write(c.createHmac("sha256",process.env.POSTGRES_PASSWORD).update(m).digest("hex"))'
+      APP_ENV="${APP_ENV}" POSTGRES_USER="${POSTGRES_USER}" POSTGRES_APP_USER="${POSTGRES_APP_USER}" POSTGRES_DATABASE="${POSTGRES_DATABASE}" POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
+        node -e 'const c=require("node:crypto");const m="supplier-henkaten:postgres-app-role:v1:"+process.env.APP_ENV+":"+process.env.POSTGRES_USER+":"+process.env.POSTGRES_APP_USER+":"+process.env.POSTGRES_DATABASE;process.stdout.write(c.createHmac("sha256",process.env.POSTGRES_PASSWORD).update(m).digest("hex"))'
     )"
   else
     echo "python3 or node is required to derive POSTGRES_APP_PASSWORD when unset." >&2

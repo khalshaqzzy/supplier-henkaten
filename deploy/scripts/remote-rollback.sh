@@ -20,12 +20,16 @@ if [[ "${DEPLOY_LOCK_HELD:-false}" != "true" ]]; then
   flock -n 9 || die "Another deploy or rollback is already running."
 fi
 
+"${SCRIPT_DIR}/validate-runtime-env.sh" --allow-legacy-db-role "${RUNTIME_ENV}"
 load_runtime_env "${RUNTIME_ENV}"
 [[ "${REQUESTED_ENV}" == "${APP_ENV:-}" ]] || die "Rollback environment mismatch."
 
 printf 'Rolling code back to %s; database schema and shared volumes are not restored.\n' "${RELEASE_SHA}"
 compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" up -d --no-deps postgres
 wait_for_service "${RELEASE_DIR}" "${RUNTIME_ENV}" postgres 180
+if [[ -n "${POSTGRES_APP_USER:-}" && -n "${POSTGRES_APP_PASSWORD:-}" && -f "${RELEASE_DIR}/apps/api/src/cli/migrate.ts" ]]; then
+  compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" --profile operations run --rm --entrypoint node migrate dist/cli/migrate.js --provision-role-only
+fi
 compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" up -d --no-deps api
 wait_for_service "${RELEASE_DIR}" "${RUNTIME_ENV}" api 240
 compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" up -d --no-deps supplier-web tmmin-web

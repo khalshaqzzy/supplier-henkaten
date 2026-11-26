@@ -49,7 +49,7 @@ RELEASE_DIR="${BASE_DIR}/releases/${REQUESTED_SHA}"
 if [[ -d "${RELEASE_DIR}" ]]; then
   [[ -f "${RELEASE_DIR}/.source.sha" && "$(<"${RELEASE_DIR}/.source.sha")" == "${REQUESTED_SHA}" ]] || die "Existing release directory failed source identity validation."
   [[ -f "${RELEASE_DIR}/.runtime.env" ]] || die "Existing release runtime env is missing."
-  (load_runtime_env "${RELEASE_DIR}/.runtime.env") || die "Existing release runtime env failed safe parsing."
+  "${SCRIPT_DIR}/validate-runtime-env.sh" "${RELEASE_DIR}/.runtime.env"
   rm -rf -- "${INCOMING_DIR}"
 else
   install -m 600 "${RUNTIME_ENV_INCOMING}" "${INCOMING_DIR}/.runtime.env"
@@ -58,6 +58,7 @@ else
 fi
 RUNTIME_ENV="${RELEASE_DIR}/.runtime.env"
 load_runtime_env "${RUNTIME_ENV}"
+[[ "${APP_ENV}" == "${REQUESTED_ENV}" && "${RELEASE_SHA}" == "${REQUESTED_SHA}" ]] || die "Stored runtime environment identity mismatch."
 
 previous_release=""
 if [[ -f "${BASE_DIR}/current_release" ]]; then
@@ -92,7 +93,7 @@ candidate_deploy() {
 if ! candidate_deploy; then
   echo "Candidate deployment failed. No database down migration will be attempted." >&2
   previous_env="${BASE_DIR}/releases/${previous_release}/.runtime.env"
-  if [[ -n "${previous_release}" && "${previous_release}" != "${REQUESTED_SHA}" && -f "${previous_env}" ]] && (load_runtime_env "${previous_env}"); then
+  if [[ -n "${previous_release}" && "${previous_release}" != "${REQUESTED_SHA}" && -f "${previous_env}" ]] && "${SCRIPT_DIR}/validate-runtime-env.sh" --allow-legacy-db-role "${previous_env}" >/dev/null 2>&1; then
     DEPLOY_LOCK_HELD=true "${BASE_DIR}/releases/${previous_release}/deploy/scripts/remote-rollback.sh" \
       "${REQUESTED_ENV}" "${previous_release}" "${BASE_DIR}" || echo "Automatic code rollback also failed." >&2
   else

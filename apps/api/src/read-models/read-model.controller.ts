@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, Put, Req, Res, Sse } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Put, Req, Res } from '@nestjs/common';
 import type { Response } from 'express';
 
 import {
@@ -148,13 +148,13 @@ export class SupplierReadModelController {
   }
 
   @RequireCapabilities('SUPPLIER_BOARD_READ')
-  @Sse('/realtime')
+  @Get('/realtime')
   realtimeEvents(
     @ValidatedQuery(realtimeQuerySchema) query: RealtimeQuery,
     @Req() request: ContextRequest,
-    @Res({ passthrough: true }) response: Response,
+    @Res() response: Response,
   ) {
-    return this.realtime.prepareStream(
+    return this.realtime.handleHttpStream(
       this.access.supplierScope(request),
       this.access.principal(request),
       query.lineId,

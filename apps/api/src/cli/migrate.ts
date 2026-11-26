@@ -171,6 +171,30 @@ export async function provisionRuntimeRole(options: ProvisionRuntimeRoleOptions)
       END $$;
     `);
 
+    const expectedRestrictedTables = [
+      ...APPEND_ONLY_LEDGER_TABLES,
+      ...HIDDEN_AT_LEDGER_TABLES,
+      ...NO_DELETE_TABLES,
+    ];
+    const uncategorized = await adminClient.query<{ table_name: string }>(
+      `
+      SELECT DISTINCT c.relname AS table_name
+      FROM pg_trigger t
+      JOIN pg_class c ON c.oid = t.tgrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public'
+        AND NOT t.tgisinternal
+        AND t.tgname ~ '(_prevent_update_delete|_immutable|_deletion_guard)$'
+        AND NOT (c.relname = ANY($1::text[]))
+      `,
+      [expectedRestrictedTables],
+    );
+    if (uncategorized.rows.length > 0) {
+      throw new Error(
+        `Uncategorized immutable tables missing from runtime DB role grant lists: ${uncategorized.rows.map((r) => r.table_name).join(', ')}`,
+      );
+    }
+
     const verification = await adminClient.query<{
       rolsuper: boolean;
       rolcreatedb: boolean;
@@ -258,13 +282,16 @@ async function run(): Promise<void> {
     throw new Error('DATABASE_URL is required for migration.');
   }
 
-  execFileSync(
-    process.execPath,
-    ['node_modules/prisma/build/index.js', 'migrate', 'deploy', '--config', 'prisma.config.ts'],
-    { stdio: 'inherit' },
-  );
+  const provisionRoleOnly = process.argv.includes('--provision-role-only');
+  if (!provisionRoleOnly) {
+    execFileSync(
+      process.execPath,
+      ['node_modules/prisma/build/index.js', 'migrate', 'deploy', '--config', 'prisma.config.ts'],
+      { stdio: 'inherit' },
+    );
+  }
 
-  const requireAppRole = process.env['REQUIRE_APP_DB_ROLE'] === 'true';
+  const requireAppRole = provisionRoleOnly || process.env['REQUIRE_APP_DB_ROLE'] === 'true';
   const appUser = process.env['POSTGRES_APP_USER']?.trim();
   const appPassword = process.env['POSTGRES_APP_PASSWORD']?.trim();
 

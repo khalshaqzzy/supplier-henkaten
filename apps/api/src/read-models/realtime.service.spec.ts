@@ -9,7 +9,7 @@ import { realtimeInvalidationSchema, realtimeResyncSchema } from '@tmmin-henkate
 import type { RequestPrincipal } from '../common/request-context.js';
 import { TenantScope } from '../common/scope.js';
 import { RealtimeEventPump, type RealtimeOutboxEvent } from './realtime-event-pump.js';
-import { RealtimeService } from './realtime.service.js';
+import { formatSseFrame, RealtimeService } from './realtime.service.js';
 
 const SUPPLIER_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_SUPPLIER_ID = '22222222-2222-4222-8222-222222222222';
@@ -151,11 +151,13 @@ describe('RealtimeService', () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     const moveEvent = event({
+      id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
       eventType: 'MP_MOVED',
       payload: { lineId: LINE_A, sourceLineId: LINE_B },
     });
     const deleteCommandId = randomUUID();
     const deleteEvent = event({
+      id: '00000000-0000-4000-8000-000000000001',
       eventType: 'HENKATEN_DATA_DELETED',
       aggregateType: 'HenkatenDeletionCommand',
       aggregateId: deleteCommandId,
@@ -323,5 +325,96 @@ describe('RealtimeService', () => {
     sub2.unsubscribe();
     sub3.unsubscribe();
     sub4.unsubscribe();
+  });
+
+  it('prevents pre-subscription eviction race, omits id on heartbeats, and handles DB rejection without unhandled rejection', async () => {
+    const events = new Subject<RealtimeOutboxEvent>();
+    const findFirst = vi.fn().mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      return null;
+    });
+    const resolveSession = vi.fn().mockRejectedValue(new Error('db_transient_error'));
+    const service = new RealtimeService(
+      {
+        line: {
+          findFirst,
+          findMany: vi.fn().mockResolvedValue([{ id: LINE_A }]),
+        },
+        outboxEvent: { findMany: vi.fn().mockResolvedValue([]) },
+      } as never,
+      { events: () => events } as never,
+      { resolve: resolveSession } as never,
+      {
+        sseMaxPerSession: 1,
+        sseMaxPerUser: 5,
+        sseMaxPerSupplier: 10,
+        sseMaxGlobal: 20,
+        sseRevalidationCacheMs: 2_000,
+      } as never,
+    );
+
+    // Delayed 404 lookup must reject before HTTP 200 SSE headers are written.
+    const httpRes = Object.assign(fakeResponse(), {
+      status: vi.fn(),
+      setHeader: vi.fn(),
+      flushHeaders: vi.fn(),
+      write: vi.fn(),
+    });
+    await expect(
+      service.handleHttpStream(
+        new TenantScope(SUPPLIER_ID),
+        principal,
+        LINE_B,
+        undefined,
+        httpRes as never,
+      ),
+    ).rejects.toMatchObject({ problem: { status: 404 } });
+    expect(httpRes.status).not.toHaveBeenCalled();
+    expect(httpRes.write).not.toHaveBeenCalled();
+
+    // Heartbeat and resync frames must NOT emit `id:` so browser Last-Event-ID UUID is preserved.
+    expect(
+      formatSseFrame({ type: 'heartbeat', retry: 3_000, data: { at: '2026-11-26T00:00:00.000Z' } }),
+    ).not.toContain('id:');
+    expect(
+      formatSseFrame({
+        type: 'resync',
+        retry: 3_000,
+        data: { reason: 'CURSOR_UNAVAILABLE', at: '2026-11-26T00:00:00.000Z' },
+      }),
+    ).not.toContain('id:');
+    expect(
+      formatSseFrame({
+        id: HENKATEN_ID,
+        type: 'invalidate',
+        retry: 3_000,
+        data: { eventType: 'HENKATEN_OPENED' },
+      }),
+    ).toContain(`id: ${HENKATEN_ID}`);
+
+    // Pre-subscription eviction: stream 1 is evicted BEFORE subscribe() is called.
+    const resA = fakeResponse();
+    const resB = fakeResponse();
+    const unsubscribed1 = await service.prepareStream(
+      new TenantScope(SUPPLIER_ID),
+      principal,
+      undefined,
+      undefined,
+      resA as never,
+    );
+    const stream2 = await service.prepareStream(
+      new TenantScope(SUPPLIER_ID),
+      principal,
+      undefined,
+      undefined,
+      resB as never,
+    );
+    const completed1 = vi.fn();
+    const sub1 = unsubscribed1.subscribe({ complete: completed1 });
+    expect(completed1).toHaveBeenCalledOnce();
+    const sub2 = stream2.subscribe();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    sub1.unsubscribe();
+    sub2.unsubscribe();
   });
 });
