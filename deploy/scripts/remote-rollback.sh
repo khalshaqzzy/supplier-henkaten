@@ -70,9 +70,10 @@ rollback_mutating=false
 stop_mixed_stack_on_failure() {
   local status=$?
   if [[ "${rollback_mutating}" == "true" ]]; then
-    trap - TERM INT HUP
-    compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
-    echo "Rollback to ${REQUESTED_SHA} failed or was interrupted after services began changing; stopped Caddy and application services while preserving PostgreSQL to avoid serving a mixed release. Re-run this driver for a release with verified pins (for example the release named by current_release)." >&2
+    # Cleanup must not be interrupted by a second signal or killed by a broken output pipe.
+    trap '' TERM INT HUP PIPE
+    failclosed_stop_app_services "${RELEASE_DIR}" "${RUNTIME_ENV}" "${BASE_DIR}" || true
+    note_stderr "Rollback to ${REQUESTED_SHA} failed or was interrupted after services began changing; stopped Caddy and application services while preserving PostgreSQL to avoid serving a mixed release. Re-run this driver for a release with verified pins (for example the release named by current_release)."
     # Exit 4 is reserved for refusals BEFORE any change; a post-mutation failure (e.g. a target smoke-check or
     # migrate container that happens to return 4) must stay retryable by the known-good fallback.
     if [[ "${status}" -eq 0 || "${status}" -eq "${ROLLBACK_POLICY_REFUSAL_EXIT}" ]]; then
@@ -99,6 +100,10 @@ fi
 
 printf 'Rolling code back to %s; database schema and shared volumes are not restored.\n' "${REQUESTED_SHA}"
 rollback_mutating=true
+# Quiesce ingress BEFORE replacing anything: with the current Caddy stopped, no request can reach a
+# half-replaced stack even if Compose stalls (catchable signals are deferred until it returns). Caddy is
+# started again last, only after the API and frontends of the target release are healthy.
+compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy
 compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" up -d --no-deps postgres
 wait_for_service "${RELEASE_DIR}" "${RUNTIME_ENV}" postgres 180
 if [[ -n "${POSTGRES_APP_USER:-}" && -n "${POSTGRES_APP_PASSWORD:-}" && -f "${RELEASE_DIR}/apps/api/src/cli/migrate.ts" ]]; then

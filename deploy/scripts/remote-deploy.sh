@@ -171,10 +171,14 @@ deploy_mutation_open=false
 stop_candidate_on_interrupted_mutation() {
   local status=$?
   if [[ "${deploy_mutation_open}" == "true" ]]; then
-    trap - TERM INT HUP
-    compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
-    echo "Deploy of ${REQUESTED_SHA} ended or was interrupted inside its service-mutation window; stopped application services while preserving PostgreSQL." >&2
-    [[ "${status}" -ne 0 ]] || status=1
+    # Cleanup must not be interrupted by a second signal or killed by a broken output pipe.
+    trap '' TERM INT HUP PIPE
+    failclosed_stop_app_services "${RELEASE_DIR}" "${RUNTIME_ENV}" "${BASE_DIR}" || true
+    note_stderr "Deploy of ${REQUESTED_SHA} ended or was interrupted inside its service-mutation window; stopped application services while preserving PostgreSQL."
+    # Neither success (0) nor "recovery completed" (3) may ever be reported from an open mutation window.
+    if [[ "${status}" -eq 0 || "${status}" -eq "${AUTOMATIC_ROLLBACK_COMPLETED_EXIT}" ]]; then
+      status=1
+    fi
   fi
   exit "${status}"
 }
@@ -241,6 +245,8 @@ run_known_good_rollback_driver() {
 }
 
 if ! candidate_deploy; then
+  # From here on a closed SSH session (cancelled runner) must not kill recovery mid-way via SIGPIPE.
+  trap '' PIPE
   echo "Candidate deployment failed. No database down migration will be attempted." >&2
   previous_dir="${BASE_DIR}/releases/${previous_release}"
   images_restored=true
@@ -257,7 +263,7 @@ if ! candidate_deploy; then
     exit 1
   fi
   if [[ -n "${previous_release}" && ( "${images_restored}" != "true" || "${image_snapshot_complete}" != "true" || ( ( -e "${previous_dir}/.rollback-unsafe" || -L "${previous_dir}/.rollback-unsafe" ) && ! -f "${previous_dir}/.activated-images" ) ) ]]; then
-    compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
+    failclosed_stop_app_services "${RELEASE_DIR}" "${RUNTIME_ENV}" "${BASE_DIR}" || true
     echo "Refusing automatic rollback because pre-build Docker image tags could not be verified as restored or target release ${previous_release} is marked rollback-unsafe; failed application services were stopped while persistent PostgreSQL was preserved." >&2
     exit 1
   fi
@@ -283,19 +289,21 @@ if ! candidate_deploy; then
     if (( candidate_driver_status != 0 )) &&
       { (( candidate_driver_status == ROLLBACK_POLICY_REFUSAL_EXIT )) || ! run_known_good_rollback_driver; }; then
       echo "Automatic code rollback failed or was refused (candidate driver exit ${candidate_driver_status}); stopping failed candidate application services while preserving PostgreSQL." >&2
-      compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
+      failclosed_stop_app_services "${RELEASE_DIR}" "${RUNTIME_ENV}" "${BASE_DIR}" || true
     elif [[ ! -f "${BASE_DIR}/current_release" || "$(<"${BASE_DIR}/current_release")" != "${previous_release}" ]] ||
       ! verify_running_matches_manifest "${previous_dir}" "${previous_env}" "${previous_release}"; then
       echo "A rollback driver reported success but ${previous_release} is not verifiably active on its pinned images; stopping application services while preserving PostgreSQL." >&2
-      compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
+      failclosed_stop_app_services "${RELEASE_DIR}" "${RUNTIME_ENV}" "${BASE_DIR}" || true
     else
-      printf 'DEPLOY_RESULT=automatic-rollback-completed forced_smoke_failure=%s restored=%s\n' \
-        "${forced_smoke_failure_reached}" "${previous_release}"
+      # Recovery is verified: close the mutation window BEFORE writing to a possibly broken stdout, so a
+      # failed write can never make the trap stop the healthy restored release.
       deploy_mutation_open=false
+      { printf 'DEPLOY_RESULT=automatic-rollback-completed forced_smoke_failure=%s restored=%s\n' \
+        "${forced_smoke_failure_reached}" "${previous_release}"; } 2>/dev/null || true
       exit "${AUTOMATIC_ROLLBACK_COMPLETED_EXIT}"
     fi
   else
-    compose_for "${RELEASE_DIR}" "${RUNTIME_ENV}" stop caddy supplier-web tmmin-web api || true
+    failclosed_stop_app_services "${RELEASE_DIR}" "${RUNTIME_ENV}" "${BASE_DIR}" || true
     echo "No validated previous code release was available; failed application services were stopped while persistent PostgreSQL was preserved." >&2
   fi
   exit 1

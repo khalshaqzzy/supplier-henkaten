@@ -20,7 +20,9 @@ bounded live queues with `drain`-deferred resync and `response.destroy()` hard b
 4-query board invalidation on `onResync`/`onReconnect` (`H-05`); closed-allowlist two-pass
 non-evaluating `.runtime.env` parsing, RFC-1123 FQDN validation, `32..128`-char
 `POSTGRES_APP_PASSWORD` parity, same-SHA failed-candidate retry env refresh vs immutable
-`.activated` rollback snapshots, and pre-validated rollback (`H-06`);
+`.activated` rollback snapshots, pre-validated rollback, and a pinned fail-closed deploy/rollback
+state machine (five-image `.activated-images` pins, shared strict rollback driver, verified automatic
+recovery, interruption-safe stops; ADR 0057 Decision 7, deploymentGuide §9) (`H-06`);
 and distroless `apps/api/src/cli/migrate.ts` provisioning a least-privilege non-superuser
 PostgreSQL runtime role (`POSTGRES_APP_USER`) with SCRAM-SHA-256 verifier and staged zero-touch
 credential derivation (`H-07`). See

@@ -26,8 +26,13 @@
   `source`) and strict RFC-1123 FQDN validation. The hosted `api` and `bootstrap-admin` containers
   connect through a dedicated non-superuser PostgreSQL runtime role (`POSTGRES_APP_USER`) provisioned
   idempotently during `migrate` with least-privilege table/column grants and staged zero-touch
-  credential derivation (overridable by an explicit `POSTGRES_APP_PASSWORD` secret). Staging vs.
-  production SSH/secret separation and manual production approval gates remain deferred.
+  credential derivation (overridable by an explicit `POSTGRES_APP_PASSWORD` secret). Code rollback
+  (automatic on failed validation, manual, and staging rehearsal) only restarts the five image IDs
+  pinned when a release was activated, always through one shared strict rollback driver, and fails
+  closed (stopping application services while keeping PostgreSQL) whenever pins, provenance, or the
+  recovered state cannot be verified or the run is interrupted. Releases without verified pins are
+  recovered by shipping a new commit. Staging vs. production SSH/secret separation and manual
+  production approval gates remain deferred.
 
 See [ADR 0057](../docs/adr/0057-high-severity-security-hardening-and-runtime-db-isolation.md).
 
@@ -2495,6 +2500,7 @@ Adaptasi pola `loom`:
 - Migration production wajib forward-only dan expand/contract.
 - Destructive column/table removal tidak boleh berada pada release yang sama dengan code transition.
 - Code rollback hanya dijamin bila database schema backward compatible.
+- Code rollback hanya menyalakan image ID yang di-pin saat rilis diaktifkan (`.activated-images`) melalui driver rollback strict bersama; target tanpa pin terverifikasi ditolak dan dipulihkan dengan commit baru (lihat `.agent/deploymentGuide.md` §9).
 - `prisma migrate reset`, down migration destructive, atau reset database dilarang di staging/production.
 - Karena tidak ada backup, migration destructive merupakan accepted critical risk dan harus dicegah melalui CI/review, bukan dipulihkan.
 

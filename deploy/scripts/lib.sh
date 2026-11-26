@@ -274,7 +274,9 @@ rename_exact() {
   fi
 }
 
-ROLLBACK_DRIVER_CONTRACT="strict-five-image-pins-v1"
+# v2: strict five-image pins + mutation-flag EXIT/signal cleanup + ingress quiesced during rollback. Bumped
+# from v1 so bundles from earlier PR iterations (strict pins but no mutation cleanup) are never trusted.
+ROLLBACK_DRIVER_CONTRACT="strict-five-image-pins-v2"
 # Exit status remote-rollback.sh uses for deliberate policy refusals (never retried by any fallback).
 # shellcheck disable=SC2034 # consumed by remote-rollback.sh and remote-deploy.sh, which source lib.sh
 ROLLBACK_POLICY_REFUSAL_EXIT=4
@@ -308,6 +310,24 @@ verify_running_matches_manifest() {
       return 1
     fi
   done
+}
+
+# Fail-closed stop of Caddy + application services (PostgreSQL preserved) that survives a broken SSH session:
+# Compose output goes to a durable log instead of the (possibly closed) stdout/stderr pipe, so a cancelled CI
+# runner cannot make the stop itself die of SIGPIPE before stopping anything.
+failclosed_stop_app_services() {
+  local release_dir="$1"
+  local compose_env="$2"
+  local base_dir="$3"
+  local log="${base_dir}/shared/deployment-state/failclosed.log"
+  if ! compose_for "${release_dir}" "${compose_env}" stop caddy supplier-web tmmin-web api >>"${log}" 2>&1; then
+    compose_for "${release_dir}" "${compose_env}" stop caddy supplier-web tmmin-web api >/dev/null 2>&1 || return 1
+  fi
+}
+
+# Best-effort message to stderr that can never abort a cleanup path when the pipe is gone.
+note_stderr() {
+  { printf '%s\n' "$*" >&2; } 2>/dev/null || true
 }
 
 # Atomically publish a one-line text file (refusing to place it inside a directory at the destination).
@@ -344,6 +364,16 @@ install_hardened_rollback_driver() {
   for script_name in lib.sh validate-runtime-env.sh remote-rollback.sh; do
     [[ -f "${source_scripts_dir}/${script_name}" && ! -L "${source_scripts_dir}/${script_name}" ]] || return 1
   done
+  # Quarantine a pre-versioning real directory FIRST (we hold the deploy lock, so no rollback runs). The
+  # legacy driver is NOT strict (it can start unpinned releases from mutable tags), so it must never remain
+  # reachable at the documented path, even if staging the new bundle fails later (copy error, no inodes...).
+  # It is never moved back; until a strict bundle is published the path is simply absent (fail closed).
+  legacy_dir=""
+  if [[ -e "${driver_link}" && ! -L "${driver_link}" ]]; then
+    [[ -d "${driver_link}" ]] || return 1
+    legacy_dir="$(mktemp -u "${state_dir}/rollback-driver.legacy.XXXXXX")" || return 1
+    mv -- "${driver_link}" "${legacy_dir}" || return 1
+  fi
   stage="$(mktemp -d "${state_dir}/rollback-driver.v.XXXXXX")" || return 1
   for script_name in lib.sh validate-runtime-env.sh remote-rollback.sh; do
     if ! cp "${source_scripts_dir}/${script_name}" "${stage}/${script_name}" ||
@@ -354,30 +384,11 @@ install_hardened_rollback_driver() {
     fi
   done
   # Contract marker: only bundles published by this installer enforce strict five-image pins (refusing
-  # unpinned targets); fallbacks never trust a bundle without it.
+  # unpinned targets) AND fail closed on interrupted/failed mutation with ingress quiesced; fallbacks and
+  # the manual entry point never trust a bundle without it.
   if ! printf '%s\n' "${ROLLBACK_DRIVER_CONTRACT}" >"${stage}/.driver-contract" || ! chmod 755 "${stage}"; then
     rm -rf -- "${stage}"
     return 1
-  fi
-  # Migrate a pre-versioning real directory out of the way (we hold the deploy lock, so no rollback runs).
-  # The legacy driver is NOT strict (it can start unpinned releases from mutable tags), so it is quarantined
-  # permanently and never moved back to the documented path. If publication fails (or the process dies in
-  # this window) the rollback-driver path is simply absent until the next deploy republishes, and the staged
-  # strict bundle (rollback-driver.v.* whose .driver-contract matches) is KEPT as the operator fallback.
-  legacy_dir=""
-  if [[ -e "${driver_link}" && ! -L "${driver_link}" ]]; then
-    if [[ ! -d "${driver_link}" ]]; then
-      rm -rf -- "${stage}"
-      return 1
-    fi
-    legacy_dir="$(mktemp -u "${state_dir}/rollback-driver.legacy.XXXXXX")" || {
-      rm -rf -- "${stage}"
-      return 1
-    }
-    mv -- "${driver_link}" "${legacy_dir}" || {
-      rm -rf -- "${stage}"
-      return 1
-    }
   fi
   tmp_link="$(mktemp -u "${state_dir}/.rollback-driver.link.XXXXXX")" || tmp_link=""
   if [[ -z "${tmp_link}" ]] || ! ln -s "${stage}" "${tmp_link}" ||

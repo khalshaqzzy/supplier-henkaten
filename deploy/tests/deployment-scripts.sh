@@ -356,6 +356,27 @@ if [[ "${1:-}" == "compose" ]]; then
   if [[ -n "${TEST_DOCKER_LOG:-}" ]]; then
     printf '%s\n' "$*" >>"${TEST_DOCKER_LOG}"
   fi
+  stop_args=""
+  seen_stop=false
+  for argument in "$@"; do
+    if [[ "${seen_stop}" == "true" ]]; then
+      stop_args+="${stop_args:+ }${argument}"
+    fi
+    if [[ "${argument}" == "stop" ]]; then seen_stop=true; fi
+  done
+  if [[ "${seen_stop}" == "true" ]]; then
+    # Like the real CLI, `compose stop` writes progress to stderr and dies (SIGPIPE/EPIPE) if that pipe is
+    # closed, BEFORE the stop completes; only a completed stop is recorded as STOPPED.
+    if [[ -n "${TEST_STOP_DELAY:-}" ]]; then sleep "${TEST_STOP_DELAY}"; fi
+    exec 3>&2
+    if ! { printf 'Container stopping\n' >&3; } 2>/dev/null; then
+      exit 141
+    fi
+    exec 3>&-
+    if [[ -n "${TEST_DOCKER_LOG:-}" ]]; then
+      printf 'STOPPED %s\n' "${stop_args}" >>"${TEST_DOCKER_LOG}"
+    fi
+  fi
   for argument in "$@"; do
     if [[ "${argument}" == "exec" ]]; then
       # Stable PostgreSQL cluster identity for rehearse-staging.sh's pg_control_system() probe.
@@ -668,7 +689,7 @@ if DEPLOY_FORCE_SMOKE_FAILURE=true TEST_DOCKER_LOG="${same_sha_smoke_log}" TEST_
   "${smokefail_archive}" "${smokefail_checksum}" 127.0.0.1 >/dev/null 2>&1; then
   fail "same-SHA forced smoke failure unexpectedly succeeded"
 fi
-if grep -q ' stop ' "${same_sha_smoke_log}"; then
+if grep -Eq ' stop caddy supplier-web tmmin-web api$' "${same_sha_smoke_log}"; then
   fail "same-SHA post-mutation failure stopped application services instead of recovering"
 fi
 grep -Fxq 'STARTED postgres=sha256:good-postgres' "${same_sha_smoke_log}" || fail "same-SHA rollback did not restart pre-build postgres image"
@@ -1108,9 +1129,16 @@ grep -Fxq 'STARTED postgres=sha256:legacy-postgres' "${rollback_log}" || fail "a
 for svc in api supplier-web tmmin-web caddy; do
   grep -Fxq "STARTED ${svc}=sha256:legacy-${svc}" "${rollback_log}" || fail "automatic rollback did not restart pinned legacy ${svc} image"
 done
-if grep -q ' stop ' "${rollback_log}"; then
+if grep -Eq ' stop caddy supplier-web tmmin-web api$' "${rollback_log}"; then
   fail "successful hardened automatic rollback stopped application services"
 fi
+# Ingress is quiesced before the driver replaces anything: its 'stop caddy' precedes its API start, and Caddy
+# is only started again after the target API and frontends.
+quiesce_line="$( (grep -n -E ' stop caddy$' "${rollback_log}" || true) | tail -n 1 | cut -d: -f1)"
+[[ -n "${quiesce_line}" ]] || fail "rollback driver did not quiesce ingress (stop caddy) before replacing services"
+api_after="$(awk -v from="${quiesce_line}" 'NR > from && /up -d --no-deps api$/ {print NR; exit}' "${rollback_log}")"
+caddy_after="$(awk -v from="${quiesce_line}" 'NR > from && /up -d --no-deps caddy --remove-orphans$/ {print NR; exit}' "${rollback_log}")"
+[[ -n "${api_after}" && -n "${caddy_after}" && "${caddy_after}" -gt "${api_after}" ]] || fail "rollback driver did not restart Caddy only after the target API"
 [[ "$(<"${rollback_base}/current_release")" == "${previous_sha}" ]] || fail "failed candidate changed the active pointer"
 [[ "$(readlink "${rollback_base}/current")" == "${rollback_base}/releases/${previous_sha}" ]] || fail "hardened automatic rollback did not re-point current at the previous release"
 
@@ -1222,7 +1250,7 @@ install_driver "${SCRIPTS}" "${driver_base}" || fail "second hardened rollback d
 [[ ! -e "${driver_base}/shared/deployment-state/rollback-driver.good" && ! -L "${driver_base}/shared/deployment-state/rollback-driver.good" ]] || fail "an unproven install (or the non-strict legacy driver) was designated known-good before any activation"
 [[ -d "${first_driver_target}" ]] || fail "an unproven candidate install pruned the previous bundle"
 [[ "$(find "${driver_base}/shared/deployment-state" -mindepth 1 -maxdepth 1 -name 'rollback-driver.legacy.*' | wc -l | tr -d ' ')" == "1" ]] || fail "the migrated legacy driver was pruned before any activation"
-grep -Fxq 'strict-five-image-pins-v1' "${driver_link}/.driver-contract" || fail "published rollback driver bundle lacks the strict pin contract marker"
+grep -Fxq 'strict-five-image-pins-v2' "${driver_link}/.driver-contract" || fail "published rollback driver bundle lacks the strict pin contract marker"
 PATH="${fake_bin}:${PATH}" bash -c 'set -euo pipefail; source "$1"; promote_rollback_driver "$2"' _ "${SCRIPTS}/lib.sh" "${driver_base}" || fail "promoting the activated rollback driver failed"
 [[ "$(readlink "${driver_base}/shared/deployment-state/rollback-driver.good")" == "$(readlink "${driver_link}")" ]] || fail "promotion did not make the activated bundle the known-good fallback"
 [[ "$(find "${driver_base}/shared/deployment-state" -mindepth 1 -maxdepth 1 -name 'rollback-driver.*' | wc -l | tr -d ' ')" == "2" ]] || fail "promotion did not prune superseded rollback driver bundles (expected only the live bundle and the .good link)"
@@ -1347,7 +1375,7 @@ chmod +x "${rv_incoming}/deploy/scripts/remote-rollback.sh"
 # known-good driver's own pin checks) is what prevents the retry.
 rv_probe="${fallback_base}/shared/deployment-state/rollback-driver.v.revalidation-probe"
 mkdir -p "${rv_probe}"
-printf 'strict-five-image-pins-v1\n' >"${rv_probe}/.driver-contract"
+printf 'strict-five-image-pins-v2\n' >"${rv_probe}/.driver-contract"
 printf '#!/usr/bin/env bash\ntouch "%s/revalidation-probe-ran"\nexit 0\n' "${fallback_base}" >"${rv_probe}/remote-rollback.sh"
 chmod +x "${rv_probe}/remote-rollback.sh"
 ln -sfn "${rv_probe}" "${fallback_base}/shared/deployment-state/rollback-driver.good"
@@ -1517,7 +1545,7 @@ mig_state="${mig_base}/shared/deployment-state"
 [[ "$(find "${mig_state}" -mindepth 1 -maxdepth 1 -name 'rollback-driver.legacy.*' | wc -l | tr -d ' ')" == "1" ]] || fail "non-strict legacy driver was not quarantined"
 mig_stage="$(find "${mig_state}" -mindepth 1 -maxdepth 1 -name 'rollback-driver.v.*' | head -n 1)"
 [[ -n "${mig_stage}" ]] || fail "failed driver publication discarded the staged strict bundle"
-grep -Fxq 'strict-five-image-pins-v1' "${mig_stage}/.driver-contract" || fail "kept staged bundle lacks the strict contract"
+grep -Fxq 'strict-five-image-pins-v2' "${mig_stage}/.driver-contract" || fail "kept staged bundle lacks the strict contract"
 [[ "$(find "${mig_state}" -mindepth 1 -maxdepth 1 -name '.rollback-driver.link.*' | wc -l | tr -d ' ')" == "0" ]] || fail "failed driver publication left a temporary link"
 # Rehearsal must refuse to run a shared driver that lacks the strict contract.
 ln -s "$(find "${mig_state}" -mindepth 1 -maxdepth 1 -name 'rollback-driver.legacy.*' | head -n 1)" "${mig_state}/rollback-driver"
@@ -1534,6 +1562,31 @@ if PATH="${fake_bin}:${PATH}" "${SCRIPTS}/rehearse-staging.sh" "$(printf '%040x'
   fail "rehearsal ran with a shared rollback driver lacking the strict contract"
 fi
 grep -q 'lacks the strict pin contract' "${mig_rehearsal_out}" || fail "rehearsal did not refuse the non-strict shared driver for the expected reason"
+
+# An EARLY staging failure (copy error / no inodes) must still leave the non-strict legacy driver quarantined:
+# the documented path must never keep pointing at it.
+early_base="${TEST_ROOT}/driver-early-failure"
+prepare_base "${early_base}"
+mkdir -p "${early_base}/shared/deployment-state/rollback-driver"
+printf 'legacy-driver\n' >"${early_base}/shared/deployment-state/rollback-driver/remote-rollback.sh"
+fail_cp_bin="${TEST_ROOT}/fail-cp-bin"
+mkdir -p "${fail_cp_bin}"
+cat >"${fail_cp_bin}/cp" <<'FAKECP'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  if [[ "${arg}" == *"/rollback-driver.v."* ]]; then
+    exit 1
+  fi
+done
+exec /bin/cp "$@"
+FAKECP
+chmod +x "${fail_cp_bin}/cp"
+if PATH="${fail_cp_bin}:${fake_bin}:${PATH}" bash -c 'set -euo pipefail; source "$1"; install_hardened_rollback_driver "$2" "$3"' \
+  _ "${SCRIPTS}/lib.sh" "${SCRIPTS}" "${early_base}" >/dev/null 2>&1; then
+  fail "rollback driver install reported success although staging failed"
+fi
+[[ ! -e "${early_base}/shared/deployment-state/rollback-driver" && ! -L "${early_base}/shared/deployment-state/rollback-driver" ]] || fail "early staging failure left the non-strict legacy driver at the documented path"
+[[ "$(find "${early_base}/shared/deployment-state" -mindepth 1 -maxdepth 1 -name 'rollback-driver.legacy.*' | wc -l | tr -d ' ')" == "1" ]] || fail "early staging failure did not quarantine the legacy driver"
 
 # End-to-end staging rehearsal: succeeds only with positive proof that the forced smoke failure was reached
 # and the shared driver completed automatic recovery; a candidate that fails earlier (here: build) must
@@ -1663,6 +1716,19 @@ wait "${rbsig_pid}" || rbsig_status=$?
 [[ "${rbsig_status}" != "0" ]] || fail "interrupted rollback exited 0"
 grep -Eq ' stop caddy supplier-web tmmin-web api$' "${rbsig_log}" || fail "SIGTERM during the rollback health wait left a mixed stack running"
 [[ "$(<"${rbfail_base}/current_release")" == "${rbfail_current}" ]] || fail "interrupted rollback changed current_release"
+
+# A cancelled CI runner closes the SSH output pipes. The fail-closed stop must still COMPLETE (its output
+# goes to a durable log), even though the original stdout/stderr pipe is gone.
+rbpipe_log="${TEST_ROOT}/rollback-broken-pipe.log"
+cp "${rbfail_base}/images.state" "${rbfail_base}/releases/${rbfail_target}/.activated-images"
+{
+  TEST_STOP_DELAY=0.5 TEST_DOCKER_LOG="${rbpipe_log}" TEST_IMAGE_STATE_FILE="${rbfail_base}/images.state" \
+    PATH="${fake_bin}:${PATH}" "${rbfail_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" \
+    staging "${rbfail_target}" "${rbfail_base}" 2>&1 |
+    { while IFS= read -r pipe_line; do [[ "${pipe_line}" != *"Rolling code back"* ]] || exit 0; done; }
+} || true
+grep -Fxq 'STOPPED caddy supplier-web tmmin-web api' "${rbpipe_log}" || fail "fail-closed stop did not complete after the SSH output pipe closed (cancelled runner)"
+[[ "$(<"${rbfail_base}/current_release")" == "${rbfail_current}" ]] || fail "broken-pipe rollback changed current_release"
 
 # A current_release left as a directory must be refused BEFORE any service changes (no silent success with
 # the pointer swallowed into the directory).
