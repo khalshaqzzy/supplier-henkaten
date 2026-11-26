@@ -431,13 +431,21 @@ if [[ "${1:-}" == "tag" ]]; then
 fi
 if [[ "${1:-}" == "rm" ]]; then
   if [[ -n "${TEST_DOCKER_LOG:-}" ]]; then
-    printf 'DOCKER_RM %s\n' "${!#}" >>"${TEST_DOCKER_LOG}"
+    printf 'DOCKER_RM %s\n' "$*" >>"${TEST_DOCKER_LOG}"
+  fi
+  if [[ "${TEST_RM_FAIL_RUNNING:-false}" == "true" ]]; then
+    printf 'Error response from daemon: cannot remove container %s: container is running\n' "${!#}" >&2
+    exit 1
   fi
   exit 0
 fi
 if [[ "${1:-}" == "inspect" ]]; then
   container_name="${!#}"
   if [[ "${3:-}" == "{{.State.Running}}" ]]; then
+    if [[ "${TEST_INSPECT_RUNNING_FAIL:-false}" == "true" ]]; then
+      printf 'Error response from daemon: simulated inspect error\n' >&2
+      exit 1
+    fi
     if [[ "${container_name}" == *-stale-stopped-container ]]; then
       echo false
     else
@@ -2512,13 +2520,88 @@ TEST_CONTAINERD_STORE=true TEST_IMAGE_STATE_FILE="${retind_images}" TEST_RUNNING
 [[ -d "${retind_base}/releases/${retprio_shas[4]}" ]] || fail "transient inspect failure did not skip destructive cleanup completely"
 
 # 18. Leftover stopped/renamed container from an interrupted Compose recreate must be cleaned up
-#     by ensure_service_runs_image without failing closed (while multiple running containers still fail).
+#     via non-forced `docker rm` after confirmed State.Running=false; an inspect error or a container
+#     that restarted before removal must fail closed without force-killing it.
 stale_stop_base="${TEST_ROOT}/stale-stopped-leftover"
 prepare_base "${stale_stop_base}"
 stale_stop_log="${TEST_ROOT}/stale-stopped-leftover.log"
 TEST_PS_ALL_EXTRA_STOPPED=postgres TEST_DOCKER_LOG="${stale_stop_log}" \
   run_candidate "${stale_stop_base}" a200000000000000000000000000000000000001 10 >/dev/null 2>&1 || fail "deploy failed closed on a leftover stopped container from an interrupted Compose recreate"
-grep -Fxq 'DOCKER_RM postgres--stale-stopped-container' "${stale_stop_log}" || fail "ensure_service_runs_image did not remove leftover stopped container"
+grep -Fxq 'DOCKER_RM rm postgres--stale-stopped-container' "${stale_stop_log}" || fail "ensure_service_runs_image did not remove leftover stopped container without -f"
+
+stale_insfail_base="${TEST_ROOT}/stale-stopped-inspect-fail"
+prepare_base "${stale_insfail_base}"
+stale_insfail_log="${TEST_ROOT}/stale-stopped-inspect-fail.log"
+if TEST_PS_ALL_EXTRA_STOPPED=postgres TEST_INSPECT_RUNNING_FAIL=true TEST_DOCKER_LOG="${stale_insfail_log}" \
+  run_candidate "${stale_insfail_base}" a200000000000000000000000000000000000002 10 >/dev/null 2>&1; then
+  fail "deploy proceeded despite failing to inspect extra container running state"
+fi
+if [[ -f "${stale_insfail_log}" ]] && grep -q '^DOCKER_RM ' "${stale_insfail_log}"; then
+  fail "ensure_service_runs_image called docker rm after failing to inspect container running state"
+fi
+
+stale_rmfail_base="${TEST_ROOT}/stale-stopped-rm-fail"
+prepare_base "${stale_rmfail_base}"
+stale_rmfail_log="${TEST_ROOT}/stale-stopped-rm-fail.log"
+if TEST_PS_ALL_EXTRA_STOPPED=postgres TEST_RM_FAIL_RUNNING=true TEST_DOCKER_LOG="${stale_rmfail_log}" \
+  run_candidate "${stale_rmfail_base}" a200000000000000000000000000000000000003 10 >/dev/null 2>&1; then
+  fail "deploy proceeded despite non-forced docker rm rejecting a restarted container"
+fi
+
+# 19. Policy refusal (exit 4) must survive a closed stderr pipe with inherited ignored SIGPIPE
+#     so automatic recovery never misclassifies a policy refusal as a retryable exit 1.
+epipe_refuse_base="${TEST_ROOT}/rollback-epipe-refusal"
+setup_rehearsal_base "${epipe_refuse_base}"
+rm -f -- "${epipe_refuse_base}/releases/${rehearsal_prev}/.activated-images"
+epipe_refuse_status=0
+python3 - "${fake_bin}:${PATH}" "${epipe_refuse_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" \
+  staging "${rehearsal_prev}" "${epipe_refuse_base}" <<'PY' || epipe_refuse_status=$?
+import os, signal, subprocess, sys
+path_env, script, app_env, sha, base_dir = sys.argv[1:6]
+r_fd, w_fd = os.pipe()
+os.close(r_fd)
+env = os.environ.copy()
+env["PATH"] = path_env
+def preexec():
+    signal.signal(signal.SIGPIPE, signal.SIG_IGN)
+proc = subprocess.run(
+    [script, app_env, sha, base_dir],
+    stdout=subprocess.DEVNULL,
+    stderr=w_fd,
+    env=env,
+    preexec_fn=preexec,
+)
+os.close(w_fd)
+sys.exit(proc.returncode)
+PY
+[[ "${epipe_refuse_status}" == "4" ]] || fail "policy refusal with closed stderr pipe and ignored SIGPIPE did not exit 4 (got ${epipe_refuse_status})"
+
+# 20. Target manifest with a confirmed-missing pinned image ID must refuse with exit 4 BEFORE
+#     creating retention tags for the outgoing release (zero docker tag calls).
+miss_before_tag_base="${TEST_ROOT}/rollback-missing-before-outgoing-tag"
+setup_rehearsal_base "${miss_before_tag_base}"
+miss_before_tag_images="${TEST_ROOT}/rollback-missing-before-outgoing-tag-images.state"
+# Seed outgoing (rehearsal_cur) runtime tags WITHOUT retention pins, and omit one target (rehearsal_prev) image!
+{
+  printf 'supplier-henkaten-postgres:18.4-pgvector-0.8.5 %s\n' "$(fake_id "${rehearsal_cur:0:6}-postgres")"
+  for svc in api supplier-web tmmin-web caddy; do
+    printf 'supplier-henkaten-%s:%s %s\n' "${svc}" "${rehearsal_cur}" "$(fake_id "${rehearsal_cur:0:6}-${svc}")"
+  done
+  for svc in api supplier-web tmmin-web; do
+    printf 'supplier-henkaten-%s:%s %s\n' "${svc}" "${rehearsal_prev}" "$(fake_id "${rehearsal_prev:0:6}-${svc}")"
+  done
+  printf 'supplier-henkaten-pin-staging:postgres-%s %s\n' "$(fake_hex "${rehearsal_prev:0:6}-postgres")" "$(fake_id "${rehearsal_prev:0:6}-postgres")"
+} >"${miss_before_tag_images}"
+miss_before_tag_log="${TEST_ROOT}/rollback-missing-before-outgoing-tag.log"
+miss_before_tag_status=0
+TEST_CONTAINERD_STORE=true TEST_IMAGE_STATE_FILE="${miss_before_tag_images}" \
+  TEST_DOCKER_LOG="${miss_before_tag_log}" PATH="${fake_bin}:${PATH}" \
+  "${miss_before_tag_base}/shared/deployment-state/rollback-driver/remote-rollback.sh" \
+  staging "${rehearsal_prev}" "${miss_before_tag_base}" >/dev/null 2>&1 || miss_before_tag_status=$?
+[[ "${miss_before_tag_status}" == "4" ]] || fail "rollback with missing target image ID did not exit 4 (got ${miss_before_tag_status})"
+if [[ -f "${miss_before_tag_log}" ]] && grep -q '^TAG ' "${miss_before_tag_log}"; then
+  fail "rollback mutated Docker tags (outgoing pins) before checking target image availability"
+fi
 
 lock_base="${TEST_ROOT}/lock"
 prepare_base "${lock_base}"

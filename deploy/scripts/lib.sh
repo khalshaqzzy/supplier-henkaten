@@ -352,7 +352,8 @@ inspect_local_image_state() {
     note_stderr "${context}: local image '${image_id}' resolved to unexpected ID '${out:-<empty>}'."
     return 1
   fi
-  local err_lower="${err_text,,}"
+  local err_lower
+  err_lower="$(printf '%s' "${err_text}" | tr '[:upper:]' '[:lower:]')"
   if (( status != 127 )) && [[ "${err_lower}" == *"no such image: ${image_id}"* || "${err_lower}" == *"no such object: ${image_id}"* || "${err_lower}" == *"image \"${image_id}\": not found"* ]]; then
     note_stderr "${context}: pinned image ID '${image_id}' is confirmed missing locally (${err_text})."
     return 2
@@ -650,13 +651,16 @@ ensure_service_runs_image() {
     fi
     while IFS= read -r cid; do
       [[ -n "${cid}" && "${cid}" != "${live_ids}" ]] || continue
-      is_running="$(docker inspect --format '{{.State.Running}}' "${cid}" 2>/dev/null || true)"
-      if [[ "${is_running}" == "true" ]]; then
-        note_stderr "Reconciliation failed for ${svc}: extra container ${cid} is still running alongside '${live_ids:-none}'."
+      if ! is_running="$(docker inspect --format '{{.State.Running}}' "${cid}" 2>&1)"; then
+        note_stderr "Reconciliation failed for ${svc}: could not inspect extra container ${cid} running state (${is_running:-inspect failed})."
+        return 1
+      fi
+      if [[ "${is_running}" != "false" ]]; then
+        note_stderr "Reconciliation failed for ${svc}: extra container ${cid} is not confirmed stopped (State.Running='${is_running:-<empty>}') alongside '${live_ids:-none}'."
         return 1
       fi
       log_info "[reconcile] ${svc}: removing leftover stopped container ${cid} from an interrupted recreate."
-      if ! rm_err="$(docker rm -f "${cid}" 2>&1)"; then
+      if ! rm_err="$(docker rm "${cid}" 2>&1)"; then
         note_stderr "Reconciliation failed for ${svc}: could not remove leftover stopped container ${cid} (${rm_err:-docker rm failed})."
         return 1
       fi
@@ -1218,6 +1222,37 @@ write_activated_images() {
   fi
 }
 
+# Read-only check that all 5 image IDs in a manifest exist locally without mutating any Docker tags.
+# Returns:
+#   0: all 5 IDs verified present locally
+#   2: policy violation (manifest malformed or >= 1 pinned ID confirmed missing locally)
+#   1: operational/indeterminate Docker failure (retryable)
+verify_manifest_images_local() {
+  local pinned_file="$1"
+  local release_dir="$2"
+  local pin_sha="$3"
+  local parsed_lines svc ref expected_id inspect_rc
+  local had_confirmed_missing=false had_operational_err=false
+
+  parsed_lines="$(parse_manifest_file "${pinned_file}" "${release_dir}" "${pin_sha}")" || return 2
+  while IFS=' ' read -r svc ref expected_id; do
+    inspect_rc=0
+    inspect_local_image_state "${expected_id}" "Pinned image check for ${ref}" || inspect_rc=$?
+    if (( inspect_rc == 2 )); then
+      had_confirmed_missing=true
+    elif (( inspect_rc != 0 )); then
+      had_operational_err=true
+    fi
+  done <<<"${parsed_lines}"
+  if [[ "${had_operational_err}" == "true" ]]; then
+    return 1
+  fi
+  if [[ "${had_confirmed_missing}" == "true" ]]; then
+    return 2
+  fi
+  return 0
+}
+
 # Restore all 5 runtime tags from a verified .activated-images manifest and re-assert their
 # content-addressed retention tags.
 # Returns:
@@ -1231,31 +1266,20 @@ restore_pinned_images_file() {
   local explicit_env="${4:-}"
   local parsed_lines svc ref expected_id restored_id tag_err pin_env
   local -a parsed_svcs=() parsed_refs=() parsed_ids=()
-  local i inspect_rc status=0 had_confirmed_missing=false had_operational_err=false
+  local i precheck_rc status=0
 
+  # Pass 1: verify manifest syntax and every pinned image ID locally before modifying any tag.
+  precheck_rc=0
+  verify_manifest_images_local "${pinned_file}" "${release_dir}" "${pin_sha}" || precheck_rc=$?
+  if (( precheck_rc != 0 )); then
+    return "${precheck_rc}"
+  fi
   parsed_lines="$(parse_manifest_file "${pinned_file}" "${release_dir}" "${pin_sha}")" || return 2
   while IFS=' ' read -r svc ref expected_id; do
     parsed_svcs+=("${svc}")
     parsed_refs+=("${ref}")
     parsed_ids+=("${expected_id}")
   done <<<"${parsed_lines}"
-
-  # Pass 1: verify every pinned image ID exists locally before modifying any tag.
-  for ((i = 0; i < ${#parsed_refs[@]}; i++)); do
-    inspect_rc=0
-    inspect_local_image_state "${parsed_ids[i]}" "Pinned image check for ${parsed_refs[i]}" || inspect_rc=$?
-    if (( inspect_rc == 2 )); then
-      had_confirmed_missing=true
-    elif (( inspect_rc != 0 )); then
-      had_operational_err=true
-    fi
-  done
-  if [[ "${had_operational_err}" == "true" ]]; then
-    return 1
-  fi
-  if [[ "${had_confirmed_missing}" == "true" ]]; then
-    return 2
-  fi
 
   # Pass 2: restore every runtime tag, re-verify it resolves to its exact pinned ID, and re-assert
   # its content-addressed retention tag so subsequent builds never GC it.

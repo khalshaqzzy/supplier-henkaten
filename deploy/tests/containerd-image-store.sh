@@ -167,7 +167,7 @@ sleep 2
 compose_for "${REL_A}" "${REL_A}/.runtime.env" build --quiet postgres
 pg_attested_2="$(docker image inspect --format '{{.Id}}' "${PG_REF}")"
 if [[ "${pg_attested_2}" == "${pg_attested_1}" ]]; then
-  printf 'Warning: default runner Buildx %s produced identical IDs across two builds (%s); forcing distinct unpinned rebuild to exercise containerd tag-overwrite GC.\n' \
+  printf '::warning::Default runner Buildx %s produced identical IDs across two builds (%s); forcing distinct unpinned rebuild to exercise containerd tag-overwrite GC.\n' \
     "${buildx_version:-unknown}" "${pg_attested_1}" >&2
   make_fixture_release "${REL_A}" "${SHA_A}" "v1-canary"
   compose_for "${REL_A}" "${REL_A}/.runtime.env" build --quiet postgres

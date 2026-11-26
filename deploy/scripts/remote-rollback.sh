@@ -9,8 +9,9 @@ source "${SCRIPT_DIR}/lib.sh"
 
 # Deliberate policy refusals (unsafe/unpinned/unverifiable target) exit with a dedicated status so the
 # automatic known-good fallback in remote-deploy.sh never overrides them; other failures exit 1.
+# Use note_stderr so a closed SSH stderr pipe with inherited SIGPIPE-ignore cannot abort before exit 4.
 refuse() {
-  printf '%s\n' "$*" >&2
+  note_stderr "$*"
   exit "${ROLLBACK_POLICY_REFUSAL_EXIT}"
 }
 
@@ -30,7 +31,10 @@ if [[ "${DEPLOY_LOCK_HELD:-false}" != "true" ]]; then
   flock -n 9 || die "Another deploy or rollback is already running."
 fi
 
-"${SCRIPT_DIR}/validate-runtime-env.sh" --allow-legacy-db-role "${RUNTIME_ENV}"
+if ! env_check_out="$("${SCRIPT_DIR}/validate-runtime-env.sh" --allow-legacy-db-role "${RUNTIME_ENV}" 2>&1)"; then
+  note_stderr "${env_check_out:-validate-runtime-env.sh failed for ${RUNTIME_ENV}.}"
+  exit 1
+fi
 load_runtime_env "${RUNTIME_ENV}"
 [[ "${REQUESTED_ENV}" == "${APP_ENV:-}" && "${REQUESTED_SHA}" == "${RELEASE_SHA:-}" ]] || die "Rollback environment or release SHA mismatch."
 
@@ -71,12 +75,20 @@ target_tmmin_id=""
 target_caddy_ref=""
 target_caddy_id=""
 
-# Validate target manifest existence and syntax BEFORE touching outgoing retention tags so policy
-# refusals (exit 4) on unpinned, unsafe, or malformed targets remain strictly read-only.
+# Validate target manifest existence, syntax, and local availability of all 5 pinned IDs BEFORE
+# touching outgoing retention tags so policy refusals (exit 4) perform zero Docker tag writes.
 if [[ -f "${RELEASE_DIR}/.activated-images" ]]; then
   if ! parsed_target_manifest="$(parse_manifest_file "${RELEASE_DIR}/.activated-images" "${RELEASE_DIR}" "${REQUESTED_SHA}")"; then
     mark_rollback_unsafe "${RELEASE_DIR}" "${REQUESTED_SHA}" || note_stderr "Warning: failed to persist .rollback-unsafe marker for ${REQUESTED_SHA}."
     refuse "Rollback aborted: ${RELEASE_DIR}/.activated-images failed strict manifest validation."
+  fi
+  target_local_status=0
+  verify_manifest_images_local "${RELEASE_DIR}/.activated-images" "${RELEASE_DIR}" "${REQUESTED_SHA}" || target_local_status=$?
+  if (( target_local_status == 2 )); then
+    mark_rollback_unsafe "${RELEASE_DIR}" "${REQUESTED_SHA}" || note_stderr "Warning: failed to persist .rollback-unsafe marker for ${REQUESTED_SHA}."
+    refuse "Rollback aborted: one or more pinned activated image IDs for ${REQUESTED_SHA} are confirmed missing locally."
+  elif (( target_local_status != 0 )); then
+    die "Rollback aborted: operational Docker error verifying pinned image availability for ${REQUESTED_SHA}."
   fi
 elif [[ -e "${RELEASE_DIR}/.rollback-unsafe" || -L "${RELEASE_DIR}/.rollback-unsafe" ]]; then
   refuse "Rollback aborted: release ${REQUESTED_SHA} is marked rollback-unsafe and has no pinned activated image IDs."
@@ -152,6 +164,7 @@ trap stop_mixed_stack_on_failure EXIT
 trap 'exit 143' TERM
 trap 'exit 130' INT
 trap 'exit 129' HUP
+trap 'exit 141' PIPE
 
 { printf 'Rolling code back to %s; database schema and shared volumes are not restored.\n' "${REQUESTED_SHA}"; } 2>/dev/null || true
 log_info "[rollback] Pre-mutation checks passed (pointers, activation proof, 5-image manifest restored and pinned); quiescing Caddy and opening mutation window."
@@ -175,11 +188,17 @@ ensure_service_runs_image "${RELEASE_DIR}" "${RUNTIME_ENV}" tmmin-web "${target_
 ensure_service_runs_image "${RELEASE_DIR}" "${RUNTIME_ENV}" caddy "${target_caddy_ref}" "${target_caddy_id}" 120 --remove-orphans
 
 log_info "[rollback] Running three-surface smoke checks for ${REQUESTED_SHA} (${SUPPLIER_DOMAIN}, ${TMMIN_DOMAIN}, ${API_DOMAIN})."
-"${RELEASE_DIR}/deploy/scripts/smoke-check.sh" \
+smoke_status=0
+smoke_out="$("${RELEASE_DIR}/deploy/scripts/smoke-check.sh" \
   "${REQUESTED_SHA}" \
   "https://${SUPPLIER_DOMAIN}" \
   "https://${TMMIN_DOMAIN}" \
-  "https://${API_DOMAIN}"
+  "https://${API_DOMAIN}" 2>&1)" || smoke_status=$?
+if (( smoke_status != 0 )); then
+  [[ -z "${smoke_out}" ]] || note_stderr "${smoke_out}"
+  exit "${smoke_status}"
+fi
+[[ -z "${smoke_out}" ]] || log_info "[rollback] ${smoke_out}"
 
 # Independently verify all five running containers, runtime tags, and retention pins match the target
 # manifest BEFORE clearing .rollback-unsafe or publishing pointers (protects manual rollbacks too).

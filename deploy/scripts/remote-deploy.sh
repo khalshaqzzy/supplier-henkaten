@@ -232,6 +232,7 @@ trap stop_candidate_on_interrupted_mutation EXIT
 trap 'exit 143' TERM
 trap 'exit 130' INT
 trap 'exit 129' HUP
+trap 'exit 141' PIPE
 forced_smoke_failure_reached=false
 # Exit status reserved for "candidate failed, shared hardened driver completed automatic recovery"
 # so callers (rehearse-staging.sh) can prove recovery actually ran rather than inferring it from state.
